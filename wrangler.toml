@@ -1,0 +1,14 @@
+name = "hasi-share-api"
+account_id = "ac6ab4ce1149a3591d014841856490af"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "HASI_SHARE_R2"
+bucket_name = "hasi-share"
+
+[[d1_databases]]
+binding = "HASI_SHARE_DB"
+database_name = "hasi-share"
+database_id = "8e6fee06-843a-4048-89c1-ea0d1a6bb066"
