@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hasi Share — Datei herunterladen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --hasi: #33afe2;
+  --hasi-dark: #1a8bbf;
+  --hasi-glow: rgba(51,175,226,0.25);
+  --bg: #0a0f1a;
+  --surface: #111827;
+  --surface2: #1a2535;
+  --border: rgba(51,175,226,0.15);
+  --text: #e8f4fd;
+  --text-muted: #6b8aaa;
+  --success: #22d3a0;
+  --danger: #f87171;
+  --font: 'Syne', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(51,175,226,0.07) 0%, transparent 60%);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 3rem;
+}
+.brand .h { font-size: 1.6rem; font-weight: 800; color: var(--hasi); letter-spacing: -1px; }
+.brand .e { font-size: 0.85rem; font-style: italic; color: var(--text-muted); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 0 80px rgba(51,175,226,0.07);
+  animation: fadeUp 0.5s ease;
+}
+
+/* STATE: PASSWORD */
+#statePassword {}
+
+.card-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(51,175,226,0.15), rgba(51,175,226,0.05));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.4rem; }
+.card .subtitle { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 2rem; line-height: 1.5; }
+
+.field { margin-bottom: 1.2rem; }
+.field label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.pw-wrap { position: relative; }
+.pw-wrap input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 3rem 0.9rem 1rem;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 1rem;
+  letter-spacing: 0.15em;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pw-wrap input:focus {
+  border-color: var(--hasi);
+  box-shadow: 0 0 0 3px var(--hasi-glow);
+}
+.pw-wrap input.error { border-color: var(--danger); }
+
+.eye-btn {
+  position: absolute;
+  right: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1rem;
+  padding: 0.2rem;
+}
+
+.err-msg {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+.btn-dl {
+  width: 100%;
+  background: linear-gradient(135deg, var(--hasi), #1a8bbf);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px var(--hasi-glow);
+  margin-top: 0.5rem;
+}
+.btn-dl:hover { transform: translateY(-1px); box-shadow: 0 8px 30px var(--hasi-glow); }
+.btn-dl:active { transform: scale(0.98); }
+.btn-dl:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* STATE: READY */
+#stateReady { display: none; }
+
+.file-info {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.file-icon-big {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.file-details { flex: 1; min-width: 0; }
+.file-details .fname {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-details .fmeta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  margin-top: 0.2rem;
+}
+
+.expiry-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 1rem;
+  font-family: var(--mono);
+}
+
+/* STATE: DOWNLOADING */
+#stateDownloading { display: none; }
+
+.dl-progress {
+  margin: 1.5rem 0;
+}
+
+.dl-bar {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.dl-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--hasi), var(--success));
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.3s;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* STATE: EXPIRED / ERROR */
+#stateExpired { display: none; }
+#stateError { display: none; }
+
+.state-icon-lg {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+/* FOOTER */
+footer {
+  margin-top: 2.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+footer a { color: var(--hasi); text-decoration: none; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.shake {
+  animation: shake 0.4s ease;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <img src="https://hasi-share-api.hguencavdi.workers.dev/assets/logo.png" alt="Hasi Elektronic" style="height:40px;">
+</div>
+
+<div class="card">
+
+  <!-- PASSWORD STATE -->
+  <div id="statePassword">
+    <div class="card-icon">🔒</div>
+    <h2>Datei herunterladen</h2>
+    <p class="subtitle">Diese Datei ist passwortgeschützt.<br>Bitte geben Sie das Passwort ein, das Sie erhalten haben.</p>
+
+    <div class="field">
+      <label>Passwort</label>
+      <div class="pw-wrap">
+        <input type="password" id="pwInput" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter')unlock()"
+          autocomplete="current-password">
+        <button class="eye-btn" onclick="toggleEye()" id="eyeBtn">👁</button>
+      </div>
+      <p class="err-msg" id="pwErr">Falsches Passwort. Bitte erneut versuchen.</p>
+    </div>
+
+    <button class="btn-dl" id="unlockBtn" onclick="unlock()">
+      🔓 Entsperren & Herunterladen
+    </button>
+  </div>
+
+  <!-- READY STATE -->
+  <div id="stateReady">
+    <div class="card-icon">✅</div>
+    <h2>Bereit zum Download</h2>
+    <p class="subtitle">Passwort korrekt. Klicken Sie auf Herunterladen.</p>
+
+    <div class="file-info">
+      <div class="file-icon-big" id="readyIcon">📄</div>
+      <div class="file-details">
+        <div class="fname" id="readyFilename">datei.exe</div>
+        <div class="fmeta" id="readyMeta">—</div>
+      </div>
+    </div>
+
+    <button class="btn-dl" onclick="startDownload()">
+      ⬇️ Jetzt herunterladen
+    </button>
+
+    <p class="expiry-note" id="expiryNote"></p>
+  </div>
+
+  <!-- DOWNLOADING STATE -->
+  <div id="stateDownloading">
+    <div class="card-icon">⬇️</div>
+    <h2>Download läuft…</h2>
+    <p class="subtitle">Bitte warten Sie, die Datei wird heruntergeladen.</p>
+
+    <div class="dl-progress">
+      <p id="dlStatus" style="font-size:0.85rem;color:var(--text-muted);">Verbindung wird hergestellt…</p>
+      <div class="dl-bar"><div class="dl-fill" id="dlFill"></div></div>
+    </div>
+  </div>
+
+  <!-- EXPIRED STATE -->
+  <div id="stateExpired">
+    <div class="state-icon-lg">⏰</div>
+    <h2 style="text-align:center;">Link abgelaufen</h2>
+    <p class="subtitle" style="text-align:center;">Dieser Download-Link ist nicht mehr gültig.<br>Bitte kontaktieren Sie uns für einen neuen Link.</p>
+    <a href="mailto:info@hasi-elektronic.de" class="btn-dl" style="display:block;text-align:center;text-decoration:none;margin-top:1rem;">
+      📧 Kontakt aufnehmen
+    </a>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div id="stateError">
+    <div class="state-icon-lg">❌</div>
+    <h2 style="text-align:center;">Link nicht gefunden</h2>
+    <p class="subtitle" style="text-align:center;">Dieser Link existiert nicht oder wurde bereits gelöscht.</p>
+    <a href="https://hasi-elektronic.de" class="btn-dl" style="display:block;text-align:center;text-decoration:none;margin-top:1rem;">
+      🏠 Zur Startseite
+    </a>
+  </div>
+
+</div>
+
+<footer>
+  Sicher bereitgestellt von <a href="https://hasi-elektronic.de">Hasi Elektronic</a><br>
+  Ihre Daten sind verschlüsselt übertragen
+</footer>
+
+<script>
+const API_BASE = 'https://hasi-share-api.hguencavdi.workers.dev/api';
+const shareId = new URLSearchParams(location.search).get('id') || 
+                location.pathname.split('/').pop() || 'demo';
+
+let fileInfo = null;
+let downloadToken = null;
+
+// Check link on load
+window.addEventListener('load', checkLink);
+
+async function checkLink() {
+  try {
+    const res = await fetch(`${API_BASE}/share/${shareId}/info`);
+    const data = await res.json();
+
+    if (!res.ok || data.expired) {
+      showState('stateExpired');
+      return;
+    }
+    if (!data.exists) {
+      showState('stateError');
+      return;
+    }
+
+    fileInfo = data;
+    // Link exists, wait for password
+
+  } catch {
+    // Demo mode — link appears valid
+    fileInfo = {
+      filename: 'HasiSafe_Setup_v2.exe',
+      size: 45200000,
+      expiresAt: new Date(Date.now() + 3 * 86400000).toISOString()
+    };
+  }
+}
+
+async function unlock() {
+  const pw = document.getElementById('pwInput').value;
+  if (!pw) return;
+
+  const btn = document.getElementById('unlockBtn');
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  try {
+    const res = await fetch(`${API_BASE}/share/${shareId}/unlock`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      downloadToken = data.token;
+      fileInfo = data.fileInfo || fileInfo;
+      sessionStorage.setItem('hasi_share_pw', pw);
+      showReady();
+    } else {
+      showPwError();
+    }
+  } catch {
+    // Demo mode
+    if (pw.length >= 3) {
+      showReady();
+    } else {
+      showPwError();
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔓 Entsperren & Herunterladen';
+}
+
+function showPwError() {
+  const input = document.getElementById('pwInput');
+  const err = document.getElementById('pwErr');
+  input.classList.add('error');
+  err.style.display = 'block';
+  document.querySelector('.pw-wrap').classList.add('shake');
+  setTimeout(() => document.querySelector('.pw-wrap').classList.remove('shake'), 500);
+}
+
+function showReady() {
+  if (!fileInfo) return;
+  document.getElementById('readyFilename').textContent = fileInfo.filename || 'Datei';
+  document.getElementById('readyMeta').textContent =
+    (fileInfo.size ? formatSize(fileInfo.size) + ' · ' : '') +
+    getFileType(fileInfo.filename || '');
+
+  document.getElementById('readyIcon').textContent = getFileIcon(fileInfo.filename || '');
+
+  if (fileInfo.expiresAt) {
+    const d = new Date(fileInfo.expiresAt);
+    document.getElementById('expiryNote').textContent =
+      '⏱ Link läuft ab am ' + d.toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+  }
+
+  showState('stateReady');
+}
+
+async function startDownload() {
+  showState('stateDownloading');
+
+  const fill = document.getElementById('dlFill');
+  const status = document.getElementById('dlStatus');
+
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress = Math.min(progress + Math.random() * 10, 85);
+    fill.style.width = progress + '%';
+  }, 400);
+
+  try {
+    // Taze token al (her download'da yenile)
+    const pw = sessionStorage.getItem('hasi_share_pw');
+    if (!pw) throw new Error('No password in session');
+
+    status.textContent = 'Verbindung wird hergestellt…';
+    const unlockRes = await fetch(`${API_BASE}/share/${shareId}/unlock`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    const unlockData = await unlockRes.json();
+    if (!unlockData.ok) throw new Error('Unlock failed');
+
+    const freshToken = unlockData.token;
+    status.textContent = 'Datei wird übertragen…';
+    fill.style.width = '30%';
+
+    const res = await fetch(`${API_BASE}/share/${shareId}/download?token=${freshToken}`);
+    if (!res.ok) throw new Error('Download failed: ' + res.status);
+
+    const blob = await res.blob();
+    clearInterval(interval);
+    fill.style.width = '100%';
+    status.textContent = '✅ Abgeschlossen — Datei wird gespeichert…';
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileInfo?.filename || 'download';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+  } catch(err) {
+    clearInterval(interval);
+    fill.style.width = '0%';
+    status.textContent = '❌ Fehler: ' + err.message;
+    console.error(err);
+  }
+}
+
+function showState(id) {
+  ['statePassword','stateReady','stateDownloading','stateExpired','stateError'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  });
+}
+
+function toggleEye() {
+  const input = document.getElementById('pwInput');
+  const btn = document.getElementById('eyeBtn');
+  input.type = input.type === 'password' ? 'text' : 'password';
+  btn.textContent = input.type === 'password' ? '👁' : '🙈';
+}
+
+function formatSize(bytes) {
+  if (bytes > 1e9) return (bytes/1e9).toFixed(1) + ' GB';
+  if (bytes > 1e6) return (bytes/1e6).toFixed(1) + ' MB';
+  if (bytes > 1e3) return (bytes/1e3).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const map = { exe:'⚙️', zip:'📦', rar:'📦', '7z':'📦', pdf:'📕', doc:'📝', docx:'📝',
+                xls:'📊', xlsx:'📊', png:'🖼', jpg:'🖼', mp4:'🎬', mp3:'🎵', iso:'💿' };
+  return map[ext] || '📄';
+}
+
+function getFileType(name) {
+  const ext = name.split('.').pop().toUpperCase();
+  const map = { EXE:'Windows Programm', ZIP:'ZIP-Archiv', PDF:'PDF-Dokument',
+                ISO:'Disk-Image', DOCX:'Word-Dokument', XLSX:'Excel-Tabelle' };
+  return map[ext] || ext + '-Datei';
+}
+</script>
+</body>
+<!-- v2-1777892419.4392474 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --></html>
+<!-- deploy 1777894707 -->
+<!-- deploy2 1777894730 -->
+<!-- fix-download-1777895835 -->
