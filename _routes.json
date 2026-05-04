@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/admin.html", "/download.html", "/index.html", "/_routes.json"]
+}
