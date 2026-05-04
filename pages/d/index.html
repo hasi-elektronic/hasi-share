@@ -299,6 +299,11 @@ footer a { color: var(--hasi); text-decoration: none; }
       </div>
     </div>
 
+    <div id="previewBox" style="display:none;margin-bottom:1rem;">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">Vorschau</div>
+      <div id="previewContent" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;max-height:280px;"></div>
+    </div>
+
     <button class="btn-dl" onclick="startDownload()">
       ⬇️ Jetzt herunterladen
     </button>
@@ -352,6 +357,7 @@ const shareId = new URLSearchParams(location.search).get('id') ||
 
 let fileInfo = null;
 let downloadToken = null;
+let previewToken = null;
 
 // Check link on load
 window.addEventListener('load', checkLink);
@@ -399,8 +405,15 @@ async function unlock() {
     });
     const data = await res.json();
 
+    if (data.error === 'limit_reached') {
+      showState('stateExpired');
+      document.querySelector('#stateExpired h2').textContent = 'Download-Limit erreicht';
+      document.querySelector('#stateExpired .subtitle').textContent = 'Diese Datei wurde zu oft heruntergeladen. Bitte kontaktieren Sie uns.';
+      return;
+    }
     if (data.ok) {
       downloadToken = data.token;
+      previewToken = data.previewToken || null;
       fileInfo = data.fileInfo || fileInfo;
       sessionStorage.setItem('hasi_share_pw', pw);
       showReady();
@@ -442,6 +455,23 @@ function showReady() {
     const d = new Date(fileInfo.expiresAt);
     document.getElementById('expiryNote').textContent =
       '⏱ Link läuft ab am ' + d.toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+  }
+
+  // Önizleme
+  if (previewToken) {
+    const ext = (fileInfo.filename||'').split('.').pop().toLowerCase();
+    const previewUrl = `${API_BASE}/share/${shareId}/preview?token=${previewToken}`;
+    const previewBox = document.getElementById('previewBox');
+    const previewContent = document.getElementById('previewContent');
+
+    if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) {
+      previewBox.style.display = 'block';
+      previewContent.innerHTML = `<img src="${previewUrl}" style="width:100%;height:auto;display:block;max-height:280px;object-fit:contain;">`;
+    } else if (ext === 'pdf') {
+      previewBox.style.display = 'block';
+      previewContent.style.height = '280px';
+      previewContent.innerHTML = `<iframe src="${previewUrl}" style="width:100%;height:100%;border:none;"></iframe>`;
+    }
   }
 
   showState('stateReady');
@@ -534,7 +564,7 @@ function getFileType(name) {
 }
 </script>
 </body>
-<!-- v2-1777892419.4392474 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --></html>
+<!-- v2-1777892419.4392474 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v5-1777899256 --></html>
 <!-- deploy 1777894707 -->
 <!-- deploy2 1777894730 -->
 <!-- fix-download-1777895835 -->
