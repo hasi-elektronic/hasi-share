@@ -1,4 +1,4 @@
-// Hasi Share — Cloudflare Worker v3
+// Hasi Share — Cloudflare Worker v4
 // Bindings: HASI_SHARE_R2 (R2), HASI_SHARE_DB (D1), ADMIN_PASSWORD (secret)
 
 const CORS = {
@@ -36,6 +36,14 @@ function checkAdmin(request, env) {
   return request.headers.get('X-Admin-Password') === env.ADMIN_PASSWORD;
 }
 
+// R2 Multipart Upload helpers
+async function startMultipartUpload(env, fileKey, contentType) {
+  const upload = await env.HASI_SHARE_R2.createMultipartUpload(fileKey, {
+    httpMetadata: { contentType: contentType || 'application/octet-stream' }
+  });
+  return { uploadId: upload.uploadId, key: upload.key };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -45,9 +53,20 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // GET /d/:shareId — Download sayfasını sun
-    if (path.startsWith('/d/') && request.method === 'GET') {
-      return env.ASSETS ? env.ASSETS.fetch(request) : json({ error: 'not found' }, 404);
+    // GET /assets/* — R2'den statik dosyaları sun
+    if (path.startsWith('/assets/') && request.method === 'GET') {
+      const key = path.slice(1);
+      const obj = await env.HASI_SHARE_R2.get(key);
+      if (!obj) return json({ error: 'Not found' }, 404);
+      const ext = key.split('.').pop().toLowerCase();
+      const mimeMap = { png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml', ico: 'image/x-icon' };
+      return new Response(obj.body, {
+        headers: {
+          'Content-Type': mimeMap[ext] || 'application/octet-stream',
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
     }
 
     // POST /api/admin/login
@@ -57,6 +76,8 @@ export default {
     }
 
     // POST /api/admin/upload-init
+    // Küçük dosyalar (<100MB): uploadUrl = Worker PUT endpoint
+    // Büyük dosyalar (≥100MB): multipart upload başlatır, parça URL'leri döner
     if (path === '/api/admin/upload-init' && request.method === 'POST') {
       if (!checkAdmin(request, env)) return json({ ok: false }, 401);
       const { filename, size, password, expireDays, note } = await request.json();
@@ -74,49 +95,89 @@ export default {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'))`
       ).bind(shareId, fileKey, filename, size || 0, pwHash, salt, expiresAt, note || '').run();
 
+      const workerBase = 'https://hasi-share-api.hguencavdi.workers.dev';
+      const isLarge = size && size > 95 * 1024 * 1024; // 95MB threshold
+
+      let extra = {};
+      if (isLarge) {
+        // Multipart upload başlat
+        const contentType = 'application/octet-stream';
+        const mp = await startMultipartUpload(env, fileKey, contentType);
+        // uploadId'yi D1'e kaydet
+        await env.HASI_SHARE_DB.prepare(
+          'UPDATE shares SET note = ? WHERE id = ?'
+        ).bind((note || '') + `__mpid:${mp.uploadId}`, shareId).run();
+        extra = {
+          multipart: true,
+          uploadId: mp.uploadId,
+          uploadPartUrl: `${workerBase}/api/admin/upload-part/${shareId}`,
+          uploadCompleteUrl: `${workerBase}/api/admin/upload-complete/${shareId}`,
+        };
+      }
+
       return json({
         ok: true, shareId, fileKey,
-        uploadUrl: `https://hasi-share-api.hguencavdi.workers.dev/api/admin/upload/${shareId}`,
+        uploadUrl: `${workerBase}/api/admin/upload/${shareId}`,
         downloadUrl: `https://share.hasi-elektronic.de/download/?id=${shareId}`,
+        ...extra,
       });
     }
 
-    // PUT /api/admin/upload/:shareId — Dosyayı R2'ye yükle (streaming)
-    if (path.startsWith('/api/admin/upload/') && request.method === 'PUT') {
+    // PUT /api/admin/upload/:shareId — Normal upload (≤100MB)
+    if (path.startsWith('/api/admin/upload/') && !path.includes('part') && !path.includes('complete') && request.method === 'PUT') {
       if (!checkAdmin(request, env)) return json({ ok: false }, 401);
-
       const shareId = path.replace('/api/admin/upload/', '').split('/')[0];
-      const row = await env.HASI_SHARE_DB.prepare(
-        'SELECT file_key FROM shares WHERE id = ?'
-      ).bind(shareId).first();
-
+      const row = await env.HASI_SHARE_DB.prepare('SELECT file_key FROM shares WHERE id = ?').bind(shareId).first();
       if (!row) return json({ ok: false, error: 'Share not found' }, 404);
 
       const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
+      await env.HASI_SHARE_R2.put(row.file_key, request.body, { httpMetadata: { contentType } });
+
       const contentLength = request.headers.get('Content-Length');
-
-      // R2'ye stream et
-      await env.HASI_SHARE_R2.put(row.file_key, request.body, {
-        httpMetadata: { contentType },
-      });
-
-      // Size güncelle
       if (contentLength) {
-        await env.HASI_SHARE_DB.prepare(
-          'UPDATE shares SET size = ? WHERE id = ?'
-        ).bind(parseInt(contentLength), shareId).run();
-      }
-
-      // R2'den size al (content-length yoksa)
-      if (!contentLength) {
+        await env.HASI_SHARE_DB.prepare('UPDATE shares SET size = ? WHERE id = ?')
+          .bind(parseInt(contentLength), shareId).run();
+      } else {
         const obj = await env.HASI_SHARE_R2.head(row.file_key);
-        if (obj) {
-          await env.HASI_SHARE_DB.prepare(
-            'UPDATE shares SET size = ? WHERE id = ?'
-          ).bind(obj.size, shareId).run();
-        }
+        if (obj) await env.HASI_SHARE_DB.prepare('UPDATE shares SET size = ? WHERE id = ?').bind(obj.size, shareId).run();
       }
+      return json({ ok: true, shareId });
+    }
 
+    // PUT /api/admin/upload-part/:shareId — Multipart parça yükle
+    // Query: ?partNumber=1&uploadId=xxx
+    if (path.startsWith('/api/admin/upload-part/') && request.method === 'PUT') {
+      if (!checkAdmin(request, env)) return json({ ok: false }, 401);
+      const shareId = path.replace('/api/admin/upload-part/', '');
+      const partNumber = parseInt(url.searchParams.get('partNumber') || '1');
+      const uploadId = url.searchParams.get('uploadId');
+      if (!uploadId) return json({ ok: false, error: 'Missing uploadId' }, 400);
+
+      const row = await env.HASI_SHARE_DB.prepare('SELECT file_key FROM shares WHERE id = ?').bind(shareId).first();
+      if (!row) return json({ ok: false, error: 'Not found' }, 404);
+
+      // R2 multipart upload nesnesini yeniden aç
+      const upload = env.HASI_SHARE_R2.resumeMultipartUpload(row.file_key, uploadId);
+      const part = await upload.uploadPart(partNumber, request.body);
+
+      return json({ ok: true, partNumber, etag: part.etag });
+    }
+
+    // POST /api/admin/upload-complete/:shareId — Multipart tamamla
+    if (path.startsWith('/api/admin/upload-complete/') && request.method === 'POST') {
+      if (!checkAdmin(request, env)) return json({ ok: false }, 401);
+      const shareId = path.replace('/api/admin/upload-complete/', '');
+      const { uploadId, parts, size } = await request.json();
+
+      const row = await env.HASI_SHARE_DB.prepare('SELECT file_key FROM shares WHERE id = ?').bind(shareId).first();
+      if (!row) return json({ ok: false, error: 'Not found' }, 404);
+
+      const upload = env.HASI_SHARE_R2.resumeMultipartUpload(row.file_key, uploadId);
+      await upload.complete(parts); // parts: [{partNumber, etag}]
+
+      if (size) {
+        await env.HASI_SHARE_DB.prepare('UPDATE shares SET size = ? WHERE id = ?').bind(size, shareId).run();
+      }
       return json({ ok: true, shareId });
     }
 
@@ -126,7 +187,12 @@ export default {
       const rows = await env.HASI_SHARE_DB.prepare(
         'SELECT id, filename, size, note, expires_at AS expiresAt, downloads, created_at FROM shares ORDER BY created_at DESC'
       ).all();
-      return json({ ok: true, files: rows.results });
+      // note'tan __mpid: kısmını temizle
+      const files = rows.results.map(r => ({
+        ...r,
+        note: (r.note || '').replace(/__mpid:[^,]*/, '').trim()
+      }));
+      return json({ ok: true, files });
     }
 
     // DELETE /api/admin/files/:id
@@ -185,7 +251,6 @@ export default {
       const obj = await env.HASI_SHARE_R2.get(row.file_key);
       if (!obj) return json({ error: 'File not found in storage' }, 404);
       await env.HASI_SHARE_DB.prepare('UPDATE shares SET downloads = downloads + 1 WHERE id = ?').bind(shareId).run();
-      // Encode filename for Content-Disposition
       const encodedFilename = encodeURIComponent(row.filename);
       return new Response(obj.body, {
         headers: {
@@ -194,23 +259,6 @@ export default {
           'Content-Length': String(obj.size || ''),
           ...CORS,
         },
-      });
-    }
-
-
-    // GET /assets/* — R2'den statik dosyaları sun
-    if (path.startsWith('/assets/') && request.method === 'GET') {
-      const key = path.slice(1); // /assets/logo.png → assets/logo.png
-      const obj = await env.HASI_SHARE_R2.get(key);
-      if (!obj) return json({ error: 'Not found' }, 404);
-      const ext = key.split('.').pop().toLowerCase();
-      const mimeMap = { png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml', ico: 'image/x-icon' };
-      return new Response(obj.body, {
-        headers: {
-          'Content-Type': mimeMap[ext] || 'application/octet-stream',
-          'Cache-Control': 'public, max-age=86400',
-          'Access-Control-Allow-Origin': '*',
-        }
       });
     }
 
