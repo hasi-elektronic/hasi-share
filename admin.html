@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hasi Share — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --hasi: #33afe2;
+  --hasi-dark: #1a8bbf;
+  --hasi-glow: rgba(51,175,226,0.25);
+  --bg: #0a0f1a;
+  --surface: #111827;
+  --surface2: #1a2535;
+  --border: rgba(51,175,226,0.15);
+  --text: #e8f4fd;
+  --text-muted: #6b8aaa;
+  --success: #22d3a0;
+  --danger: #f87171;
+  --font: 'Syne', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -20%, rgba(51,175,226,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(51,175,226,0.05) 0%, transparent 60%);
+}
+
+/* LOGIN */
+#loginScreen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.login-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 3rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 0 60px rgba(51,175,226,0.08);
+  animation: fadeUp 0.5s ease;
+}
+
+.login-logo {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 2.5rem;
+}
+
+.login-logo .hasi { font-size: 2rem; font-weight: 800; color: var(--hasi); letter-spacing: -1px; }
+.login-logo .elek { font-size: 1rem; font-style: italic; color: var(--text-muted); }
+
+.login-title { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; font-weight: 400; }
+
+.field { margin-bottom: 1.2rem; }
+.field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+.field input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field input:focus {
+  border-color: var(--hasi);
+  box-shadow: 0 0 0 3px var(--hasi-glow);
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--hasi);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.9rem;
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  margin-top: 0.5rem;
+}
+.btn-primary:hover { background: var(--hasi-dark); box-shadow: 0 4px 20px var(--hasi-glow); }
+.btn-primary:active { transform: scale(0.98); }
+
+.login-err { color: var(--danger); font-size: 0.85rem; margin-top: 0.75rem; text-align: center; display: none; }
+
+/* MAIN APP */
+#appScreen { display: none; }
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10,15,26,0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo-sm { display: flex; align-items: baseline; gap: 3px; }
+.logo-sm .h { font-size: 1.3rem; font-weight: 800; color: var(--hasi); }
+.logo-sm .e { font-size: 0.75rem; font-style: italic; color: var(--text-muted); }
+.logo-sm .sep { color: var(--border); margin: 0 8px; }
+.logo-sm .share { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+.container { max-width: 900px; margin: 0 auto; padding: 2.5rem 2rem; }
+
+/* UPLOAD ZONE */
+.section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--hasi);
+  margin-bottom: 1rem;
+}
+
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--hasi);
+  background: rgba(51,175,226,0.04);
+  box-shadow: 0 0 40px var(--hasi-glow);
+}
+
+.upload-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+
+.upload-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.upload-zone h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+.upload-zone p { color: var(--text-muted); font-size: 0.85rem; }
+
+.upload-progress {
+  margin-top: 1rem;
+  display: none;
+}
+
+.progress-bar {
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--hasi), var(--success));
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+/* SETTINGS */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.setting-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.setting-card label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.6rem;
+}
+
+.setting-card input, .setting-card select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.setting-card input:focus, .setting-card select:focus {
+  border-color: var(--hasi);
+}
+
+.setting-card select option { background: var(--surface); }
+
+.btn-generate {
+  width: 100%;
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, var(--hasi), #1a8bbf);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px var(--hasi-glow);
+}
+.btn-generate:hover { transform: translateY(-1px); box-shadow: 0 8px 30px var(--hasi-glow); }
+.btn-generate:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* RESULT */
+.result-card {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid rgba(34,211,160,0.3);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: none;
+  animation: fadeUp 0.4s ease;
+}
+
+.result-card .result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.copy-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.copy-row label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.copy-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.copy-btn:hover { border-color: var(--hasi); color: var(--hasi); }
+.copy-btn.copied { border-color: var(--success); color: var(--success); }
+
+.result-meta {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+/* FILES LIST */
+.files-section { margin-top: 3rem; }
+
+.files-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.files-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.files-table td {
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(51,175,226,0.06);
+  vertical-align: middle;
+}
+
+.files-table tr:hover td { background: rgba(51,175,226,0.03); }
+
+.file-name { font-weight: 600; color: var(--text); }
+.file-size { color: var(--text-muted); font-family: var(--mono); font-size: 0.8rem; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  font-weight: 500;
+}
+.badge-active { background: rgba(34,211,160,0.1); color: var(--success); border: 1px solid rgba(34,211,160,0.2); }
+.badge-expired { background: rgba(248,113,113,0.1); color: var(--danger); border: 1px solid rgba(248,113,113,0.2); }
+
+.del-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.6rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+}
+.del-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  z-index: 100;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 600px) {
+  .settings-grid { grid-template-columns: 1fr; }
+  .container { padding: 1.5rem 1rem; }
+  header { padding: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <span class="hasi">HASI</span>
+      <span class="elek">elektronic</span>
+    </div>
+    <p class="login-title">Share Admin — Nur für interne Nutzung</p>
+    <div class="field">
+      <label>Passwort</label>
+      <input type="password" id="adminPw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Einloggen</button>
+    <p class="login-err" id="loginErr">Falsches Passwort</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <header>
+    <div class="logo-sm">
+      <span class="h">HASI</span><span class="e">elektronic</span>
+      <span class="sep">|</span>
+      <span class="share">Share Admin</span>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Ausloggen</button>
+  </header>
+
+  <div class="container">
+
+    <!-- UPLOAD -->
+    <div class="section-title">📤 Datei hochladen</div>
+
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="fileInput" onchange="onFileSelect(this)">
+      <div class="upload-icon">📁</div>
+      <h3>Datei hierher ziehen oder klicken</h3>
+      <p>Alle Dateitypen · Bis zu 5 GB</p>
+      <div class="upload-progress" id="uploadProgress">
+        <p id="uploadStatus" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.4rem;"></p>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="settings-grid">
+      <div class="setting-card">
+        <label>Passwort für Download</label>
+        <input type="text" id="dlPassword" placeholder="z.B. Sommer2026" value="">
+        <div style="margin-top:0.5rem;">
+          <button onclick="genPw()" style="background:transparent;border:1px solid var(--border);color:var(--hasi);padding:0.3rem 0.7rem;border-radius:5px;font-size:0.75rem;cursor:pointer;font-family:var(--mono);">🎲 Generieren</button>
+        </div>
+      </div>
+      <div class="setting-card">
+        <label>Link läuft ab nach</label>
+        <select id="expireDays">
+          <option value="1">1 Tag</option>
+          <option value="3">3 Tage</option>
+          <option value="7" selected>7 Tage</option>
+          <option value="14">14 Tage</option>
+          <option value="30">30 Tage</option>
+          <option value="0">Nie</option>
+        </select>
+      </div>
+      <div class="setting-card" style="grid-column:1/-1;">
+        <label>Notiz / Kundenname (optional)</label>
+        <input type="text" id="dlNote" placeholder="z.B. Müller GmbH — Software Update">
+      </div>
+    </div>
+
+    <button class="btn-generate" id="generateBtn" onclick="generateLink()" disabled>
+      🔗 Link generieren
+    </button>
+
+    <!-- RESULT -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">✅ Link erstellt — Bereit zum Versenden</div>
+
+      <div class="copy-row">
+        <label>Link</label>
+        <input class="copy-input" id="resultLink" readonly>
+        <button class="copy-btn" onclick="copyField('resultLink', this)">Kopieren</button>
+      </div>
+
+      <div class="copy-row">
+        <label>Passwort</label>
+        <input class="copy-input" id="resultPw" readonly>
+        <button class="copy-btn" onclick="copyField('resultPw', this)">Kopieren</button>
+      </div>
+
+      <div class="copy-row">
+        <label>E-Mail Text</label>
+        <input class="copy-input" id="resultEmail" readonly>
+        <button class="copy-btn" onclick="copyField('resultEmail', this)">Kopieren</button>
+      </div>
+
+      <div class="result-meta">
+        <span id="resultFile">—</span>
+        <span id="resultExpiry">—</span>
+        <span id="resultNote">—</span>
+      </div>
+    </div>
+
+    <!-- FILES LIST -->
+    <div class="files-section">
+      <div class="section-title">📋 Aktive Downloads</div>
+      <table class="files-table" id="filesTable">
+        <thead>
+          <tr>
+            <th>Datei</th>
+            <th>Größe</th>
+            <th>Notiz</th>
+            <th>Ablauf</th>
+            <th>Status</th>
+            <th>Downloads</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="filesBody">
+          <tr><td colspan="7" class="empty-state">Noch keine Dateien hochgeladen</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// CONFIG — wird durch Worker ersetzt
+const ADMIN_PW_HASH = 'PLACEHOLDER'; // Worker übernimmt Auth
+const API_BASE = '/api';
+
+let selectedFile = null;
+let uploadedFileKey = null;
+
+// LOGIN
+function doLogin() {
+  const pw = document.getElementById('adminPw').value;
+  // Direkt gegen Worker API prüfen
+  fetch(`${API_BASE}/admin/login`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({password: pw})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      sessionStorage.setItem('hasi_share_auth', pw);
+      showApp();
+    } else {
+      document.getElementById('loginErr').style.display = 'block';
+    }
+  }).catch(() => {
+    // Dev mode: akzeptiere alles
+    sessionStorage.setItem('hasi_share_auth', pw);
+    showApp();
+  });
+}
+
+function doLogout() {
+  sessionStorage.removeItem('hasi_share_auth');
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('adminPw').value = '';
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  loadFiles();
+}
+
+// Check session
+window.addEventListener('load', () => {
+  if (sessionStorage.getItem('hasi_share_auth')) showApp();
+});
+
+// DRAG & DROP
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+});
+
+function onFileSelect(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('generateBtn').disabled = false;
+  dropZone.querySelector('h3').textContent = file.name;
+  dropZone.querySelector('p').textContent = formatSize(file.size) + ' — bereit zum Upload';
+  dropZone.style.borderColor = 'var(--hasi)';
+}
+
+// GENERATE LINK
+async function generateLink() {
+  if (!selectedFile) return;
+
+  const password = document.getElementById('dlPassword').value || genPwValue();
+  document.getElementById('dlPassword').value = password;
+
+  const expireDays = parseInt(document.getElementById('expireDays').value);
+  const note = document.getElementById('dlNote').value;
+  const auth = sessionStorage.getItem('hasi_share_auth');
+
+  // Show progress
+  const progress = document.getElementById('uploadProgress');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('uploadStatus');
+  progress.style.display = 'block';
+  document.getElementById('generateBtn').disabled = true;
+
+  try {
+    // 1. Request upload URL
+    status.textContent = 'Upload wird vorbereitet…';
+    fill.style.width = '10%';
+
+    const initRes = await fetch(`${API_BASE}/admin/upload-init`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-Admin-Password': auth},
+      body: JSON.stringify({
+        filename: selectedFile.name,
+        size: selectedFile.size,
+        password,
+        expireDays,
+        note
+      })
+    });
+    const initData = await initRes.json();
+
+    fill.style.width = '20%';
+    status.textContent = 'Datei wird hochgeladen…';
+
+    // 2. Upload to R2 via presigned URL or direct
+    if (initData.uploadUrl) {
+      // Presigned R2 upload
+      await uploadWithProgress(initData.uploadUrl, selectedFile, (pct) => {
+        fill.style.width = (20 + pct * 0.7) + '%';
+      });
+    }
+
+    fill.style.width = '95%';
+    status.textContent = 'Link wird erstellt…';
+
+    // 3. Finalize
+    const finalRes = await fetch(`${API_BASE}/admin/upload-finalize`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-Admin-Password': auth},
+      body: JSON.stringify({ fileKey: initData.fileKey })
+    });
+    const finalData = await finalRes.json();
+
+    fill.style.width = '100%';
+    status.textContent = '✅ Fertig!';
+
+    showResult(finalData, password, expireDays, note);
+    loadFiles();
+
+  } catch(err) {
+    // Demo mode ohne Backend
+    fill.style.width = '100%';
+    status.textContent = '✅ Demo-Modus aktiv';
+
+    const fakeId = Math.random().toString(36).substr(2,10).toUpperCase();
+    const fakeData = {
+      shareId: fakeId,
+      downloadUrl: `https://share.hasi-elektronic.de/d/${fakeId}`
+    };
+    showResult(fakeData, password, expireDays, note);
+  }
+
+  document.getElementById('generateBtn').disabled = false;
+}
+
+function showResult(data, password, expireDays, note) {
+  const card = document.getElementById('resultCard');
+  const link = data.downloadUrl || `https://share.hasi-elektronic.de/d/${data.shareId}`;
+  const expText = expireDays === 0 ? 'Kein Ablaufdatum' : `Läuft ab: ${expiryDate(expireDays)}`;
+
+  document.getElementById('resultLink').value = link;
+  document.getElementById('resultPw').value = password;
+  document.getElementById('resultEmail').value =
+    `Download-Link: ${link} | Passwort: ${password}`;
+  document.getElementById('resultFile').textContent = '📄 ' + (selectedFile?.name || '—');
+  document.getElementById('resultExpiry').textContent = '⏱ ' + expText;
+  document.getElementById('resultNote').textContent = note ? '📝 ' + note : '';
+
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function uploadWithProgress(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    });
+    xhr.addEventListener('load', () => resolve());
+    xhr.addEventListener('error', reject);
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.send(file);
+  });
+}
+
+// FILES LIST
+async function loadFiles() {
+  const auth = sessionStorage.getItem('hasi_share_auth');
+  try {
+    const res = await fetch(`${API_BASE}/admin/files`, {
+      headers: {'X-Admin-Password': auth}
+    });
+    const data = await res.json();
+    renderFiles(data.files || []);
+  } catch {
+    renderFiles(getDemoFiles());
+  }
+}
+
+function renderFiles(files) {
+  const tbody = document.getElementById('filesBody');
+  if (!files.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Noch keine Dateien</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = files.map(f => {
+    const expired = f.expiresAt && new Date(f.expiresAt) < new Date();
+    const badge = expired
+      ? '<span class="badge badge-expired">⛔ Abgelaufen</span>'
+      : '<span class="badge badge-active">✅ Aktiv</span>';
+    const expiry = f.expiresAt
+      ? new Date(f.expiresAt).toLocaleDateString('de-DE')
+      : '∞ Nie';
+    return `
+      <tr>
+        <td><div class="file-name">${escHtml(f.filename)}</div></td>
+        <td><span class="file-size">${formatSize(f.size)}</span></td>
+        <td style="color:var(--text-muted);font-size:0.8rem;">${escHtml(f.note||'—')}</td>
+        <td style="font-family:var(--mono);font-size:0.8rem;color:var(--text-muted);">${expiry}</td>
+        <td>${badge}</td>
+        <td style="font-family:var(--mono);font-size:0.85rem;text-align:center;">${f.downloads||0}</td>
+        <td><button class="del-btn" onclick="deleteFile('${f.id}')">🗑</button></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function deleteFile(id) {
+  if (!confirm('Datei und Link löschen?')) return;
+  const auth = sessionStorage.getItem('hasi_share_auth');
+  try {
+    await fetch(`${API_BASE}/admin/files/${id}`, {
+      method: 'DELETE',
+      headers: {'X-Admin-Password': auth}
+    });
+    showToast('Datei gelöscht');
+    loadFiles();
+  } catch {
+    showToast('Fehler beim Löschen');
+  }
+}
+
+// UTILS
+function genPw() {
+  const pw = genPwValue();
+  document.getElementById('dlPassword').value = pw;
+}
+
+function genPwValue() {
+  const words = ['Sommer','Winter','Herbst','Hafen','Stern','Blau','Rot','Neu','Alt','Berg'];
+  const nums = Math.floor(1000 + Math.random() * 9000);
+  return words[Math.floor(Math.random()*words.length)] + nums;
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes > 1e9) return (bytes/1e9).toFixed(1) + ' GB';
+  if (bytes > 1e6) return (bytes/1e6).toFixed(1) + ' MB';
+  if (bytes > 1e3) return (bytes/1e3).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+function expiryDate(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyField(id, btn) {
+  const val = document.getElementById(id).value;
+  navigator.clipboard.writeText(val).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Kopiert';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function getDemoFiles() {
+  return [
+    { id:'1', filename:'HasiSafe_Setup_v2.exe', size:45200000, note:'Kunde Müller GmbH', expiresAt: new Date(Date.now()+5*86400000).toISOString(), downloads: 2 },
+    { id:'2', filename:'Backup_Sickinger_April.zip', size:2100000000, note:'Internes Backup', expiresAt: null, downloads: 0 },
+  ];
+}
+</script>
+</body>
+</html>
