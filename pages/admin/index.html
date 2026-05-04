@@ -660,7 +660,6 @@ async function generateLink() {
   document.getElementById('generateBtn').disabled = true;
 
   try {
-    // 1. Init — shareId ve uploadUrl al
     status.textContent = 'Upload wird vorbereitet…';
     fill.style.width = '10%';
 
@@ -677,14 +676,55 @@ async function generateLink() {
     if (!initData.shareId) throw new Error('No shareId returned');
 
     fill.style.width = '20%';
-    status.textContent = 'Datei wird hochgeladen…';
 
-    // 2. Dosyayı Worker'a PUT ile yükle
-    await uploadWithProgress(
-      `${API_BASE}/admin/upload/${initData.shareId}`,
-      selectedFile,
-      (pct) => { fill.style.width = (20 + pct * 75) + '%'; }
-    );
+    const CHUNK = 95 * 1024 * 1024; // 95MB chunk
+
+    if (initData.multipart && selectedFile.size > CHUNK) {
+      // ── MULTIPART UPLOAD ──
+      status.textContent = `Große Datei erkannt (${formatSize(selectedFile.size)}) — Multipart Upload…`;
+      const { uploadId, uploadPartUrl, uploadCompleteUrl } = initData;
+      const parts = [];
+      const totalChunks = Math.ceil(selectedFile.size / CHUNK);
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK;
+        const end = Math.min(start + CHUNK, selectedFile.size);
+        const chunk = selectedFile.slice(start, end);
+        const partNumber = i + 1;
+
+        status.textContent = `Teil ${partNumber}/${totalChunks} wird hochgeladen…`;
+
+        const partRes = await fetch(
+          `${uploadPartUrl}?partNumber=${partNumber}&uploadId=${uploadId}`,
+          { method: 'PUT', headers: { 'X-Admin-Password': auth }, body: chunk }
+        );
+        const partData = await partRes.json();
+        if (!partData.ok) throw new Error(`Part ${partNumber} failed`);
+        parts.push({ partNumber, etag: partData.etag });
+
+        fill.style.width = (20 + (partNumber / totalChunks) * 75) + '%';
+      }
+
+      // Tamamla
+      status.textContent = 'Upload wird abgeschlossen…';
+      const completeRes = await fetch(uploadCompleteUrl, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-Admin-Password': auth},
+        body: JSON.stringify({ uploadId, parts, size: selectedFile.size })
+      });
+      const completeData = await completeRes.json();
+      if (!completeData.ok) throw new Error('Complete failed');
+
+    } else {
+      // ── NORMAL UPLOAD (≤95MB) ──
+      status.textContent = 'Datei wird hochgeladen…';
+      await uploadWithProgress(
+        `${API_BASE}/admin/upload/${initData.shareId}`,
+        selectedFile,
+        (pct) => { fill.style.width = (20 + pct * 75) + '%'; },
+        auth
+      );
+    }
 
     fill.style.width = '100%';
     status.textContent = '✅ Fertig!';
@@ -721,16 +761,20 @@ function showResult(data, password, expireDays, note) {
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function uploadWithProgress(url, file, onProgress) {
+async function uploadWithProgress(url, file, onProgress, auth) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener('progress', e => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
     });
-    xhr.addEventListener('load', () => resolve());
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload HTTP ${xhr.status}`));
+    });
     xhr.addEventListener('error', reject);
     xhr.open('PUT', url);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    if (auth) xhr.setRequestHeader('X-Admin-Password', auth);
     xhr.send(file);
   });
 }
@@ -848,6 +892,6 @@ function getDemoFiles() {
 }
 </script>
 </body>
-<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --></html>
+<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v4-multipart-1777897500 --></html>
 <!-- v1777892382 -->
 <!-- final 1777894985 -->
