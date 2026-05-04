@@ -507,6 +507,10 @@ header {
           <option value="0">Nie</option>
         </select>
       </div>
+      <div class="setting-card">
+        <label>Max. Downloads (0 = unbegrenzt)</label>
+        <input type="number" id="maxDownloads" placeholder="0" value="0" min="0" max="999">
+      </div>
       <div class="setting-card" style="grid-column:1/-1;">
         <label>Notiz / Kundenname (optional)</label>
         <input type="text" id="dlNote" placeholder="z.B. Müller GmbH — Software Update">
@@ -558,6 +562,7 @@ header {
             <th>Ablauf</th>
             <th>Status</th>
             <th>Downloads</th>
+            <th>Limit</th>
             <th></th>
           </tr>
         </thead>
@@ -669,7 +674,7 @@ async function generateLink() {
       body: JSON.stringify({
         filename: selectedFile.name,
         size: selectedFile.size,
-        password, expireDays, note
+        password, expireDays, note, maxDownloads: parseInt(document.getElementById('maxDownloads').value)||0
       })
     });
     const initData = await initRes.json();
@@ -816,6 +821,7 @@ function renderFiles(files) {
         <td style="font-family:var(--mono);font-size:0.8rem;color:var(--text-muted);">${expiry}</td>
         <td>${badge}</td>
         <td style="font-family:var(--mono);font-size:0.85rem;text-align:center;">${f.downloads||0}</td>
+        <td style="font-family:var(--mono);font-size:0.8rem;color:var(--text-muted);text-align:center;">${f.maxDownloads>0 ? f.maxDownloads : '∞'}</td>
         <td><button class="del-btn" onclick="deleteFile('${f.id}')">🗑</button></td>
       </tr>
     `;
@@ -892,6 +898,6 @@ function getDemoFiles() {
 }
 </script>
 </body>
-<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v4-multipart-1777897500 --></html>
+<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v4-multipart-1777897500 --><!-- v5-1777899239 --></html>
 <!-- v1777892382 -->
 <!-- final 1777894985 -->
