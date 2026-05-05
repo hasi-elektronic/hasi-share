@@ -511,9 +511,21 @@ header {
         <label>Max. Downloads (0 = unbegrenzt)</label>
         <input type="number" id="maxDownloads" placeholder="0" value="0" min="0" max="999">
       </div>
+      <div class="setting-card">
+        <label>PDF Wasserzeichen</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <input type="checkbox" id="watermark" style="width:18px;height:18px;cursor:pointer;accent-color:var(--hasi);">
+          <span style="font-size:0.82rem;color:var(--text-muted);">Kundenname auf PDF stempeln</span>
+        </div>
+      </div>
       <div class="setting-card" style="grid-column:1/-1;">
         <label>Notiz / Kundenname (optional)</label>
         <input type="text" id="dlNote" placeholder="z.B. Müller GmbH — Software Update">
+      </div>
+      <div class="setting-card" style="grid-column:1/-1;">
+        <label>🔐 Nur für diese E-Mail (Microsoft SSO)</label>
+        <input type="text" id="allowedEmail" placeholder="z.B. mueller@firma.de oder @firma.de (leer = jeder)">
+        <p style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Falls angegeben, muss Empfänger sich mit Microsoft anmelden.</p>
       </div>
     </div>
 
@@ -674,7 +686,10 @@ async function generateLink() {
       body: JSON.stringify({
         filename: selectedFile.name,
         size: selectedFile.size,
-        password, expireDays, note, maxDownloads: parseInt(document.getElementById('maxDownloads').value)||0
+        password, expireDays, note,
+        maxDownloads: parseInt(document.getElementById('maxDownloads').value)||0,
+        watermark: document.getElementById('watermark').checked,
+        allowedEmail: document.getElementById('allowedEmail').value.trim()||null
       })
     });
     const initData = await initRes.json();
@@ -751,7 +766,7 @@ async function generateLink() {
 
 function showResult(data, password, expireDays, note) {
   const card = document.getElementById('resultCard');
-  const link = data.downloadUrl || `https://share.hasi-elektronic.de/d/${data.shareId}`;
+  const link = data.downloadUrl || `https://share.hasi-elektronic.de/download/?id=${data.shareId}`;
   const expText = expireDays === 0 ? 'Kein Ablaufdatum' : `Läuft ab: ${expiryDate(expireDays)}`;
 
   document.getElementById('resultLink').value = link;
@@ -822,7 +837,10 @@ function renderFiles(files) {
         <td>${badge}</td>
         <td style="font-family:var(--mono);font-size:0.85rem;text-align:center;">${f.downloads||0}</td>
         <td style="font-family:var(--mono);font-size:0.8rem;color:var(--text-muted);text-align:center;">${f.maxDownloads>0 ? f.maxDownloads : '∞'}</td>
-        <td><button class="del-btn" onclick="deleteFile('${f.id}')">🗑</button></td>
+        <td style="display:flex;gap:4px;">
+          <button class="del-btn" onclick="showLogs('${f.id}','${f.filename}')" title="Download-Log">📋</button>
+          <button class="del-btn" onclick="deleteFile('${f.id}')">🗑</button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -897,7 +915,77 @@ function getDemoFiles() {
   ];
 }
 </script>
+
+<!-- LOG MODAL -->
+<div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:700px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+      <div class="section-title" id="logTitle" style="margin:0;">📋 Download-Log</div>
+      <button onclick="document.getElementById('logModal').style.display='none'" 
+        style="background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:0.3rem 0.7rem;border-radius:6px;cursor:pointer;">✕</button>
+    </div>
+    <div id="logContent"></div>
+  </div>
+</div>
+
+<script>
+async function showLogs(shareId, filename) {
+  const auth = sessionStorage.getItem('hasi_share_auth');
+  const modal = document.getElementById('logModal');
+  const content = document.getElementById('logContent');
+  document.getElementById('logTitle').textContent = `📋 ${filename}`;
+  content.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Lädt…</p>';
+  modal.style.display = 'flex';
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/logs/${shareId}`, {
+      headers: { 'X-Admin-Password': auth }
+    });
+    const data = await res.json();
+    const logs = data.logs || [];
+
+    if (!logs.length) {
+      content.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem;">Noch keine Downloads</p>';
+      return;
+    }
+
+    content.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--border);">Datum</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--border);">IP</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--border);">Land</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--border);">Browser</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${logs.map(l => `
+            <tr style="border-bottom:1px solid rgba(51,175,226,0.06);">
+              <td style="padding:6px 8px;font-family:var(--mono);">${new Date(l.at).toLocaleString('de-DE')}</td>
+              <td style="padding:6px 8px;font-family:var(--mono);">${l.ip||'—'}</td>
+              <td style="padding:6px 8px;">${l.country||'—'}</td>
+              <td style="padding:6px 8px;color:var(--text-muted);font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${parseUA(l.ua||'')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch(e) {
+    content.innerHTML = `<p style="color:var(--danger);">Fehler: ${e.message}</p>`;
+  }
+}
+
+function parseUA(ua) {
+  if (ua.startsWith('SSO:')) return '🔐 ' + ua.replace('SSO:','');
+  if (ua.includes('Chrome')) return '🌐 Chrome';
+  if (ua.includes('Firefox')) return '🦊 Firefox';
+  if (ua.includes('Safari')) return '🧭 Safari';
+  if (ua.includes('Edge')) return '🔷 Edge';
+  return ua.slice(0,40);
+}
+</script>
 </body>
-<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v4-multipart-1777897500 --><!-- v5-1777899239 --></html>
+<!-- v2-1777892419.438662 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v4-multipart-1777897500 --><!-- v5-1777899239 --><!-- v6-1777960700 --></html>
 <!-- v1777892382 -->
 <!-- final 1777894985 -->
