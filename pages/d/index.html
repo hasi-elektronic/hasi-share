@@ -263,6 +263,18 @@ footer a { color: var(--hasi); text-decoration: none; }
 
 <div class="card">
 
+
+  <!-- SSO STATE -->
+  <div id="stateSSO" style="display:none;">
+    <div class="card-icon">🔐</div>
+    <h2>Anmeldung erforderlich</h2>
+    <p class="subtitle">Diese Datei ist nur für autorisierte Nutzer.<br>Bitte melden Sie sich mit Ihrem Microsoft-Konto an.</p>
+    <a id="ssoBtn" href="#" class="btn-dl" style="display:block;text-align:center;text-decoration:none;margin-top:1rem;">
+      <img src="https://img.icons8.com/color/20/microsoft.png" style="vertical-align:middle;margin-right:8px;">
+      Mit Microsoft anmelden
+    </a>
+  </div>
+
   <!-- PASSWORD STATE -->
   <div id="statePassword">
     <div class="card-icon">🔒</div>
@@ -362,6 +374,31 @@ let previewToken = null;
 // Check link on load
 window.addEventListener('load', checkLink);
 
+// SSO callback'ten geldiyse otomatik unlock
+const ssoToken = new URLSearchParams(location.search).get('sso_token');
+const ssoUser  = new URLSearchParams(location.search).get('user');
+if (ssoToken) {
+  downloadToken = ssoToken;
+  fileInfo = fileInfo || { filename: 'Datei' };
+  if (ssoUser) {
+    document.getElementById('readyFilename').textContent = decodeURIComponent(ssoUser);
+  }
+  // Info'dan dosya adını al
+  fetch(`${API_BASE}/share/${shareId}/info`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.filename) {
+        fileInfo = { filename: d.filename, size: d.size };
+        document.getElementById('readyFilename').textContent = d.filename;
+        document.getElementById('readyMeta').textContent = formatSize(d.size);
+        document.getElementById('readyIcon').textContent = getFileIcon(d.filename);
+      }
+    }).catch(()=>{});
+  sessionStorage.setItem('hasi_share_pw', '__sso__');
+  showState('stateReady');
+}
+
+
 async function checkLink() {
   try {
     const res = await fetch(`${API_BASE}/share/${shareId}/info`);
@@ -377,6 +414,13 @@ async function checkLink() {
     }
 
     fileInfo = data;
+    if (data.ssoRequired) {
+      // SSO gerekli - Microsoft butonu göster
+      showState('stateSSO');
+      document.getElementById('ssoBtn').href =
+        `https://hasi-share-api.hguencavdi.workers.dev/auth/microsoft?shareId=${shareId}`;
+      return;
+    }
     // Link exists, wait for password
 
   } catch {
@@ -530,7 +574,7 @@ async function startDownload() {
 }
 
 function showState(id) {
-  ['statePassword','stateReady','stateDownloading','stateExpired','stateError'].forEach(s => {
+  ['stateSSO','statePassword','stateReady','stateDownloading','stateExpired','stateError'].forEach(s => {
     document.getElementById(s).style.display = s === id ? 'block' : 'none';
   });
 }
@@ -564,7 +608,7 @@ function getFileType(name) {
 }
 </script>
 </body>
-<!-- v2-1777892419.4392474 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v5-1777899256 --></html>
+<!-- v2-1777892419.4392474 --><!-- logo-1777896155 --><!-- logo-fix-1777896260 --><!-- v5-1777899256 --><!-- v6-1777960716 --></html>
 <!-- deploy 1777894707 -->
 <!-- deploy2 1777894730 -->
 <!-- fix-download-1777895835 -->
