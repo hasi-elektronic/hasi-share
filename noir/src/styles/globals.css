@@ -1,0 +1,463 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: auto; /* Lenis übernimmt das Smoothing */
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family:
+      Inter,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* Wird beim Öffnen von Overlays gesetzt (Lightbox, Menü, Preloader) */
+  body[data-scroll-locked='true'] {
+    overflow: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  blockquote,
+  figure,
+  p,
+  ul,
+  ol {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    padding: 0;
+    list-style: none;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  /* Vom Preloader kontrolliert, damit der erste Frame nicht springt */
+  html[data-preloading='true'] body {
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .shell {
+    width: 100%;
+    max-width: var(--shell);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .section-y {
+    padding-block: var(--section-y);
+  }
+
+  /* Kleines Großbuchstaben-Label mit großzügiger Laufweite */
+  .label {
+    font-size: clamp(0.625rem, 0.9vw, 0.72rem);
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+
+  .label-accent {
+    color: var(--accent);
+  }
+
+  .display {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 300;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+  }
+
+  .hairline {
+    height: 1px;
+    width: 100%;
+    background: var(--hairline);
+  }
+
+  /* Animierte Unterstreichung für Textlinks */
+  .link-underline {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.35em;
+  }
+  .link-underline::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0.999);
+    transform-origin: right;
+    transition: transform 0.6s var(--ease-noir);
+  }
+  .link-underline:hover::after,
+  .link-underline:focus-visible::after {
+    transform: scaleX(0);
+  }
+
+  /* Feines Filmkorn über dem gesamten Viewport */
+  .grain::after {
+    content: '';
+    position: fixed;
+    inset: -50%;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    will-change: transform;
+    animation: grain-shift 8s steps(6) infinite;
+  }
+
+  @keyframes grain-shift {
+    0% {
+      transform: translate(0, 0);
+    }
+    20% {
+      transform: translate(-3%, 2%);
+    }
+    40% {
+      transform: translate(2%, -3%);
+    }
+    60% {
+      transform: translate(-2%, -2%);
+    }
+    80% {
+      transform: translate(3%, 1%);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+/* Systemweite Bewegungsreduktion: alles wird statisch, nichts verschwindet. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .grain::after {
+    animation: none;
+  }
+}
+
+/* ---- Eigener Cursor ------------------------------------------------------ */
+body.has-custom-cursor,
+body.has-custom-cursor * {
+  cursor: none;
+}
+
+.cursor-ring {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: -1.125rem;
+  margin-top: -1.125rem;
+  transition:
+    width 0.5s var(--ease-noir),
+    height 0.5s var(--ease-noir),
+    margin 0.5s var(--ease-noir),
+    background-color 0.5s var(--ease-noir),
+    border-color 0.5s var(--ease-noir),
+    opacity 0.3s linear;
+}
+
+.cursor-ring[data-state='active'] {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-left: -1.625rem;
+  margin-top: -1.625rem;
+  background-color: var(--accent-veil);
+}
+
+.cursor-ring[data-state='labelled'] {
+  width: 6.5rem;
+  height: 6.5rem;
+  margin-left: -3.25rem;
+  margin-top: -3.25rem;
+  background-color: rgba(10, 10, 11, 0.7);
+  border-color: var(--accent);
+}
+
+.cursor-label {
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.4s var(--ease-noir),
+    transform 0.4s var(--ease-noir);
+}
+
+.cursor-ring[data-state='labelled'] .cursor-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---- Scroll-Hinweis ------------------------------------------------------ */
+.scroll-hint {
+  transform-origin: top;
+  animation: scroll-hint 2.6s var(--ease-noir) infinite;
+}
+
+@keyframes scroll-hint {
+  0% {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  70% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1) translateY(60%);
+    opacity: 0;
+  }
+}
+
+/* Die Wörter der Hero-Zeile starten unter ihrer Maske; GSAP holt sie herauf.
+   Nur solange das Intro läuft — danach entscheidet allein GSAP. */
+html[data-intro='pending'] #hero-titel .split-word__inner {
+  transform: translateY(115%);
+}
+
+/* Die Maske schneidet sonst Unterlängen ab (das g in "Gang"). Das Polster
+   schafft Platz, der negative Rand hält das Layout trotzdem eng. */
+.split-word {
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
+}
+
+html[data-motion='reduced'] .split-word__inner {
+  transform: none;
+}
+
+/* ---- Hotspots im 3-D-Raum ------------------------------------------------ */
+.hotspot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.hotspot__ring {
+  position: relative;
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 9999px;
+  background: rgb(var(--bg-rgb) / 0.6);
+  transition: background-color 0.5s var(--ease-noir);
+}
+
+.hotspot__ring::after {
+  content: '';
+  position: absolute;
+  inset: -0.45rem;
+  border: 1px solid var(--accent);
+  border-radius: 9999px;
+  opacity: 0;
+  animation: hotspot-pulse 2.8s var(--ease-noir) infinite;
+}
+
+.hotspot__label {
+  padding: 0.3rem 0.6rem;
+  background: rgb(var(--bg-rgb) / 0.72);
+  border: 1px solid var(--hairline);
+  transition:
+    color 0.4s var(--ease-noir),
+    border-color 0.4s var(--ease-noir);
+}
+
+.hotspot:hover .hotspot__label,
+.hotspot--active .hotspot__label {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.hotspot--active .hotspot__ring {
+  background: var(--accent);
+}
+
+@keyframes hotspot-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.7);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotspot__ring::after {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ---- Rechtsseiten -------------------------------------------------------- */
+.legal h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  color: var(--ink);
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.legal h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.legal h3 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-top: 2rem;
+}
+
+.legal p,
+.legal li {
+  color: var(--ink-muted);
+  line-height: 1.75;
+  margin-top: 1rem;
+}
+
+.legal ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.legal ul li {
+  position: relative;
+  padding-left: 1.25rem;
+}
+
+.legal ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.85em;
+  width: 0.4rem;
+  height: 1px;
+  background: var(--accent);
+}
+
+.legal a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-color: var(--accent);
+}
+
+.legal strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.legal dl {
+  margin-top: 1rem;
+}
+
+.legal dt {
+  color: var(--ink);
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.legal dd {
+  color: var(--ink-muted);
+  margin-left: 0;
+}

@@ -1,0 +1,53 @@
+{
+  "name": "noir-fine-dining",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "NOIR — Fine Dining. Demo-Website von Hasi Site Studio.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.functions.json && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts,.tsx,.mjs --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "images": "node scripts/fetch-images.mjs",
+    "og": "node scripts/make-og.mjs",
+    "build:single": "vite build --config vite.config.single.ts && node scripts/build-single.mjs"
+  },
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.1.0",
+    "@fontsource/inter": "^5.1.0",
+    "@hookform/resolvers": "^3.9.1",
+    "@react-three/drei": "^9.117.3",
+    "@react-three/fiber": "^8.17.10",
+    "framer-motion": "^11.11.17",
+    "gsap": "^3.12.5",
+    "lenis": "^1.1.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.2",
+    "react-router-dom": "^6.28.0",
+    "three": "^0.169.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.169.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "postcss": "^8.4.49",
+    "prettier": "^3.3.3",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,50 @@
+/**
+ * AUTOMATISCH ERZEUGT — nicht von Hand bearbeiten.
+ * Wird von `npm run images` (scripts/fetch-images.mjs) neu geschrieben.
+ */
+export const LQIP: Record<string, string> = {
+  'chef-hands':
+    'data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAACwAgCdASoUAA8APxl2slEspySisAgBkCMJaQAAeyAA/u+CJg5eCN2Aa42xoAAA',
+  'chef-portrait':
+    'data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAABQAwCdASoUABkAPxl0sFC6JqSisAgDQCMJZwAAetCJqFQkIAD+78k7rF2pZdToTOfYHTUdqBcNCD0IAAA=',
+  'dish-01':
+    'data:image/webp;base64,UklGRkQAAABXRUJQVlA4IDgAAADwAgCdASoUABkAPxl4sFCsp6SisAgBkCMJaQAAcr3AAAD+7174bu9qSoy9jtPsS0EW/rMhksAAAA==',
+  'dish-01v':
+    'data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAAAQAwCdASoUABkAPxmAtFU6KCSjKAqrQCMJaQAAPlQkAAAA/u9djCtnGzamXzjRl6zKJAyhMrQ7jugAAAA=',
+  'dish-02':
+    'data:image/webp;base64,UklGRkYAAABXRUJQVlA4IDoAAAAQAwCdASoUABkAPxmEulYsqKWkqAgBkCMJaQAAPZX9WgAA/u83TN1g9z3iNgkNng6NxNFqOd21gAAA',
+  'dish-02v':
+    'data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAADwAgCdASoUABkAPxl8tFExKCUisAgCICMJZwAAe2t5AAD+7uCuhzWUG7tl++/g8u7+IZwAD3ZTXIidJCAAAA==',
+  'dish-03':
+    'data:image/webp;base64,UklGRj4AAABXRUJQVlA4IDIAAADwAgCdASoUABkAPxl+uVQsqCYjKAqpkCMJaQAAPlRrgAD+7zLQzBDbVdHglSnAndgAAA==',
+  'dish-04':
+    'data:image/webp;base64,UklGRkwAAABXRUJQVlA4IEAAAAAQBACdASoUABkAPxl2sVCspySisAgBkCMJZwAAW+s7rsVldNjDDPwnAAD+7nLGnJ7TW/bxS92mXZ+VkENXYIQA',
+  'dish-05':
+    'data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAACwAwCdASoUABkAPxmAtlSsqCSjKAqpkCMJaQAALnYCWdvErrOwgAD+7ndflLdFnKlFXfewHBgt+KOEAAA=',
+  'dish-05v':
+    'data:image/webp;base64,UklGRkYAAABXRUJQVlA4IDoAAADwAgCdASoUABkAPxmEuFaxKCUjqAgCICMJaQAAP8h4AAD+78LFqbrXSyScu57F4T2bDZF/r/LAAAAA',
+  'dish-06':
+    'data:image/webp;base64,UklGRkIAAABXRUJQVlA4IDYAAADwAgCdASoUABkAPxmAtlSsqCSjKAqpkCMJaQAAOsiKAAD+7w0x8lEJq1H1JjFn9LAn8o3jYAA=',
+  'dish-07':
+    'data:image/webp;base64,UklGRj4AAABXRUJQVlA4IDIAAAAQAwCdASoUABkAPxl2tVExJysiqA1SICMJaQAAPBasqCAA/u810tx1JWHSQKvS9AAAAA==',
+  'gal-01':
+    'data:image/webp;base64,UklGRkYAAABXRUJQVlA4IDoAAABQAwCdASoUABkAPxl0sVCspqSisAgBkCMJZwAAW+s+aEasKAD+7nOIpMRb+niPozg3T5Y1DogQIAAA',
+  'gal-02':
+    'data:image/webp;base64,UklGRjgAAABXRUJQVlA4ICwAAAAwAwCdASoUAA8APxl2slCspySisAgBkCMJaQAAetHPamAAAP7vnj+0AAAAAA==',
+  'gal-03':
+    'data:image/webp;base64,UklGRkQAAABXRUJQVlA4IDgAAABQAwCdASoUABQAPxl+slO6KCQiqA1TQCMJaQAAPF/boLniAAD+7w+S9ffvzKfjSFxnRzNmYNAAAA==',
+  'gal-04':
+    'data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAACwAwCdASoUABkAPxlwsVGxJiSisBgMAiAjCWkAADywIpfGCnQ7sAD+716sXCtjspy19h5QumiwL0YAAAA=',
+  'gal-05':
+    'data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAACwAgCdASoUAA8APxl0sVCspqSisAgBkCMJaQAAeyAA/u9WU/J82sdKcT/MAAAA',
+  'gal-06':
+    'data:image/webp;base64,UklGRj4AAABXRUJQVlA4IDIAAADQAgCdASoUABQAPxmEulYsqCWjqAgBkCMJaQAAPaOgAP7vNnz/a2u3WqrdyyFjySAAAA==',
+  'gal-07':
+    'data:image/webp;base64,UklGRjwAAABXRUJQVlA4IDAAAADwAgCdASoUABkAPxl+sVOsqCUiqA1RkCMJaQAAPB20AAD+74G52TSnjQmDF7iAAAA=',
+  'gal-08':
+    'data:image/webp;base64,UklGRkQAAABXRUJQVlA4IDgAAADQAgCdASoUAA8APxl0sVCspqSisAgBkCMJaQAAe/QAAP7vpa1xfv32bI57+BPImr0Fd/Epg8AAAA==',
+  'gal-09':
+    'data:image/webp;base64,UklGRkAAAABXRUJQVlA4IDQAAACQAwCdASoUABQAPxl4tVMspyUisBgIAZAjCWkAAC51xFFxcFYAAP7ug+vpSt534M8wAAAA',
+  'hero-poster':
+    'data:image/webp;base64,UklGRjgAAABXRUJQVlA4ICwAAACwAgCdASoUAA0APxl2slEspySisAgBkCMJaQAAeyAA/u+jEItJZQSWC3RgAA==',
+}

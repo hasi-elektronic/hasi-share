@@ -1,0 +1,4 @@
+# Single-Page-App: unbekannte Pfade liefern index.html aus, damit /impressum
+# und /datenschutz auch beim direkten Aufruf funktionieren.
+# Pages-Functions (/api/*) werden vorher ausgewertet und bleiben unberührt.
+/*    /index.html   200
