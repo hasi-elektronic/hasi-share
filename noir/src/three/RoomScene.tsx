@@ -163,6 +163,9 @@ export default function RoomScene({ active, autoRotate, selectedId, onSelect }: 
       // Die Kamera bleibt innerhalb der Raumhülle — von außen wären die
       // Wände (BackSide) unsichtbar und man sähe in eine leere Schachtel.
       camera={{ position: [2.8, 2.2, 3.2], fov: 46 }}
+      // Sobald der Zeiger die Szene erreicht, steht sie still: bewegliche
+      // Hotspots lassen sich sonst nur schwer treffen.
+      onPointerEnter={() => setUserTouched(true)}
       onPointerDown={() => setUserTouched(true)}
       onWheel={() => setUserTouched(true)}
     >
