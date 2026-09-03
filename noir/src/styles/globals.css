@@ -293,9 +293,17 @@ body.has-custom-cursor * {
   }
 }
 
-/* Wörter starten unter ihrer Maske; GSAP holt sie herauf. */
-.split-word__inner {
+/* Die Wörter der Hero-Zeile starten unter ihrer Maske; GSAP holt sie herauf.
+   Nur solange das Intro läuft — danach entscheidet allein GSAP. */
+html[data-intro='pending'] #hero-titel .split-word__inner {
   transform: translateY(115%);
+}
+
+/* Die Maske schneidet sonst Unterlängen ab (das g in "Gang"). Das Polster
+   schafft Platz, der negative Rand hält das Layout trotzdem eng. */
+.split-word {
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
 }
 
 html[data-motion='reduced'] .split-word__inner {

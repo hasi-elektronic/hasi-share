@@ -18,6 +18,7 @@ export function Hero() {
   const stageRef = useRef<HTMLDivElement>(null)
   const headlineRef = useRef<HTMLHeadingElement>(null)
   const introRef = useRef<HTMLDivElement>(null)
+  const introPlayed = useRef(false)
 
   const { allow3D, reducedMotion } = useAppEnv()
   const introReady = useIntroReady()
@@ -29,11 +30,13 @@ export function Hero() {
     if (!section) return
 
     const ctx = gsap.context(() => {
+      // Kein `scrub` hier: das gehoert an eine Animation. Ein reiner
+      // Fortschritts-Trigger ohne Animation wirft damit zur Laufzeit.
+      // onUpdate feuert ohnehin bei jeder Scroll-Aktualisierung.
       ScrollTrigger.create({
         trigger: section,
         start: 'top top',
         end: 'bottom top',
-        scrub: true,
         onUpdate: (self) => setHeroProgress(self.progress),
       })
 
@@ -59,8 +62,11 @@ export function Hero() {
   }, [reducedMotion])
 
   // Auftritt: Wörter steigen aus ihrer Maske, sobald der Vorhang oben ist.
+  // Der Riegel sorgt dafür, dass das genau einmal passiert: liefe der Effekt
+  // ein zweites Mal, setzte `fromTo` die Wörter sofort wieder unter die Maske.
   useEffect(() => {
-    if (!introReady) return
+    if (!introReady || introPlayed.current) return
+    introPlayed.current = true
     const headline = headlineRef.current
     const words = collectWords(headline)
 
@@ -72,7 +78,18 @@ export function Hero() {
 
     const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
     timeline
-      .fromTo(words, { yPercent: 115 }, { yPercent: 0, duration: 1.3, stagger: 0.055 })
+      .fromTo(
+        words,
+        { yPercent: 115 },
+        {
+          yPercent: 0,
+          duration: 1.3,
+          stagger: 0.055,
+          // Danach keine Inline-Transformation mehr — nichts kann die Zeile
+          // versehentlich wieder nach unten schieben.
+          onComplete: () => gsap.set(words, { clearProps: 'transform' }),
+        },
+      )
       .fromTo(
         '[data-hero-fade]',
         { opacity: 0, y: 20 },

@@ -10,7 +10,7 @@ type SmokeProps = {
   opacity?: number
 }
 
-export function Smoke({ count = 260, spread = 2.6, opacity = 0.5 }: SmokeProps) {
+export function Smoke({ count = 340, spread = 2.6, opacity = 0.38 }: SmokeProps) {
   const dpr = useThree((state) => state.viewport.dpr)
 
   const geometry = useMemo(() => {
@@ -50,7 +50,7 @@ export function Smoke({ count = 260, spread = 2.6, opacity = 0.5 }: SmokeProps) 
         blending: THREE.AdditiveBlending,
         uniforms: {
           uTime: { value: 0 },
-          uSize: { value: 190 },
+          uSize: { value: 120 },
           uPixelRatio: { value: dpr },
           uSpread: { value: spread },
           uOpacity: { value: opacity },

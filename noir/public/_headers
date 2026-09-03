@@ -1,0 +1,29 @@
+# Cloudflare Pages — Antwort-Header
+# Reihenfolge: spezifische Regeln zuerst, allgemeine zuletzt.
+
+/assets/*
+  # Vite hängt einen Inhalts-Hash an jeden Dateinamen: unbegrenzt cachebar.
+  Cache-Control: public, max-age=31536000, immutable
+
+/img/*
+  # Bilddateien tragen keinen Hash. Ein Jahr wäre zu lang, wenn ein Foto
+  # ausgetauscht wird — 30 Tage plus Hintergrund-Aktualisierung passt.
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/og.jpg
+  Cache-Control: public, max-age=604800
+
+/*.svg
+  Cache-Control: public, max-age=2592000
+
+/api/*
+  Cache-Control: no-store
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
+  # Die Seite lädt ausschließlich eigene Ressourcen: keine Fremdschriften,
+  # keine Analyse, keine externen Skripte. Entsprechend eng ist die Richtlinie.
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'

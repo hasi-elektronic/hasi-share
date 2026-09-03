@@ -109,7 +109,7 @@ export function Menu() {
         className="relative"
       >
         <div ref={stageRef} className="h-[100svh] overflow-hidden">
-          <div className="mx-auto flex h-full w-full max-w-shell flex-col px-gutter pb-10 pt-24 sm:pt-28">
+          <div className="mx-auto flex h-full w-full max-w-shell flex-col px-gutter pb-6 pt-20 sm:pb-10 sm:pt-28">
             <MenuHeader
               vegetarian={vegetarian}
               onToggle={toggleVegetarian}
@@ -118,7 +118,7 @@ export function Menu() {
               showRail
             />
 
-            <div className="relative mt-8 grid flex-1 grid-cols-12 items-center gap-6 lg:gap-10">
+            <div className="relative mt-6 grid flex-1 grid-cols-12 items-center gap-5 md:mt-8 lg:gap-10">
               {/* Fortschrittsschiene mit sieben Punkten */}
               <div
                 aria-hidden="true"
@@ -145,7 +145,7 @@ export function Menu() {
               </div>
 
               {/* Text */}
-              <div className="col-span-12 md:col-span-6 lg:col-span-5">
+              <div className="order-2 col-span-12 md:order-none md:col-span-6 lg:col-span-5">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`${vegetarian ? 'v' : 'k'}-${current?.nummer ?? '00'}`}
@@ -161,11 +161,16 @@ export function Menu() {
                 </AnimatePresence>
               </div>
 
-              {/* Bildrahmen — feste Größe, der Inhalt blendet darin über. */}
-              <div className="col-span-12 md:col-span-5 lg:col-span-6">
+              {/*
+                Bildrahmen — feste Größe, der Inhalt blendet darin über.
+                Auf dem Handy ein Streifen über dem Text, ab md hochkant
+                daneben. Die Höhe ist gedeckelt, damit die gepinnte Bühne
+                nie über den Bildschirm hinauswächst.
+              */}
+              <div className="order-1 col-span-12 md:order-none md:col-span-5 lg:col-span-6">
                 <div
                   ref={frameRef}
-                  className="relative ml-auto aspect-[4/5] w-full max-w-[26rem] will-change-transform lg:max-w-[32rem]"
+                  className="relative mx-auto h-[20svh] w-full will-change-transform md:mx-0 md:ml-auto md:h-[min(54svh,34rem)] md:w-auto md:aspect-[4/5]"
                 >
                   <span
                     aria-hidden="true"
@@ -224,15 +229,15 @@ function MenuHeader({
   showRail: boolean
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-6 border-b border-hairline pb-6">
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-hairline pb-4 sm:pb-6">
       <div>
         <p className="label label-accent">Degustationsmenü</p>
-        <h2 id="menue-titel" className="display mt-4 text-[clamp(2rem,5vw,3.5rem)]">
+        <h2 id="menue-titel" className="display mt-2 text-[clamp(1.75rem,5vw,3.5rem)] sm:mt-4">
           Sieben Gänge
         </h2>
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-4 sm:gap-5">
         {showRail ? (
           <span className="label">
             {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
@@ -246,7 +251,7 @@ function MenuHeader({
             aria-checked={vegetarian}
             onClick={onToggle}
             data-cursor={vegetarian ? 'Klassisch' : 'Vegetarisch'}
-            className="group inline-flex items-center gap-3 border border-hairline px-4 py-2.5 transition-colors duration-500 ease-noir hover:border-accent"
+            className="group inline-flex items-center gap-3 border border-hairline px-3 py-2 transition-colors duration-500 ease-noir hover:border-accent sm:px-4 sm:py-2.5"
           >
             <span
               aria-hidden="true"
@@ -268,7 +273,7 @@ function MenuHeader({
               Vegetarisch
             </span>
           </button>
-          <p className="label mt-2 text-[0.55rem] normal-case tracking-normal">
+          <p className="label mt-2 hidden text-[0.55rem] normal-case tracking-normal sm:block">
             {VEGETARIAN_SWAPS} von {total} Gängen werden getauscht
           </p>
         </div>
@@ -280,19 +285,23 @@ function MenuHeader({
 function CourseText({ course }: { course: Course }) {
   return (
     <article>
-      <p className="font-display text-[clamp(4rem,11vw,9rem)] leading-[0.8] text-accent">
+      <p className="font-display text-[clamp(3rem,10vw,9rem)] leading-[0.8] text-accent">
         {course.nummer}
       </p>
-      <h3 className="display mt-6 text-[clamp(1.75rem,3.4vw,2.75rem)] text-ink">{course.name}</h3>
-      <p className="mt-5 max-w-[42ch] text-pretty text-sm leading-relaxed text-muted sm:text-base">
+      <h3 className="display mt-4 text-[clamp(1.5rem,3.4vw,2.75rem)] text-ink sm:mt-6">
+        {course.name}
+      </h3>
+      <p className="mt-4 max-w-[42ch] text-pretty text-sm leading-relaxed text-muted sm:mt-5 sm:text-base">
         {course.beschreibung}
       </p>
-      <dl className="mt-8 space-y-3 border-t border-hairline pt-6">
+      <dl className="mt-6 space-y-3 border-t border-hairline pt-5 sm:mt-8 sm:pt-6">
         <div className="flex gap-4">
           <dt className="label w-24 shrink-0">Herkunft</dt>
           <dd className="text-sm text-ink/80">{course.herkunft}</dd>
         </div>
-        <div className="flex gap-4">
+        {/* Auf dem Handy fehlt der Platz — die Weinbegleitung steht dort
+            weiterhin in der reduzierten Ansicht und im Preisblock. */}
+        <div className="hidden gap-4 sm:flex">
           <dt className="label w-24 shrink-0">Begleitung</dt>
           <dd className="text-sm text-ink/80">{course.weinbegleitung}</dd>
         </div>

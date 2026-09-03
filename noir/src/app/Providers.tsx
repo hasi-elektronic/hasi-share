@@ -4,7 +4,7 @@ import { AppContext, type AppEnv } from './appContext'
 import { useIsCoarsePointer, useReducedMotion } from '@/lib/useReducedMotion'
 import { canRender3D } from '@/lib/capabilities'
 import { destroyLenis, initLenis } from './lenis'
-import { ScrollTrigger, registerGsap } from './gsap'
+import { ScrollTrigger } from './gsap'
 import { setPointer } from './sceneProgress'
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -23,7 +23,6 @@ export function Providers({ children }: { children: ReactNode }) {
 
   // Lenis wird bei jeder Änderung der Bewegungs-Präferenz neu bewertet.
   useEffect(() => {
-    registerGsap()
     // Für CSS-Regeln, die nicht über die Media-Query allein lösbar sind.
     document.documentElement.dataset['motion'] = reducedMotion ? 'reduced' : 'full'
     initLenis(reducedMotion)

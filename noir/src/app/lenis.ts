@@ -1,5 +1,5 @@
 import Lenis from 'lenis'
-import { gsap, ScrollTrigger, registerGsap } from './gsap'
+import { gsap, ScrollTrigger } from './gsap'
 
 let instance: Lenis | null = null
 
@@ -14,8 +14,6 @@ const tick = (time: number): void => {
  * Smoothing und Scroll-Animationen garantiert im selben Frame.
  */
 export function initLenis(reducedMotion: boolean): Lenis | null {
-  registerGsap()
-
   if (reducedMotion) {
     destroyLenis()
     return null

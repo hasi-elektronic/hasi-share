@@ -1,5 +1,5 @@
-import { Suspense, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Suspense, useMemo, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
 import { Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { HOTSPOTS } from '@/data/room'
@@ -20,7 +20,7 @@ const TABLES: [number, number][] = [
   [0.4, 2.8],
 ]
 
-const ROOM = { width: 9, height: 3.4, depth: 9 }
+const ROOM = { width: 10, height: 3.4, depth: 10 }
 
 function Room() {
   const materials = useMemo(() => {
@@ -61,9 +61,14 @@ function Room() {
         <planeGeometry args={[ROOM.width, ROOM.depth]} />
       </mesh>
 
-      {/* Fensterfront zur Königstraße */}
-      <mesh material={materials.window} position={[0, 1.5, ROOM.depth / 2 - 0.02]}>
-        <planeGeometry args={[5.4, 1.9]} />
+      {/* Fensterfront zur Königstraße — nach innen gedreht, damit sie nur
+          von innerhalb des Raums zu sehen ist. */}
+      <mesh
+        material={materials.window}
+        position={[0, 1.55, ROOM.depth / 2 - 0.04]}
+        rotation={[0, Math.PI, 0]}
+      >
+        <planeGeometry args={[5.6, 1.9]} />
       </mesh>
 
       {/* Küchenzeile an der Rückwand */}
@@ -139,21 +144,6 @@ function Table({
   )
 }
 
-/** Dreht die Szene langsam, bis der Gast selbst zugreift. */
-function AutoRotate({ enabled }: { enabled: boolean }) {
-  const group = useRef<THREE.Group>(null)
-  useFrame((state, delta) => {
-    if (!enabled) return
-    // Kamera um den Mittelpunkt führen statt die Geometrie zu drehen.
-    const radius = Math.hypot(state.camera.position.x, state.camera.position.z)
-    const angle = Math.atan2(state.camera.position.z, state.camera.position.x) + delta * 0.06
-    state.camera.position.x = Math.cos(angle) * radius
-    state.camera.position.z = Math.sin(angle) * radius
-    state.camera.lookAt(0, 1, 0)
-  })
-  return <group ref={group} />
-}
-
 type RoomSceneProps = {
   active: boolean
   autoRotate: boolean
@@ -170,13 +160,15 @@ export default function RoomScene({ active, autoRotate, selectedId, onSelect }: 
       frameloop={active ? 'always' : 'never'}
       dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
-      camera={{ position: [5.4, 2.4, 5.4], fov: 42 }}
+      // Die Kamera bleibt innerhalb der Raumhülle — von außen wären die
+      // Wände (BackSide) unsichtbar und man sähe in eine leere Schachtel.
+      camera={{ position: [2.8, 2.2, 3.2], fov: 46 }}
       onPointerDown={() => setUserTouched(true)}
       onWheel={() => setUserTouched(true)}
     >
       <color attach="background" args={['#0a0a0b']} />
       {/* Nebel verschluckt die Ecken — der Raum wirkt größer, als er ist. */}
-      <fog attach="fog" args={['#0a0a0b', 6, 20]} />
+      <fog attach="fog" args={['#0a0a0b', 3.5, 13]} />
 
       <ambientLight intensity={0.14} />
       <hemisphereLight args={['#3a2f22', '#08080a', 0.35]} />
@@ -189,7 +181,8 @@ export default function RoomScene({ active, autoRotate, selectedId, onSelect }: 
             key={hotspot.id}
             position={hotspot.position}
             center
-            distanceFactor={9}
+            // Bewusst ohne distanceFactor: die Beschriftung soll immer gleich
+            // groß bleiben. Sonst wächst ein naher Punkt über das halbe Bild.
             zIndexRange={[20, 0]}
           >
             <button
@@ -204,15 +197,18 @@ export default function RoomScene({ active, autoRotate, selectedId, onSelect }: 
           </Html>
         ))}
 
-        <AutoRotate enabled={rotating} />
-
         <OrbitControls
-          target={[0, 1, 0]}
+          target={[0, 0.9, 0]}
           enablePan={false}
           enableDamping
           dampingFactor={0.08}
-          minDistance={3.5}
-          maxDistance={11}
+          // Die eingebaute Drehung statt einer eigenen Schleife: sie rechnet
+          // mit derselben Kugelkoordinate wie die Dämpfung und gerät dadurch
+          // nicht mit der Benutzereingabe in Streit.
+          autoRotate={rotating}
+          autoRotateSpeed={0.35}
+          minDistance={2.4}
+          maxDistance={4.8}
           // Nie unter den Boden und nie senkrecht von oben.
           minPolarAngle={Math.PI * 0.18}
           maxPolarAngle={Math.PI * 0.49}
