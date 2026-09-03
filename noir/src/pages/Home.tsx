@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { scrollToId } from '@/app/lenis'
+import { Preloader } from '@/sections/Preloader'
+import { Hero } from '@/sections/Hero'
+import { Manifest } from '@/sections/Manifest'
 
 export function Home() {
   const location = useLocation()
@@ -17,10 +20,10 @@ export function Home() {
 
   return (
     <PageTransition>
+      <Preloader />
       <main id="inhalt">
-        <section className="flex min-h-screen items-center justify-center">
-          <p className="label">Aufbau läuft</p>
-        </section>
+        <Hero />
+        <Manifest />
       </main>
     </PageTransition>
   )

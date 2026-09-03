@@ -1,4 +1,5 @@
 import { Fragment, type ReactElement } from 'react'
+import { WORD_INNER_CLASS } from './wordMask'
 
 /**
  * Eigene Text-Aufteilung — kein GSAP-Club-Plugin.
@@ -18,8 +19,6 @@ type SplitWordsProps = {
   /** Erzwingt einen Zeilenumbruch an dieser Stelle: "Zeile eins|Zeile zwei" */
   as?: 'span' | 'div'
 }
-
-export const WORD_INNER_CLASS = 'split-word__inner'
 
 export function SplitWords({
   text,
@@ -56,10 +55,4 @@ export function SplitWords({
       </span>
     </Tag>
   )
-}
-
-/** Sammelt alle animierbaren Wort-Elemente innerhalb eines Containers. */
-export function collectWords(root: HTMLElement | null): HTMLElement[] {
-  if (!root) return []
-  return Array.from(root.querySelectorAll<HTMLElement>(`.${WORD_INNER_CLASS}`))
 }

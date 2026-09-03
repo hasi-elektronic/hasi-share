@@ -268,3 +268,36 @@ body.has-custom-cursor * {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ---- Scroll-Hinweis ------------------------------------------------------ */
+.scroll-hint {
+  transform-origin: top;
+  animation: scroll-hint 2.6s var(--ease-noir) infinite;
+}
+
+@keyframes scroll-hint {
+  0% {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  70% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1) translateY(60%);
+    opacity: 0;
+  }
+}
+
+/* Wörter starten unter ihrer Maske; GSAP holt sie herauf. */
+.split-word__inner {
+  transform: translateY(115%);
+}
+
+html[data-motion='reduced'] .split-word__inner {
+  transform: none;
+}

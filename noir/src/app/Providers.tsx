@@ -24,6 +24,8 @@ export function Providers({ children }: { children: ReactNode }) {
   // Lenis wird bei jeder Änderung der Bewegungs-Präferenz neu bewertet.
   useEffect(() => {
     registerGsap()
+    // Für CSS-Regeln, die nicht über die Media-Query allein lösbar sind.
+    document.documentElement.dataset['motion'] = reducedMotion ? 'reduced' : 'full'
     initLenis(reducedMotion)
     return () => {
       destroyLenis()

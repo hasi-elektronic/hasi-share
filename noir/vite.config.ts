@@ -13,19 +13,9 @@ export default defineConfig({
     target: 'es2020',
     cssTarget: 'safari15',
     assetsInlineLimit: 2048,
-    rollupOptions: {
-      output: {
-        // Keep three.js + R3F out of the initial chunk. They are only ever
-        // pulled in by the lazily mounted WebGL scenes.
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (/three|@react-three/.test(id)) return 'three'
-            if (/gsap/.test(id)) return 'gsap'
-            if (/framer-motion/.test(id)) return 'motion'
-          }
-          return undefined
-        },
-      },
-    },
+    // Kein manualChunks: die dynamischen Imports der WebGL-Szenen erzeugen von
+    // sich aus eigene Chunks. Eine erzwungene Aufteilung zog React in den
+    // three.js-Chunk und ließ ihn dadurch beim ersten Laden mitgeladen werden.
+    chunkSizeWarningLimit: 1200,
   },
 })
