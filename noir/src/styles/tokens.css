@@ -1,0 +1,38 @@
+:root {
+  /* Farbwelt — Kerzenlicht, schwarzer Stein, gebürstetes Messing.
+     Kanalwerte, damit Tailwind-Opazitäten (bg-accent/60) funktionieren. */
+  --bg-rgb: 10 10 11;
+  --bg-elevated-rgb: 20 20 22;
+  --ink-rgb: 244 241 234;
+  --ink-muted-rgb: 154 150 142;
+  --accent-rgb: 200 169 106;
+  --accent-deep-rgb: 140 111 58;
+  --wine-rgb: 90 31 43;
+
+  --bg: rgb(var(--bg-rgb));
+  --bg-elevated: rgb(var(--bg-elevated-rgb));
+  --ink: rgb(var(--ink-rgb));
+  --ink-muted: rgb(var(--ink-muted-rgb));
+  --accent: rgb(var(--accent-rgb));
+  --accent-deep: rgb(var(--accent-deep-rgb));
+  --wine: rgb(var(--wine-rgb));
+
+  /* Abgeleitete Werte */
+  --hairline: rgb(var(--ink-rgb) / 0.12);
+  --hairline-strong: rgb(var(--ink-rgb) / 0.24);
+  --accent-veil: rgb(var(--accent-rgb) / 0.14);
+  --overlay: rgb(var(--bg-rgb) / 0.86);
+
+  /* Bewegung */
+  --ease-noir: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.4s;
+  --dur-base: 0.8s;
+  --dur-slow: 1.4s;
+
+  /* Raster */
+  --shell: 1440px;
+  --gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --section-y: clamp(6rem, 12vh, 12rem);
+
+  color-scheme: dark;
+}

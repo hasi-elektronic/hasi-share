@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0A0B" />
+    <meta name="color-scheme" content="dark" />
+
+    <title>NOIR — Fine Dining · Stuttgart</title>
+    <meta
+      name="description"
+      content="NOIR — Fine Dining in Stuttgart. Sieben Gänge, ein Abend, keine Ablenkung. Degustationsmenü von Küchenchef Elias Roth. Jetzt Tisch reservieren."
+    />
+    <link rel="canonical" href="https://noir-demo.pages.dev/" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="restaurant" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:site_name" content="NOIR — Fine Dining" />
+    <meta property="og:title" content="NOIR — Fine Dining · Stuttgart" />
+    <meta
+      property="og:description"
+      content="Sieben Gänge. Ein Abend. Keine Ablenkung. Degustationsmenü von Küchenchef Elias Roth."
+    />
+    <meta property="og:image" content="/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "name": "NOIR — Fine Dining",
+        "servesCuisine": "Neue deutsche Küche",
+        "priceRange": "€€€€",
+        "telephone": "+49 711 9028440",
+        "email": "reservierung@noir-stuttgart.de",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Königstraße 12",
+          "postalCode": "70173",
+          "addressLocality": "Stuttgart",
+          "addressCountry": "DE"
+        },
+        "openingHours": ["Di-Sa 18:00-24:00", "So 18:00-23:00"],
+        "acceptsReservations": "True"
+      }
+    </script>
+
+    <style>
+      /* Painted before any CSS chunk loads — kein weißer Blitz. */
+      html {
+        background: #0a0a0b;
+      }
+      body {
+        margin: 0;
+        background: #0a0a0b;
+        color: #f4f1ea;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 4rem 1.5rem; font-family: Georgia, serif; max-width: 40rem">
+        <h1 style="font-weight: 300">NOIR — Fine Dining, Stuttgart</h1>
+        <p>
+          Diese Website benötigt JavaScript. Für Reservierungen erreichen Sie uns telefonisch unter
+          +49 711 9028440 oder per E-Mail an reservierung@noir-stuttgart.de.
+        </p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
