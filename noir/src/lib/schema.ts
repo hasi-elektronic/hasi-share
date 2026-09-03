@@ -100,9 +100,11 @@ export const reservationSchema = z.object({
 
   nachricht: z.string().trim().max(600, 'Bitte höchstens 600 Zeichen.').optional(),
 
-  datenschutz: z.literal(true, {
-    errorMap: () => ({ message: 'Bitte bestätigen Sie die Datenschutzerklärung.' }),
-  }),
+  // Kein z.literal(true): react-hook-form braucht einen Startwert `false`,
+  // und der wäre gegen ein Literal nicht typisierbar.
+  datenschutz: z
+    .boolean()
+    .refine((value) => value, { message: 'Bitte bestätigen Sie die Datenschutzerklärung.' }),
 
   /**
    * Honeypot: für Menschen unsichtbar, Bots füllen ihn aus.

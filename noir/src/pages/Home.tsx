@@ -8,6 +8,7 @@ import { Manifest } from '@/sections/Manifest'
 import { Menu } from '@/sections/Menu'
 import { Chef } from '@/sections/Chef'
 import { Gallery } from '@/sections/Gallery'
+import { Reservation } from '@/sections/Reservation'
 
 export function Home() {
   const location = useLocation()
@@ -30,6 +31,7 @@ export function Home() {
         <Menu />
         <Chef />
         <Gallery />
+        <Reservation />
       </main>
     </PageTransition>
   )
