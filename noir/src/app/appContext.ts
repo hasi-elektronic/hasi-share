@@ -5,7 +5,7 @@ export type AppEnv = {
   reducedMotion: boolean
   /** Touch-Gerät oder anderer grober Zeiger. */
   coarsePointer: boolean
-  /** Darf eine WebGL-Szene gemountet werden? */
+  /** Hardware-Urteil: darf überhaupt eine WebGL-Szene gemountet werden? */
   allow3D: boolean
 }
 

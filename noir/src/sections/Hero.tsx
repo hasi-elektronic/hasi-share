@@ -94,7 +94,7 @@ export function Hero() {
     >
       {/* --- Bühne: WebGL oder Standbild ---------------------------------- */}
       <div ref={stageRef} className="absolute inset-0 z-0">
-        {allow3D ? (
+        {allow3D && !reducedMotion ? (
           <Suspense fallback={<HeroPoster />}>
             <HeroScene active={canvasActive} />
           </Suspense>

@@ -6,6 +6,8 @@ import { Preloader } from '@/sections/Preloader'
 import { Hero } from '@/sections/Hero'
 import { Manifest } from '@/sections/Manifest'
 import { Menu } from '@/sections/Menu'
+import { Chef } from '@/sections/Chef'
+import { Gallery } from '@/sections/Gallery'
 
 export function Home() {
   const location = useLocation()
@@ -26,6 +28,8 @@ export function Home() {
         <Hero />
         <Manifest />
         <Menu />
+        <Chef />
+        <Gallery />
       </main>
     </PageTransition>
   )

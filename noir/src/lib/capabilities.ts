@@ -32,8 +32,12 @@ export function isLowPoweredDevice(): boolean {
   return false
 }
 
-/** Gesamturteil: 3D rendern oder Poster zeigen? */
-export function canRender3D(reducedMotion: boolean): boolean {
-  if (reducedMotion) return false
+/**
+ * Gesamturteil über die Hardware: WebGL2 vorhanden und Gerät kräftig genug?
+ * Die Bewegungs-Präferenz fließt hier bewusst nicht ein — sie entscheidet pro
+ * Szene: der Hero zeigt dann das Poster, der Raum bleibt bedienbar, dreht sich
+ * aber nicht mehr von allein.
+ */
+export function canRender3D(): boolean {
   return supportsWebGL2() && !isLowPoweredDevice()
 }

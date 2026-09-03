@@ -16,7 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
     () => ({
       reducedMotion,
       coarsePointer,
-      allow3D: canRender3D(reducedMotion),
+      allow3D: canRender3D(),
     }),
     [reducedMotion, coarsePointer],
   )
