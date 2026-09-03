@@ -5,6 +5,7 @@ import { scrollToId } from '@/app/lenis'
 import { Preloader } from '@/sections/Preloader'
 import { Hero } from '@/sections/Hero'
 import { Manifest } from '@/sections/Manifest'
+import { Menu } from '@/sections/Menu'
 
 export function Home() {
   const location = useLocation()
@@ -24,6 +25,7 @@ export function Home() {
       <main id="inhalt">
         <Hero />
         <Manifest />
+        <Menu />
       </main>
     </PageTransition>
   )
