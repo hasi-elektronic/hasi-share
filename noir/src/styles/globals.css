@@ -374,3 +374,82 @@ html[data-motion='reduced'] .split-word__inner {
     opacity: 0.5;
   }
 }
+
+/* ---- Rechtsseiten -------------------------------------------------------- */
+.legal h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  color: var(--ink);
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.legal h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.legal h3 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-top: 2rem;
+}
+
+.legal p,
+.legal li {
+  color: var(--ink-muted);
+  line-height: 1.75;
+  margin-top: 1rem;
+}
+
+.legal ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.legal ul li {
+  position: relative;
+  padding-left: 1.25rem;
+}
+
+.legal ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.85em;
+  width: 0.4rem;
+  height: 1px;
+  background: var(--accent);
+}
+
+.legal a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-color: var(--accent);
+}
+
+.legal strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.legal dl {
+  margin-top: 1rem;
+}
+
+.legal dt {
+  color: var(--ink);
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.legal dd {
+  color: var(--ink-muted);
+  margin-left: 0;
+}
