@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 
 // Selbst gehostete Schriften — keine Laufzeit-Anfrage an Google Fonts (DSGVO).
 import '@fontsource/cormorant-garamond/latin-300.css'
@@ -20,12 +20,16 @@ import { App } from './app/App'
 const container = document.getElementById('root')
 if (!container) throw new Error('Root-Element nicht gefunden.')
 
+// Die Einzeldatei-Fassung läuft ohne Server: dort kann kein Pfad-Routing
+// funktionieren, /impressum liegt dann hinter #/impressum.
+const Router = import.meta.env.VITE_SINGLE_FILE === 'true' ? HashRouter : BrowserRouter
+
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <Providers>
         <App />
       </Providers>
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 )

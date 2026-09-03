@@ -222,3 +222,27 @@ Der Auftrag war eng gefasst; diese Punkte gehören in eine spätere Runde:
 ---
 
 Website: **Hasi Site Studio** — hasi-elektronic.de
+
+---
+
+## Anhang: Einzeldatei-Fassung für die Vorführung
+
+```bash
+npm run build:single
+# -> dist-single/noir-einzeldatei.html (rund 2,6 MB)
+```
+
+Eine einzige HTML-Datei mit allem darin: Skript, Stile, Schriften und alle 66
+Bildvarianten als data-URI. Zum Mailen an einen Kunden, für den Stick oder für
+den Termin ohne WLAN — Doppelklick genügt, kein Server nötig.
+
+Bewusste Unterschiede zur gehosteten Fassung:
+
+- Routing über den Hash (`#/impressum` statt `/impressum`), weil ohne Server
+  kein Pfad ausgeliefert werden kann
+- keine Code-Aufteilung: three.js liegt im selben Bündel und wird immer
+  geladen, auch auf Geräten, die sonst das Poster bekämen
+- `/api/reserve` antwortet nicht — das Formular zeigt einen Verbindungsfehler
+  statt der Bestätigungskarte
+
+Für Kunden und Messungen zählt weiterhin `npm run build`.

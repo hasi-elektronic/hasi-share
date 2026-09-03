@@ -11,7 +11,8 @@
     "lint": "eslint . --ext .ts,.tsx,.mjs --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "images": "node scripts/fetch-images.mjs",
-    "og": "node scripts/make-og.mjs"
+    "og": "node scripts/make-og.mjs",
+    "build:single": "vite build --config vite.config.single.ts && node scripts/build-single.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.0",

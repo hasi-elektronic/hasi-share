@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { IMAGE_WIDTHS, type ImageAsset } from '@/data/images'
+import { resolveImageSrc } from '@/lib/imageRegistry'
 
 type PictureProps = {
   image: ImageAsset
@@ -9,8 +10,6 @@ type PictureProps = {
   /** Bilder oberhalb der Falz laden eifrig, alles andere lazy. */
   priority?: boolean
 }
-
-const srcFor = (name: string, width: number) => `/img/${name}-${width}.webp`
 
 /**
  * WebP mit Breitenvarianten, festen Maßen (CLS = 0) und LQIP-Unschärfe,
@@ -33,10 +32,10 @@ export function Picture({ image, sizes, className = '', imgClassName = '', prior
         <source
           type="image/webp"
           sizes={sizes}
-          srcSet={IMAGE_WIDTHS.map((w) => `${srcFor(image.name, w)} ${w}w`).join(', ')}
+          srcSet={IMAGE_WIDTHS.map((w) => `${resolveImageSrc(image.name, w)} ${w}w`).join(', ')}
         />
         <img
-          src={srcFor(image.name, 1280)}
+          src={resolveImageSrc(image.name, 1280)}
           alt={image.alt}
           width={image.width}
           height={image.height}
