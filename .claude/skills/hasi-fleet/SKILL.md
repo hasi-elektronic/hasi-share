@@ -1,28 +1,61 @@
 ---
 name: hasi-fleet
 description: >
-  Hasi Elektronic işlerinde çok-agent'lı (paralel) çalışma ve delegasyon sistemi.
+  Çok-agent (paralel) çalışma, delegasyon ve doğrulama sistemi — platformdan bağımsız.
+  Claude Code, claude.ai, Cursor/Windsurf, Codex CLI veya düz sohbet arayüzü fark etmez;
+  hangi ortamda çalışıyorsan oradaki yeteneklere göre uyarlanır.
   Büyük kod incelemeleri, güvenlik/performans auditleri, çok modüllü implementasyon,
-  toplu müşteri sitesi üretimi, zor bug avı ve görsel varlık üretiminde kullan.
+  toplu müşteri sitesi üretimi, zor bug avı, büyük refactor ve görsel varlık üretiminde kullan.
   Görevi tek agent / pipeline / fleet olarak sınıflandırır, lane sahipliğini (OWNS /
   DO NOT TOUCH) tanımlar, en dar yetkiyle çalışır, git worktree ile eşzamanlı yazmayı
   izole eder ve her lane'i doğrulama kapısından geçirir.
   Tetikleyiciler: "paralel çalış", "fleet başlat", "agent'lara dağıt", "çok agent",
   "tüm projeyi incele", "audit yap", "kod review", "büyük refactor", "aynı anda",
-  "birden fazla site/proje", "parallel", "multi-agent", "Projekt prüfen",
-  "Code Review", "Audit", "Refactor", "gleichzeitig".
+  "birden fazla site/proje", "parallel", "multi-agent", "orchestrate", "fan out",
+  "Projekt prüfen", "Code Review", "Audit", "Refactor", "gleichzeitig".
 ---
 
-# Hasi Fleet — Çok-Agent Orkestrasyonu
+# Hasi Fleet — Çok-Agent Orkestrasyonu (platformdan bağımsız)
 
-**Sürüm:** 1.0.0
-**Bağlı sistem:** Hasi KI-System (11 agent) + Claude Code subagent'ları
+**Sürüm:** 2.0.0
 
 Amaç **"mümkün olduğunca çok agent açmak" değildir.** Amaç:
 **kontrolü, doğruluğu ve repo bütünlüğünü kaybetmeden işi hızlı bitirmek.**
 
-Bu skill `hasi-os` ile çakışmaz: `hasi-os` *ne yapılacağını* yönlendirir,
-`hasi-fleet` *işin kaç agent'la ve hangi sahiplikle yapılacağını* yönetir.
+Bu dosya çekirdek doktrindir ve **her platformda geçerlidir.** Ortama veya teknoloji
+yığınına özel detaylar ayrı referans dosyalarındadır — sadece gerektiğinde oku:
+
+| Ne zaman | Oku |
+|---|---|
+| Hangi ortamdayım, delegasyonu nasıl yaparım | `references/platforms.md` |
+| Bu projenin kabul/doğrulama komutu ne | `references/stacks.md` |
+| Hasi KI-System agent'ları, MCP araçları, marka kuralları | `references/hasi-mapping.md` |
+| Claude dışı bir araca (ChatGPT, Grok, Codex, Cursor) taşıyacağım | `references/portable-prompt.md` |
+
+Kurulum ve dağıtım için: `INSTALL.md`.
+
+---
+
+## 0. Adım sıfır: yetenek tespiti
+
+Delegasyondan önce **bulunduğun ortamın gerçekte ne yapabildiğini** belirle. Varsayma.
+
+1. **Gerçek paralel agent açabiliyor muyum?** (subagent/task aracı, arka plan süreç, ayrı CLI)
+2. **Dosya yazabiliyor muyum?** (dosya araçları veya shell)
+3. **Komut çalıştırabiliyor muyum?** (test, build, git)
+4. **Ağ / MCP erişimim var mı?**
+
+Buna göre çalışma modunu seç:
+
+| Yetenek | Mod |
+|---|---|
+| Paralel agent + shell + dosya | **Tam fleet** — bu dosyanın tamamı geçerli |
+| Shell + dosya, paralel agent yok | **Seri fleet** — lane'leri sırayla, aynı sahiplik ve kapılarla çalıştır |
+| Sadece sohbet (dosya/komut yok) | **Danışman modu** — lane brief'lerini, sahiplik haritasını ve kabul komutlarını *üret*, çalıştırılmış gibi davranma |
+
+Ortama özgü komutlar ve delegasyon biçimi için `references/platforms.md`.
+
+**Asla:** yapılmamış bir doğrulamayı yapılmış gibi raporlama; olmayan bir yeteneği varmış gibi kullanma.
 
 ---
 
@@ -30,48 +63,32 @@ Bu skill `hasi-os` ile çakışmaz: `hasi-os` *ne yapılacağını* yönlendirir
 
 ### 1.1 En dar yetki (least privilege)
 
-Yetki sırası — her zaman en alttakinden başla:
-
 1. **Salt okuma** (inceleme, audit, teşhis, mimari çıkarımı)
-2. **Workspace yazma** (yalnız gerçekten kod değişikliği gerekiyorsa)
-3. **Ağ erişimi** (paket kurulumu, API, doküman çekme — ayrı gerekçe ister)
-4. **Deploy / production erişimi** (yalnızca açık onayla, tek lane)
+2. **Workspace yazma** (yalnız gerçekten değişiklik gerekiyorsa)
+3. **Ağ erişimi** (paket, API, doküman — ayrı gerekçe ister)
+4. **Deploy / production** (yalnızca açık onayla, tek lane)
 
 Kolaylık olsun diye geniş yetki kullanma. Kural/onay/güvenlik sınırını **atlatmak amaçlı**
 bayrak veya komut asla kullanma.
 
 ### 1.2 Sadece bağımsız işi paralelleştir
 
-**Paralel olur:**
-- frontend review + backend review
-- güvenlik auditi + performans auditi
-- birbirinden bağımsız müşteri siteleri (Site Studio toplu üretim)
-- bağımsız paketler / bağımsız failing testler
-- bağımsız görseller (Instagram post + Angebot görseli)
+**Paralel olur:** frontend review + backend review · güvenlik auditi + performans auditi ·
+bağımsız müşteri projeleri · bağımsız paketler · bağımsız failing testler · bağımsız görseller.
 
-**Paralel olmaz (pipeline gerekir):**
-- D1 migration → migration'a bağlı Worker kodu
-- refactor → refactor'a bağlı testler
-- şema değişimi → API → frontend
-- sıralı Reel/story kareleri (görsel süreklilik gerekir)
-- aynı dosyaya yazan iki agent
-- rakip mimari karar veren iki agent
+**Paralel olmaz (pipeline gerekir):** şema/migration → ona bağlı kod · refactor → ona bağlı
+testler · API → frontend · sıralı video/story kareleri · aynı dosyaya yazan iki lane ·
+rakip mimari karar veren iki lane.
 
 Bağımlılık varsa **fleet değil pipeline** kur.
 
 ### 1.3 Doğrulama > özgüven
 
-Bir agent'ın "bitti" demesi kanıt değildir. Önemli her işi en güçlü uygun kapıdan geçir:
+Bir agent'ın "bitti" demesi kanıt değildir. Her önemli işi en güçlü uygun kapıdan geçir:
+typecheck · hedefli test → geniş test · lint · build · dry-run deploy · şema doğrulama ·
+`git diff` okuması · runtime smoke test · görsel işte gözle kontrol.
 
-- `npx tsc --noEmit` / typecheck
-- targeted test → sonra geniş test
-- lint / format
-- `npm run build`
-- `npx wrangler deploy --dry-run`
-- D1 şema doğrulama (`schema.sql` + migration sırası)
-- `git diff` okuması
-- runtime smoke test (Worker `/health`, form POST, upload akışı)
-- UI/görsel işte gözle kontrol
+Bu projede hangi komutun geçerli olduğu için → `references/stacks.md`.
 
 ### 1.4 Kullanıcının işini koru
 
@@ -83,44 +100,30 @@ git rev-parse --abbrev-ref HEAD
 ```
 
 İlgisiz lokal değişiklik varsa **koru**. Kullanıcı açıkça istemedikçe ve kapsam
-doğrulanmadıkça şunlar asla çalıştırılmaz:
+doğrulanmadıkça yıkıcı komut çalıştırma:
 
-```bash
-git reset --hard
-git clean -fd
-git checkout -- .
-rm -rf <geniş-yol>
-npx wrangler d1 execute ... --command "DROP ..."
+```
+git reset --hard · git clean -fd · git checkout -- . · rm -rf <geniş-yol>
+DROP/TRUNCATE içeren veritabanı komutları · force push · geçmiş yeniden yazma
 ```
 
 ---
 
-## 2. Ortam keşfi (ilk delegasyondan önce)
+## 2. Ortam ve proje keşfi
 
 ```bash
 pwd
 git rev-parse --show-toplevel 2>/dev/null || true
 git status --short 2>/dev/null || true
-ls package.json wrangler.toml schema.sql 2>/dev/null
+ls package.json wrangler.toml schema.sql requirements.txt app.json composer.json 2>/dev/null
 ```
 
-Proje tipi tespiti:
+Bulguları `references/stacks.md` tablosuyla eşleştir → proje tipi ve kabul kapıları çıkar.
 
-| Bulgu | Proje tipi | Tipik kapı |
-|---|---|---|
-| `wrangler.toml` + `worker.js` | Cloudflare Worker API | `wrangler deploy --dry-run` |
-| `wrangler.toml` + `pages/` | Pages + Worker | build + dry-run |
-| `schema.sql` / `migrations/` | D1 veritabanı | şema/migration sırası |
-| `vite.config.*` + React/TS | Frontend | `tsc --noEmit` + `npm run build` |
-| `app.json` + Expo | Mobil | `expo-doctor`, EAS build |
-| Supabase client | Supabase | RLS + policy kontrolü |
+**Efor seçimi:** mekanik iş (rename, çeviri, format) → düşük–orta · normal mühendislik →
+yüksek · zor teşhis/mimari/güvenlik → en yüksek, ama **her lane'de değil.**
 
-**Model / efor seçimi:**
-- mekanik iş (rename, çeviri, format) → düşük–orta efor
-- normal mühendislik → yüksek
-- zor teşhis / mimari / güvenlik → en yüksek, ama **her lane'de değil**
-
-Kullanıcı bir model istediyse sessizce düşürme; yoksa açıkça belirt.
+Kullanıcı belirli bir model/araç istediyse sessizce düşürme; kullanılamıyorsa açıkça söyle.
 
 ---
 
@@ -140,7 +143,8 @@ Basit bir düzeltmeyi fleet'e çevirme. Tek dosyalık iş = tek agent.
 
 ## 4. Lane briefing sözleşmesi
 
-Her delege agent **kendi başına yeterli** brief alır:
+Her delege **kendi başına yeterli** brief alır. Bu şablon platformdan bağımsızdır: subagent'a,
+başka bir CLI'ya, hatta başka bir sohbet penceresine aynı şekilde verilir.
 
 ```text
 ROL
@@ -161,11 +165,10 @@ SAHİPLİK (OWNS)
 DOKUNMA (DO NOT TOUCH)
 - <başka lane'lerin dosyaları>
 - ilgisiz lokal değişiklikler
-- wrangler.toml / package.json / schema.sql (tek sahibi var)
+- tek sahipli ortak dosyalar (bkz. references/stacks.md)
 
 GEREKSİNİMLER
-- <fonksiyonel gereksinim>
-- <kısıt: geriye dönük uyumluluk, DSGVO, dil, marka>
+- <fonksiyonel gereksinim, kısıt: geriye dönük uyumluluk, DSGVO, dil, marka>
 
 SÜREÇ
 1. ilgili kodu incele
@@ -178,33 +181,30 @@ KABUL KONTROLLERİ
 
 ÇIKTI
 - durum: DONE | PARTIAL | BLOCKED | FAILED
-- özet
-- değişen dosyalar
-- çalıştırılan kontroller ve sonuçları
-- kalan riskler
-- blocker (varsa)
+- özet · değişen dosyalar · çalıştırılan kontroller ve sonuçları
+- kalan riskler · blocker (varsa)
 ```
 
-Salt-okuma lane'lerinde `OWNS` yerine `SCOPE` yaz ve **"DOSYA DEĞİŞTİRME"** talimatını
-açıkça ver.
+Salt-okuma lane'lerinde `OWNS` yerine `SCOPE` yaz ve **"DOSYA DEĞİŞTİRME"** talimatını açıkça ver.
 
 ---
 
-## 5. Lane rolleri → Hasi KI-System eşlemesi
+## 5. Genel lane rolleri
 
-| Fleet lane | Hasi agent | Odak |
-|---|---|---|
-| Frontend | `builder` | React/Vite/Tailwind, render, state, a11y, responsive |
-| Backend/API | `builder` + `backend-architect` | Worker route'ları, validation, hata yönetimi, CORS |
-| Veritabanı | `backend-architect` | D1/Supabase şema, index, migration, RLS, FTS5 |
-| Güvenlik (salt okuma) | `security-guardian` | auth, secret sızıntısı, injection, CSP/headers, DSGVO |
-| Performans | `builder` | bundle, cache, gereksiz render, yavaş sorgu, R2 erişimi |
-| QA | `qa-reviewer` | kabul kriteri, test kapsamı, Lighthouse, Almanca dil kontrolü |
-| UI/UX | `designer` | hiyerarşi, okunabilirlik, marka tutarlılığı |
-| Deploy | `hasi-devops` | GitHub, Pages/Workers deploy, DNS, SSL — **tek lane** |
-| Doküman/müşteri metni | `hasi-customer-comms` | README, Angebot, Kundenbericht, teslim notu |
+| Lane | Odak |
+|---|---|
+| Frontend | bileşen mimarisi, render, state, a11y, responsive |
+| Backend/API | route/endpoint, validation, hata yönetimi, eşzamanlılık, entegrasyon |
+| Veritabanı | şema, index, migration, sorgu performansı, yetki sınırı (RLS vb.) |
+| Güvenlik (salt okuma) | auth/authz, secret sızıntısı, injection, güvensiz varsayılan, bağımlılık riski |
+| Performans | bundle, cache, gereksiz render, yavaş sorgu, ağ maliyeti |
+| QA | kabul kriteri, test kapsamı, regresyon, uç durumlar |
+| UI/UX | hiyerarşi, okunabilirlik, tutarlılık, etkileşim |
+| Deploy | build, release, DNS/SSL, ortam değişkeni — **her zaman tek lane** |
+| Doküman | README, API dokümanı, teslim/müşteri metni, migration notu |
 
-Sadece göreve gerçekten gereken lane'leri aç. 6 lane'in hepsini otomatik açma.
+Hasi KI-System'in 11 agent'ıyla eşleme → `references/hasi-mapping.md`.
+Sadece göreve gerçekten gereken lane'leri aç.
 
 ---
 
@@ -228,18 +228,15 @@ Her lane kendi dizininde çalışır. Bitince:
 5. entegrasyon kapısını çalıştır
 6. `git worktree remove ../fleet-*` ile temizle
 
+Worktree yoksa (git dışı proje, salt sohbet ortamı): lane'leri **sıraya al**, veya ayrı klasör
+kopyalarında çalıştır. Aynı dosyaya eşzamanlı iki yazıcı asla olmaz.
+
 ### 6.2 Ortak ağaçta yazma
 
-Yalnızca lane'ler **tamamen ayrık** dosyalara yazıyorsa. Tek sahipli, yüksek çakışmalı dosyalar:
-
-- `package.json`, `package-lock.json`
-- `wrangler.toml`, `.dev.vars` şablonları
-- `schema.sql`, `migrations/`
-- `worker.js` içindeki route tablosu
-- merkezi config, barrel export, üretilmiş dosyalar
-- `_redirects`, `_routes.json`
-
-Birden çok lane bu dosyalara ihtiyaç duyuyorsa: **paralel iş bittikten sonra tek entegrasyon lane'i** yapsın.
+Yalnızca lane'ler **tamamen ayrık** dosyalara yazıyorsa. Tek sahipli, yüksek çakışmalı
+dosya listesi teknoloji yığınına göre değişir → `references/stacks.md`.
+Genel kural: paket manifesti, kilit dosyası, merkezi config, route tablosu, şema, üretilmiş
+dosyalar → **tek sahip** veya paralel iş bittikten sonra **tek entegrasyon lane'i.**
 
 ---
 
@@ -248,31 +245,26 @@ Birden çok lane bu dosyalara ihtiyaç duyuyorsa: **paralel iş bittikten sonra 
 | Boyut | Ne zaman |
 |---|---|
 | 2–4 lane | normal |
-| 5–8 lane | büyük kod tabanı, geniş audit, toplu site üretimi |
+| 5–8 lane | büyük kod tabanı, geniş audit, toplu üretim |
 | >8 lane | iş doğal olarak parçalanıyorsa ve ortam kaldırıyorsa |
 
-Lane açmadan önce sor:
-- Ayrı ve net bir hedefi var mı?
-- Bağımsız ilerleyebilir mi?
-- Bağlamı kendi içinde yeterli mi?
-- Çıktısı nihai sonucu gerçekten iyileştirir mi?
-
-Cevaplardan biri "hayır" ise **açma.** Koordinasyon maliyeti hızla artar.
+Lane açmadan önce sor: ayrı ve net hedefi var mı? · bağımsız ilerleyebilir mi? ·
+bağlamı yeterli mi? · çıktısı sonucu gerçekten iyileştirir mi?
+Biri "hayır" ise **açma.** Koordinasyon maliyeti hızla artar.
 
 ---
 
 ## 8. Canlılık (liveness) ve kurtarma
 
-Bir lane şu durumlarda takılmış olabilir: uzun süre çıktı üretmiyor, aynı adımı tekrar
-ediyor, veya süreç yaşıyor ama ilerleme yok.
+Bir lane takılmış olabilir: uzun süre çıktı üretmiyor, aynı adımı tekrar ediyor, süreç yaşıyor
+ama ilerleme yok.
 
-Yeniden denemeden önce:
-1. lane çıktısını/logunu oku
-2. çalışma ağacında kısmi değişiklik var mı bak (`git status --short`, `git diff`)
-3. tekrar denemenin güvenli olup olmadığına karar ver
+Yeniden denemeden önce: (1) lane çıktısını/logunu oku · (2) çalışma ağacında kısmi değişiklik
+var mı bak (`git status --short`, `git diff`) · (3) tekrar denemenin güvenli olup olmadığına
+karar ver.
 
-Aynı yazılabilir dizine körlemesine ikinci bir lane açma. Başarısız bir agent'ın
-**hiç değişiklik bırakmadığını varsayma.**
+Aynı yazılabilir dizine körlemesine ikinci lane açma. Başarısız bir agent'ın **hiç değişiklik
+bırakmadığını varsayma.**
 
 ---
 
@@ -286,21 +278,19 @@ Tüm yazan lane'ler bittikten sonra kalite orkestratörün sorumluluğundadır:
 4. repo geneli typecheck
 5. lint
 6. entegrasyon testleri
-7. `npm run build`
-8. `npx wrangler deploy --dry-run` (Worker/Pages projelerinde)
+7. build
+8. dry-run deploy (destekleyen yığınlarda)
 9. mümkünse runtime smoke test
 
-Kapıyı projeye göre uyarla; gereksiz pahalı test paketi çalıştırma.
-**Önceden var olan hata ile fleet'in ürettiği regresyonu net biçimde ayır.**
-
-Deploy her zaman entegrasyon kapısından **sonra**, `hasi-devops` lane'i tarafından,
-tek seferde yapılır.
+Kapıyı projeye göre uyarla (`references/stacks.md`); gereksiz pahalı test paketi çalıştırma.
+**Önceden var olan hata ile fleet'in ürettiği regresyonu net ayır.**
+Deploy her zaman entegrasyon kapısından **sonra**, tek lane tarafından yapılır.
 
 ---
 
 ## 10. Rapor formatı
 
-Ham agent loglarını kullanıcıya dökme. Şu formatta özetle:
+Ham agent loglarını kullanıcıya dökme.
 
 ```text
 SONUÇ
@@ -326,10 +316,9 @@ Fleet için ayrıca lane tablosu:
 
 ```text
 Lane        Durum      Kapsam            Doğrulama
-Frontend    DONE       pages/            build PASS
-Backend     DONE       worker.js         dry-run PASS
+Frontend    DONE       src/app           build PASS
+Backend     DONE       src/api           test 18/18 PASS
 Güvenlik    BULGU      salt okuma        3 bulgu (1 kritik)
-QA          DONE       tests/            18/18 PASS
 ```
 
 ---
@@ -338,7 +327,7 @@ QA          DONE       tests/            18/18 PASS
 
 | Durum | Davranış |
 |---|---|
-| Araç/CLI yok | Neyin eksik olduğunu ve nasıl tespit edildiğini söyle; iş yapılmış gibi davranma |
+| Araç/CLI/yetenek yok | Neyin eksik olduğunu ve nasıl tespit edildiğini söyle; yapılmış gibi davranma |
 | Kimlik doğrulama hatası | Hatayı bildir, tekrar tekrar deneme |
 | Yetki/sandbox hatası | Hemen geniş yetkiye çıkma; önce daha dar yazılabilir dizin, kapsamlı ağ izni veya farklı mod dene |
 | Test hatası | Sınıflandır: lane'in yol açtığı / önceden var olan / başka lane / ortam-bağımlılık |
@@ -349,47 +338,42 @@ QA          DONE       tests/            18/18 PASS
 
 ## 12. Görsel varlık delegasyonu
 
-Görsel üretim **yetenek bağımlıdır, varsayılmaz.** Hasi ortamında yol:
+Görsel üretim **yetenek bağımlıdır, varsayılmaz.** Önce ortamda gerçek bir görsel üretim
+aracı var mı bak; yoksa söyle. Kod aracıyla (PIL vb.) sahte "üretilmiş görsel" yapma.
 
-1. **Higgsfield MCP** — `generate_image` / `generate_video` (kampanya, Reel, UGC)
-2. **Canva MCP** — marka şablonu, Angebot görseli, brand kit
-3. **hasi-social-media** skill'i — Instagram karussell (HTML → PNG, 1080x1350)
-4. **gunar-angebot / gunar-campaign-pro** — Gün-Ar Market kampanyaları
+Hasi ortamındaki araç sırası ve marka kuralları → `references/hasi-mapping.md`.
 
-Kod aracıyla (PIL vb.) sahte "üretilmiş görsel" yapma; kullanıcı gerçek görsel istediyse
-uygun MCP yoksa bunu söyle.
-
-**Brief şablonu:** kullanım amacı, konu, kompozisyon, stil, ışık, renk (marka paleti),
-birebir metin, referanslar (kimlik / ürün / logo / önceki kare), korunacaklar,
-kaçınılacaklar (watermark, fazladan logo, bozuk yazı), çıktı (oran, boyut, dosya adı).
+**Brief şablonu:** kullanım amacı · konu · kompozisyon · stil · ışık · renk (marka paleti) ·
+birebir metin · referanslar (kimlik/ürün/logo/önceki kare) · korunacaklar · kaçınılacaklar
+(watermark, fazladan logo, bozuk yazı) · çıktı (oran, boyut, dosya adı).
 
 **Paralellik:** bağımsız görseller paralel; süreklilik gerektiren kareler **sıralı**.
 
-**Doğrulama:** dosya var mı, boyut/format doğru mu, logo ve fiyat doğru mu, metin doğru
-yazılmış mı. Dosya boyutu kalite kanıtı değildir. Sadece hatalı varlığı yeniden üret.
+**Doğrulama:** dosya var mı · boyut/format doğru mu · logo, fiyat, metin doğru mu.
+Dosya boyutu kalite kanıtı değildir. Sadece hatalı varlığı yeniden üret.
 
 ---
 
 ## 13. Hazır preset'ler
 
-### 13.1 Cloudflare full-stack audit (salt okuma, paralel)
+### 13.1 Tam proje auditi (salt okuma, paralel)
 
 ```text
-Lane A — Mimari      : Worker route yapısı, sorumluluk ayrımı, ölçeklenme
-Lane B — Güvenlik    : auth, token, CORS/CSP, R2/D1 erişim sınırı, DSGVO
-Lane C — Veritabanı  : şema, index, migration sırası, N+1 sorgu
-Lane D — Frontend    : render, a11y, responsive, Almanca metin
-Lane E — Performans  : bundle, cache, cold start, R2 transfer
+Lane A — Mimari      : yapı, sorumluluk ayrımı, ölçeklenme
+Lane B — Güvenlik    : auth, secret, injection, yetki sınırı, DSGVO
+Lane C — Veritabanı  : şema, index, migration sırası, N+1
+Lane D — Frontend    : render, a11y, responsive, dil/metin
+Lane E — Performans  : bundle, cache, cold start, ağ maliyeti
 Lane F — QA          : test kapsamı, kabul kriterleri
 ```
 
-Bulgular birleştirilir → **kullanıcı onayı** → sadece onaylanan değişiklikler için yazan
-lane açılır. Problemi anlamadan koda yazan agent açma.
+Bulgular birleştirilir → **kullanıcı onayı** → sadece onaylanan değişiklikler için yazan lane
+açılır. Problemi anlamadan koda yazan agent açma.
 
-### 13.2 Toplu müşteri sitesi (Site Studio)
+### 13.2 Toplu üretim (çok müşteri / çok site / çok varlık)
 
-Her müşteri sitesi **bağımsız bir lane**: kendi repo'su, kendi Pages projesi.
-Ortak sahipler: marka/tasarım kararı tek lane'de, deploy tek lane'de (`hasi-devops`).
+Her müşteri veya varlık **bağımsız bir lane**: kendi repo'su/klasörü. Ortak marka-tasarım
+kararı tek lane'de, deploy tek lane'de.
 
 ### 13.3 Büyük refactor
 
@@ -401,26 +385,26 @@ Faz 4 — entegrasyon
 Faz 5 — test/build/deploy kapısı
 ```
 
-"projeyi temizle", "kodu iyileştir", "her şeyi refactor et" gibi belirsiz brief'le
-çok-agent refactor **başlatma.** Önce ölçülebilir sınır tanımla.
+"projeyi temizle", "kodu iyileştir", "her şeyi refactor et" gibi belirsiz brief'le çok-agent
+refactor **başlatma.** Önce ölçülebilir sınır tanımla.
 
 ---
 
 ## 14. Güvenlik ve gizlilik
 
-Aşağıdakiler **asla varsayılan davranış değildir:**
+Aşağıdakiler **asla varsayılan davranış değildir:** repo kurallarını/sandbox'ı/onay
+mekanizmasını atlatmak · güvenlik kontrollerini kapatmak · prompt veya log içinde secret
+göstermek · özel kaynak kodu ilgisiz dış servise göndermek · takip edilmeyen dosyaları
+silmek · git geçmişini yeniden yazmak, force push · production altyapısını veya veriyi
+yıkıcı biçimde değiştirmek.
 
-- repo kurallarını, sandbox'ı veya onay mekanizmasını atlatmak
-- güvenlik kontrollerini kapatmak
-- prompt/log içinde secret göstermek
-- özel kaynak kodu ilgisiz dış servise göndermek
-- takip edilmeyen dosyaları silmek
-- git geçmişini yeniden yazmak, force push
-- production altyapısını veya D1 verisini yıkıcı biçimde değiştirmek
+**Secret kuralı:** API key, token, parola, BitLocker key, müşteri kimlik bilgisi hiçbir lane
+brief'ine yazılmaz. Ortam değişkeni, secret store veya mevcut oturum kullanılır. Örneklerde
+`<SECRET_FROM_PASSWORD_MANAGER>` yaz. Log'da secret geçiyorsa ham dökme, özetle.
 
-**Secret kuralı:** API key, token, parola, BitLocker key, müşteri kimlik bilgisi hiçbir
-lane brief'ine yazılmaz. Wrangler secret, ortam değişkeni veya mevcut oturum kullanılır.
-Örneklerde `<SECRET_FROM_PASSWORD_MANAGER>` yaz. Log'da secret geçiyorsa ham dökme, özetle.
+**Skill'i başka platforma taşırken:** bu dosyalar müşteri adı, adres, fiyat veya iç mimari
+bilgi içerebilir (özellikle `references/hasi-mapping.md`). Üçüncü parti bir araca aktarmadan
+önce gözden geçir; genel kullanım için `references/portable-prompt.md` yeterlidir.
 
 Production'a dokunan işlerde otomatik yürütme değil, **aşamalı plan + doğrulama** kullan.
 
@@ -429,13 +413,15 @@ Production'a dokunan işlerde otomatik yürütme değil, **aşamalı plan + doğ
 ## 15. Karar ağacı
 
 ```text
+Ortam ne yapabiliyor? (paralel agent / shell / sadece sohbet)
+     ↓
 İş birden fazla bağımsız kola ayrılıyor mu?
  ├─ Hayır → tek agent (veya doğrudan sen yap)
  └─ Evet
      ↓
 Kollar birbirinin çıktısına bağlı mı?
  ├─ Evet → PIPELINE
- └─ Hayır → FLEET
+ └─ Hayır → FLEET (paralel yetenek yoksa: seri fleet)
      ↓
 Yazma gerekiyor mu?
  ├─ Hayır → salt okuma lane'leri
@@ -452,42 +438,25 @@ Entegrasyon kapısı → rapor → (onaylıysa) deploy
 
 ## 16. Orkestratör kontrol listesi
 
-**Başlamadan:**
-- [ ] hedef net mi
-- [ ] ortam ve proje tipi tespit edildi mi
-- [ ] yazma varsa repo durumu temiz mi
-- [ ] en dar yetki seçildi mi
-- [ ] tek / pipeline / fleet kararı verildi mi
-- [ ] lane sahipliği yazılı mı
-- [ ] kabul kontrolleri tanımlı mı
+**Başlamadan:** hedef net mi · ortam yetenekleri tespit edildi mi · proje tipi ve kabul
+komutları biliniyor mu · yazma varsa repo durumu temiz mi · en dar yetki seçildi mi ·
+tek/pipeline/fleet kararı verildi mi · lane sahipliği yazılı mı.
 
-**Çalışırken:**
-- [ ] lane'ler bağımsız kaldı mı
-- [ ] worktree/log/çıktı takip ediliyor mu
-- [ ] ilgisiz düzenleme yapılmadı mı
-- [ ] blocker dürüstçe raporlandı mı
+**Çalışırken:** lane'ler bağımsız kaldı mı · worktree/log/çıktı takip ediliyor mu · ilgisiz
+düzenleme yapılmadı mı · blocker dürüstçe raporlandı mı.
 
-**Bitirirken:**
-- [ ] diff okundu mu
-- [ ] hedefli kontroller çalıştı mı
-- [ ] entegrasyon kapısı geçildi mi
-- [ ] önceden var olan hatalar ayrıldı mı
-- [ ] sonuç ve riskler kısa özetlendi mi
+**Bitirirken:** diff okundu mu · hedefli kontroller çalıştı mı · entegrasyon kapısı geçildi mi ·
+önceden var olan hatalar ayrıldı mı · sonuç ve riskler kısa özetlendi mi.
 
 ---
 
 ## 17. Bu skill bilerek şunları YAPMAZ
 
-- sınırsız kaynak varsaymaz
-- otomatik tam sistem erişimi vermez
-- hataları gizlemez
-- kural/onay atlamaz
-- agent'ın "bitti" demesine kanıtsız güvenmez
-- tek bir CLI veya model adını kalıcı varsaymaz
-- bağımlı işleri paralelleştirmez
-- eşzamanlı agent'ların aynı dosyaya yazmasına izin vermez
-- dosya boyutunu görsel kalite kanıtı saymaz
-- ham log veya secret dökmez
+sınırsız kaynak varsaymaz · otomatik tam sistem erişimi vermez · hataları gizlemez ·
+kural/onay atlamaz · agent'ın "bitti" demesine kanıtsız güvenmez · tek bir CLI, model veya
+platform adını kalıcı varsaymaz · bağımlı işleri paralelleştirmez · eşzamanlı agent'ların aynı
+dosyaya yazmasına izin vermez · dosya boyutunu görsel kalite kanıtı saymaz · ham log veya
+secret dökmez.
 
 ---
 

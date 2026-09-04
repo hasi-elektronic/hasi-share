@@ -1,28 +1,34 @@
 # hasi-fleet
 
-Çok-agent (paralel) çalışma ve delegasyon skill'i. Kaynak: harici "codex-fleet v2"
-skill'inin Hasi ortamına uyarlanmış hali.
+Çok-agent (paralel) çalışma, delegasyon ve doğrulama skill'i.
+Kaynak: harici **codex-fleet v2** skill'i — Hasi ortamına uyarlanmış ve
+**platformdan bağımsız** hale getirilmiş sürümü.
 
-## Uyarlama farkları
+## Sürüm geçmişi
+
+- **2.0.0** — platformdan bağımsız yapı: yetenek tespiti (Adım 0), çekirdek + referans
+  dosyaları ayrımı, her platform için adaptör, Claude dışı araçlar için İngilizce
+  kopyala-yapıştır sürüm, kurulum rehberi.
+- **1.0.0** — codex-fleet v2'nin Hasi/Cloudflare ortamına ilk uyarlaması.
+
+## Uyarlama farkları (orijinale göre)
 
 | Orijinal (codex-fleet) | Bu sürüm (hasi-fleet) |
 |---|---|
-| Codex CLI çağrıları (`codex exec --sandbox ...`) | Claude Code subagent'ları + Hasi KI-System'in 11 agent'ı |
-| Genel sandbox bayrakları | Salt okuma → workspace yazma → ağ → deploy yetki merdiveni |
-| Genel test/build kapıları | `tsc --noEmit`, `npm run build`, `wrangler deploy --dry-run`, D1 şema kontrolü |
-| Genel "shared files" listesi | `wrangler.toml`, `schema.sql`, `worker.js` route tablosu, `_routes.json`, `_redirects` |
-| Codex image-generation yeteneği | Higgsfield MCP, Canva MCP, `hasi-social-media`, `gunar-*` skill'leri |
-| İngilizce | Türkçe (Hamdi'nin çalışma dili), Almanca/Türkçe tetikleyiciler |
-| React/Next/Supabase preset | Cloudflare Pages + Workers + D1 + R2 preset, Site Studio toplu üretim preset'i |
+| Codex CLI'ye sabitlenmiş (`codex exec --sandbox ...`) | Yetenek tespitiyle **her ortam**: Claude Code, claude.ai, Cursor, Codex CLI, ChatGPT/Grok, n8n |
+| Tek çalışma modu varsayımı | Tam fleet / seri fleet / danışman modu |
+| Genel sandbox bayrakları | Yetki merdiveni: salt okuma → workspace yazma → ağ → deploy |
+| Genel test/build kapıları | Yığın bazlı kapı tablosu (`references/stacks.md`) |
+| Genel "shared files" listesi | Yığın bazlı tek sahipli dosya listesi |
+| Codex image-generation | Ortamda gerçek görsel yeteneği varsa; Hasi'de Higgsfield/Canva/`hasi-social-media` |
+| İngilizce, tek dosya | Türkçe çekirdek + referanslar + İngilizce taşınabilir sürüm |
+
+## Korunanlar
+
+Lane sahiplik sözleşmesi (OWNS / DO NOT TOUCH), git worktree izolasyonu, liveness kurtarma,
+entegrasyon kapısı, yapılandırılmış rapor formatı, hata politikası, secret kuralları.
 
 ## Kurulum
 
-Bu skill'i tüm projelerde kullanmak için:
-
-```bash
-mkdir -p ~/.claude/skills/hasi-fleet
-cp .claude/skills/hasi-fleet/SKILL.md ~/.claude/skills/hasi-fleet/
-```
-
-Ya da claude.ai → Skills üzerinden hesap seviyesinde yükle (diğer `hasi-*` skill'leri
-gibi senkronlansın). Repo içinde bırakılırsa yalnızca bu proje için geçerli olur.
+Bkz. `INSTALL.md` — Claude Code (proje/kullanıcı), claude.ai hesap yüklemesi (zip),
+Cursor rules, Codex CLI, ChatGPT/Grok özel talimat, n8n.
