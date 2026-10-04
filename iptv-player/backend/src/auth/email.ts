@@ -18,7 +18,7 @@ export function normalizeEmail(raw: string): string {
   return e;
 }
 
-const emailHash = (email: string) => sha256Hex(`email|${email}`);
+export const emailHash = (email: string) => sha256Hex(`email|${email}`);
 const codeHash = (eh: string, code: string) => sha256Hex(`otp|${eh}|${code}`);
 
 /** POST /v1/auth/email/start {email, locale} → {ok: true[, devCode]} */

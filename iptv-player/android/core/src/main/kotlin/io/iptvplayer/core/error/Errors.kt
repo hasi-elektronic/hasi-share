@@ -111,10 +111,16 @@ public sealed interface SourceError {
             }
         }
 
-        /** Maps a non-2xx HTTP status of a list/EPG download (M3U, XMLTV). */
-        public fun fromHttpStatus(status: Int): SourceError = when (status) {
+        /** Maps a non-2xx HTTP status of a list/EPG download (M3U, XMLTV): 404 → NotFound, else ServerError. */
+        public fun fromListHttpStatus(status: Int): SourceError = when (status) {
+            404 -> NotFound
+            else -> ServerError(status)
+        }
+
+        /** Maps a non-2xx HTTP status of Xtream `player_api.php` (CONTRACT §4.4). */
+        public fun fromXtreamHttpStatus(status: Int): SourceError = when (status) {
             401, 403 -> InvalidCredentials
-            404, 410 -> NotFound
+            404 -> NotFound
             else -> ServerError(status)
         }
     }

@@ -1,3 +1,4 @@
+import { emailHash } from "./auth/email";
 import { requireSession } from "./auth/session";
 import { json, type Ctx } from "./http";
 
@@ -51,6 +52,7 @@ export async function deleteAccount(c: Ctx): Promise<Response> {
     db.prepare("DELETE FROM sync_items WHERE account_id = ?1").bind(id),
     db.prepare("DELETE FROM device_codes WHERE account_id = ?1").bind(id),
     db.prepare("DELETE FROM account_trials WHERE account_id = ?1").bind(id),
+    db.prepare("DELETE FROM email_codes WHERE email_hash = ?1").bind(await emailHash(s.email)),
     db.prepare("UPDATE licenses SET account_id = NULL, updated_at = ?2 WHERE account_id = ?1").bind(id, c.deps.now()),
     db.prepare("UPDATE devices SET account_id = NULL WHERE account_id = ?1").bind(id),
     db.prepare("DELETE FROM accounts WHERE id = ?1").bind(id),

@@ -5,8 +5,8 @@ package io.iptvplayer.core.util
  *
  * Rules, applied **in this order**:
  * 1. every registered secret value (length ≥ 3), longest first, literal replace → `***`
- * 2. `scheme://user:pass@` → `scheme://***@`
- * 3. `/(live|movie|series|timeshift)/U/P/` → `/$1/***/***/`
+ * 2. user info in URLs (`scheme://user:pass@`) → masked
+ * 3. credentials in `/live|movie|series|timeshift/U/P/` paths → masked
  * 4. `username=…`, `password=…`, `token=…` … → `key=***`
  * 5. `Bearer xyz` → `Bearer ***`
  *

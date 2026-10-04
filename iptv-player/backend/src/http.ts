@@ -80,7 +80,7 @@ export async function readText(req: Request, maxBytes: number): Promise<string> 
     buf.set(c, off);
     off += c.byteLength;
   }
-  return new TextDecoder("utf-8", { fatal: false }).decode(buf);
+  return new TextDecoder().decode(buf);
 }
 
 /** Parses a JSON object body (size-limited). */
