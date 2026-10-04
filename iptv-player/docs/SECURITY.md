@@ -1,0 +1,66 @@
+# Güvenlik ve Veri Koruma
+
+## 1. Ne nerede saklanır?
+
+| Veri | Android | iOS / tvOS | Backend |
+|---|---|---|---|
+| M3U URL, Xtream sunucu/kullanıcı/şifre, EPG URL | Android Keystore'daki AES-256-GCM anahtarıyla şifreli kayıt (anahtar cihazdan çıkamaz) | Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` | **Hiç** (yalnızca eşleştirmede okunamaz şifreli metin, ≤10 dk) |
+| Kanal/film/dizi listeleri, EPG | Uygulamaya özel Room DB | Uygulama konteynerinde SQLite, `NSFileProtectionCompleteUntilFirstUserAuthentication`, iCloud yedeğinden hariç | Hiç |
+| M3U kanal URL'leri (içerik) | Room DB (yedekten hariç) | SQLite (yedekten hariç) | Hiç |
+| Xtream yayın URL'leri | **Saklanmaz** – oynatma anında oluşturulur | Saklanmaz | Hiç |
+| Lisans token'ı, güvenilir saat durumu | DataStore (imzalı token, değiştirilirse geçersiz) | UserDefaults (aynı) | İmzalayan |
+| Oturum token'ı (hesap) | Keystore-şifreli | Keychain | Yalnızca SHA-256 özeti |
+| Cihaz kimliği | Gönderilmez; yalnızca `sha256(prefix|appId|ANDROID_ID)` | `sha256(prefix|bundleId|IDFV)` | `deviceKey` |
+| E-posta (opsiyonel hesap) | – | – | D1, hesap silinince silinir |
+
+**Yedekleme:** Android `dataExtractionRules` / `fullBackupContent` veritabanını, şifreli
+kayıtları ve DataStore'u buluta yedeklemeden ve cihaz aktarımından hariç tutar (Keystore
+anahtarı zaten taşınamaz). iOS'ta veritabanı dosyası `isExcludedFromBackup`, Keychain öğesi
+`ThisDeviceOnly`.
+
+## 2. Loglar
+* Tüm log çağrıları `SafeLog` → `Redactor` (CONTRACT §10) üzerinden geçer: kayıtlı gizli
+  değerler, `password=`/`token=` vb. sorgu parametreleri, `user:pass@` URL kullanıcı bilgisi,
+  Xtream yolundaki `/live/<u>/<p>/` kimlik bilgileri, `Bearer` token'ları maskelenir.
+* Release derlemelerinde DEBUG/INFO logları kaldırılır (Android R8
+  `-assumenosideeffects`, Apple `os.Logger` + `privacy: .private`). Çökme raporlayıcısı yoktur;
+  eklenirse aynı redaksiyon zorunludur.
+* Backend logları da `redact()`'tan geçer; e-posta maskeli (`a***@d***.com`), satın alma
+  token'ları ve şifreli eşleştirme verisi loglanmaz.
+* Oynatıcı hata mesajları kullanıcıya gösterilirken URL içermez.
+
+## 3. Ağ
+* IPTV kaynakları çoğunlukla HTTP'dir → Android `network_security_config` cleartext'e izin verir,
+  iOS ATS `NSAllowsArbitraryLoads` (mağaza incelemesi için gerekçe: kullanıcının kendi eklediği
+  rastgele IPTV sunucuları). **Backend her zaman HTTPS.**
+* Tüm istekler iptal edilebilir; bağlantı/okuma/toplam zaman aşımları CONTRACT §2'de.
+* Xtream şifresi zorunlu olarak URL sorgu parametresi/yol parçası olarak sunucuya gider
+  (protokolün doğası); bu yüzden yalnızca kullanıcının girdiği sunucuya gönderilir, başka
+  hiçbir yere gönderilmez.
+
+## 4. Lisans ve deneme bütünlüğü (tehdit modeli)
+
+| Tehdit | Önlem | Kalan risk |
+|---|---|---|
+| Cihaz saatini geri almak | `TrustedClock`: sunucu zamanı + monoton saat; yeniden başlatmada cihaz saati son sunucu zamanının gerisine düşemez | Uzun süre çevrimdışı + saat dondurma (IPTV internet gerektirdiği için pratik değil) |
+| Uygulamayı silip yeniden kurmak | Android: `ANDROID_ID` türevi deviceKey yeniden kurulumda aynı; Apple: deneme Apple ID'ye bağlı ücretsiz IAP | Android fabrika ayarı / farklı kullanıcı profili → yeni deneme (Play Integrity ileride) |
+| Lisans token'ını değiştirmek | ES256 imza, gömülü açık anahtar, `iss`/`aud` kontrolü | – |
+| Eski "satın alındı" token'ını saklamak (iade sonrası) | Mağaza kütüphanesi iade edilen ürünü döndürmez; aynı mağazada `revoked` + token `src` eşleşirse yok sayılır | Backend'i engelleyen ve başka platformdan hesap lisansı olan kullanıcı |
+| Sahte satın alma (root / Lucky Patcher vb.) | Play Billing imzası + backend `purchases.products.get` doğrulaması; StoreKit 2 JWS doğrulaması + App Store Server API | İstemci tarafı yamalanmış APK (her yerel kontrol aşılabilir) |
+| Backend'e sahte webhook | Google: paylaşılan sır + Google'a yeniden sorgu; Apple: bildirimdeki işlem Apple'dan yeniden çekilir | – |
+| Admin uçları | `ADMIN_TOKEN` (≥32 karakter, sabit zamanlı karşılaştırma), Cloudflare Access ile ek koruma önerilir | Token sızıntısı |
+| Kaba kuvvet (e-posta kodu, eşleştirme kodu) | 5 deneme, oran sınırlama, 10 dk TTL, 31^6 ≈ 887 M kod uzayı | – |
+
+## 5. TV eşleştirme (uçtan uca şifreleme)
+TV geçici P-256 anahtar çifti üretir; telefon tarayıcısı ECDH + HKDF-SHA256 + AES-256-GCM ile
+şifreler (CONTRACT §9). Backend yalnızca şifreli metni 10 dakikaya kadar tutar ve TV aldıktan
+sonra siler. Özel anahtar TV belleğinden hiç çıkmaz.
+
+## 6. GDPR / gizlilik
+* Veri minimizasyonu: hesapsız kullanımda backend yalnızca `deviceKey`, platform, uygulama
+  sürümü, deneme zamanları ve mağaza satın alma referanslarını tutar.
+* Hesap silme uygulama içinden (`DELETE /v1/account`): hesap, oturumlar, senkron verisi silinir;
+  mağaza satın alma kayıtları kişisel veri olmadan (iade muhasebesi için) kalır.
+* Gizlilik politikası ve Impressum URL'leri mağaza kayıtlarında ve Ayarlar'da gösterilmeli
+  (harici: hukuki metinler hazırlanmalı).
+* Google Play "Data safety" ve Apple "App Privacy" formları için beyan tablosu: `STORE_SETUP.md §5`.

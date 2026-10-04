@@ -5,12 +5,22 @@
 // APP_DISPLAY_NAME from apple/Config/Shared.xcconfig (Apple); fallback "NovaPlayer".
 // {0},{1}… are positional STRING args; in plural entries {0} is the INTEGER count.
 // Run: node spec/tools/gen-strings.mjs
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const { strings } = JSON.parse(readFileSync(join(root, 'spec', 'strings.json'), 'utf8'));
+// strings.json + every spec/strings.<area>.json (e.g. strings.android.json, strings.apple.json)
+// are merged; a key may be defined only once.
+const strings = {};
+for (const f of ['strings.json', ...readdirSync(join(root, 'spec')).filter((n) => /^strings\.[a-z0-9-]+\.json$/.test(n)).sort()]) {
+  const part = JSON.parse(readFileSync(join(root, 'spec', f), 'utf8')).strings ?? {};
+  for (const [k, v] of Object.entries(part)) {
+    if (k in strings) throw new Error(`duplicate string key "${k}" in ${f}`);
+    if (!v.en || !v.tr) throw new Error(`string "${k}" in ${f} needs both en and tr`);
+    strings[k] = v;
+  }
+}
 
 function readProp(file, key, sep) {
   const f = join(root, file);
