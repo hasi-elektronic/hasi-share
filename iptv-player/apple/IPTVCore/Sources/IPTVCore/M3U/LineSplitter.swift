@@ -20,7 +20,9 @@ struct LineSplitter: Sendable {
         while i < n {
             if bytes[i] == 0x0A {
                 if carry.isEmpty {
-                    try body(UnsafeBufferPointer(rebasing: bytes[lineStart..<i]))
+                    // Same limit as the buffered path, independent of chunk boundaries.
+                    let end = min(i, lineStart + maxLineLength)
+                    try body(UnsafeBufferPointer(rebasing: bytes[lineStart..<end]))
                 } else {
                     append(UnsafeBufferPointer(rebasing: bytes[lineStart..<i]))
                     try carry.withUnsafeBufferPointer { try body($0) }

@@ -22,7 +22,7 @@ public enum SourceFingerprint {
     /// Fingerprint of a source from its secrets.
     public static func of(_ secrets: SourceSecrets) -> String? {
         switch secrets {
-        case .m3u(let m3u): return m3u(url: m3u.url)
+        case .m3u(let m): return m3u(url: m.url)
         case .xtream(let x): return xtream(serverUrl: x.serverUrl, username: x.username)
         }
     }
