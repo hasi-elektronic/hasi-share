@@ -1,0 +1,29 @@
+{
+ "_note": "Apple-only UI strings (merged by spec/tools/gen-strings.mjs; keys must not exist in strings.json).",
+ "strings": {
+  "account_field_email": {
+   "en": "E-mail",
+   "tr": "E-posta"
+  },
+  "account_send_code": {
+   "en": "Send code",
+   "tr": "Kod gönder"
+  },
+  "account_verify": {
+   "en": "Verify",
+   "tr": "Doğrula"
+  },
+  "account_dev_code": {
+   "en": "Development code: {0}",
+   "tr": "Geliştirme kodu: {0}"
+  },
+  "format_test_run": {
+   "en": "Run test",
+   "tr": "Testi başlat"
+  },
+  "format_test_host": {
+   "en": "Test server (host for local samples)",
+   "tr": "Test sunucusu (yerel örnekler için host)"
+  }
+ }
+}

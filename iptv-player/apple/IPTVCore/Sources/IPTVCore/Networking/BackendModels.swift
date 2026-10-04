@@ -178,6 +178,16 @@ public struct DeviceCodeStart: Codable, Sendable, Hashable {
     public var interval: Int
     /// Lifetime in seconds.
     public var expiresIn: Int
+
+    public init(deviceCode: String, userCode: String, verificationUrl: String, verificationUrlComplete: String,
+                interval: Int, expiresIn: Int) {
+        self.deviceCode = deviceCode
+        self.userCode = userCode
+        self.verificationUrl = verificationUrl
+        self.verificationUrlComplete = verificationUrlComplete
+        self.interval = interval
+        self.expiresIn = expiresIn
+    }
 }
 
 /// Result of `POST /v1/auth/device/poll`.
@@ -198,12 +208,23 @@ public struct SyncPage: Sendable, Hashable {
     public var items: [SyncItem]
     public var cursor: Int64
     public var hasMore: Bool
+
+    public init(items: [SyncItem], cursor: Int64, hasMore: Bool) {
+        self.items = items
+        self.cursor = cursor
+        self.hasMore = hasMore
+    }
 }
 
 /// Result of `POST /v1/sync`.
 public struct SyncPushResult: Codable, Sendable, Hashable {
     public var applied: Int
     public var cursor: Int64
+
+    public init(applied: Int, cursor: Int64) {
+        self.applied = applied
+        self.cursor = cursor
+    }
 }
 
 /// `POST /v1/pair/sessions` (TV side).
@@ -216,6 +237,13 @@ public struct PairSession: Codable, Sendable, Hashable {
     public var expiresAt: Int64
     /// `{BASE}/pair?c=CODE` (QR code content).
     public var pairUrl: String
+
+    public init(code: String, secret: String, expiresAt: Int64, pairUrl: String) {
+        self.code = code
+        self.secret = secret
+        self.expiresAt = expiresAt
+        self.pairUrl = pairUrl
+    }
 }
 
 /// Result of `GET /v1/pair/sessions/{code}?secret=` (TV polling).

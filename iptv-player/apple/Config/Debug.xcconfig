@@ -1,0 +1,3 @@
+#include "Shared.xcconfig"
+// Optional, git-ignored local overrides (e.g. BACKEND_BASE_URL = http:/$()/localhost:8798).
+#include? "Local.xcconfig"
