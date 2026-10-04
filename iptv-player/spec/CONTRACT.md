@@ -211,7 +211,7 @@ Expected-output schema: see `test-vectors/m3u/README.md`.
 | HTTP 401 / 403 | `InvalidCredentials` |
 | HTTP 404 | `NotFound` |
 | other non-2xx | `ServerError(code)` |
-| body not JSON object | `InvalidResponse` |
+| body not JSON object (an empty top-level `[]` counts as an empty object per §4.3; any other array, string or HTML does not) | `InvalidResponse` |
 | `user_info` missing, `[]`, or `auth` ≠ 1 | `InvalidCredentials` |
 | `status` = `Expired` | `AccountExpired(exp_date)` |
 | `status` ∈ {`Banned`, `Disabled`} | `AccountDisabled` |
