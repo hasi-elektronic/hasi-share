@@ -1,10 +1,10 @@
 // Single place for the product placeholders (CONTRACT §0). Rename the app here only.
 // Note: "//" starts a comment in xcconfig files, hence "https:/$()/" in URLs.
 APP_DISPLAY_NAME = NovaPlayer
-APP_BUNDLE_ID = de.hasielektronik.novaplayer
+APP_BUNDLE_ID = com.hasielektronic.novaplayer
 // Non-consumables – must match backend/wrangler.toml APPLE_PRODUCT_ID / APPLE_TRIAL_PRODUCT_ID.
-PRODUCT_LIFETIME = de.hasielektronik.novaplayer.lifetime
-PRODUCT_TRIAL = de.hasielektronik.novaplayer.trial
+PRODUCT_LIFETIME = com.hasielektronic.novaplayer.lifetime
+PRODUCT_TRIAL = com.hasielektronic.novaplayer.trial
 // Backend (Cloudflare Worker). Production must be HTTPS.
 BACKEND_BASE_URL = https:/$()/iptv-backend.example.workers.dev
 MARKETING_VERSION = 1.0.0

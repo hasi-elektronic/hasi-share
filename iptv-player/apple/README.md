@@ -158,7 +158,7 @@ Simülatörde elle çalıştırma:
 ```sh
 xcrun simctl boot "iPhone 17 Pro"
 xcrun simctl install booted build/DerivedData/Build/Products/Debug-iphonesimulator/NovaPlayer.app
-xcrun simctl launch booted de.hasielektronik.novaplayer -uiTestReset -seedM3U http://localhost:8765/test.m3u -uiTrial -uiScreen live
+xcrun simctl launch booted com.hasielektronic.novaplayer -uiTestReset -seedM3U http://localhost:8765/test.m3u -uiTrial -uiScreen live
 xcrun simctl io booted screenshot live.png
 ```
 

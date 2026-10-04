@@ -10,7 +10,7 @@ import XCTest
 @MainActor
 final class StoreKitFlowTests: XCTestCase {
     private var session: SKTestSession!
-    private let ids = ProductIDs(lifetime: "de.hasielektronik.novaplayer.lifetime", trial: "de.hasielektronik.novaplayer.trial")
+    private let ids = ProductIDs(lifetime: "com.hasielektronic.novaplayer.lifetime", trial: "com.hasielektronic.novaplayer.trial")
 
     override func setUp() async throws {
         // The configuration lives in this test bundle (the main bundle is the host app).
@@ -39,9 +39,9 @@ final class StoreKitFlowTests: XCTestCase {
     }
 
     private func license() throws -> LicenseManager {
-        let verifier = try LicenseTokenVerifier(jwkSetJSON: Data("{}".utf8), audience: "de.hasielektronik.novaplayer")
+        let verifier = try LicenseTokenVerifier(jwkSetJSON: Data("{}".utf8), audience: "com.hasielektronic.novaplayer")
         return LicenseManager(backend: OfflineBackend(), verifier: verifier, kv: InMemoryKeyValueStore(),
-                              identity: LicenseIdentity(appId: "de.hasielektronik.novaplayer", appVersion: "1", deviceKey: "k", platform: .ios))
+                              identity: LicenseIdentity(appId: "com.hasielektronic.novaplayer", appVersion: "1", deviceKey: "k", platform: .ios))
     }
 
     func testProductsLoadWithLocalizedPrice() async throws {
