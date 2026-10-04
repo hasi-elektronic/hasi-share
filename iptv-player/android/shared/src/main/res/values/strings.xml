@@ -236,4 +236,18 @@
     <string name="perr_network_title" formatted="false">Connection lost</string>
     <string name="perr_network_body" formatted="false">Could not reconnect to the stream.</string>
     <string name="perr_unknown_title" formatted="false">Playback error</string>
+    <string name="account_field_email" formatted="false">E-mail</string>
+    <string name="account_send_code" formatted="false">Send code</string>
+    <string name="account_verify" formatted="false">Verify</string>
+    <string name="account_dev_code">Development code: %1$s</string>
+    <string name="format_test_run" formatted="false">Run test</string>
+    <string name="format_test_host" formatted="false">Test server (host for local samples)</string>
+    <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
+    <string name="sync_now" formatted="false">Sync now</string>
+    <string name="format_test_pending" formatted="false">Not tested</string>
+    <string name="format_test_skipped" formatted="false">Skipped (local sample – enter a test server)</string>
+    <string name="item_unavailable" formatted="false">This item is no longer available in your sources.</string>
+    <string name="source_status_ok" formatted="false">OK</string>
+    <string name="error_backend_generic">Server not reachable (%1$s)</string>
+    <string name="account_not_configured" formatted="false">Accounts are not available in this build (no backend configured).</string>
 </resources>

@@ -236,4 +236,18 @@
     <string name="perr_network_title" formatted="false">Bağlantı koptu</string>
     <string name="perr_network_body" formatted="false">Yayına yeniden bağlanılamadı.</string>
     <string name="perr_unknown_title" formatted="false">Oynatma hatası</string>
+    <string name="account_field_email" formatted="false">E-posta</string>
+    <string name="account_send_code" formatted="false">Kod gönder</string>
+    <string name="account_verify" formatted="false">Doğrula</string>
+    <string name="account_dev_code">Geliştirme kodu: %1$s</string>
+    <string name="format_test_run" formatted="false">Testi başlat</string>
+    <string name="format_test_host" formatted="false">Test sunucusu (yerel örnekler için host)</string>
+    <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
+    <string name="sync_now" formatted="false">Şimdi eşitle</string>
+    <string name="format_test_pending" formatted="false">Test edilmedi</string>
+    <string name="format_test_skipped" formatted="false">Atlandı (yerel örnek – test sunucusu girin)</string>
+    <string name="item_unavailable" formatted="false">Bu öğe artık kaynaklarınızda yok.</string>
+    <string name="source_status_ok" formatted="false">Tamam</string>
+    <string name="error_backend_generic">Sunucuya ulaşılamıyor (%1$s)</string>
+    <string name="account_not_configured" formatted="false">Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).</string>
 </resources>

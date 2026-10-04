@@ -1,0 +1,37 @@
+{
+ "_note": "Android-only UI strings (merged by spec/tools/gen-strings.mjs; keys must not exist in strings.json or strings.apple.json).",
+ "strings": {
+  "trial_backend_unavailable": {
+   "en": "The free trial needs a connection to the license server. Check your internet connection and try again.",
+   "tr": "Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin."
+  },
+  "sync_now": {
+   "en": "Sync now",
+   "tr": "Şimdi eşitle"
+  },
+  "format_test_pending": {
+   "en": "Not tested",
+   "tr": "Test edilmedi"
+  },
+  "format_test_skipped": {
+   "en": "Skipped (local sample – enter a test server)",
+   "tr": "Atlandı (yerel örnek – test sunucusu girin)"
+  },
+  "item_unavailable": {
+   "en": "This item is no longer available in your sources.",
+   "tr": "Bu öğe artık kaynaklarınızda yok."
+  },
+  "source_status_ok": {
+   "en": "OK",
+   "tr": "Tamam"
+  },
+  "error_backend_generic": {
+   "en": "Server not reachable ({0})",
+   "tr": "Sunucuya ulaşılamıyor ({0})"
+  },
+  "account_not_configured": {
+   "en": "Accounts are not available in this build (no backend configured).",
+   "tr": "Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış)."
+  }
+ }
+}
