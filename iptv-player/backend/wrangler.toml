@@ -1,0 +1,46 @@
+# Cloudflare Worker for the IPTV player backend (licensing, accounts, sync, TV pairing).
+# Secrets are NOT stored here – set them with `wrangler secret put <NAME>` (see scripts/dev.md).
+name = "iptv-backend"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+# Keep function sources free of esbuild `__name()` helpers: the /pair page inlines
+# the encryption routine via Function.prototype.toString().
+keep_names = false
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "iptv-backend"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "migrations"
+
+# Daily: Google Play Voided Purchases poll + housekeeping (UTC).
+[triggers]
+crons = ["17 3 * * *"]
+
+[vars]
+PUBLIC_BASE_URL = "https://iptv-backend.example.workers.dev"
+APP_NAME = "NovaPlayer"
+# Allowed `appId` / license token `aud` values (Android applicationId and Apple bundle id).
+APP_IDS = "de.hasielektronik.novaplayer"
+LICENSE_KID = "lk-1"
+GOOGLE_PACKAGE_NAME = "de.hasielektronik.novaplayer"
+GOOGLE_PRODUCT_ID = "lifetime_access"
+APPLE_ISSUER_ID = "REPLACE_WITH_APPLE_ISSUER_ID"
+APPLE_KEY_ID = "REPLACE_WITH_APPLE_KEY_ID"
+APPLE_BUNDLE_ID = "de.hasielektronik.novaplayer"
+APPLE_PRODUCT_ID = "de.hasielektronik.novaplayer.lifetime"
+APPLE_TRIAL_PRODUCT_ID = "de.hasielektronik.novaplayer.trial"
+# "Production" or "Sandbox"; the other environment is tried on 404.
+APPLE_ENVIRONMENT = "Production"
+MAIL_FROM = "NovaPlayer <no-reply@example.com>"
+# Defaults used until an admin stores a value in the D1 `config` table.
+DEFAULT_TRIAL_DAYS = "7"
+MIN_VERSION_ANDROID = "1"
+MIN_VERSION_APPLE = "1"
+# Extra origins allowed for CORS (comma list). PUBLIC_BASE_URL's origin is always allowed.
+CORS_ORIGINS = ""
+# Never "true" in production: returns login codes in API responses and relaxes rate limits.
+DEV_MODE = "false"
