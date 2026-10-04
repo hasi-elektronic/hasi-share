@@ -1,0 +1,22 @@
+[
+  {
+    "id": "5001",
+    "name": "Inception",
+    "posterUrl": "http://img.example.com/inception.jpg",
+    "categoryId": "10",
+    "rating": 8.8,
+    "year": null,
+    "containerExt": "mkv",
+    "addedAt": 1700000000
+  },
+  {
+    "id": "5002",
+    "name": "Dune: Part Two (2024)",
+    "posterUrl": null,
+    "categoryId": "11",
+    "rating": 7.9,
+    "year": 2024,
+    "containerExt": "mp4",
+    "addedAt": null
+  }
+]

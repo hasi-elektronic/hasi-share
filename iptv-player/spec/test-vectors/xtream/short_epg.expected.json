@@ -1,0 +1,16 @@
+[
+  {
+    "start": 1759591800,
+    "end": 1759597200,
+    "title": "Akşam Haberleri",
+    "description": "Günün öne çıkan haberleri.",
+    "hasArchive": false
+  },
+  {
+    "start": 1759597200,
+    "end": 1759602600,
+    "title": "Dizi",
+    "description": null,
+    "hasArchive": true
+  }
+]

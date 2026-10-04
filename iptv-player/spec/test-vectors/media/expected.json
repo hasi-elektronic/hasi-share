@@ -1,0 +1,140 @@
+{
+  "_note": "CONTRACT \u00a76. Real files generated with ffmpeg 7.1 (spec/test-vectors/media/README.md). Sniff with the first 1024 bytes; url is a fake URL WITHOUT a useful extension so that sniffing is exercised.",
+  "files": [
+    {
+      "file": "sample.ts",
+      "expected": "mpegts"
+    },
+    {
+      "file": "sample_multiaudio.ts",
+      "expected": "mpegts"
+    },
+    {
+      "file": "sample.mp4",
+      "expected": "mp4"
+    },
+    {
+      "file": "sample.mkv",
+      "expected": "mkv"
+    },
+    {
+      "file": "sample.webm",
+      "expected": "webm"
+    },
+    {
+      "file": "sample.flv",
+      "expected": "flv"
+    },
+    {
+      "file": "sample.avi",
+      "expected": "avi"
+    },
+    {
+      "file": "hls/index.m3u8",
+      "expected": "hls"
+    },
+    {
+      "file": "dash/manifest.mpd",
+      "expected": "dash"
+    }
+  ],
+  "urls": [
+    {
+      "url": "rtmp://live.example.com/app/stream",
+      "contentType": null,
+      "expected": "rtmp"
+    },
+    {
+      "url": "rtsp://cam.example.com:554/h264",
+      "contentType": null,
+      "expected": "rtsp"
+    },
+    {
+      "url": "udp://@239.0.0.1:1234",
+      "contentType": null,
+      "expected": "udp"
+    },
+    {
+      "url": "http://x.example.com/live/a/b/1.ts",
+      "contentType": null,
+      "expected": "mpegts"
+    },
+    {
+      "url": "http://x.example.com/live/a/b/1.m3u8?token=1",
+      "contentType": null,
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "application/vnd.apple.mpegurl; charset=utf-8",
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "application/x-mpegURL",
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "video/MP2T",
+      "expected": "mpegts"
+    },
+    {
+      "url": "http://x.example.com/v/movie.MKV",
+      "contentType": null,
+      "expected": "mkv"
+    },
+    {
+      "url": "http://x.example.com/v/movie.mov",
+      "contentType": null,
+      "expected": "mp4"
+    },
+    {
+      "url": "http://x.example.com/manifest.mpd",
+      "contentType": null,
+      "expected": "dash"
+    },
+    {
+      "url": "http://x.example.com/stream/channel9",
+      "contentType": "application/octet-stream",
+      "expected": "unknown"
+    },
+    {
+      "url": "http://x.example.com/x.m3u8",
+      "contentType": "video/mp2t",
+      "expected": "mpegts",
+      "_why": "content-type beats extension"
+    }
+  ],
+  "support": {
+    "media3": {
+      "hls": true,
+      "dash": true,
+      "mpegts": true,
+      "mp4": true,
+      "mkv": true,
+      "webm": true,
+      "flv": true,
+      "avi": true,
+      "rtmp": false,
+      "rtsp": true,
+      "udp": false,
+      "unknown": true
+    },
+    "avplayer": {
+      "hls": true,
+      "dash": false,
+      "mpegts": false,
+      "mp4": true,
+      "mkv": false,
+      "webm": false,
+      "flv": false,
+      "avi": false,
+      "rtmp": false,
+      "rtsp": false,
+      "udp": false,
+      "unknown": true
+    }
+  },
+  "_unknown": "unknown => try to play and map the player error"
+}

@@ -1,0 +1,67 @@
+{
+  "_note": "CONTRACT §10. secrets = registered secret values for the case.",
+  "cases": [
+    {
+      "input": "GET http://iptv.example.com:8080/player_api.php?username=user1&password=secret123&action=get_live_streams",
+      "secrets": [],
+      "expected": "GET http://iptv.example.com:8080/player_api.php?username=***&password=***&action=get_live_streams"
+    },
+    {
+      "input": "Playing http://iptv.example.com:8080/live/user1/secret123/1001.ts",
+      "secrets": [],
+      "expected": "Playing http://iptv.example.com:8080/live/***/***/1001.ts"
+    },
+    {
+      "input": "http://admin:hunter2@cam.example.com/stream?token=a1",
+      "secrets": [],
+      "expected": "http://***@cam.example.com/stream?token=***"
+    },
+    {
+      "input": "Authorization: Bearer abc.def-ghi_jkl",
+      "secrets": [],
+      "expected": "Authorization: Bearer ***"
+    },
+    {
+      "input": "url=https://cdn.example.com/x.m3u8?token=XYZ&expires=123",
+      "secrets": [],
+      "expected": "url=https://cdn.example.com/x.m3u8?token=***&expires=123"
+    },
+    {
+      "input": "login failed for s3cr3tP4ss on host",
+      "secrets": [
+        "s3cr3tP4ss"
+      ],
+      "expected": "login failed for *** on host"
+    },
+    {
+      "input": "/timeshift/user1/secret123/90/2025-10-04:18-30/1001.ts",
+      "secrets": [],
+      "expected": "/timeshift/***/***/90/2025-10-04:18-30/1001.ts"
+    },
+    {
+      "input": "api_key=AAA&apikey=BBB&sig=CCC&monkey=ok",
+      "secrets": [],
+      "expected": "api_key=***&apikey=***&sig=***&monkey=ok"
+    },
+    {
+      "input": "Pass=abc PWD=x",
+      "secrets": [],
+      "expected": "Pass=*** PWD=***"
+    },
+    {
+      "input": "nothing secret here: channel 5 OK",
+      "secrets": [
+        "ab"
+      ],
+      "expected": "nothing secret here: channel 5 OK"
+    },
+    {
+      "input": "m3u http://lists.example.com/get.php?username=ali&password=veli123&type=m3u_plus",
+      "secrets": [
+        "veli123",
+        "ali"
+      ],
+      "expected": "m3u http://lists.example.com/get.php?username=***&password=***&type=m3u_plus"
+    }
+  ]
+}

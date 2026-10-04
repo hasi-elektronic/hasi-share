@@ -1,0 +1,185 @@
+{
+  "_note": "Public test streams for ON-DEVICE format verification (Settings > Diagnostics > Format test). Availability of third-party URLs is not guaranteed; 'local' items are served from spec/test-vectors/media via `python3 -m http.server 8000` on the LAN.",
+  "samples": [
+    {
+      "id": "apple-adv-fmp4",
+      "name": "Apple bipbop advanced (HLS fMP4, multi-audio, WebVTT)",
+      "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      },
+      "checks": [
+        "audio tracks >= 2",
+        "subtitle tracks >= 1"
+      ]
+    },
+    {
+      "id": "apple-16x9-ts",
+      "name": "Apple bipbop 16x9 (HLS MPEG-TS segments, CEA-608)",
+      "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      },
+      "checks": [
+        "closed captions"
+      ]
+    },
+    {
+      "id": "mux-x36",
+      "name": "Mux test stream (HLS)",
+      "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      }
+    },
+    {
+      "id": "akamai-live",
+      "name": "Akamai live test (HLS live)",
+      "url": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      },
+      "checks": [
+        "live edge",
+        "reconnect after airplane mode"
+      ]
+    },
+    {
+      "id": "akamai-dash",
+      "name": "Akamai BBB (DASH)",
+      "url": "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
+      "container": "dash",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "gtv-bbb-mp4",
+      "name": "Big Buck Bunny (MP4)",
+      "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      "container": "mp4",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      },
+      "checks": [
+        "resume position after app restart"
+      ]
+    },
+    {
+      "id": "local-ts",
+      "name": "Local progressive MPEG-TS",
+      "url": "http://<LAN-IP>:8000/sample.ts",
+      "container": "mpegts",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "local-ts-multiaudio",
+      "name": "Local MPEG-TS, 2 audio tracks (tur/eng)",
+      "url": "http://<LAN-IP>:8000/sample_multiaudio.ts",
+      "container": "mpegts",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      },
+      "checks": [
+        "audio track switch tur/eng"
+      ]
+    },
+    {
+      "id": "local-mkv",
+      "name": "Local MKV",
+      "url": "http://<LAN-IP>:8000/sample.mkv",
+      "container": "mkv",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "local-webm",
+      "name": "Local WebM (VP9/Opus)",
+      "url": "http://<LAN-IP>:8000/sample.webm",
+      "container": "webm",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "local-flv",
+      "name": "Local FLV",
+      "url": "http://<LAN-IP>:8000/sample.flv",
+      "container": "flv",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "local-avi",
+      "name": "Local AVI (MPEG-4 Part 2 / MP3)",
+      "url": "http://<LAN-IP>:8000/sample.avi",
+      "container": "avi",
+      "expect": {
+        "media3": "play-or-codec-error",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "local-hls",
+      "name": "Local HLS (VOD)",
+      "url": "http://<LAN-IP>:8000/hls/index.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "play",
+        "avplayer": "play"
+      }
+    },
+    {
+      "id": "local-dash",
+      "name": "Local DASH",
+      "url": "http://<LAN-IP>:8000/dash/manifest.mpd",
+      "container": "dash",
+      "expect": {
+        "media3": "play",
+        "avplayer": "error:UnsupportedFormat"
+      }
+    },
+    {
+      "id": "http-404",
+      "name": "HTTP 404",
+      "url": "http://<LAN-IP>:8000/does-not-exist.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "error:StreamOffline",
+        "avplayer": "error:StreamOffline"
+      }
+    },
+    {
+      "id": "dead-host",
+      "name": "Unreachable host",
+      "url": "http://10.255.255.1:9/live.m3u8",
+      "container": "hls",
+      "expect": {
+        "media3": "error:Network",
+        "avplayer": "error:Network"
+      },
+      "checks": [
+        "retry with backoff, then error UI"
+      ]
+    }
+  ]
+}

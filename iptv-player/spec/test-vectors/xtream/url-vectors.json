@@ -1,0 +1,140 @@
+{
+  "_note": "CONTRACT §4.1 / §4.5. Percent-encoding: everything except A-Z a-z 0-9 - . _ ~",
+  "normalize": [
+    {
+      "input": "iptv.example.com:8080",
+      "expected": "http://iptv.example.com:8080"
+    },
+    {
+      "input": "http://IPTV.Example.com:8080/",
+      "expected": "http://iptv.example.com:8080"
+    },
+    {
+      "input": "https://iptv.example.com:443/player_api.php?username=a&password=b",
+      "expected": "https://iptv.example.com"
+    },
+    {
+      "input": "http://iptv.example.com:80/get.php?username=a&password=b&type=m3u_plus",
+      "expected": "http://iptv.example.com"
+    },
+    {
+      "input": " http://panel.example.com/c/ ",
+      "expected": "http://panel.example.com/c"
+    },
+    {
+      "input": "http://panel.example.com/c/xmltv.php",
+      "expected": "http://panel.example.com/c"
+    },
+    {
+      "input": "https://iptv.example.com:8443",
+      "expected": "https://iptv.example.com:8443"
+    }
+  ],
+  "credentials": {
+    "base": "http://iptv.example.com:8080",
+    "username": "user1",
+    "password": "p@ss/w rd"
+  },
+  "urls": [
+    {
+      "kind": "api",
+      "action": "get_live_streams",
+      "expected": "http://iptv.example.com:8080/player_api.php?username=user1&password=p%40ss%2Fw%20rd&action=get_live_streams"
+    },
+    {
+      "kind": "api",
+      "action": null,
+      "expected": "http://iptv.example.com:8080/player_api.php?username=user1&password=p%40ss%2Fw%20rd"
+    },
+    {
+      "kind": "xmltv",
+      "expected": "http://iptv.example.com:8080/xmltv.php?username=user1&password=p%40ss%2Fw%20rd"
+    },
+    {
+      "kind": "live",
+      "streamId": "1001",
+      "ext": "ts",
+      "expected": "http://iptv.example.com:8080/live/user1/p%40ss%2Fw%20rd/1001.ts"
+    },
+    {
+      "kind": "movie",
+      "streamId": "5001",
+      "ext": "mkv",
+      "expected": "http://iptv.example.com:8080/movie/user1/p%40ss%2Fw%20rd/5001.mkv"
+    },
+    {
+      "kind": "episode",
+      "streamId": "70001",
+      "ext": "mkv",
+      "expected": "http://iptv.example.com:8080/series/user1/p%40ss%2Fw%20rd/70001.mkv"
+    },
+    {
+      "kind": "timeshift",
+      "streamId": "1001",
+      "ext": "ts",
+      "start": 1759591800,
+      "end": 1759597200,
+      "serverTimezone": "Europe/Istanbul",
+      "expected": "http://iptv.example.com:8080/timeshift/user1/p%40ss%2Fw%20rd/90/2025-10-04:18-30/1001.ts"
+    },
+    {
+      "kind": "timeshift",
+      "streamId": "1001",
+      "ext": "m3u8",
+      "start": 1759591800,
+      "end": 1759597201,
+      "serverTimezone": null,
+      "expected": "http://iptv.example.com:8080/timeshift/user1/p%40ss%2Fw%20rd/91/2025-10-04:15-30/1001.m3u8"
+    }
+  ],
+  "liveExt": [
+    {
+      "platform": "android",
+      "allowed": [
+        "m3u8",
+        "ts"
+      ],
+      "expected": "ts"
+    },
+    {
+      "platform": "android",
+      "allowed": [
+        "m3u8"
+      ],
+      "expected": "m3u8"
+    },
+    {
+      "platform": "android",
+      "allowed": [],
+      "expected": "ts"
+    },
+    {
+      "platform": "apple",
+      "allowed": [
+        "ts"
+      ],
+      "expected": "error:UnsupportedFormat"
+    },
+    {
+      "platform": "apple",
+      "allowed": [],
+      "expected": "m3u8"
+    },
+    {
+      "platform": "apple",
+      "allowed": [
+        "m3u8",
+        "ts"
+      ],
+      "expected": "m3u8"
+    },
+    {
+      "platform": "apple",
+      "allowed": [
+        "rtmp",
+        "m3u8"
+      ],
+      "expected": "m3u8"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "seasons": [],
+  "info": [],
+  "episodes": [
+    [
+      {
+        "id": "80001",
+        "episode_num": 1,
+        "title": "Ep 1",
+        "container_extension": "mp4",
+        "info": {},
+        "season": 1
+      }
+    ],
+    [
+      {
+        "id": "80101",
+        "episode_num": 1,
+        "title": "Ep 1",
+        "container_extension": "mp4",
+        "info": {}
+      }
+    ]
+  ]
+}

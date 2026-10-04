@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "file": "series_info.json",
+      "seriesId": "7000",
+      "episodes": [
+        {
+          "id": "70001",
+          "seriesId": "7000",
+          "season": 1,
+          "number": 1,
+          "title": "Breaking Bad - S01E01 - Pilot",
+          "containerExt": "mkv",
+          "durationSec": 3480,
+          "plot": "Walter White is diagnosed.",
+          "posterUrl": "http://img.example.com/bb_e1.jpg"
+        },
+        {
+          "id": "70002",
+          "seriesId": "7000",
+          "season": 1,
+          "number": 2,
+          "title": "Breaking Bad - S01E02 - Cat's in the Bag...",
+          "containerExt": "mp4",
+          "durationSec": null,
+          "plot": null,
+          "posterUrl": null
+        },
+        {
+          "id": "70101",
+          "seriesId": "7000",
+          "season": 2,
+          "number": 1,
+          "title": "S02E01",
+          "containerExt": "mkv",
+          "durationSec": 2820,
+          "plot": null,
+          "posterUrl": null
+        }
+      ]
+    },
+    {
+      "file": "series_info_list_variant.json",
+      "seriesId": "8000",
+      "episodes": [
+        {
+          "id": "80001",
+          "seriesId": "8000",
+          "season": 1,
+          "number": 1,
+          "title": "Ep 1",
+          "containerExt": "mp4",
+          "durationSec": null,
+          "plot": null,
+          "posterUrl": null
+        },
+        {
+          "id": "80101",
+          "seriesId": "8000",
+          "season": 2,
+          "number": 1,
+          "title": "Ep 1",
+          "containerExt": "mp4",
+          "durationSec": null,
+          "plot": null,
+          "posterUrl": null
+        }
+      ]
+    }
+  ]
+}

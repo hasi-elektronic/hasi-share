@@ -1,0 +1,20 @@
+[
+  {
+    "id": "7000",
+    "name": "Breaking Bad",
+    "posterUrl": "http://img.example.com/bb.jpg",
+    "categoryId": "20",
+    "plot": "A chemistry teacher turns to crime.",
+    "rating": 9.5,
+    "year": 2008
+  },
+  {
+    "id": "7100",
+    "name": "Dark",
+    "posterUrl": null,
+    "categoryId": "20",
+    "plot": null,
+    "rating": null,
+    "year": 2017
+  }
+]
