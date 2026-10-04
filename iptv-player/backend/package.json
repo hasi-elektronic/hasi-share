@@ -6,14 +6,16 @@
   "description": "IPTV player backend: licensing, accounts, sync, TV pairing (Cloudflare Workers + D1)",
   "scripts": {
     "dev": "wrangler dev",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/keygen.test.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "keygen": "node scripts/keygen.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "deploy": "wrangler deploy",
-    "build:dry": "wrangler deploy --dry-run --outdir dist"
+    "build:dry": "wrangler deploy --dry-run --outdir dist",
+    "test:workers": "vitest run",
+    "test:scripts": "node --test scripts/keygen.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",

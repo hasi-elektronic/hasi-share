@@ -9,7 +9,7 @@ const RULE_PATH_CREDS = /\/(live|movie|series|timeshift)\/[^/\s?#]+\/[^/\s?#]+\/
 const RULE_QUERY =
   /\b(username|password|pass|pwd|token|auth|key|apikey|api_key|secret|signature|sig|access_token)=([^&\s#"']*)/gi;
 const RULE_BEARER = /(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi;
-const EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g;
+const EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9])[A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*(\.[A-Za-z]{2,})\b/g;
 
 /** CONTRACT §10 – rules applied in the specified order. */
 export function redact(input: string, secrets: readonly string[] = []): string {
@@ -28,9 +28,12 @@ export function redact(input: string, secrets: readonly string[] = []): string {
   return out;
 }
 
-/** "alice@example.com" → "a***@example.com" (backend-specific addition to §10). */
+/**
+ * "alice@mail.example.com" → "a***@m***.com" (backend-specific addition to §10, as described
+ * in docs/SECURITY.md): first character of the local part and of the domain, plus the TLD.
+ */
 export function maskEmails(input: string): string {
-  return input.replace(EMAIL, "$1***@$2");
+  return input.replace(EMAIL, "$1***@$2***$3");
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error";

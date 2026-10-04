@@ -1,5 +1,5 @@
 # Cloudflare Worker for the IPTV player backend (licensing, accounts, sync, TV pairing).
-# Secrets are NOT stored here – set them with `wrangler secret put <NAME>` (see scripts/dev.md).
+# Secrets are NOT stored here – set them with `wrangler secret put <NAME>` (see README.md, section "Gizli değerler").
 name = "iptv-backend"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"

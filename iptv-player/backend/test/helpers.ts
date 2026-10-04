@@ -116,7 +116,8 @@ export class FakeStores {
 
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const req = new Request(input as RequestInfo, init);
-    const body = req.method === "GET" ? "" : await req.text();
+    // arrayBuffer() + decode: workerd warns when .text() is used on form-encoded bodies.
+    const body = req.method === "GET" ? "" : new TextDecoder().decode(await req.arrayBuffer());
     const call: Call = { method: req.method, url: req.url, headers: req.headers, body };
     this.calls.push(call);
     const url = new URL(req.url);

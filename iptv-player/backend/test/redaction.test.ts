@@ -24,7 +24,8 @@ describe("Logger", () => {
     expect(lines).toHaveLength(1);
     const line = lines[0]!;
     expect(line).not.toContain("alice.smith");
-    expect(line).toContain("a***@example.com");
+    expect(line).toContain("a***@e***.com");
+    expect(line).not.toContain("example.com");
     expect(line).toContain("Bearer ***");
     expect(line).toContain("/live/***/***/");
     expect(line).toContain("token=***");
@@ -34,6 +35,8 @@ describe("Logger", () => {
 
   it("maskEmails keeps redaction output intact", () => {
     expect(maskEmails("http://***@cam.example.com/x")).toBe("http://***@cam.example.com/x");
-    expect(maskEmails("to bob@test.io now")).toBe("to b***@test.io now");
+    expect(maskEmails("to bob@test.io now")).toBe("to b***@t***.io now");
+    expect(maskEmails("x.y+z@mail.example.co.uk")).toBe("x***@m***.uk");
+    expect(maskEmails("no mail here: a@b, @foo.com")).toBe("no mail here: a@b, @foo.com");
   });
 });
