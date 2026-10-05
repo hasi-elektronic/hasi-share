@@ -677,8 +677,8 @@ fun TvSettings(factory: ViewModelFactory, main: MainViewModel, nav: TvNav) {
         item { Choice(stringResource(R.string.pref_tv_preview), stringResource(if (s.tvPreview) R.string.automatic else R.string.off)) { vm.update { it.copy(tvPreview = !it.tvPreview) } } }
         item { Header(stringResource(R.string.settings_appearance)) }
         item {
-            Choice(stringResource(R.string.pref_app_language), when (s.appLanguage) { "tr" -> "Türkçe"; "en" -> "English"; else -> system }) {
-                val v = next(listOf("", "tr", "en"), s.appLanguage)
+            Choice(stringResource(R.string.pref_app_language), io.iptvplayer.app.ui.common.AppLocale.label(s.appLanguage, system)) {
+                val v = next(listOf("") + io.iptvplayer.app.ui.common.AppLocale.SUPPORTED.map { it.first }, s.appLanguage)
                 vm.update { it.copy(appLanguage = v) }
                 io.iptvplayer.app.ui.common.AppLocale.apply(ctx, v)
             }

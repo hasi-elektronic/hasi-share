@@ -216,4 +216,12 @@ describe("GET /admin page", () => {
     expect(r.text).toContain('<html lang="en">');
     expect(r.text).toContain("Grant a license");
   });
+
+  it("German via Accept-Language and ?lang=de", async () => {
+    for (const r of [await h.get("/admin", { headers: { "accept-language": "de-DE" } }), await h.get("/admin?lang=de")]) {
+      expect(r.text).toContain('<html lang="de">');
+      expect(r.text).toContain("Lizenz vergeben");
+      expect(r.text).toContain('href="/admin?lang=tr"');
+    }
+  });
 });

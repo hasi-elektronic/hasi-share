@@ -53,7 +53,7 @@ girdi tek kanal olur (özet sayıları veritabanındaki gerçek satırlardır).
   `ON_STOP`'ta release).
 * Manifest: `leanback` ve `touchscreen` `required=false`, TV banner, cleartext izinli
   `network_security_config`, `data_extraction_rules` + `backup_rules` (DB, SharedPreferences,
-  DataStore yedek/aktarım dışı), `localeConfig` (TR/EN).
+  DataStore yedek/aktarım dışı), `localeConfig` (EN/TR/DE; uygulama içi dil: Sistem / Deutsch / Türkçe / English → `AppLocale`).
 * `stream-samples.json` derleme sırasında `spec/test-vectors/`'ten asset olarak kopyalanır
   (`copyStreamSamples` görevi).
 * Lisans açık anahtarları: `app/src/main/assets/license-keys.json`. **Depodaki dosya yalnızca

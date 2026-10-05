@@ -35,12 +35,12 @@ struct SettingsView: View {
                 .onChange(of: settings.aspect) { env.player.aspect = settings.aspect }
                 Picker(L10n.t("pref_audio_lang"), selection: $settings.audioLanguage) {
                     Text(L10n.t("automatic")).tag("")
-                    ForEach(Self.languages, id: \.self) { Text(Locale.current.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
+                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
                 }
                 Picker(L10n.t("pref_subtitle_lang"), selection: $settings.subtitleLanguage) {
                     Text(L10n.t("automatic")).tag("")
                     Text(L10n.t("off")).tag("off")
-                    ForEach(Self.languages, id: \.self) { Text(Locale.current.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
+                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
                 }
                 .onChange(of: settings.audioLanguage) { env.applyLanguagePreferences() }
                 .onChange(of: settings.subtitleLanguage) { env.applyLanguagePreferences() }
@@ -53,6 +53,16 @@ struct SettingsView: View {
                 #endif
             }
             Section(L10n.t("settings_appearance")) {
+                // Switching re-renders the whole app in the new language (root views are keyed by it).
+                Picker(L10n.t("pref_app_language"), selection: Binding(get: { settings.appLanguage }, set: { code in
+                    L10n.setLanguage(code)
+                    settings.appLanguage = code
+                    env.applyLanguagePreferences()
+                })) {
+                    Text(L10n.t("system_default")).tag("")
+                    ForEach(AppSettings.supportedLanguages, id: \.self) { Text(verbatim: Self.languageNames[$0] ?? $0).tag($0) }
+                }
+                .accessibilityIdentifier("settings_app_language")
                 Picker(L10n.t("pref_epg_timezone"), selection: $settings.epgTimeZone) {
                     Text(L10n.t("timezone_device")).tag("")
                     ForEach(["UTC", "Europe/Istanbul", "Europe/Berlin", "Europe/London"], id: \.self) { Text($0).tag($0) }
@@ -99,6 +109,8 @@ struct SettingsView: View {
     }
 
     static let languages = ["tr", "en", "de", "fr", "es", "ar", "ru"]
+    /// Endonyms for the app-language picker (always in their own language).
+    static let languageNames = ["de": "Deutsch", "tr": "Türkçe", "en": "English"]
 }
 
 private struct PurchaseStatusRow: View {
@@ -124,12 +136,12 @@ struct SourceSummaryRow: View {
                 Text(source.name).font(Theme.body.weight(.semibold))
                 Text("\(source.type == .xtream ? "Xtream" : "M3U") · \(source.displayHost)").font(Theme.caption).foregroundStyle(Theme.textSecondary)
                 if let last = source.lastRefreshAt {
-                    LText("source_last_refresh", last.formatted(date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(Theme.textSecondary)
+                    LText("source_last_refresh", L10n.date(last, date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(Theme.textSecondary)
                 } else {
                     LText("source_never_refreshed").font(.caption2).foregroundStyle(Theme.textSecondary)
                 }
                 if let expires = source.xtreamAccount?.expiresAt {
-                    LText("source_expires", expires.formatted(date: .abbreviated, time: .omitted)).font(.caption2).foregroundStyle(Theme.textSecondary)
+                    LText("source_expires", L10n.date(expires, date: .abbreviated, time: .omitted)).font(.caption2).foregroundStyle(Theme.textSecondary)
                 }
             }
             if env.refreshing.contains(source.id) { Spacer(); ProgressView() }
@@ -239,7 +251,7 @@ struct AccountView: View {
             if let info = account.account {
                 Section {
                     LText("account_signed_in_as", info.email)
-                    if let synced = env.lastSyncedAt { LText("last_synced", synced.formatted(date: .omitted, time: .shortened)) }
+                    if let synced = env.lastSyncedAt { LText("last_synced", L10n.date(synced, date: .omitted, time: .shortened)) }
                     Button(L10n.t("account_sign_out")) { Task { await account.signOut() } }
                     Button(L10n.t("account_delete"), role: .destructive) { confirmDelete = true }
                 }
@@ -263,7 +275,7 @@ struct AccountView: View {
                         #if os(iOS)
                             .keyboardType(.emailAddress)
                         #endif
-                        Button(L10n.t("account_send_code")) { Task { await account.startEmailLogin(email: email) } }
+                        Button(L10n.t("account_send_code")) { Task { await account.startEmailLogin(email: email, locale: L10n.languageCode) } }
                             .disabled(!email.contains("@"))
                     }
                     if account.busy { ProgressView() }

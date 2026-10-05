@@ -16,6 +16,8 @@ struct NovaPlayerApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .id(env.settings.appLanguage) // Settings → App language: rebuild in the new language
+                .environment(\.locale, L10n.locale)
                 .environment(env)
                 .environment(router)
                 .preferredColorScheme(.dark)

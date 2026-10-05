@@ -445,7 +445,7 @@ struct FavoritesView: View {
                 .accessibilityIdentifier("favorites_segment")
                 content(model)
                 if let synced = env.lastSyncedAt, env.account.isSignedIn {
-                    LText("last_synced", synced.formatted(date: .omitted, time: .shortened)).font(Theme.caption).foregroundStyle(Theme.textSecondary).padding()
+                    LText("last_synced", L10n.date(synced, date: .omitted, time: .shortened)).font(Theme.caption).foregroundStyle(Theme.textSecondary).padding()
                 }
             }
         }

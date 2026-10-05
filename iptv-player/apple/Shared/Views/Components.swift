@@ -511,7 +511,9 @@ struct TrialChip: View {
     }
 
     private func chip(_ text: String, _ color: Color) -> some View {
+        // Never truncated (German "Testphase: noch 4 Tage" is long); neighbours wrap instead.
         Text(text).font(Theme.caption.weight(.semibold)).foregroundStyle(.white).lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(Capsule().fill(color.opacity(0.85)))
     }
@@ -700,7 +702,7 @@ struct EmptyStateView: View {
 extension AppEnvironment {
     /// EPG time formatter honouring the settings (time zone, 24 h).
     var timeFormatter: EpgTimeFormatter {
-        EpgTimeFormatter(timeZone: settings.timeZone, locale: .current, use24Hour: settings.use24Hour)
+        EpgTimeFormatter(timeZone: settings.timeZone, locale: L10n.locale, use24Hour: settings.use24Hour)
     }
 
     /// Category name for a catalog item (shown as genre line).

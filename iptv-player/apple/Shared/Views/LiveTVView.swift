@@ -401,7 +401,7 @@ struct CatchupSheet: View {
                         Section {
                             ForEach(day.programs, id: \.start) { p in row(p, canReplay: canReplay) }
                         } header: {
-                            Text(day.day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                            Text(day.day.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(L10n.locale)))
                                 .font((Theme.isTV ? Theme.caption : .subheadline).weight(.bold)).foregroundStyle(Theme.primary)
                                 .textCase(nil)
                         }

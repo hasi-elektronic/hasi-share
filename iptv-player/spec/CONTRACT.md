@@ -116,7 +116,7 @@ PlaybackError =
   UnsupportedFormat(container) | UnsupportedCodec(codec?) | Drm | Unknown(message)
 ```
 
-Each maps to a localized, actionable message (TR + EN) – see `docs/SCREENS.md` §Errors.
+Each maps to a localized, actionable message (EN + TR + DE) – see `docs/SCREENS.md` §Errors.
 Retry for source GETs: at most 2 retries (2 s, 4 s) on `Network`/`ServerError(5xx)`;
 never on 4xx. All requests: connect timeout 10 s, read timeout 30 s, whole-call
 timeout 120 s for playlists/EPG, 20 s for Xtream JSON calls; all cancellable.

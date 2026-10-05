@@ -18,6 +18,14 @@ public final class AppSettings {
     public var epgTimeZone: String { didSet { defaults.set(epgTimeZone, forKey: "pref.epgTz") } }
     /// nil → system/locale default.
     public var use24Hour: Bool? { didSet { defaults.set(use24Hour.map { $0 ? 1 : 0 } ?? -1, forKey: "pref.24h") } }
+    /// In-app UI language: one of [supportedLanguages] or "" (system). Also written to `AppleLanguages`
+    /// so system UI and `Locale.current` follow from the next launch on (the app's L10n switches at once).
+    public var appLanguage: String {
+        didSet {
+            defaults.set(appLanguage, forKey: Self.appLanguageKey)
+            if appLanguage.isEmpty { defaults.removeObject(forKey: "AppleLanguages") } else { defaults.set([appLanguage], forKey: "AppleLanguages") }
+        }
+    }
     public var currentSourceId: String? { didSet { defaults.set(currentSourceId, forKey: "pref.currentSource") } }
     /// Host used for `<LAN-IP>` in the format test (simulator: localhost).
     public var formatTestHost: String { didSet { defaults.set(formatTestHost, forKey: "pref.formatTestHost") } }
@@ -30,6 +38,8 @@ public final class AppSettings {
         largeBuffer = defaults.bool(forKey: "pref.largeBuffer")
         tvPreview = defaults.object(forKey: "pref.tvPreview") as? Bool ?? false
         epgTimeZone = defaults.string(forKey: "pref.epgTz") ?? ""
+        let lang = defaults.string(forKey: Self.appLanguageKey) ?? ""
+        appLanguage = Self.supportedLanguages.contains(lang) ? lang : ""
         let h = defaults.object(forKey: "pref.24h") as? Int ?? -1
         use24Hour = h < 0 ? nil : h == 1
         currentSourceId = defaults.string(forKey: "pref.currentSource")
@@ -37,4 +47,16 @@ public final class AppSettings {
     }
 
     public var timeZone: TimeZone { TimeZone(identifier: epgTimeZone) ?? .current }
+
+    /// UI languages shipped in Localizable.xcstrings (Settings order: Deutsch · Türkçe · English).
+    public nonisolated static let supportedLanguages = ["de", "tr", "en"]
+    public nonisolated static let appLanguageKey = "pref.appLang"
+
+    /// Effective UI language code: the in-app choice, else the localization iOS picked for the app.
+    public nonisolated static func uiLanguageCode(defaults: UserDefaults = .standard) -> String {
+        let chosen = defaults.string(forKey: appLanguageKey) ?? ""
+        if supportedLanguages.contains(chosen) { return chosen }
+        let system = Bundle.main.preferredLocalizations.first ?? "en"
+        return supportedLanguages.contains(system) ? system : "en"
+    }
 }

@@ -133,9 +133,11 @@ enum AppBootstrap {
         }
         let secure: any SecureStore = isUITest ? InMemorySecureStore() : KeychainStore(service: (Bundle.main.bundleIdentifier ?? "app") + ".secrets")
         let kv = UserDefaultsStore(suite)
+        let settings = AppSettings(defaults: suite)
+        L10n.setLanguage(settings.appLanguage)
         do {
             return try AppEnvironment(config: config, database: database, secureStore: secure, kv: kv,
-                                      settings: AppSettings(defaults: suite), engines: .app)
+                                      settings: settings, engines: .app)
         } catch {
             fatalError("Invalid build configuration (license keys): \(error)")
         }

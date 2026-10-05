@@ -84,7 +84,7 @@ android {
         abortOnError = true
         warningsAsErrors = false
         checkDependencies = true
-        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "MissingTranslation")
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
         // spec/strings.json is shared with the Apple apps: not every key is used on Android.
         disable += "UnusedResources"
     }

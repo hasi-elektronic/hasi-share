@@ -62,12 +62,13 @@ public final class AccountManager {
     public var sessionToken: String? { secureStore.string(forKey: Keys.session) }
     public var isSignedIn: Bool { account != nil && sessionToken != nil }
 
-    public func startEmailLogin(email: String) async {
+    /// `locale`: UI language for the e-mail ("de" / "tr" / "en"; the backend falls back to English).
+    public func startEmailLogin(email: String, locale: String = AppSettings.uiLanguageCode()) async {
         busy = true
         defer { busy = false }
         errorMessage = nil
         do {
-            devCode = try await backend.startEmailLogin(email: email, locale: Locale.current.language.languageCode?.identifier == "tr" ? "tr" : "en")
+            devCode = try await backend.startEmailLogin(email: email, locale: locale)
             pendingEmail = email
         } catch {
             errorMessage = Self.message(error)

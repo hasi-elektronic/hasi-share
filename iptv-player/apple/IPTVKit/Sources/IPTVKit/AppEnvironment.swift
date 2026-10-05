@@ -123,7 +123,8 @@ public final class AppEnvironment {
     }
 
     public func applyLanguagePreferences() {
-        player.preferredAudioLanguage = settings.audioLanguage.isEmpty ? Locale.current.language.languageCode?.identifier : settings.audioLanguage
+        player.preferredAudioLanguage = settings.audioLanguage.isEmpty
+            ? (settings.appLanguage.isEmpty ? Locale.current.language.languageCode?.identifier : settings.appLanguage) : settings.audioLanguage
         player.preferredSubtitleLanguage = settings.subtitleLanguage.isEmpty || settings.subtitleLanguage == "off" ? nil : settings.subtitleLanguage
     }
 

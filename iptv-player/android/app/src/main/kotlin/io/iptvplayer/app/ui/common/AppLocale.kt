@@ -10,10 +10,16 @@ import androidx.core.content.edit
 import java.util.Locale
 
 /**
- * In-app language (SCREENS §3.9: System / Türkçe / English). API 33+: per-app locale via
+ * In-app language (SCREENS §3.9: System / Deutsch / Türkçe / English). API 33+: per-app locale via
  * [LocaleManager]; older devices: the activity's base context is wrapped ([wrap]).
  */
 object AppLocale {
+    /** UI languages offered in Settings (tag → endonym); keep in sync with res/xml/locales_config.xml. */
+    val SUPPORTED: List<Pair<String, String>> = listOf("de" to "Deutsch", "tr" to "Türkçe", "en" to "English")
+
+    /** Endonym for [tag], or [system] for "" / unknown tags. */
+    fun label(tag: String, system: String): String = SUPPORTED.firstOrNull { it.first == tag }?.second ?: system
+
     private const val PREFS = "ui_prefs"
     private const val KEY = "app_lang"
 

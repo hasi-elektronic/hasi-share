@@ -1,37 +1,45 @@
 {
- "_note": "Android-only UI strings (merged by spec/tools/gen-strings.mjs; keys must not exist in strings.json or strings.apple.json).",
+ "_note": "Android-only UI strings, EN/TR/DE (merged by spec/tools/gen-strings.mjs; keys must not exist in strings.json or strings.apple.json).",
  "strings": {
   "trial_backend_unavailable": {
    "en": "The free trial needs a connection to the license server. Check your internet connection and try again.",
-   "tr": "Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin."
+   "tr": "Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+   "de": "Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen."
   },
   "sync_now": {
    "en": "Sync now",
-   "tr": "Şimdi eşitle"
+   "tr": "Şimdi eşitle",
+   "de": "Jetzt synchronisieren"
   },
   "format_test_pending": {
    "en": "Not tested",
-   "tr": "Test edilmedi"
+   "tr": "Test edilmedi",
+   "de": "Nicht getestet"
   },
   "format_test_skipped": {
    "en": "Skipped (local sample – enter a test server)",
-   "tr": "Atlandı (yerel örnek – test sunucusu girin)"
+   "tr": "Atlandı (yerel örnek – test sunucusu girin)",
+   "de": "Übersprungen (lokales Beispiel – Testserver eingeben)"
   },
   "item_unavailable": {
    "en": "This item is no longer available in your sources.",
-   "tr": "Bu öğe artık kaynaklarınızda yok."
+   "tr": "Bu öğe artık kaynaklarınızda yok.",
+   "de": "Dieser Inhalt ist in Ihren Quellen nicht mehr verfügbar."
   },
   "source_status_ok": {
    "en": "OK",
-   "tr": "Tamam"
+   "tr": "Tamam",
+   "de": "OK"
   },
   "error_backend_generic": {
    "en": "Server not reachable ({0})",
-   "tr": "Sunucuya ulaşılamıyor ({0})"
+   "tr": "Sunucuya ulaşılamıyor ({0})",
+   "de": "Server nicht erreichbar ({0})"
   },
   "account_not_configured": {
    "en": "Accounts are not available in this build (no backend configured).",
-   "tr": "Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış)."
+   "tr": "Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).",
+   "de": "Konten sind in dieser Version nicht verfügbar (kein Server konfiguriert)."
   }
  }
 }

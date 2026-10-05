@@ -2,7 +2,8 @@
 
 Bu doküman hem mobil (Android / iOS) hem TV (Android TV / Apple TV) arayüzleri için
 **normatif** tasarım spesifikasyonudur. Metin anahtarları `spec/strings.json` içindedir
-(tek kaynak; Android `strings.xml` ve Apple `Localizable.xcstrings` buradan üretilir).
+(tek kaynak, her anahtar EN + TR + DE; Android `strings.xml` ve Apple `Localizable.xcstrings`
+buradan üretilir – eksik çeviri üretimi durdurur).
 
 ## 1. Görsel dil
 
@@ -188,8 +189,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "+ Kaynak ekle".
 * **Oynatma:** tercih edilen ses dili, altyazı dili, görüntü oranı varsayılanı, canlı yayın
   formatı (Android: Otomatik/TS/HLS), arabellek (Normal/Büyük), TV'de önizleme oynatıcısı.
-* **Görünüm & dil:** Uygulama dili (Sistem/Türkçe/English), EPG saat dilimi (Cihaz/özel),
-  24 saat biçimi.
+* **Görünüm & dil:** Uygulama dili (Sistem / Deutsch / Türkçe / English – dil adları her zaman
+  kendi dilinde), EPG saat dilimi (Cihaz/özel), 24 saat biçimi. Arayüz üç dilde tamdır (EN/TR/DE);
+  "Sistem" cihaz dilini izler, desteklenmeyen dillerde English. Dil değişince arayüz hemen yeniden
+  çizilir; tarih/saat seçilen dile göre biçimlenir (DE/TR: 24 saat).
 * **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
   senkronizasyon durumu, çıkış, **hesabı sil**.
 * **Satın alma:** durum, geri yükle.

@@ -117,7 +117,7 @@ struct TrialCard: View {
                 LText("purchase_owned").font(Theme.body).foregroundStyle(Theme.success)
             case .trialActive:
                 if let end = decision.trialEndMs {
-                    LText("trial_active_until", Date(timeIntervalSince1970: Double(end) / 1000).formatted(date: .abbreviated, time: .shortened))
+                    LText("trial_active_until", L10n.date(Date(timeIntervalSince1970: Double(end) / 1000), date: .abbreviated, time: .shortened))
                         .font(Theme.body).foregroundStyle(Theme.textSecondary)
                 }
             case .trialExpired, .trialNotStarted:

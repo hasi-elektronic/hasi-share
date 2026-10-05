@@ -1,5 +1,5 @@
 import { randomToken } from "../crypto";
-import type { Lang } from "./i18n";
+import { LANGS, type Lang } from "./i18n";
 
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) =>
@@ -94,8 +94,13 @@ export function renderPage(p: PageParts): Response {
   });
 }
 
+/** "Deutsch · Türkçe · English" – the current language is plain text, the others are links. */
 export function langSwitch(lang: Lang, path: string, extraQuery = ""): string {
-  const other: Lang = lang === "tr" ? "en" : "tr";
   const q = extraQuery ? `&${extraQuery}` : "";
-  return `<p class="muted"><a href="${escapeHtml(`${path}?lang=${other}${q}`)}">${other === "tr" ? "Türkçe" : "English"}</a></p>`;
+  const items = LANGS.map(({ lang: l, name }) =>
+    l === lang
+      ? `<strong lang="${l}" aria-current="true">${name}</strong>`
+      : `<a lang="${l}" hreflang="${l}" href="${escapeHtml(`${path}?lang=${l}${q}`)}">${name}</a>`,
+  );
+  return `<p class="muted lang-switch">${items.join(" · ")}</p>`;
 }

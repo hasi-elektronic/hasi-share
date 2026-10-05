@@ -276,7 +276,8 @@ xcrun simctl io booted screenshot live.png
 | Uygulama adı, bundle id, ürün id'leri, backend URL | `Config/Shared.xcconfig` (backend `wrangler.toml` ile aynı ürün id'leri) |
 | Yerel geçersiz kılma (ör. dev backend) | `Config/Local.xcconfig` (git dışı): `BACKEND_BASE_URL = http:/$()/localhost:8798` |
 | Lisans açık anahtarları | `Config/license-keys.json` |
-| Arayüz metinleri | `spec/strings.json` + `spec/strings.apple.json` → `node spec/tools/gen-strings.mjs` |
+| Arayüz metinleri | `spec/strings.json` + `spec/strings.apple.json` → `node spec/tools/gen-strings.mjs` (EN/TR/DE; `CFBundleLocalizations` en, tr, de) |
+| Uygulama dili | Ayarlar → Görünüm & dil: Sistem / Deutsch / Türkçe / English (`AppSettings.appLanguage`, `L10n.setLanguage` → kök görünüm `.id` ile anında yeniden çizilir; `AppleLanguages` da yazılır) |
 | ATS | Info.plist `NSAllowsArbitraryLoads = YES` (kullanıcının HTTP IPTV sunucuları, V17) |
 
 > ⚠️ **`Config/license-keys.json` şu an yalnızca test anahtarını (`test-1`, `spec/test-vectors/license-token.json`)

@@ -106,11 +106,16 @@ describe("language selection", () => {
   it.each([
     [undefined, "", "en"],
     ["tr-TR,tr;q=0.9,en;q=0.8", "", "tr"],
-    ["de-DE,de;q=0.9,tr;q=0.5,en;q=0.4", "", "tr"],
+    ["de-DE,de;q=0.9,tr;q=0.5,en;q=0.4", "", "de"],
+    ["fr-FR,de;q=0.7,tr;q=0.5", "", "de"],
+    ["fr-FR,tr;q=0.9,de;q=0.8", "", "tr"],
     ["en-US,tr;q=0.9", "", "en"],
     ["tr;q=0", "", "en"],
-    ["de", "", "en"],
+    ["de", "", "de"],
+    ["de-AT", "", "de"],
+    ["fr", "", "en"],
     ["tr", "?lang=en", "en"],
+    ["en", "?lang=de", "de"],
     [undefined, "?lang=tr", "tr"],
     [undefined, "?lang=xx", "en"],
   ])("Accept-Language %s %s → %s", (al, q, lang) => {
@@ -155,10 +160,32 @@ describe("GET /pair", () => {
     const r = await h.get("/pair?lang=tr", { headers: { "accept-language": "en" } });
     expect(r.text).toContain('<html lang="tr">');
   });
+
+  it("German page by Accept-Language, client strings in German", async () => {
+    const r = await h.get("/pair?c=abc234", { headers: { "accept-language": "de-DE,de;q=0.9,en;q=0.5" } });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-language")).toBe("de");
+    expect(r.text).toContain('<html lang="de">');
+    expect(r.text).toContain("Quelle zum TV hinzufügen");
+    expect(r.text).toContain("Diese App stellt keine Inhalte bereit");
+    const i18n = JSON.parse(/<script type="application\/json" id="i18n">([^<]*)<\/script>/.exec(r.text)![1]!);
+    expect(i18n.err_code_unknown).toBe("Dieser Code ist unbekannt. Bitte den Code auf Ihrem TV prüfen.");
+  });
+
+  it("language switcher: Deutsch · Türkçe · English, current one not linked, ?c= kept", async () => {
+    const de = await h.get("/pair?lang=de&c=abc234");
+    expect(de.text).toContain('<html lang="de">');
+    const sw = /<p class="muted lang-switch">(.*?)<\/p>/.exec(de.text)![1]!;
+    expect(sw.replace(/<[^>]+>/g, "")).toBe("Deutsch · Türkçe · English");
+    expect(sw).toContain('<strong lang="de" aria-current="true">Deutsch</strong>');
+    expect(sw).toContain('href="/pair?lang=tr&amp;c=ABC234"');
+    expect(sw).toContain('href="/pair?lang=en&amp;c=ABC234"');
+    expect(sw).not.toContain("lang=de");
+  });
 });
 
 describe("GET /link", () => {
-  it("renders TR/EN and pre-fills the TV code from ?c=", async () => {
+  it("renders EN/TR/DE and pre-fills the TV code from ?c=", async () => {
     const en = await h.get("/link?c=ABCDEFGH");
     expect(en.status).toBe(200);
     expect(en.text).toContain("Sign in on your TV");
@@ -169,6 +196,12 @@ describe("GET /link", () => {
     const tr = await h.get("/link", { headers: { "accept-language": "tr" } });
     expect(tr.text).toContain("TV&#39;nizde oturum açın");
     expect(tr.text).toContain('value=""');
+
+    const de = await h.get("/link?lang=de&c=ABCDEFGH");
+    expect(de.text).toContain('<html lang="de">');
+    expect(de.text).toContain("Auf dem TV anmelden");
+    expect(de.text).toContain("TV-Anmeldung bestätigen");
+    expect(de.text).toContain('href="/link?lang=en&amp;c=ABCDEFGH"');
   });
 
   it("ignores invalid codes", async () => {

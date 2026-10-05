@@ -33,6 +33,10 @@ describe("POST /v1/auth/email/start", () => {
     const en = await h.post("/v1/auth/email/start", { email: "user2@example.com", locale: "en" });
     expect(en.status).toBe(200);
     expect(h.stores.emails[1]!.subject).toMatch(/^Your NovaPlayer sign-in code: \d{6}$/);
+    const de = await h.post("/v1/auth/email/start", { email: "user3@example.com", locale: "de-DE" });
+    expect(de.status).toBe(200);
+    expect(h.stores.emails[2]!.subject).toMatch(/^Ihr NovaPlayer-Anmeldecode: \d{6}$/);
+    expect(h.stores.emails[2]!.text).toContain("10 Minuten gültig");
   });
 
   it("production without RESEND_API_KEY → 503 email_unavailable", async () => {

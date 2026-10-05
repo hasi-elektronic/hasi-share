@@ -49,7 +49,7 @@ struct AddSourceView: View {
         case .success(let source):
             successView(source)
         case .failed(let error):
-            ErrorCardView(presentation: error.presentation(formatDate: { $0.formatted(date: .long, time: .omitted) })) { action in
+            ErrorCardView(presentation: error.presentation(formatDate: { L10n.date($0, date: .long, time: .omitted) })) { action in
                 switch action {
                 case .retry, .refresh: model.connect()
                 default: model.backToForm()
@@ -69,7 +69,7 @@ struct AddSourceView: View {
                 .font(Theme.body).foregroundStyle(Theme.textPrimary)
             if let account = source.xtreamAccount {
                 if let expires = account.expiresAt {
-                    LText("source_expires", expires.formatted(date: .long, time: .omitted)).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    LText("source_expires", L10n.date(expires, date: .long, time: .omitted)).font(Theme.caption).foregroundStyle(Theme.textSecondary)
                 } else {
                     LText("source_unlimited").font(Theme.caption).foregroundStyle(Theme.textSecondary)
                 }
@@ -88,9 +88,9 @@ struct AddSourceView: View {
         switch step {
         case .connecting: return L10n.t("progress_connecting")
         case .authenticating: return L10n.t("progress_auth")
-        case .channels(let n): return L10n.t("progress_channels", n.formatted())
-        case .movies(let n): return L10n.t("progress_movies", n.formatted())
-        case .series(let n): return L10n.t("progress_series", n.formatted())
+        case .channels(let n): return L10n.t("progress_channels", L10n.number(n))
+        case .movies(let n): return L10n.t("progress_movies", L10n.number(n))
+        case .series(let n): return L10n.t("progress_series", L10n.number(n))
         case .epg: return L10n.t("progress_epg")
         }
     }

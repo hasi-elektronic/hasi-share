@@ -73,7 +73,7 @@ targetTemplates:
         APP_BUNDLE_ID: $(APP_BUNDLE_ID)
         TESTFLIGHT_FULL_ACCESS: $(TESTFLIGHT_FULL_ACCESS)
         ITSAppUsesNonExemptEncryption: false
-        CFBundleLocalizations: [en, tr]
+        CFBundleLocalizations: [en, tr, de]
         # Users add arbitrary (mostly plain-HTTP) IPTV servers (ARCHITECTURE V17).
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

@@ -41,7 +41,7 @@ android {
         abortOnError = true
         warningsAsErrors = false
         checkDependencies = false
-        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "MissingTranslation")
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
     }
 }
 

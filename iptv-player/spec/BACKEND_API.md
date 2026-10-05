@@ -67,7 +67,7 @@ Rate limit: 30/min per deviceKey.
 
 ## Accounts (optional feature)
 
-### `POST /v1/auth/email/start` `{email, locale: "tr"|"en"}` → `{ok: true}`
+### `POST /v1/auth/email/start` `{email, locale: "de"|"tr"|"en"}` → `{ok: true}`
 Sends a 6-digit code (valid 10 min, 5 attempts). Rate limit 5/hour per email and
 20/hour per IP. In `DEV_MODE=true` the response also contains `devCode`.
 
@@ -99,7 +99,7 @@ Limits: 5 000 favorites, 2 000 progress items per account (oldest progress trimm
 * `GET /v1/pair/sessions/{code}/key` → `{publicKey}` | `404` | `410`
 * `POST /v1/pair/sessions/{code}/payload {epk, iv, ct}` → `{ok:true}` (once; `409` if already set; ct ≤ 8 KB)
 * `GET /v1/pair/sessions/{code}?secret=` → `202 {status:"pending"}` | `200 {epk, iv, ct}` (deleted after) | `404` | `410`
-* `GET /pair` – HTML page (TR/EN by `Accept-Language`), encrypts in the browser with WebCrypto.
+* `GET /pair` – HTML page (DE/TR/EN by `Accept-Language`, `?lang=de|tr|en`), encrypts in the browser with WebCrypto.
 
 ## Store webhooks
 * `POST /v1/webhooks/google?token=<GOOGLE_PUBSUB_TOKEN>` – Pub/Sub push. Handles

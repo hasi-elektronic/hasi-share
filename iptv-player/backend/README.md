@@ -51,7 +51,8 @@ npm run dev                           # http://localhost:8787
   yapmayın** (`wrangler.toml` varsayılanı `"false"`).
 * Hızlı kontrol: `curl http://localhost:8787/v1/config`
 * Sayfalar: `/pair` (telefondan TV'ye kaynak gönderme), `/link` (TV girişini onaylama),
-  `/admin` (yönetim). Dil `Accept-Language`'a göre TR/EN, `?lang=tr|en` ile zorlanabilir.
+  `/admin` (yönetim). Dil `Accept-Language`'a göre DE/TR/EN (varsayılan EN), `?lang=de|tr|en` ile zorlanabilir;
+  altta dil seçici: Deutsch · Türkçe · English. Giriş kodu e-postası da DE/TR/EN.
 
 ## 3. D1 veritabanı
 ```bash

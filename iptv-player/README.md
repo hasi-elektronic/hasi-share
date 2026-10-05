@@ -23,7 +23,7 @@ iptv-player/
 ├── spec/                    platformlar arası normatif sözleşme
 │   ├── CONTRACT.md          modeller, ayrıştırma kuralları, lisans algoritmaları
 │   ├── BACKEND_API.md       REST API
-│   ├── strings.json         TR/EN arayüz metinleri (tek kaynak)
+│   ├── strings.json         EN/TR/DE arayüz metinleri (tek kaynak)
 │   ├── test-vectors/        Kotlin + Swift + TS testlerinin ortak vektörleri, gerçek medya örnekleri
 │   └── tools/               vektör ve string üreticileri (Node)
 ├── backend/                 Cloudflare Worker + D1 (lisans, deneme, hesap, senkron, eşleştirme, admin)
@@ -35,7 +35,7 @@ iptv-player/
 
 ```sh
 # Ortak araçlar
-node spec/tools/gen-strings.mjs          # strings.json → Android strings.xml + Apple xcstrings
+node spec/tools/gen-strings.mjs          # strings.json (EN/TR/DE) → Android strings.xml + Apple xcstrings
 node spec/tools/gen-vectors.mjs          # (yalnızca vektörleri yeniden üretmek için)
 
 # Backend

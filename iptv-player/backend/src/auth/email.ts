@@ -27,7 +27,8 @@ export async function emailStart(c: Ctx): Promise<Response> {
   const body = await readJsonObject(c.req);
   const email = normalizeEmail(reqString(body, "email", { max: 254 }));
   const localeRaw = optString(body, "locale", { max: 10 });
-  const lang: Lang = localeRaw === "tr" || localeRaw === "en" ? localeRaw : pickLang(c.req, c.url);
+  const primary = localeRaw?.toLowerCase().split(/[-_]/)[0];
+  const lang: Lang = primary === "de" || primary === "tr" || primary === "en" ? primary : pickLang(c.req, c.url);
 
   await rateLimit(c, "email_start_ip", c.ip, 20, 3600);
   await rateLimit(c, "email_start_email", email, 5, 3600);

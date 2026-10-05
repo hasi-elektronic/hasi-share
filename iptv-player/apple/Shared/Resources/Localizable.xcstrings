@@ -15,6 +15,12 @@
             "state": "translated",
             "value": "NovaPlayer"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NovaPlayer"
+          }
         }
       }
     },
@@ -31,6 +37,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tekrar dene"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneut versuchen"
           }
         }
       }
@@ -49,6 +61,12 @@
             "state": "translated",
             "value": "Düzenle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bearbeiten"
+          }
         }
       }
     },
@@ -65,6 +83,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sil"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
           }
         }
       }
@@ -83,6 +107,12 @@
             "state": "translated",
             "value": "İptal"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbrechen"
+          }
         }
       }
     },
@@ -99,6 +129,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaydet"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speichern"
           }
         }
       }
@@ -117,6 +153,12 @@
             "state": "translated",
             "value": "Kapat"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schließen"
+          }
         }
       }
     },
@@ -133,6 +175,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geri"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück"
           }
         }
       }
@@ -151,6 +199,12 @@
             "state": "translated",
             "value": "Devam"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter"
+          }
         }
       }
     },
@@ -167,6 +221,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yenile"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualisieren"
           }
         }
       }
@@ -185,6 +245,12 @@
             "state": "translated",
             "value": "Bağlan"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbinden"
+          }
         }
       }
     },
@@ -201,6 +267,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şifreyi göster"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort anzeigen"
           }
         }
       }
@@ -219,6 +291,12 @@
             "state": "translated",
             "value": "Şifreyi gizle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort ausblenden"
+          }
         }
       }
     },
@@ -235,6 +313,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ara"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suchen"
           }
         }
       }
@@ -253,6 +337,12 @@
             "state": "translated",
             "value": "Ayarlar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen"
+          }
         }
       }
     },
@@ -269,6 +359,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Favorilere ekle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zu Favoriten hinzufügen"
           }
         }
       }
@@ -287,6 +383,12 @@
             "state": "translated",
             "value": "Favorilerden çıkar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus Favoriten entfernen"
+          }
         }
       }
     },
@@ -303,6 +405,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oynat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abspielen"
           }
         }
       }
@@ -321,6 +429,12 @@
             "state": "translated",
             "value": "Devam et (%1$@)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsetzen (%1$@)"
+          }
         }
       }
     },
@@ -337,6 +451,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Baştan oynat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von vorne abspielen"
           }
         }
       }
@@ -355,6 +475,12 @@
             "state": "translated",
             "value": "Baştan izle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von vorne ansehen"
+          }
         }
       }
     },
@@ -371,6 +497,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanal listesi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senderliste"
           }
         }
       }
@@ -389,6 +521,12 @@
             "state": "translated",
             "value": "Rehber"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Guide"
+          }
         }
       }
     },
@@ -405,6 +543,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaldır"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernen"
           }
         }
       }
@@ -423,6 +567,12 @@
             "state": "translated",
             "value": "Yeni kod al"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neuen Code anfordern"
+          }
         }
       }
     },
@@ -439,6 +589,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sırala"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sortieren"
           }
         }
       }
@@ -457,6 +613,12 @@
             "state": "translated",
             "value": "Yükleniyor…"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird geladen…"
+          }
         }
       }
     },
@@ -473,6 +635,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diğer"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonstige"
           }
         }
       }
@@ -491,6 +659,12 @@
             "state": "translated",
             "value": "Tümü"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle"
+          }
         }
       }
     },
@@ -507,6 +681,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "CANLI"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE"
           }
         }
       }
@@ -525,6 +705,12 @@
             "state": "translated",
             "value": "Parça %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spur %1$@"
+          }
         }
       }
     },
@@ -541,6 +727,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapalı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus"
           }
         }
       }
@@ -559,6 +751,12 @@
             "state": "translated",
             "value": "Otomatik"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch"
+          }
         }
       }
     },
@@ -575,6 +773,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sistem"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
           }
         }
       }
@@ -593,6 +797,12 @@
             "state": "translated",
             "value": "Ana Sayfa"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
         }
       }
     },
@@ -609,6 +819,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canlı TV"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-TV"
           }
         }
       }
@@ -627,6 +843,12 @@
             "state": "translated",
             "value": "Filmler"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filme"
+          }
         }
       }
     },
@@ -643,6 +865,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diziler"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serien"
           }
         }
       }
@@ -661,6 +889,12 @@
             "state": "translated",
             "value": "Favoriler"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoriten"
+          }
         }
       }
     },
@@ -677,6 +911,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ara"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suche"
           }
         }
       }
@@ -695,6 +935,12 @@
             "state": "translated",
             "value": "Ayarlar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen"
+          }
         }
       }
     },
@@ -711,6 +957,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "NovaPlayer – Hoş geldiniz"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Willkommen bei NovaPlayer"
           }
         }
       }
@@ -729,6 +981,12 @@
             "state": "translated",
             "value": "Kendi IPTV kaynaklarınız için premium oynatıcı."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Premium-Player für Ihre eigenen IPTV-Quellen."
+          }
         }
       }
     },
@@ -745,6 +1003,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Uygulama içerik sağlamaz; yalnızca size ait veya kullanım hakkınız olan M3U / Xtream kaynaklarını oynatır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese App stellt keine Inhalte bereit. Sie spielt nur M3U-/Xtream-Quellen ab, die Ihnen gehören oder für die Sie eine Nutzungsberechtigung haben."
           }
         }
       }
@@ -763,6 +1027,12 @@
             "state": "translated",
             "value": "Kaynak ekle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelle hinzufügen"
+          }
         }
       }
     },
@@ -780,6 +1050,12 @@
             "state": "translated",
             "value": "M3U bağlantısı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M3U-Link"
+          }
         }
       }
     },
@@ -793,6 +1069,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xtream Codes"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Xtream Codes"
@@ -814,6 +1096,12 @@
             "state": "translated",
             "value": "Telefonla ekle (QR)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per Smartphone hinzufügen (QR)"
+          }
         }
       }
     },
@@ -830,6 +1118,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ad"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
           }
         }
       }
@@ -848,6 +1142,12 @@
             "state": "translated",
             "value": "Liste URL'si"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist-URL"
+          }
         }
       }
     },
@@ -864,6 +1164,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "EPG URL'si (isteğe bağlı)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EPG-URL (optional)"
           }
         }
       }
@@ -882,6 +1188,12 @@
             "state": "translated",
             "value": "User-Agent (isteğe bağlı)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User-Agent (optional)"
+          }
         }
       }
     },
@@ -898,6 +1210,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sunucu (http://host:port)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server (http://host:port)"
           }
         }
       }
@@ -916,6 +1234,12 @@
             "state": "translated",
             "value": "Kullanıcı adı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Benutzername"
+          }
         }
       }
     },
@@ -932,6 +1256,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şifre"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort"
           }
         }
       }
@@ -950,6 +1280,12 @@
             "state": "translated",
             "value": "Gelişmiş"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erweitert"
+          }
         }
       }
     },
@@ -966,6 +1302,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zorunlu alan"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pflichtfeld"
           }
         }
       }
@@ -984,6 +1326,12 @@
             "state": "translated",
             "value": "Geçerli bir http(s) adresi girin"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gültige http(s)-URL eingeben"
+          }
         }
       }
     },
@@ -1000,6 +1348,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlanılıyor…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindung wird hergestellt…"
           }
         }
       }
@@ -1018,6 +1372,12 @@
             "state": "translated",
             "value": "Hesap doğrulanıyor…"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto wird geprüft…"
+          }
         }
       }
     },
@@ -1034,6 +1394,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanallar yükleniyor (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender werden geladen (%1$@)"
           }
         }
       }
@@ -1052,6 +1418,12 @@
             "state": "translated",
             "value": "Filmler yükleniyor (%1$@)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filme werden geladen (%1$@)"
+          }
         }
       }
     },
@@ -1068,6 +1440,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diziler yükleniyor (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serien werden geladen (%1$@)"
           }
         }
       }
@@ -1086,6 +1464,12 @@
             "state": "translated",
             "value": "Yayın akışı yükleniyor…"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Guide wird geladen…"
+          }
         }
       }
     },
@@ -1102,6 +1486,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynak eklendi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelle hinzugefügt"
           }
         }
       }
@@ -1120,6 +1510,12 @@
             "state": "translated",
             "value": "%1$@ kanal · %2$@ film · %3$@ dizi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Sender · %2$@ Filme · %3$@ Serien"
+          }
         }
       }
     },
@@ -1136,6 +1532,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hesap geçerlilik: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto gültig bis %1$@"
           }
         }
       }
@@ -1154,6 +1556,12 @@
             "state": "translated",
             "value": "Süresiz"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Ablaufdatum"
+          }
         }
       }
     },
@@ -1170,6 +1578,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Telefonunuzla kaynak ekleyin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelle per Smartphone hinzufügen"
           }
         }
       }
@@ -1188,6 +1602,12 @@
             "state": "translated",
             "value": "QR kodu okutun veya %1$@ adresini açın"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR-Code scannen oder %1$@ öffnen"
+          }
         }
       }
     },
@@ -1204,6 +1624,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kodu girin: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code eingeben: %1$@"
           }
         }
       }
@@ -1222,6 +1648,12 @@
             "state": "translated",
             "value": "Kodun süresi: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code läuft ab in %1$@"
+          }
         }
       }
     },
@@ -1238,6 +1670,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynak alındı – bağlanılıyor…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelle empfangen – Verbindung wird hergestellt…"
           }
         }
       }
@@ -1256,6 +1694,12 @@
             "state": "translated",
             "value": "Kodun süresi doldu."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Code ist abgelaufen."
+          }
         }
       }
     },
@@ -1272,6 +1716,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bilgileriniz uçtan uca şifrelenir; sunucumuz bunları okuyamaz."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihre Zugangsdaten sind Ende-zu-Ende-verschlüsselt – unser Server kann sie nicht lesen."
           }
         }
       }
@@ -1290,6 +1740,12 @@
             "state": "translated",
             "value": "İzlemeye devam et"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiterschauen"
+          }
         }
       }
     },
@@ -1306,6 +1762,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son izlenen kanallar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt gesehene Sender"
           }
         }
       }
@@ -1324,6 +1786,12 @@
             "state": "translated",
             "value": "Favori kanallar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lieblingssender"
+          }
         }
       }
     },
@@ -1340,6 +1808,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni eklenen filmler"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu hinzugefügte Filme"
           }
         }
       }
@@ -1358,6 +1832,12 @@
             "state": "translated",
             "value": "Yeni eklenen diziler"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu hinzugefügte Serien"
+          }
         }
       }
     },
@@ -1374,6 +1854,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "İzlemeye başlayın – son izledikleriniz burada görünür."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einfach losschauen – zuletzt Gesehenes erscheint hier."
           }
         }
       }
@@ -1416,6 +1902,24 @@
               }
             }
           }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Testphase: noch %1$lld Tag"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Testphase: noch %1$lld Tage"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1432,6 +1936,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Deneme: %1$@ saat kaldı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testphase: noch %1$@ Std."
           }
         }
       }
@@ -1450,6 +1960,12 @@
             "state": "translated",
             "value": "Deneme sona erdi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testphase beendet"
+          }
         }
       }
     },
@@ -1466,6 +1982,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynak"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelle"
           }
         }
       }
@@ -1484,6 +2006,12 @@
             "state": "translated",
             "value": "Şimdi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt"
+          }
         }
       }
     },
@@ -1500,6 +2028,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sıradaki"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danach"
           }
         }
       }
@@ -1518,6 +2052,12 @@
             "state": "translated",
             "value": "Program bilgisi yok"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Programminformationen"
+          }
         }
       }
     },
@@ -1535,6 +2075,12 @@
             "state": "translated",
             "value": "Geçmiş yayın mevcut"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im TV-Archiv verfügbar"
+          }
         }
       }
     },
@@ -1548,6 +2094,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ – %2$@"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ – %2$@"
@@ -1569,6 +2121,12 @@
             "state": "translated",
             "value": "Bu kategoride kanal yok."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Sender in dieser Kategorie."
+          }
         }
       }
     },
@@ -1585,6 +2143,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanal, film, dizi ara"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender, Filme, Serien suchen"
           }
         }
       }
@@ -1603,6 +2167,12 @@
             "state": "translated",
             "value": "“%1$@” için sonuç yok"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Ergebnisse für „%1$@“"
+          }
         }
       }
     },
@@ -1619,6 +2189,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu kaynakta film yok."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Quelle enthält keine Filme."
           }
         }
       }
@@ -1637,6 +2213,12 @@
             "state": "translated",
             "value": "Bu kaynakta dizi yok."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Quelle enthält keine Serien."
+          }
         }
       }
     },
@@ -1654,6 +2236,12 @@
             "state": "translated",
             "value": "Eklenme"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt hinzugefügt"
+          }
         }
       }
     },
@@ -1667,6 +2255,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A–Z"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "A–Z"
@@ -1688,6 +2282,12 @@
             "state": "translated",
             "value": "Puan"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bewertung"
+          }
         }
       }
     },
@@ -1704,6 +2304,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sezon %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Staffel %1$@"
           }
         }
       }
@@ -1722,6 +2328,12 @@
             "state": "translated",
             "value": "S%1$@B%2$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "S%1$@E%2$@"
+          }
         }
       }
     },
@@ -1738,6 +2350,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Devam et: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiterschauen: %1$@"
           }
         }
       }
@@ -1756,6 +2374,12 @@
             "state": "translated",
             "value": "İzlendi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesehen"
+          }
         }
       }
     },
@@ -1772,6 +2396,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sonraki bölüm %1$@ sn içinde"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächste Folge in %1$@ s"
           }
         }
       }
@@ -1790,6 +2420,12 @@
             "state": "translated",
             "value": "%1$@ dk"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Min."
+          }
         }
       }
     },
@@ -1806,6 +2442,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanallar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender"
           }
         }
       }
@@ -1824,6 +2466,12 @@
             "state": "translated",
             "value": "Filmler"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filme"
+          }
         }
       }
     },
@@ -1840,6 +2488,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diziler"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serien"
           }
         }
       }
@@ -1858,6 +2512,12 @@
             "state": "translated",
             "value": "Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü)."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch keine Favoriten. Zum Hinzufügen ein Element lange gedrückt halten (TV: Menü)."
+          }
         }
       }
     },
@@ -1874,6 +2534,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son senkron: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt synchronisiert: %1$@"
           }
         }
       }
@@ -1892,6 +2558,12 @@
             "state": "translated",
             "value": "Ses"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
         }
       }
     },
@@ -1908,6 +2580,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Altyazı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untertitel"
           }
         }
       }
@@ -1926,6 +2604,12 @@
             "state": "translated",
             "value": "Görüntü oranı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seitenverhältnis"
+          }
         }
       }
     },
@@ -1942,6 +2626,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sığdır"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einpassen"
           }
         }
       }
@@ -1960,6 +2650,12 @@
             "state": "translated",
             "value": "Doldur (kırp)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Füllen (zuschneiden)"
+          }
         }
       }
     },
@@ -1977,6 +2673,12 @@
             "state": "translated",
             "value": "Uzat"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strecken"
+          }
         }
       }
     },
@@ -1990,6 +2692,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "16:9"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "16:9"
@@ -2011,6 +2719,12 @@
             "state": "translated",
             "value": "4:3"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4:3"
+          }
         }
       }
     },
@@ -2027,6 +2741,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeniden bağlanılıyor… (%1$@/%2$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu verbinden… (%1$@/%2$@)"
           }
         }
       }
@@ -2045,6 +2765,12 @@
             "state": "translated",
             "value": "Arabelleğe alınıyor…"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puffern…"
+          }
         }
       }
     },
@@ -2061,6 +2787,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ konumundan devam ediliyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortgesetzt bei %1$@"
           }
         }
       }
@@ -2079,6 +2811,12 @@
             "state": "translated",
             "value": "Önceki kanal"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorheriger Sender"
+          }
         }
       }
     },
@@ -2096,6 +2834,12 @@
             "state": "translated",
             "value": "Deneme süreniz bitti. İzlemeye devam etmek için satın alın."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihre Testphase ist beendet. Jetzt kaufen und weiterschauen."
+          }
         }
       }
     },
@@ -2109,6 +2853,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NovaPlayer Premium"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "NovaPlayer Premium"
@@ -2130,6 +2880,12 @@
             "state": "translated",
             "value": "Tek seferlik satın alma · abonelik yok"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmalkauf · kein Abo"
+          }
         }
       }
     },
@@ -2146,6 +2902,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynaklarınızı sınırsız oynatma"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unbegrenzte Wiedergabe Ihrer Quellen"
           }
         }
       }
@@ -2164,6 +2926,12 @@
             "state": "translated",
             "value": "Aynı mağaza hesabıyla telefon ve TV"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smartphone und TV mit demselben Store-Konto"
+          }
         }
       }
     },
@@ -2180,6 +2948,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir kez öde, hep kullan"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmal zahlen, dauerhaft nutzen"
           }
         }
       }
@@ -2222,6 +2996,24 @@
               }
             }
           }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Kostenlose Testphase: %1$lld Tag. Danach ist die Wiedergabe gesperrt, bis Sie die einmalige Freischaltung (%2$@) kaufen. Quellen und Einstellungen bleiben verfügbar."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Kostenlose Testphase: %1$lld Tage. Danach ist die Wiedergabe gesperrt, bis Sie die einmalige Freischaltung (%2$@) kaufen. Quellen und Einstellungen bleiben verfügbar."
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2238,6 +3030,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ücretsiz denemeyi başlat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kostenlos testen"
           }
         }
       }
@@ -2256,6 +3054,12 @@
             "state": "translated",
             "value": "Deneme %1$@ tarihine kadar aktif"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testphase aktiv bis %1$@"
+          }
         }
       }
     },
@@ -2272,6 +3076,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ kaldı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch %1$@"
           }
         }
       }
@@ -2290,6 +3100,12 @@
             "state": "translated",
             "value": "Deneme süreniz sona erdi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihre Testphase ist beendet"
+          }
         }
       }
     },
@@ -2306,6 +3122,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Deneme başlatılmadı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testphase nicht gestartet"
           }
         }
       }
@@ -2324,6 +3146,12 @@
             "state": "translated",
             "value": "Bu cihazda deneme süresi daha önce kullanıldı."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Testphase wurde auf diesem Gerät bereits genutzt."
+          }
         }
       }
     },
@@ -2340,6 +3168,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Satın al – %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaufen – %1$@"
           }
         }
       }
@@ -2358,6 +3192,12 @@
             "state": "translated",
             "value": "Satın alımları geri yükle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Käufe wiederherstellen"
+          }
         }
       }
     },
@@ -2374,6 +3214,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Satın alındı ✓"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gekauft ✓"
           }
         }
       }
@@ -2392,6 +3238,12 @@
             "state": "translated",
             "value": "Ödeme bekleniyor – onaylandığında erişim otomatik açılır."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zahlung ausstehend – der Zugang wird nach der Freigabe automatisch aktiviert."
+          }
         }
       }
     },
@@ -2408,6 +3260,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Satın alma geri yüklendi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kauf wiederhergestellt"
           }
         }
       }
@@ -2426,6 +3284,12 @@
             "state": "translated",
             "value": "Bu mağaza hesabında satın alma bulunamadı."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für dieses Store-Konto wurde kein Kauf gefunden."
+          }
         }
       }
     },
@@ -2442,6 +3306,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Satın alma başarısız: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kauf fehlgeschlagen: %1$@"
           }
         }
       }
@@ -2460,6 +3330,12 @@
             "state": "translated",
             "value": "Bu cihazda mağaza kullanılamıyor."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Store ist auf diesem Gerät nicht verfügbar."
+          }
         }
       }
     },
@@ -2476,6 +3352,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu satın alma iade edildi veya iptal edildi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Kauf wurde erstattet oder widerrufen."
           }
         }
       }
@@ -2494,6 +3376,12 @@
             "state": "translated",
             "value": "Başka platformda mı satın aldınız (Apple ↔ Google)? Hesabınıza giriş yapın."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf einer anderen Plattform gekauft (Apple ↔ Google)? Melden Sie sich mit Ihrem Konto an."
+          }
         }
       }
     },
@@ -2510,6 +3398,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kullanım koşulları"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nutzungsbedingungen"
           }
         }
       }
@@ -2528,6 +3422,12 @@
             "state": "translated",
             "value": "Gizlilik politikası"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenschutzerklärung"
+          }
         }
       }
     },
@@ -2544,6 +3444,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lisans sunucusuna ulaşılamıyor – son bilinen durum kullanılıyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lizenzserver nicht erreichbar – der letzte bekannte Status wird verwendet."
           }
         }
       }
@@ -2562,6 +3468,12 @@
             "state": "translated",
             "value": "Kaynaklar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quellen"
+          }
         }
       }
     },
@@ -2578,6 +3490,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oynatma"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiedergabe"
           }
         }
       }
@@ -2596,6 +3514,12 @@
             "state": "translated",
             "value": "Görünüm ve dil"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Darstellung & Sprache"
+          }
         }
       }
     },
@@ -2612,6 +3536,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hesap"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto"
           }
         }
       }
@@ -2630,6 +3560,12 @@
             "state": "translated",
             "value": "Satın alma"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kauf"
+          }
         }
       }
     },
@@ -2646,6 +3582,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gelişmiş ve tanılama"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erweitert & Diagnose"
           }
         }
       }
@@ -2664,6 +3606,12 @@
             "state": "translated",
             "value": "Son yenileme %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt aktualisiert: %1$@"
+          }
         }
       }
     },
@@ -2680,6 +3628,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hiç yenilenmedi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch nie aktualisiert"
           }
         }
       }
@@ -2698,6 +3652,12 @@
             "state": "translated",
             "value": "EPG saat kaydırma"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EPG-Zeitversatz"
+          }
         }
       }
     },
@@ -2714,6 +3674,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Otomatik yenileme"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch aktualisieren"
           }
         }
       }
@@ -2732,6 +3698,12 @@
             "state": "translated",
             "value": "%1$@ saatte bir"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle %1$@ Std."
+          }
         }
       }
     },
@@ -2748,6 +3720,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "“%1$@” silinsin mi? Bu kaynağın favorileri ve izleme ilerlemesi saklanır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ löschen? Favoriten und Fortschritt dieser Quelle bleiben erhalten."
           }
         }
       }
@@ -2766,6 +3744,12 @@
             "state": "translated",
             "value": "Tercih edilen ses dili"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audiosprache"
+          }
         }
       }
     },
@@ -2782,6 +3766,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tercih edilen altyazı dili"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untertitelsprache"
           }
         }
       }
@@ -2800,6 +3790,12 @@
             "state": "translated",
             "value": "Varsayılan görüntü oranı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard-Seitenverhältnis"
+          }
         }
       }
     },
@@ -2816,6 +3812,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canlı yayın formatı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-Stream-Format"
           }
         }
       }
@@ -2834,6 +3836,12 @@
             "state": "translated",
             "value": "Arabellek"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puffer"
+          }
         }
       }
     },
@@ -2847,6 +3855,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Normal"
@@ -2868,6 +3882,12 @@
             "state": "translated",
             "value": "Büyük"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Groß"
+          }
         }
       }
     },
@@ -2884,6 +3904,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanal listesinde önizleme oynatıcısı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorschau in der Senderliste"
           }
         }
       }
@@ -2902,6 +3928,12 @@
             "state": "translated",
             "value": "Uygulama dili"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App-Sprache"
+          }
         }
       }
     },
@@ -2918,6 +3950,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "EPG saat dilimi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EPG-Zeitzone"
           }
         }
       }
@@ -2936,6 +3974,12 @@
             "state": "translated",
             "value": "Cihaz saat dilimi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeitzone des Geräts"
+          }
         }
       }
     },
@@ -2952,6 +3996,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "24 saat biçimi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24-Stunden-Format"
           }
         }
       }
@@ -2970,6 +4020,12 @@
             "state": "translated",
             "value": "E-posta ile giriş yap"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit E-Mail anmelden"
+          }
         }
       }
     },
@@ -2986,6 +4042,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Telefonunuzla giriş yapın"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit dem Smartphone anmelden"
           }
         }
       }
@@ -3004,6 +4066,12 @@
             "state": "translated",
             "value": "%1$@ adresine 6 haneli bir kod gönderdik."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wir haben einen 6-stelligen Code an %1$@ gesendet."
+          }
         }
       }
     },
@@ -3020,6 +4088,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kodu girin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code eingeben"
           }
         }
       }
@@ -3038,6 +4112,12 @@
             "state": "translated",
             "value": "%1$@ olarak giriş yapıldı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angemeldet als %1$@"
+          }
         }
       }
     },
@@ -3054,6 +4134,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çıkış yap"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abmelden"
           }
         }
       }
@@ -3072,6 +4158,12 @@
             "state": "translated",
             "value": "Hesabı sil"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto löschen"
+          }
         }
       }
     },
@@ -3088,6 +4180,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hesabınız ve senkronize veriler silinsin mi? Mağaza satın alımlarınız mağaza hesabınızla geçerli kalır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto und synchronisierte Daten löschen? Store-Käufe bleiben mit Ihrem Store-Konto gültig."
           }
         }
       }
@@ -3106,6 +4204,12 @@
             "state": "translated",
             "value": "İsteğe bağlı: favorileri ve ilerlemeyi senkronize edin, satın alımınızı Apple ve Google cihazlarında kullanın."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional: Favoriten & Fortschritt synchronisieren und den Kauf auf Apple- und Google-Geräten nutzen."
+          }
         }
       }
     },
@@ -3122,6 +4226,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@/link adresinde giriş yapın"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf %1$@/link anmelden"
           }
         }
       }
@@ -3140,6 +4250,12 @@
             "state": "translated",
             "value": "Kod: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code: %1$@"
+          }
         }
       }
     },
@@ -3156,6 +4272,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Format testi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formattest"
           }
         }
       }
@@ -3174,6 +4296,12 @@
             "state": "translated",
             "value": "Görsel önbelleğini temizle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild-Cache leeren"
+          }
         }
       }
     },
@@ -3190,6 +4318,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yayın akışı önbelleğini temizle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Guide-Cache leeren"
           }
         }
       }
@@ -3208,6 +4342,12 @@
             "state": "translated",
             "value": "Sürüm %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %1$@"
+          }
         }
       }
     },
@@ -3224,6 +4364,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açık kaynak lisansları"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open-Source-Lizenzen"
           }
         }
       }
@@ -3242,6 +4388,12 @@
             "state": "translated",
             "value": "Oynatılıyor ✓"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird abgespielt ✓"
+          }
         }
       }
     },
@@ -3258,6 +4410,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Beklenen hata ✓ (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erwarteter Fehler ✓ (%1$@)"
           }
         }
       }
@@ -3276,6 +4434,12 @@
             "state": "translated",
             "value": "Beklenmeyen sonuç: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unerwartet: %1$@"
+          }
         }
       }
     },
@@ -3292,6 +4456,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "İnternet bağlantısı yok"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Internetverbindung"
           }
         }
       }
@@ -3310,6 +4480,12 @@
             "state": "translated",
             "value": "Bağlantınızı kontrol edip tekrar deneyin."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte Verbindung prüfen und erneut versuchen."
+          }
         }
       }
     },
@@ -3326,6 +4502,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sunucuya ulaşılamıyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server nicht erreichbar"
           }
         }
       }
@@ -3344,6 +4526,12 @@
             "state": "translated",
             "value": "Sunucu zamanında yanıt vermedi (zaman aşımı)."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Server hat nicht rechtzeitig geantwortet."
+          }
         }
       }
     },
@@ -3360,6 +4548,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sunucu adresi bulunamadı. Adresi kontrol edin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Serveradresse wurde nicht gefunden. Bitte Adresse prüfen."
           }
         }
       }
@@ -3378,6 +4572,12 @@
             "state": "translated",
             "value": "Sunucu bağlantıyı reddetti. Adres ve portu kontrol edin."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Server hat die Verbindung abgelehnt. Bitte Adresse und Port prüfen."
+          }
         }
       }
     },
@@ -3394,6 +4594,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Güvenli bağlantı kurulamadı (sertifika/TLS)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sichere Verbindung fehlgeschlagen (Zertifikat/TLS)."
           }
         }
       }
@@ -3412,6 +4618,12 @@
             "state": "translated",
             "value": "Bir ağ hatası oluştu."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Netzwerkfehler ist aufgetreten."
+          }
         }
       }
     },
@@ -3428,6 +4640,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kullanıcı adı veya şifre hatalı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Benutzername oder Passwort falsch"
           }
         }
       }
@@ -3446,6 +4664,12 @@
             "state": "translated",
             "value": "Sağlayıcınızın verdiği bilgileri kontrol edin."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte die Zugangsdaten Ihres Anbieters prüfen."
+          }
         }
       }
     },
@@ -3462,6 +4686,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynak hesabınızın süresi dolmuş"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihr Quellkonto ist abgelaufen"
           }
         }
       }
@@ -3480,6 +4710,12 @@
             "state": "translated",
             "value": "%1$@ tarihinde sona erdi. Sağlayıcınızla iletişime geçin."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Es ist am %1$@ abgelaufen. Bitte wenden Sie sich an Ihren Anbieter."
+          }
         }
       }
     },
@@ -3496,6 +4732,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcınızla iletişime geçin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte wenden Sie sich an Ihren Anbieter."
           }
         }
       }
@@ -3514,6 +4756,12 @@
             "state": "translated",
             "value": "Kaynak hesabı devre dışı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quellkonto deaktiviert"
+          }
         }
       }
     },
@@ -3530,6 +4778,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı bu hesabı askıya almış."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Anbieter hat dieses Konto gesperrt."
           }
         }
       }
@@ -3548,6 +4802,12 @@
             "state": "translated",
             "value": "Liste bulunamadı (404)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist nicht gefunden (404)"
+          }
         }
       }
     },
@@ -3564,6 +4824,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "URL'yi kontrol edin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte URL prüfen."
           }
         }
       }
@@ -3582,6 +4848,12 @@
             "state": "translated",
             "value": "Sunucu hatası (%1$@)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serverfehler (%1$@)"
+          }
         }
       }
     },
@@ -3598,6 +4870,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lütfen daha sonra tekrar deneyin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte später erneut versuchen."
           }
         }
       }
@@ -3616,6 +4894,12 @@
             "state": "translated",
             "value": "Geçersiz liste"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ungültige Playlist"
+          }
         }
       }
     },
@@ -3632,6 +4916,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adres bir M3U listesi döndürmüyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unter dieser Adresse ist keine M3U-Playlist zu finden."
           }
         }
       }
@@ -3650,6 +4940,12 @@
             "state": "translated",
             "value": "Beklenmeyen yanıt"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unerwartete Antwort"
+          }
         }
       }
     },
@@ -3666,6 +4962,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sunucu Xtream Codes API yanıtı vermedi. Adresi kontrol edin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Server antwortet nicht wie eine Xtream-Codes-API. Bitte Adresse prüfen."
           }
         }
       }
@@ -3684,6 +4986,12 @@
             "state": "translated",
             "value": "Liste boş"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Liste ist leer"
+          }
         }
       }
     },
@@ -3700,6 +5008,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu kaynakta oynatılabilir içerik yok."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Quelle enthält keine abspielbaren Inhalte."
           }
         }
       }
@@ -3718,6 +5032,12 @@
             "state": "translated",
             "value": "Yayın akışı yüklenemedi: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Guide konnte nicht geladen werden: %1$@"
+          }
         }
       }
     },
@@ -3734,6 +5054,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu yayın biçimi desteklenmiyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Streamformat wird nicht unterstützt"
           }
         }
       }
@@ -3752,6 +5078,12 @@
             "state": "translated",
             "value": "%1$@ biçimi bu cihazda oynatılamıyor."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Format %1$@ kann auf diesem Gerät nicht abgespielt werden."
+          }
         }
       }
     },
@@ -3768,6 +5100,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcınızdan HLS (m3u8) çıkışını isteyin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fragen Sie Ihren Anbieter nach HLS (m3u8)."
           }
         }
       }
@@ -3786,6 +5124,12 @@
             "state": "translated",
             "value": "Video/ses kodeki desteklenmiyor"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video-/Audiocodec nicht unterstützt"
+          }
         }
       }
     },
@@ -3802,6 +5146,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cihaz bu yayını çözemiyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Gerät kann den Stream nicht dekodieren."
           }
         }
       }
@@ -3820,6 +5170,12 @@
             "state": "translated",
             "value": "Yayına erişim reddedildi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zugriff auf den Stream verweigert"
+          }
         }
       }
     },
@@ -3836,6 +5192,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlantı sınırı aşılmış veya hesap süresi dolmuş olabilir."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Möglicherweise ist das Verbindungslimit erreicht oder das Konto abgelaufen."
           }
         }
       }
@@ -3854,6 +5216,12 @@
             "state": "translated",
             "value": "Yayın şu anda kapalı"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stream derzeit offline"
+          }
         }
       }
     },
@@ -3870,6 +5238,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu kanal şu anda yayında değil."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Sender sendet gerade nicht."
           }
         }
       }
@@ -3888,6 +5262,12 @@
             "state": "translated",
             "value": "Korumalı yayın"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geschützter Stream"
+          }
         }
       }
     },
@@ -3904,6 +5284,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "DRM korumalı yayınlar desteklenmiyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DRM-geschützte Streams werden nicht unterstützt."
           }
         }
       }
@@ -3922,6 +5308,12 @@
             "state": "translated",
             "value": "Bağlantı koptu"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindung unterbrochen"
+          }
         }
       }
     },
@@ -3938,6 +5330,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yayına yeniden bağlanılamadı."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung zum Stream konnte nicht wiederhergestellt werden."
           }
         }
       }
@@ -3956,6 +5354,12 @@
             "state": "translated",
             "value": "Oynatma hatası"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiedergabefehler"
+          }
         }
       }
     },
@@ -3972,6 +5376,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "E-posta"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-Mail"
           }
         }
       }
@@ -3990,6 +5400,12 @@
             "state": "translated",
             "value": "Kod gönder"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code senden"
+          }
         }
       }
     },
@@ -4006,6 +5422,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Doğrula"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bestätigen"
           }
         }
       }
@@ -4024,6 +5446,12 @@
             "state": "translated",
             "value": "Geliştirme kodu: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entwicklungscode: %1$@"
+          }
         }
       }
     },
@@ -4040,6 +5468,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Testi başlat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test starten"
           }
         }
       }
@@ -4058,6 +5492,12 @@
             "state": "translated",
             "value": "Test sunucusu (yerel örnekler için host)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testserver (Host für lokale Beispiele)"
+          }
         }
       }
     },
@@ -4074,6 +5514,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "TV Rehberi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Guide"
           }
         }
       }
@@ -4092,6 +5538,12 @@
             "state": "translated",
             "value": "Canlı kanallar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-Sender"
+          }
         }
       }
     },
@@ -4108,6 +5560,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Öne çıkan"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empfohlen"
           }
         }
       }
@@ -4126,6 +5584,12 @@
             "state": "translated",
             "value": "Bugün"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute"
+          }
         }
       }
     },
@@ -4142,6 +5606,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şimdi yayında"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt läuft"
           }
         }
       }
@@ -4160,6 +5630,12 @@
             "state": "translated",
             "value": "Daha fazla"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mehr"
+          }
         }
       }
     },
@@ -4176,6 +5652,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tümünü gör"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle anzeigen"
           }
         }
       }
@@ -4194,6 +5676,12 @@
             "state": "translated",
             "value": "Bilgi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Info"
+          }
         }
       }
     },
@@ -4210,6 +5698,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Favori"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorit"
           }
         }
       }
@@ -4228,6 +5722,12 @@
             "state": "translated",
             "value": "Bölümler"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folgen"
+          }
         }
       }
     },
@@ -4244,6 +5744,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Puan %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bewertung %1$@"
           }
         }
       }
@@ -4262,6 +5768,12 @@
             "state": "translated",
             "value": "Tür: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genre: %1$@"
+          }
         }
       }
     },
@@ -4278,6 +5790,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sezon: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Staffeln: %1$@"
           }
         }
       }
@@ -4296,6 +5814,12 @@
             "state": "translated",
             "value": "YENİ"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NEU"
+          }
         }
       }
     },
@@ -4309,6 +5833,12 @@
           }
         },
         "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top 10"
+          }
+        },
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Top 10"
@@ -4330,6 +5860,12 @@
             "state": "translated",
             "value": "TV arşivi · Geçmiş yayınlar"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TV-Archiv · Catch-up"
+          }
         }
       }
     },
@@ -4346,6 +5882,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tekrar izle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneut ansehen"
           }
         }
       }
@@ -4364,6 +5906,12 @@
             "state": "translated",
             "value": "Yayında"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Läuft gerade"
+          }
         }
       }
     },
@@ -4380,6 +5928,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tekrar izleme Xtream kaynaklarında kullanılabilir."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das TV-Archiv ist bei Xtream-Quellen verfügbar."
           }
         }
       }
@@ -4398,6 +5952,12 @@
             "state": "translated",
             "value": "Arşivde geçmiş program yok."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine vergangenen Sendungen im Archiv."
+          }
         }
       }
     },
@@ -4414,6 +5974,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kanalı gizle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender ausblenden"
           }
         }
       }
@@ -4432,6 +5998,12 @@
             "state": "translated",
             "value": "Kategoriyi gizle"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategorie ausblenden"
+          }
         }
       }
     },
@@ -4448,6 +6020,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gizlenenleri göster (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgeblendete anzeigen (%1$@)"
           }
         }
       }
@@ -4466,6 +6044,12 @@
             "state": "translated",
             "value": "Kategori"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategorie"
+          }
         }
       }
     },
@@ -4482,6 +6066,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu uygulama VLCKit/libVLC (© VideoLAN ve VLC yazarları) kullanır; GNU LGPL sürüm 2.1 altında lisanslıdır. Kaynak kodu: https://code.videolan.org/videolan/VLCKit"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese App verwendet VLCKit/libVLC (© VideoLAN und die VLC-Autoren), lizenziert unter der GNU LGPL Version 2.1. Quellcode: https://code.videolan.org/videolan/VLCKit"
           }
         }
       }
@@ -4500,6 +6090,12 @@
             "state": "translated",
             "value": "VLCKit dinamik bağlanır ve değiştirilmeden ayrı bir framework olarak gelir; kendi derlemenizle değiştirebilirsiniz."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VLCKit wird dynamisch gelinkt und unverändert als separates Framework ausgeliefert; Sie können es durch einen eigenen Build ersetzen."
+          }
         }
       }
     },
@@ -4516,6 +6112,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaynak kodu"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quellcode"
           }
         }
       }
@@ -4534,6 +6136,12 @@
             "state": "translated",
             "value": "Lisansın tam metni"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vollständiger Lizenztext"
+          }
         }
       }
     },
@@ -4550,6 +6158,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apache Lisansı 2.0 altında lisanslıdır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lizenziert unter der Apache License 2.0."
           }
         }
       }
@@ -4568,6 +6182,12 @@
             "state": "translated",
             "value": "Motor: %1$@"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine: %1$@"
+          }
         }
       }
     },
@@ -4584,6 +6204,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Beklenen: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erwartet: %1$@"
           }
         }
       }
@@ -4602,6 +6228,12 @@
             "state": "translated",
             "value": "Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen."
+          }
         }
       }
     },
@@ -4618,6 +6250,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şimdi eşitle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt synchronisieren"
           }
         }
       }
@@ -4636,6 +6274,12 @@
             "state": "translated",
             "value": "Test edilmedi"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht getestet"
+          }
         }
       }
     },
@@ -4652,6 +6296,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atlandı (yerel örnek – test sunucusu girin)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übersprungen (lokales Beispiel – Testserver eingeben)"
           }
         }
       }
@@ -4670,6 +6320,12 @@
             "state": "translated",
             "value": "Bu öğe artık kaynaklarınızda yok."
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Inhalt ist in Ihren Quellen nicht mehr verfügbar."
+          }
         }
       }
     },
@@ -4686,6 +6342,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tamam"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
           }
         }
       }
@@ -4704,6 +6366,12 @@
             "state": "translated",
             "value": "Sunucuya ulaşılamıyor (%1$@)"
           }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server nicht erreichbar (%1$@)"
+          }
         }
       }
     },
@@ -4720,6 +6388,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konten sind in dieser Version nicht verfügbar (kein Server konfiguriert)."
           }
         }
       }

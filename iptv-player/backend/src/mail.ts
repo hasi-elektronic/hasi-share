@@ -1,6 +1,6 @@
 import type { Ctx } from "./http";
 
-export type Lang = "tr" | "en";
+export type Lang = "de" | "tr" | "en";
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) =>
@@ -9,20 +9,27 @@ function escapeHtml(s: string): string {
 }
 
 export function loginCodeEmail(appName: string, code: string, lang: Lang): { subject: string; text: string; html: string } {
-  const t =
-    lang === "tr"
-      ? {
-          subject: `${appName} giriş kodunuz: ${code}`,
-          intro: `${appName} hesabınıza giriş yapmak için bu kodu kullanın:`,
-          validity: "Kod 10 dakika geçerlidir.",
-          ignore: "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.",
-        }
-      : {
-          subject: `Your ${appName} sign-in code: ${code}`,
-          intro: `Use this code to sign in to your ${appName} account:`,
-          validity: "The code is valid for 10 minutes.",
-          ignore: "If you did not request this, you can ignore this e-mail.",
-        };
+  const texts: Record<Lang, { subject: string; intro: string; validity: string; ignore: string }> = {
+    de: {
+      subject: `Ihr ${appName}-Anmeldecode: ${code}`,
+      intro: `Verwenden Sie diesen Code, um sich bei Ihrem ${appName}-Konto anzumelden:`,
+      validity: "Der Code ist 10 Minuten gültig.",
+      ignore: "Falls Sie diese Anfrage nicht gestellt haben, können Sie diese E-Mail ignorieren.",
+    },
+    tr: {
+      subject: `${appName} giriş kodunuz: ${code}`,
+      intro: `${appName} hesabınıza giriş yapmak için bu kodu kullanın:`,
+      validity: "Kod 10 dakika geçerlidir.",
+      ignore: "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.",
+    },
+    en: {
+      subject: `Your ${appName} sign-in code: ${code}`,
+      intro: `Use this code to sign in to your ${appName} account:`,
+      validity: "The code is valid for 10 minutes.",
+      ignore: "If you did not request this, you can ignore this e-mail.",
+    },
+  };
+  const t = texts[lang];
   const text = `${t.intro}\n\n${code}\n\n${t.validity}\n${t.ignore}\n`;
   const html =
     `<!doctype html><html lang="${lang}"><body style="font-family:system-ui,sans-serif;color:#111">` +

@@ -1,329 +1,410 @@
 {
- "_note": "Single source of UI strings (TR/EN). {APP_NAME} is replaced at build time from the placeholder config; {0},{1} are positional STRING arguments. Generate platform files: node spec/tools/gen-strings.mjs",
+ "_note": "Single source of UI strings (EN/TR/DE). {APP_NAME} is replaced at build time from the placeholder config; {0},{1} are positional STRING arguments. Generate platform files: node spec/tools/gen-strings.mjs",
  "strings": {
   "app_name": {
    "en": "{APP_NAME}",
-   "tr": "{APP_NAME}"
+   "tr": "{APP_NAME}",
+   "de": "{APP_NAME}"
   },
   "action_retry": {
    "en": "Retry",
-   "tr": "Tekrar dene"
+   "tr": "Tekrar dene",
+   "de": "Erneut versuchen"
   },
   "action_edit": {
    "en": "Edit",
-   "tr": "Düzenle"
+   "tr": "Düzenle",
+   "de": "Bearbeiten"
   },
   "action_delete": {
    "en": "Delete",
-   "tr": "Sil"
+   "tr": "Sil",
+   "de": "Löschen"
   },
   "action_cancel": {
    "en": "Cancel",
-   "tr": "İptal"
+   "tr": "İptal",
+   "de": "Abbrechen"
   },
   "action_save": {
    "en": "Save",
-   "tr": "Kaydet"
+   "tr": "Kaydet",
+   "de": "Speichern"
   },
   "action_close": {
    "en": "Close",
-   "tr": "Kapat"
+   "tr": "Kapat",
+   "de": "Schließen"
   },
   "action_back": {
    "en": "Back",
-   "tr": "Geri"
+   "tr": "Geri",
+   "de": "Zurück"
   },
   "action_continue": {
    "en": "Continue",
-   "tr": "Devam"
+   "tr": "Devam",
+   "de": "Weiter"
   },
   "action_refresh": {
    "en": "Refresh",
-   "tr": "Yenile"
+   "tr": "Yenile",
+   "de": "Aktualisieren"
   },
   "action_connect": {
    "en": "Connect",
-   "tr": "Bağlan"
+   "tr": "Bağlan",
+   "de": "Verbinden"
   },
   "action_show_password": {
    "en": "Show password",
-   "tr": "Şifreyi göster"
+   "tr": "Şifreyi göster",
+   "de": "Passwort anzeigen"
   },
   "action_hide_password": {
    "en": "Hide password",
-   "tr": "Şifreyi gizle"
+   "tr": "Şifreyi gizle",
+   "de": "Passwort ausblenden"
   },
   "action_search": {
    "en": "Search",
-   "tr": "Ara"
+   "tr": "Ara",
+   "de": "Suchen"
   },
   "action_settings": {
    "en": "Settings",
-   "tr": "Ayarlar"
+   "tr": "Ayarlar",
+   "de": "Einstellungen"
   },
   "action_add_favorite": {
    "en": "Add to favorites",
-   "tr": "Favorilere ekle"
+   "tr": "Favorilere ekle",
+   "de": "Zu Favoriten hinzufügen"
   },
   "action_remove_favorite": {
    "en": "Remove from favorites",
-   "tr": "Favorilerden çıkar"
+   "tr": "Favorilerden çıkar",
+   "de": "Aus Favoriten entfernen"
   },
   "action_play": {
    "en": "Play",
-   "tr": "Oynat"
+   "tr": "Oynat",
+   "de": "Abspielen"
   },
   "action_resume_at": {
    "en": "Resume ({0})",
-   "tr": "Devam et ({0})"
+   "tr": "Devam et ({0})",
+   "de": "Fortsetzen ({0})"
   },
   "action_play_from_start": {
    "en": "Play from start",
-   "tr": "Baştan oynat"
+   "tr": "Baştan oynat",
+   "de": "Von vorne abspielen"
   },
   "action_watch_from_start": {
    "en": "Watch from start",
-   "tr": "Baştan izle"
+   "tr": "Baştan izle",
+   "de": "Von vorne ansehen"
   },
   "action_channel_list": {
    "en": "Channel list",
-   "tr": "Kanal listesi"
+   "tr": "Kanal listesi",
+   "de": "Senderliste"
   },
   "action_guide": {
    "en": "Guide",
-   "tr": "Rehber"
+   "tr": "Rehber",
+   "de": "TV-Guide"
   },
   "action_remove": {
    "en": "Remove",
-   "tr": "Kaldır"
+   "tr": "Kaldır",
+   "de": "Entfernen"
   },
   "action_new_code": {
    "en": "Get new code",
-   "tr": "Yeni kod al"
+   "tr": "Yeni kod al",
+   "de": "Neuen Code anfordern"
   },
   "action_sort": {
    "en": "Sort",
-   "tr": "Sırala"
+   "tr": "Sırala",
+   "de": "Sortieren"
   },
   "loading": {
    "en": "Loading…",
-   "tr": "Yükleniyor…"
+   "tr": "Yükleniyor…",
+   "de": "Wird geladen…"
   },
   "other_group": {
    "en": "Other",
-   "tr": "Diğer"
+   "tr": "Diğer",
+   "de": "Sonstige"
   },
   "all": {
    "en": "All",
-   "tr": "Tümü"
+   "tr": "Tümü",
+   "de": "Alle"
   },
   "live_badge": {
    "en": "LIVE",
-   "tr": "CANLI"
+   "tr": "CANLI",
+   "de": "LIVE"
   },
   "unknown_track": {
    "en": "Track {0}",
-   "tr": "Parça {0}"
+   "tr": "Parça {0}",
+   "de": "Spur {0}"
   },
   "off": {
    "en": "Off",
-   "tr": "Kapalı"
+   "tr": "Kapalı",
+   "de": "Aus"
   },
   "automatic": {
    "en": "Automatic",
-   "tr": "Otomatik"
+   "tr": "Otomatik",
+   "de": "Automatisch"
   },
   "system_default": {
    "en": "System",
-   "tr": "Sistem"
+   "tr": "Sistem",
+   "de": "System"
   },
   "nav_home": {
    "en": "Home",
-   "tr": "Ana Sayfa"
+   "tr": "Ana Sayfa",
+   "de": "Start"
   },
   "nav_live": {
    "en": "Live TV",
-   "tr": "Canlı TV"
+   "tr": "Canlı TV",
+   "de": "Live-TV"
   },
   "nav_movies": {
    "en": "Movies",
-   "tr": "Filmler"
+   "tr": "Filmler",
+   "de": "Filme"
   },
   "nav_series": {
    "en": "Series",
-   "tr": "Diziler"
+   "tr": "Diziler",
+   "de": "Serien"
   },
   "nav_favorites": {
    "en": "Favorites",
-   "tr": "Favoriler"
+   "tr": "Favoriler",
+   "de": "Favoriten"
   },
   "nav_search": {
    "en": "Search",
-   "tr": "Ara"
+   "tr": "Ara",
+   "de": "Suche"
   },
   "nav_settings": {
    "en": "Settings",
-   "tr": "Ayarlar"
+   "tr": "Ayarlar",
+   "de": "Einstellungen"
   },
   "welcome_title": {
    "en": "Welcome to {APP_NAME}",
-   "tr": "{APP_NAME} – Hoş geldiniz"
+   "tr": "{APP_NAME} – Hoş geldiniz",
+   "de": "Willkommen bei {APP_NAME}"
   },
   "welcome_subtitle": {
    "en": "A premium player for your own IPTV sources.",
-   "tr": "Kendi IPTV kaynaklarınız için premium oynatıcı."
+   "tr": "Kendi IPTV kaynaklarınız için premium oynatıcı.",
+   "de": "Der Premium-Player für Ihre eigenen IPTV-Quellen."
   },
   "legal_no_content": {
    "en": "This app does not provide any content. It only plays M3U / Xtream sources that you own or are authorized to use.",
-   "tr": "Uygulama içerik sağlamaz; yalnızca size ait veya kullanım hakkınız olan M3U / Xtream kaynaklarını oynatır."
+   "tr": "Uygulama içerik sağlamaz; yalnızca size ait veya kullanım hakkınız olan M3U / Xtream kaynaklarını oynatır.",
+   "de": "Diese App stellt keine Inhalte bereit. Sie spielt nur M3U-/Xtream-Quellen ab, die Ihnen gehören oder für die Sie eine Nutzungsberechtigung haben."
   },
   "add_source": {
    "en": "Add source",
-   "tr": "Kaynak ekle"
+   "tr": "Kaynak ekle",
+   "de": "Quelle hinzufügen"
   },
   "add_source_m3u": {
    "en": "M3U link",
-   "tr": "M3U bağlantısı"
+   "tr": "M3U bağlantısı",
+   "de": "M3U-Link"
   },
   "add_source_xtream": {
    "en": "Xtream Codes",
-   "tr": "Xtream Codes"
+   "tr": "Xtream Codes",
+   "de": "Xtream Codes"
   },
   "add_source_qr": {
    "en": "Add with phone (QR)",
-   "tr": "Telefonla ekle (QR)"
+   "tr": "Telefonla ekle (QR)",
+   "de": "Per Smartphone hinzufügen (QR)"
   },
   "field_name": {
    "en": "Name",
-   "tr": "Ad"
+   "tr": "Ad",
+   "de": "Name"
   },
   "field_m3u_url": {
    "en": "Playlist URL",
-   "tr": "Liste URL'si"
+   "tr": "Liste URL'si",
+   "de": "Playlist-URL"
   },
   "field_epg_url": {
    "en": "EPG URL (optional)",
-   "tr": "EPG URL'si (isteğe bağlı)"
+   "tr": "EPG URL'si (isteğe bağlı)",
+   "de": "EPG-URL (optional)"
   },
   "field_user_agent": {
    "en": "User-Agent (optional)",
-   "tr": "User-Agent (isteğe bağlı)"
+   "tr": "User-Agent (isteğe bağlı)",
+   "de": "User-Agent (optional)"
   },
   "field_server": {
    "en": "Server (http://host:port)",
-   "tr": "Sunucu (http://host:port)"
+   "tr": "Sunucu (http://host:port)",
+   "de": "Server (http://host:port)"
   },
   "field_username": {
    "en": "Username",
-   "tr": "Kullanıcı adı"
+   "tr": "Kullanıcı adı",
+   "de": "Benutzername"
   },
   "field_password": {
    "en": "Password",
-   "tr": "Şifre"
+   "tr": "Şifre",
+   "de": "Passwort"
   },
   "field_advanced": {
    "en": "Advanced",
-   "tr": "Gelişmiş"
+   "tr": "Gelişmiş",
+   "de": "Erweitert"
   },
   "validation_required": {
    "en": "Required",
-   "tr": "Zorunlu alan"
+   "tr": "Zorunlu alan",
+   "de": "Pflichtfeld"
   },
   "validation_url": {
    "en": "Enter a valid http(s) URL",
-   "tr": "Geçerli bir http(s) adresi girin"
+   "tr": "Geçerli bir http(s) adresi girin",
+   "de": "Gültige http(s)-URL eingeben"
   },
   "progress_connecting": {
    "en": "Connecting…",
-   "tr": "Bağlanılıyor…"
+   "tr": "Bağlanılıyor…",
+   "de": "Verbindung wird hergestellt…"
   },
   "progress_auth": {
    "en": "Verifying account…",
-   "tr": "Hesap doğrulanıyor…"
+   "tr": "Hesap doğrulanıyor…",
+   "de": "Konto wird geprüft…"
   },
   "progress_channels": {
    "en": "Loading channels ({0})",
-   "tr": "Kanallar yükleniyor ({0})"
+   "tr": "Kanallar yükleniyor ({0})",
+   "de": "Sender werden geladen ({0})"
   },
   "progress_movies": {
    "en": "Loading movies ({0})",
-   "tr": "Filmler yükleniyor ({0})"
+   "tr": "Filmler yükleniyor ({0})",
+   "de": "Filme werden geladen ({0})"
   },
   "progress_series": {
    "en": "Loading series ({0})",
-   "tr": "Diziler yükleniyor ({0})"
+   "tr": "Diziler yükleniyor ({0})",
+   "de": "Serien werden geladen ({0})"
   },
   "progress_epg": {
    "en": "Loading TV guide…",
-   "tr": "Yayın akışı yükleniyor…"
+   "tr": "Yayın akışı yükleniyor…",
+   "de": "TV-Guide wird geladen…"
   },
   "source_added_title": {
    "en": "Source added",
-   "tr": "Kaynak eklendi"
+   "tr": "Kaynak eklendi",
+   "de": "Quelle hinzugefügt"
   },
   "source_summary": {
    "en": "{0} channels · {1} movies · {2} series",
-   "tr": "{0} kanal · {1} film · {2} dizi"
+   "tr": "{0} kanal · {1} film · {2} dizi",
+   "de": "{0} Sender · {1} Filme · {2} Serien"
   },
   "source_expires": {
    "en": "Account valid until {0}",
-   "tr": "Hesap geçerlilik: {0}"
+   "tr": "Hesap geçerlilik: {0}",
+   "de": "Konto gültig bis {0}"
   },
   "source_unlimited": {
    "en": "No expiry date",
-   "tr": "Süresiz"
+   "tr": "Süresiz",
+   "de": "Kein Ablaufdatum"
   },
   "pair_title": {
    "en": "Add a source with your phone",
-   "tr": "Telefonunuzla kaynak ekleyin"
+   "tr": "Telefonunuzla kaynak ekleyin",
+   "de": "Quelle per Smartphone hinzufügen"
   },
   "pair_step1": {
    "en": "Scan the QR code or open {0}",
-   "tr": "QR kodu okutun veya {0} adresini açın"
+   "tr": "QR kodu okutun veya {0} adresini açın",
+   "de": "QR-Code scannen oder {0} öffnen"
   },
   "pair_step2": {
    "en": "Enter the code: {0}",
-   "tr": "Kodu girin: {0}"
+   "tr": "Kodu girin: {0}",
+   "de": "Code eingeben: {0}"
   },
   "pair_expires_in": {
    "en": "Code expires in {0}",
-   "tr": "Kodun süresi: {0}"
+   "tr": "Kodun süresi: {0}",
+   "de": "Code läuft ab in {0}"
   },
   "pair_received": {
    "en": "Source received – connecting…",
-   "tr": "Kaynak alındı – bağlanılıyor…"
+   "tr": "Kaynak alındı – bağlanılıyor…",
+   "de": "Quelle empfangen – Verbindung wird hergestellt…"
   },
   "pair_expired": {
    "en": "The code has expired.",
-   "tr": "Kodun süresi doldu."
+   "tr": "Kodun süresi doldu.",
+   "de": "Der Code ist abgelaufen."
   },
   "pair_e2e": {
    "en": "Your credentials are end-to-end encrypted; our server cannot read them.",
-   "tr": "Bilgileriniz uçtan uca şifrelenir; sunucumuz bunları okuyamaz."
+   "tr": "Bilgileriniz uçtan uca şifrelenir; sunucumuz bunları okuyamaz.",
+   "de": "Ihre Zugangsdaten sind Ende-zu-Ende-verschlüsselt – unser Server kann sie nicht lesen."
   },
   "home_continue": {
    "en": "Continue watching",
-   "tr": "İzlemeye devam et"
+   "tr": "İzlemeye devam et",
+   "de": "Weiterschauen"
   },
   "home_recent_channels": {
    "en": "Recently watched channels",
-   "tr": "Son izlenen kanallar"
+   "tr": "Son izlenen kanallar",
+   "de": "Zuletzt gesehene Sender"
   },
   "home_favorite_channels": {
    "en": "Favorite channels",
-   "tr": "Favori kanallar"
+   "tr": "Favori kanallar",
+   "de": "Lieblingssender"
   },
   "home_new_movies": {
    "en": "Recently added movies",
-   "tr": "Yeni eklenen filmler"
+   "tr": "Yeni eklenen filmler",
+   "de": "Neu hinzugefügte Filme"
   },
   "home_new_series": {
    "en": "Recently added series",
-   "tr": "Yeni eklenen diziler"
+   "tr": "Yeni eklenen diziler",
+   "de": "Neu hinzugefügte Serien"
   },
   "home_empty": {
    "en": "Start watching – your recent items appear here.",
-   "tr": "İzlemeye başlayın – son izledikleriniz burada görünür."
+   "tr": "İzlemeye başlayın – son izledikleriniz burada görünür.",
+   "de": "Einfach losschauen – zuletzt Gesehenes erscheint hier."
   },
   "trial_chip_days": {
    "en": {
@@ -333,187 +414,236 @@
    "tr": {
     "one": "Deneme: {0} gün kaldı",
     "other": "Deneme: {0} gün kaldı"
+   },
+   "de": {
+    "one": "Testphase: noch {0} Tag",
+    "other": "Testphase: noch {0} Tage"
    }
   },
   "trial_chip_hours": {
    "en": "Trial: {0} h left",
-   "tr": "Deneme: {0} saat kaldı"
+   "tr": "Deneme: {0} saat kaldı",
+   "de": "Testphase: noch {0} Std."
   },
   "trial_chip_expired": {
    "en": "Trial ended",
-   "tr": "Deneme sona erdi"
+   "tr": "Deneme sona erdi",
+   "de": "Testphase beendet"
   },
   "source_picker": {
    "en": "Source",
-   "tr": "Kaynak"
+   "tr": "Kaynak",
+   "de": "Quelle"
   },
   "epg_now": {
    "en": "Now",
-   "tr": "Şimdi"
+   "tr": "Şimdi",
+   "de": "Jetzt"
   },
   "epg_next": {
    "en": "Next",
-   "tr": "Sıradaki"
+   "tr": "Sıradaki",
+   "de": "Danach"
   },
   "epg_no_info": {
    "en": "No programme information",
-   "tr": "Program bilgisi yok"
+   "tr": "Program bilgisi yok",
+   "de": "Keine Programminformationen"
   },
   "epg_catchup_available": {
    "en": "Catch-up available",
-   "tr": "Geçmiş yayın mevcut"
+   "tr": "Geçmiş yayın mevcut",
+   "de": "Im TV-Archiv verfügbar"
   },
   "epg_time_range": {
    "en": "{0} – {1}",
-   "tr": "{0} – {1}"
+   "tr": "{0} – {1}",
+   "de": "{0} – {1}"
   },
   "live_empty": {
    "en": "No channels in this category.",
-   "tr": "Bu kategoride kanal yok."
+   "tr": "Bu kategoride kanal yok.",
+   "de": "Keine Sender in dieser Kategorie."
   },
   "search_hint": {
    "en": "Search channels, movies, series",
-   "tr": "Kanal, film, dizi ara"
+   "tr": "Kanal, film, dizi ara",
+   "de": "Sender, Filme, Serien suchen"
   },
   "search_no_results": {
    "en": "No results for “{0}”",
-   "tr": "“{0}” için sonuç yok"
+   "tr": "“{0}” için sonuç yok",
+   "de": "Keine Ergebnisse für „{0}“"
   },
   "movies_empty": {
    "en": "This source has no movies.",
-   "tr": "Bu kaynakta film yok."
+   "tr": "Bu kaynakta film yok.",
+   "de": "Diese Quelle enthält keine Filme."
   },
   "series_empty": {
    "en": "This source has no series.",
-   "tr": "Bu kaynakta dizi yok."
+   "tr": "Bu kaynakta dizi yok.",
+   "de": "Diese Quelle enthält keine Serien."
   },
   "sort_added": {
    "en": "Recently added",
-   "tr": "Eklenme"
+   "tr": "Eklenme",
+   "de": "Zuletzt hinzugefügt"
   },
   "sort_az": {
    "en": "A–Z",
-   "tr": "A–Z"
+   "tr": "A–Z",
+   "de": "A–Z"
   },
   "sort_rating": {
    "en": "Rating",
-   "tr": "Puan"
+   "tr": "Puan",
+   "de": "Bewertung"
   },
   "season_n": {
    "en": "Season {0}",
-   "tr": "Sezon {0}"
+   "tr": "Sezon {0}",
+   "de": "Staffel {0}"
   },
   "episode_short": {
    "en": "S{0}E{1}",
-   "tr": "S{0}B{1}"
+   "tr": "S{0}B{1}",
+   "de": "S{0}E{1}"
   },
   "continue_episode": {
    "en": "Continue {0}",
-   "tr": "Devam et: {0}"
+   "tr": "Devam et: {0}",
+   "de": "Weiterschauen: {0}"
   },
   "watched": {
    "en": "Watched",
-   "tr": "İzlendi"
+   "tr": "İzlendi",
+   "de": "Gesehen"
   },
   "next_episode_in": {
    "en": "Next episode in {0} s",
-   "tr": "Sonraki bölüm {0} sn içinde"
+   "tr": "Sonraki bölüm {0} sn içinde",
+   "de": "Nächste Folge in {0} s"
   },
   "minutes_short": {
    "en": "{0} min",
-   "tr": "{0} dk"
+   "tr": "{0} dk",
+   "de": "{0} Min."
   },
   "favorites_channels": {
    "en": "Channels",
-   "tr": "Kanallar"
+   "tr": "Kanallar",
+   "de": "Sender"
   },
   "favorites_movies": {
    "en": "Movies",
-   "tr": "Filmler"
+   "tr": "Filmler",
+   "de": "Filme"
   },
   "favorites_series": {
    "en": "Series",
-   "tr": "Diziler"
+   "tr": "Diziler",
+   "de": "Serien"
   },
   "favorites_empty": {
    "en": "No favorites yet. Long-press (TV: Menu) an item to add it.",
-   "tr": "Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü)."
+   "tr": "Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü).",
+   "de": "Noch keine Favoriten. Zum Hinzufügen ein Element lange gedrückt halten (TV: Menü)."
   },
   "last_synced": {
    "en": "Last synced {0}",
-   "tr": "Son senkron: {0}"
+   "tr": "Son senkron: {0}",
+   "de": "Zuletzt synchronisiert: {0}"
   },
   "player_audio": {
    "en": "Audio",
-   "tr": "Ses"
+   "tr": "Ses",
+   "de": "Audio"
   },
   "player_subtitles": {
    "en": "Subtitles",
-   "tr": "Altyazı"
+   "tr": "Altyazı",
+   "de": "Untertitel"
   },
   "player_aspect": {
    "en": "Aspect ratio",
-   "tr": "Görüntü oranı"
+   "tr": "Görüntü oranı",
+   "de": "Seitenverhältnis"
   },
   "aspect_fit": {
    "en": "Fit",
-   "tr": "Sığdır"
+   "tr": "Sığdır",
+   "de": "Einpassen"
   },
   "aspect_fill": {
    "en": "Fill (crop)",
-   "tr": "Doldur (kırp)"
+   "tr": "Doldur (kırp)",
+   "de": "Füllen (zuschneiden)"
   },
   "aspect_stretch": {
    "en": "Stretch",
-   "tr": "Uzat"
+   "tr": "Uzat",
+   "de": "Strecken"
   },
   "aspect_16_9": {
    "en": "16:9",
-   "tr": "16:9"
+   "tr": "16:9",
+   "de": "16:9"
   },
   "aspect_4_3": {
    "en": "4:3",
-   "tr": "4:3"
+   "tr": "4:3",
+   "de": "4:3"
   },
   "player_reconnecting": {
    "en": "Reconnecting… ({0}/{1})",
-   "tr": "Yeniden bağlanılıyor… ({0}/{1})"
+   "tr": "Yeniden bağlanılıyor… ({0}/{1})",
+   "de": "Neu verbinden… ({0}/{1})"
   },
   "player_buffering": {
    "en": "Buffering…",
-   "tr": "Arabelleğe alınıyor…"
+   "tr": "Arabelleğe alınıyor…",
+   "de": "Puffern…"
   },
   "player_resumed_from": {
    "en": "Resumed from {0}",
-   "tr": "{0} konumundan devam ediliyor"
+   "tr": "{0} konumundan devam ediliyor",
+   "de": "Fortgesetzt bei {0}"
   },
   "player_previous_channel": {
    "en": "Previous channel",
-   "tr": "Önceki kanal"
+   "tr": "Önceki kanal",
+   "de": "Vorheriger Sender"
   },
   "player_locked": {
    "en": "Your trial has ended. Purchase to keep watching.",
-   "tr": "Deneme süreniz bitti. İzlemeye devam etmek için satın alın."
+   "tr": "Deneme süreniz bitti. İzlemeye devam etmek için satın alın.",
+   "de": "Ihre Testphase ist beendet. Jetzt kaufen und weiterschauen."
   },
   "paywall_title": {
    "en": "{APP_NAME} Premium",
-   "tr": "{APP_NAME} Premium"
+   "tr": "{APP_NAME} Premium",
+   "de": "{APP_NAME} Premium"
   },
   "paywall_subtitle": {
    "en": "One-time purchase · no subscription",
-   "tr": "Tek seferlik satın alma · abonelik yok"
+   "tr": "Tek seferlik satın alma · abonelik yok",
+   "de": "Einmalkauf · kein Abo"
   },
   "paywall_benefit_1": {
    "en": "Unlimited playback of your sources",
-   "tr": "Kaynaklarınızı sınırsız oynatma"
+   "tr": "Kaynaklarınızı sınırsız oynatma",
+   "de": "Unbegrenzte Wiedergabe Ihrer Quellen"
   },
   "paywall_benefit_2": {
    "en": "Phone and TV with the same store account",
-   "tr": "Aynı mağaza hesabıyla telefon ve TV"
+   "tr": "Aynı mağaza hesabıyla telefon ve TV",
+   "de": "Smartphone und TV mit demselben Store-Konto"
   },
   "paywall_benefit_3": {
    "en": "Pay once, keep forever",
-   "tr": "Bir kez öde, hep kullan"
+   "tr": "Bir kez öde, hep kullan",
+   "de": "Einmal zahlen, dauerhaft nutzen"
   },
   "trial_info": {
    "en": {
@@ -523,439 +653,551 @@
    "tr": {
     "one": "Ücretsiz deneme: {0} gün. Süre bitince tek seferlik kilit açma ({1}) satın alınana kadar oynatma kilitlenir. Kaynaklar ve ayarlar erişilebilir kalır.",
     "other": "Ücretsiz deneme: {0} gün. Süre bitince tek seferlik kilit açma ({1}) satın alınana kadar oynatma kilitlenir. Kaynaklar ve ayarlar erişilebilir kalır."
+   },
+   "de": {
+    "one": "Kostenlose Testphase: {0} Tag. Danach ist die Wiedergabe gesperrt, bis Sie die einmalige Freischaltung ({1}) kaufen. Quellen und Einstellungen bleiben verfügbar.",
+    "other": "Kostenlose Testphase: {0} Tage. Danach ist die Wiedergabe gesperrt, bis Sie die einmalige Freischaltung ({1}) kaufen. Quellen und Einstellungen bleiben verfügbar."
    }
   },
   "trial_start": {
    "en": "Start free trial",
-   "tr": "Ücretsiz denemeyi başlat"
+   "tr": "Ücretsiz denemeyi başlat",
+   "de": "Kostenlos testen"
   },
   "trial_active_until": {
    "en": "Trial active until {0}",
-   "tr": "Deneme {0} tarihine kadar aktif"
+   "tr": "Deneme {0} tarihine kadar aktif",
+   "de": "Testphase aktiv bis {0}"
   },
   "trial_remaining": {
    "en": "{0} left",
-   "tr": "{0} kaldı"
+   "tr": "{0} kaldı",
+   "de": "Noch {0}"
   },
   "trial_expired": {
    "en": "Your trial has ended",
-   "tr": "Deneme süreniz sona erdi"
+   "tr": "Deneme süreniz sona erdi",
+   "de": "Ihre Testphase ist beendet"
   },
   "trial_not_started": {
    "en": "Trial not started",
-   "tr": "Deneme başlatılmadı"
+   "tr": "Deneme başlatılmadı",
+   "de": "Testphase nicht gestartet"
   },
   "trial_used_on_device": {
    "en": "The trial was already used on this device.",
-   "tr": "Bu cihazda deneme süresi daha önce kullanıldı."
+   "tr": "Bu cihazda deneme süresi daha önce kullanıldı.",
+   "de": "Die Testphase wurde auf diesem Gerät bereits genutzt."
   },
   "purchase_buy": {
    "en": "Buy – {0}",
-   "tr": "Satın al – {0}"
+   "tr": "Satın al – {0}",
+   "de": "Kaufen – {0}"
   },
   "purchase_restore": {
    "en": "Restore purchases",
-   "tr": "Satın alımları geri yükle"
+   "tr": "Satın alımları geri yükle",
+   "de": "Käufe wiederherstellen"
   },
   "purchase_owned": {
    "en": "Purchased ✓",
-   "tr": "Satın alındı ✓"
+   "tr": "Satın alındı ✓",
+   "de": "Gekauft ✓"
   },
   "purchase_pending": {
    "en": "Payment pending – access opens automatically once approved.",
-   "tr": "Ödeme bekleniyor – onaylandığında erişim otomatik açılır."
+   "tr": "Ödeme bekleniyor – onaylandığında erişim otomatik açılır.",
+   "de": "Zahlung ausstehend – der Zugang wird nach der Freigabe automatisch aktiviert."
   },
   "purchase_restored": {
    "en": "Purchase restored",
-   "tr": "Satın alma geri yüklendi"
+   "tr": "Satın alma geri yüklendi",
+   "de": "Kauf wiederhergestellt"
   },
   "purchase_nothing_to_restore": {
    "en": "No purchase found for this store account.",
-   "tr": "Bu mağaza hesabında satın alma bulunamadı."
+   "tr": "Bu mağaza hesabında satın alma bulunamadı.",
+   "de": "Für dieses Store-Konto wurde kein Kauf gefunden."
   },
   "purchase_failed": {
    "en": "Purchase failed: {0}",
-   "tr": "Satın alma başarısız: {0}"
+   "tr": "Satın alma başarısız: {0}",
+   "de": "Kauf fehlgeschlagen: {0}"
   },
   "purchase_unavailable": {
    "en": "Store is not available on this device.",
-   "tr": "Bu cihazda mağaza kullanılamıyor."
+   "tr": "Bu cihazda mağaza kullanılamıyor.",
+   "de": "Der Store ist auf diesem Gerät nicht verfügbar."
   },
   "purchase_revoked": {
    "en": "This purchase was refunded or revoked.",
-   "tr": "Bu satın alma iade edildi veya iptal edildi."
+   "tr": "Bu satın alma iade edildi veya iptal edildi.",
+   "de": "Dieser Kauf wurde erstattet oder widerrufen."
   },
   "paywall_other_platform": {
    "en": "Bought on another platform (Apple ↔ Google)? Sign in to your account.",
-   "tr": "Başka platformda mı satın aldınız (Apple ↔ Google)? Hesabınıza giriş yapın."
+   "tr": "Başka platformda mı satın aldınız (Apple ↔ Google)? Hesabınıza giriş yapın.",
+   "de": "Auf einer anderen Plattform gekauft (Apple ↔ Google)? Melden Sie sich mit Ihrem Konto an."
   },
   "terms": {
    "en": "Terms of use",
-   "tr": "Kullanım koşulları"
+   "tr": "Kullanım koşulları",
+   "de": "Nutzungsbedingungen"
   },
   "privacy": {
    "en": "Privacy policy",
-   "tr": "Gizlilik politikası"
+   "tr": "Gizlilik politikası",
+   "de": "Datenschutzerklärung"
   },
   "license_server_unreachable": {
    "en": "License server unreachable – using last known status.",
-   "tr": "Lisans sunucusuna ulaşılamıyor – son bilinen durum kullanılıyor."
+   "tr": "Lisans sunucusuna ulaşılamıyor – son bilinen durum kullanılıyor.",
+   "de": "Lizenzserver nicht erreichbar – der letzte bekannte Status wird verwendet."
   },
   "settings_sources": {
    "en": "Sources",
-   "tr": "Kaynaklar"
+   "tr": "Kaynaklar",
+   "de": "Quellen"
   },
   "settings_playback": {
    "en": "Playback",
-   "tr": "Oynatma"
+   "tr": "Oynatma",
+   "de": "Wiedergabe"
   },
   "settings_appearance": {
    "en": "Appearance & language",
-   "tr": "Görünüm ve dil"
+   "tr": "Görünüm ve dil",
+   "de": "Darstellung & Sprache"
   },
   "settings_account": {
    "en": "Account",
-   "tr": "Hesap"
+   "tr": "Hesap",
+   "de": "Konto"
   },
   "settings_purchase": {
    "en": "Purchase",
-   "tr": "Satın alma"
+   "tr": "Satın alma",
+   "de": "Kauf"
   },
   "settings_advanced": {
    "en": "Advanced & diagnostics",
-   "tr": "Gelişmiş ve tanılama"
+   "tr": "Gelişmiş ve tanılama",
+   "de": "Erweitert & Diagnose"
   },
   "source_last_refresh": {
    "en": "Last refresh {0}",
-   "tr": "Son yenileme {0}"
+   "tr": "Son yenileme {0}",
+   "de": "Zuletzt aktualisiert: {0}"
   },
   "source_never_refreshed": {
    "en": "Never refreshed",
-   "tr": "Hiç yenilenmedi"
+   "tr": "Hiç yenilenmedi",
+   "de": "Noch nie aktualisiert"
   },
   "source_epg_shift": {
    "en": "EPG time shift",
-   "tr": "EPG saat kaydırma"
+   "tr": "EPG saat kaydırma",
+   "de": "EPG-Zeitversatz"
   },
   "source_auto_refresh": {
    "en": "Auto refresh",
-   "tr": "Otomatik yenileme"
+   "tr": "Otomatik yenileme",
+   "de": "Automatisch aktualisieren"
   },
   "every_n_hours": {
    "en": "Every {0} h",
-   "tr": "{0} saatte bir"
+   "tr": "{0} saatte bir",
+   "de": "Alle {0} Std."
   },
   "source_delete_confirm": {
    "en": "Delete “{0}”? Favorites and progress of this source are kept.",
-   "tr": "“{0}” silinsin mi? Bu kaynağın favorileri ve izleme ilerlemesi saklanır."
+   "tr": "“{0}” silinsin mi? Bu kaynağın favorileri ve izleme ilerlemesi saklanır.",
+   "de": "„{0}“ löschen? Favoriten und Fortschritt dieser Quelle bleiben erhalten."
   },
   "pref_audio_lang": {
    "en": "Preferred audio language",
-   "tr": "Tercih edilen ses dili"
+   "tr": "Tercih edilen ses dili",
+   "de": "Audiosprache"
   },
   "pref_subtitle_lang": {
    "en": "Preferred subtitle language",
-   "tr": "Tercih edilen altyazı dili"
+   "tr": "Tercih edilen altyazı dili",
+   "de": "Untertitelsprache"
   },
   "pref_default_aspect": {
    "en": "Default aspect ratio",
-   "tr": "Varsayılan görüntü oranı"
+   "tr": "Varsayılan görüntü oranı",
+   "de": "Standard-Seitenverhältnis"
   },
   "pref_live_format": {
    "en": "Live stream format",
-   "tr": "Canlı yayın formatı"
+   "tr": "Canlı yayın formatı",
+   "de": "Live-Stream-Format"
   },
   "pref_buffer": {
    "en": "Buffer",
-   "tr": "Arabellek"
+   "tr": "Arabellek",
+   "de": "Puffer"
   },
   "buffer_normal": {
    "en": "Normal",
-   "tr": "Normal"
+   "tr": "Normal",
+   "de": "Normal"
   },
   "buffer_large": {
    "en": "Large",
-   "tr": "Büyük"
+   "tr": "Büyük",
+   "de": "Groß"
   },
   "pref_tv_preview": {
    "en": "Preview player in channel list",
-   "tr": "Kanal listesinde önizleme oynatıcısı"
+   "tr": "Kanal listesinde önizleme oynatıcısı",
+   "de": "Vorschau in der Senderliste"
   },
   "pref_app_language": {
    "en": "App language",
-   "tr": "Uygulama dili"
+   "tr": "Uygulama dili",
+   "de": "App-Sprache"
   },
   "pref_epg_timezone": {
    "en": "EPG time zone",
-   "tr": "EPG saat dilimi"
+   "tr": "EPG saat dilimi",
+   "de": "EPG-Zeitzone"
   },
   "timezone_device": {
    "en": "Device time zone",
-   "tr": "Cihaz saat dilimi"
+   "tr": "Cihaz saat dilimi",
+   "de": "Zeitzone des Geräts"
   },
   "pref_24h": {
    "en": "24-hour clock",
-   "tr": "24 saat biçimi"
+   "tr": "24 saat biçimi",
+   "de": "24-Stunden-Format"
   },
   "account_sign_in": {
    "en": "Sign in with e-mail",
-   "tr": "E-posta ile giriş yap"
+   "tr": "E-posta ile giriş yap",
+   "de": "Mit E-Mail anmelden"
   },
   "account_sign_in_tv": {
    "en": "Sign in with your phone",
-   "tr": "Telefonunuzla giriş yapın"
+   "tr": "Telefonunuzla giriş yapın",
+   "de": "Mit dem Smartphone anmelden"
   },
   "account_code_sent": {
    "en": "We sent a 6-digit code to {0}.",
-   "tr": "{0} adresine 6 haneli bir kod gönderdik."
+   "tr": "{0} adresine 6 haneli bir kod gönderdik.",
+   "de": "Wir haben einen 6-stelligen Code an {0} gesendet."
   },
   "account_enter_code": {
    "en": "Enter code",
-   "tr": "Kodu girin"
+   "tr": "Kodu girin",
+   "de": "Code eingeben"
   },
   "account_signed_in_as": {
    "en": "Signed in as {0}",
-   "tr": "{0} olarak giriş yapıldı"
+   "tr": "{0} olarak giriş yapıldı",
+   "de": "Angemeldet als {0}"
   },
   "account_sign_out": {
    "en": "Sign out",
-   "tr": "Çıkış yap"
+   "tr": "Çıkış yap",
+   "de": "Abmelden"
   },
   "account_delete": {
    "en": "Delete account",
-   "tr": "Hesabı sil"
+   "tr": "Hesabı sil",
+   "de": "Konto löschen"
   },
   "account_delete_confirm": {
    "en": "Delete your account and synced data? Store purchases stay valid with your store account.",
-   "tr": "Hesabınız ve senkronize veriler silinsin mi? Mağaza satın alımlarınız mağaza hesabınızla geçerli kalır."
+   "tr": "Hesabınız ve senkronize veriler silinsin mi? Mağaza satın alımlarınız mağaza hesabınızla geçerli kalır.",
+   "de": "Konto und synchronisierte Daten löschen? Store-Käufe bleiben mit Ihrem Store-Konto gültig."
   },
   "account_why": {
    "en": "Optional: sync favorites & progress and use your purchase across Apple and Google devices.",
-   "tr": "İsteğe bağlı: favorileri ve ilerlemeyi senkronize edin, satın alımınızı Apple ve Google cihazlarında kullanın."
+   "tr": "İsteğe bağlı: favorileri ve ilerlemeyi senkronize edin, satın alımınızı Apple ve Google cihazlarında kullanın.",
+   "de": "Optional: Favoriten & Fortschritt synchronisieren und den Kauf auf Apple- und Google-Geräten nutzen."
   },
   "device_login_title": {
    "en": "Sign in on {0}/link",
-   "tr": "{0}/link adresinde giriş yapın"
+   "tr": "{0}/link adresinde giriş yapın",
+   "de": "Auf {0}/link anmelden"
   },
   "device_login_code": {
    "en": "Code: {0}",
-   "tr": "Kod: {0}"
+   "tr": "Kod: {0}",
+   "de": "Code: {0}"
   },
   "diagnostics_format_test": {
    "en": "Format test",
-   "tr": "Format testi"
+   "tr": "Format testi",
+   "de": "Formattest"
   },
   "diagnostics_clear_images": {
    "en": "Clear image cache",
-   "tr": "Görsel önbelleğini temizle"
+   "tr": "Görsel önbelleğini temizle",
+   "de": "Bild-Cache leeren"
   },
   "diagnostics_clear_epg": {
    "en": "Clear TV guide cache",
-   "tr": "Yayın akışı önbelleğini temizle"
+   "tr": "Yayın akışı önbelleğini temizle",
+   "de": "TV-Guide-Cache leeren"
   },
   "about_version": {
    "en": "Version {0}",
-   "tr": "Sürüm {0}"
+   "tr": "Sürüm {0}",
+   "de": "Version {0}"
   },
   "about_licenses": {
    "en": "Open-source licenses",
-   "tr": "Açık kaynak lisansları"
+   "tr": "Açık kaynak lisansları",
+   "de": "Open-Source-Lizenzen"
   },
   "format_test_result_ok": {
    "en": "Playing ✓",
-   "tr": "Oynatılıyor ✓"
+   "tr": "Oynatılıyor ✓",
+   "de": "Wird abgespielt ✓"
   },
   "format_test_result_expected_error": {
    "en": "Expected error ✓ ({0})",
-   "tr": "Beklenen hata ✓ ({0})"
+   "tr": "Beklenen hata ✓ ({0})",
+   "de": "Erwarteter Fehler ✓ ({0})"
   },
   "format_test_result_fail": {
    "en": "Unexpected: {0}",
-   "tr": "Beklenmeyen sonuç: {0}"
+   "tr": "Beklenmeyen sonuç: {0}",
+   "de": "Unerwartet: {0}"
   },
   "err_offline_title": {
    "en": "No internet connection",
-   "tr": "İnternet bağlantısı yok"
+   "tr": "İnternet bağlantısı yok",
+   "de": "Keine Internetverbindung"
   },
   "err_offline_body": {
    "en": "Check your connection and try again.",
-   "tr": "Bağlantınızı kontrol edip tekrar deneyin."
+   "tr": "Bağlantınızı kontrol edip tekrar deneyin.",
+   "de": "Bitte Verbindung prüfen und erneut versuchen."
   },
   "err_unreachable_title": {
    "en": "Server unreachable",
-   "tr": "Sunucuya ulaşılamıyor"
+   "tr": "Sunucuya ulaşılamıyor",
+   "de": "Server nicht erreichbar"
   },
   "err_timeout_body": {
    "en": "The server did not respond in time.",
-   "tr": "Sunucu zamanında yanıt vermedi (zaman aşımı)."
+   "tr": "Sunucu zamanında yanıt vermedi (zaman aşımı).",
+   "de": "Der Server hat nicht rechtzeitig geantwortet."
   },
   "err_dns_body": {
    "en": "The server address could not be found. Check the address.",
-   "tr": "Sunucu adresi bulunamadı. Adresi kontrol edin."
+   "tr": "Sunucu adresi bulunamadı. Adresi kontrol edin.",
+   "de": "Die Serveradresse wurde nicht gefunden. Bitte Adresse prüfen."
   },
   "err_refused_body": {
    "en": "The server refused the connection. Check address and port.",
-   "tr": "Sunucu bağlantıyı reddetti. Adres ve portu kontrol edin."
+   "tr": "Sunucu bağlantıyı reddetti. Adres ve portu kontrol edin.",
+   "de": "Der Server hat die Verbindung abgelehnt. Bitte Adresse und Port prüfen."
   },
   "err_tls_body": {
    "en": "Secure connection failed (certificate/TLS).",
-   "tr": "Güvenli bağlantı kurulamadı (sertifika/TLS)."
+   "tr": "Güvenli bağlantı kurulamadı (sertifika/TLS).",
+   "de": "Sichere Verbindung fehlgeschlagen (Zertifikat/TLS)."
   },
   "err_network_body": {
    "en": "A network error occurred.",
-   "tr": "Bir ağ hatası oluştu."
+   "tr": "Bir ağ hatası oluştu.",
+   "de": "Ein Netzwerkfehler ist aufgetreten."
   },
   "err_credentials_title": {
    "en": "Wrong username or password",
-   "tr": "Kullanıcı adı veya şifre hatalı"
+   "tr": "Kullanıcı adı veya şifre hatalı",
+   "de": "Benutzername oder Passwort falsch"
   },
   "err_credentials_body": {
    "en": "Check the details your provider gave you.",
-   "tr": "Sağlayıcınızın verdiği bilgileri kontrol edin."
+   "tr": "Sağlayıcınızın verdiği bilgileri kontrol edin.",
+   "de": "Bitte die Zugangsdaten Ihres Anbieters prüfen."
   },
   "err_expired_title": {
    "en": "Your source account has expired",
-   "tr": "Kaynak hesabınızın süresi dolmuş"
+   "tr": "Kaynak hesabınızın süresi dolmuş",
+   "de": "Ihr Quellkonto ist abgelaufen"
   },
   "err_expired_body": {
    "en": "It expired on {0}. Contact your provider.",
-   "tr": "{0} tarihinde sona erdi. Sağlayıcınızla iletişime geçin."
+   "tr": "{0} tarihinde sona erdi. Sağlayıcınızla iletişime geçin.",
+   "de": "Es ist am {0} abgelaufen. Bitte wenden Sie sich an Ihren Anbieter."
   },
   "err_expired_body_nodate": {
    "en": "Contact your provider.",
-   "tr": "Sağlayıcınızla iletişime geçin."
+   "tr": "Sağlayıcınızla iletişime geçin.",
+   "de": "Bitte wenden Sie sich an Ihren Anbieter."
   },
   "err_disabled_title": {
    "en": "Source account disabled",
-   "tr": "Kaynak hesabı devre dışı"
+   "tr": "Kaynak hesabı devre dışı",
+   "de": "Quellkonto deaktiviert"
   },
   "err_disabled_body": {
    "en": "The provider has suspended this account.",
-   "tr": "Sağlayıcı bu hesabı askıya almış."
+   "tr": "Sağlayıcı bu hesabı askıya almış.",
+   "de": "Der Anbieter hat dieses Konto gesperrt."
   },
   "err_notfound_title": {
    "en": "Playlist not found (404)",
-   "tr": "Liste bulunamadı (404)"
+   "tr": "Liste bulunamadı (404)",
+   "de": "Playlist nicht gefunden (404)"
   },
   "err_notfound_body": {
    "en": "Check the URL.",
-   "tr": "URL'yi kontrol edin."
+   "tr": "URL'yi kontrol edin.",
+   "de": "Bitte URL prüfen."
   },
   "err_server_title": {
    "en": "Server error ({0})",
-   "tr": "Sunucu hatası ({0})"
+   "tr": "Sunucu hatası ({0})",
+   "de": "Serverfehler ({0})"
   },
   "err_server_body": {
    "en": "Please try again later.",
-   "tr": "Lütfen daha sonra tekrar deneyin."
+   "tr": "Lütfen daha sonra tekrar deneyin.",
+   "de": "Bitte später erneut versuchen."
   },
   "err_format_title": {
    "en": "Invalid playlist",
-   "tr": "Geçersiz liste"
+   "tr": "Geçersiz liste",
+   "de": "Ungültige Playlist"
   },
   "err_format_body": {
    "en": "The address does not return an M3U playlist.",
-   "tr": "Adres bir M3U listesi döndürmüyor."
+   "tr": "Adres bir M3U listesi döndürmüyor.",
+   "de": "Unter dieser Adresse ist keine M3U-Playlist zu finden."
   },
   "err_response_title": {
    "en": "Unexpected response",
-   "tr": "Beklenmeyen yanıt"
+   "tr": "Beklenmeyen yanıt",
+   "de": "Unerwartete Antwort"
   },
   "err_response_body": {
    "en": "The server did not answer like an Xtream Codes API. Check the address.",
-   "tr": "Sunucu Xtream Codes API yanıtı vermedi. Adresi kontrol edin."
+   "tr": "Sunucu Xtream Codes API yanıtı vermedi. Adresi kontrol edin.",
+   "de": "Der Server antwortet nicht wie eine Xtream-Codes-API. Bitte Adresse prüfen."
   },
   "err_empty_title": {
    "en": "The list is empty",
-   "tr": "Liste boş"
+   "tr": "Liste boş",
+   "de": "Die Liste ist leer"
   },
   "err_empty_body": {
    "en": "This source contains no playable items.",
-   "tr": "Bu kaynakta oynatılabilir içerik yok."
+   "tr": "Bu kaynakta oynatılabilir içerik yok.",
+   "de": "Diese Quelle enthält keine abspielbaren Inhalte."
   },
   "err_epg_failed": {
    "en": "TV guide could not be loaded: {0}",
-   "tr": "Yayın akışı yüklenemedi: {0}"
+   "tr": "Yayın akışı yüklenemedi: {0}",
+   "de": "TV-Guide konnte nicht geladen werden: {0}"
   },
   "perr_format_title": {
    "en": "This stream format is not supported",
-   "tr": "Bu yayın biçimi desteklenmiyor"
+   "tr": "Bu yayın biçimi desteklenmiyor",
+   "de": "Dieses Streamformat wird nicht unterstützt"
   },
   "perr_format_body": {
    "en": "The {0} format cannot be played on this device.",
-   "tr": "{0} biçimi bu cihazda oynatılamıyor."
+   "tr": "{0} biçimi bu cihazda oynatılamıyor.",
+   "de": "Das Format {0} kann auf diesem Gerät nicht abgespielt werden."
   },
   "perr_format_apple_ts": {
    "en": "Ask your provider for HLS (m3u8) output.",
-   "tr": "Sağlayıcınızdan HLS (m3u8) çıkışını isteyin."
+   "tr": "Sağlayıcınızdan HLS (m3u8) çıkışını isteyin.",
+   "de": "Fragen Sie Ihren Anbieter nach HLS (m3u8)."
   },
   "perr_codec_title": {
    "en": "Video/audio codec not supported",
-   "tr": "Video/ses kodeki desteklenmiyor"
+   "tr": "Video/ses kodeki desteklenmiyor",
+   "de": "Video-/Audiocodec nicht unterstützt"
   },
   "perr_codec_body": {
    "en": "This device cannot decode the stream.",
-   "tr": "Cihaz bu yayını çözemiyor."
+   "tr": "Cihaz bu yayını çözemiyor.",
+   "de": "Dieses Gerät kann den Stream nicht dekodieren."
   },
   "perr_denied_title": {
    "en": "Access to the stream was denied",
-   "tr": "Yayına erişim reddedildi"
+   "tr": "Yayına erişim reddedildi",
+   "de": "Zugriff auf den Stream verweigert"
   },
   "perr_denied_body": {
    "en": "The connection limit may be reached or the account expired.",
-   "tr": "Bağlantı sınırı aşılmış veya hesap süresi dolmuş olabilir."
+   "tr": "Bağlantı sınırı aşılmış veya hesap süresi dolmuş olabilir.",
+   "de": "Möglicherweise ist das Verbindungslimit erreicht oder das Konto abgelaufen."
   },
   "perr_offline_title": {
    "en": "Stream is currently offline",
-   "tr": "Yayın şu anda kapalı"
+   "tr": "Yayın şu anda kapalı",
+   "de": "Stream derzeit offline"
   },
   "perr_offline_body": {
    "en": "This channel is not broadcasting right now.",
-   "tr": "Bu kanal şu anda yayında değil."
+   "tr": "Bu kanal şu anda yayında değil.",
+   "de": "Dieser Sender sendet gerade nicht."
   },
   "perr_drm_title": {
    "en": "Protected stream",
-   "tr": "Korumalı yayın"
+   "tr": "Korumalı yayın",
+   "de": "Geschützter Stream"
   },
   "perr_drm_body": {
    "en": "DRM-protected streams are not supported.",
-   "tr": "DRM korumalı yayınlar desteklenmiyor."
+   "tr": "DRM korumalı yayınlar desteklenmiyor.",
+   "de": "DRM-geschützte Streams werden nicht unterstützt."
   },
   "perr_network_title": {
    "en": "Connection lost",
-   "tr": "Bağlantı koptu"
+   "tr": "Bağlantı koptu",
+   "de": "Verbindung unterbrochen"
   },
   "perr_network_body": {
    "en": "Could not reconnect to the stream.",
-   "tr": "Yayına yeniden bağlanılamadı."
+   "tr": "Yayına yeniden bağlanılamadı.",
+   "de": "Die Verbindung zum Stream konnte nicht wiederhergestellt werden."
   },
   "perr_unknown_title": {
    "en": "Playback error",
-   "tr": "Oynatma hatası"
+   "tr": "Oynatma hatası",
+   "de": "Wiedergabefehler"
   },
   "account_field_email": {
    "en": "E-mail",
-   "tr": "E-posta"
+   "tr": "E-posta",
+   "de": "E-Mail"
   },
   "account_send_code": {
    "en": "Send code",
-   "tr": "Kod gönder"
+   "tr": "Kod gönder",
+   "de": "Code senden"
   },
   "account_verify": {
    "en": "Verify",
-   "tr": "Doğrula"
+   "tr": "Doğrula",
+   "de": "Bestätigen"
   },
   "account_dev_code": {
    "en": "Development code: {0}",
-   "tr": "Geliştirme kodu: {0}"
+   "tr": "Geliştirme kodu: {0}",
+   "de": "Entwicklungscode: {0}"
   },
   "format_test_run": {
    "en": "Run test",
-   "tr": "Testi başlat"
+   "tr": "Testi başlat",
+   "de": "Test starten"
   },
   "format_test_host": {
    "en": "Test server (host for local samples)",
-   "tr": "Test sunucusu (yerel örnekler için host)"
+   "tr": "Test sunucusu (yerel örnekler için host)",
+   "de": "Testserver (Host für lokale Beispiele)"
   },
   "nav_guide": {
    "en": "TV Guide",
@@ -1050,7 +1292,7 @@
   "catchup_xtream_only": {
    "en": "Replay is available for Xtream sources.",
    "tr": "Tekrar izleme Xtream kaynaklarında kullanılabilir.",
-   "de": "Wiedergabe ist für Xtream-Quellen verfügbar."
+   "de": "Das TV-Archiv ist bei Xtream-Quellen verfügbar."
   },
   "catchup_empty": {
    "en": "No past programmes in the archive.",
@@ -1070,7 +1312,7 @@
   "hidden_show_all": {
    "en": "Show hidden ({0})",
    "tr": "Gizlenenleri göster ({0})",
-   "de": "Ausgeblendete einblenden ({0})"
+   "de": "Ausgeblendete anzeigen ({0})"
   },
   "category_picker": {
    "en": "Category",

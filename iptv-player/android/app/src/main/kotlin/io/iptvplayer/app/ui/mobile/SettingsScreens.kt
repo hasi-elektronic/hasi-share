@@ -150,7 +150,7 @@ fun SettingsScreen(factory: ViewModelFactory, main: MainViewModel, nav: NavHostC
                 ChoiceRow(stringResource(R.string.pref_buffer), s.buffer, listOf(BufferMode.NORMAL to stringResource(R.string.buffer_normal), BufferMode.LARGE to stringResource(R.string.buffer_large))) { v -> vm.update { it.copy(buffer = v) } }
             }
             SettingsSection(stringResource(R.string.settings_appearance)) {
-                ChoiceRow(stringResource(R.string.pref_app_language), s.appLanguage, listOf("" to system, "tr" to "Türkçe", "en" to "English")) { v ->
+                ChoiceRow(stringResource(R.string.pref_app_language), s.appLanguage, listOf("" to system) + io.iptvplayer.app.ui.common.AppLocale.SUPPORTED) { v ->
                     vm.update { it.copy(appLanguage = v) }
                     io.iptvplayer.app.ui.common.AppLocale.apply(ctx, v)
                 }
@@ -288,7 +288,7 @@ fun AccountScreen(factory: ViewModelFactory, onBack: () -> Unit, tvDeviceLogin: 
                 }
                 else -> {
                     OutlinedTextField(email, { email = it }, label = { Text(stringResource(R.string.account_field_email)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { vm.sendCode(email, if (Locale.getDefault().language == "tr") "tr" else "en") }, enabled = email.contains('@') && !st.busy) {
+                    Button(onClick = { vm.sendCode(email, Locale.getDefault().language.takeIf { it == "de" || it == "tr" } ?: "en") }, enabled = email.contains('@') && !st.busy) {
                         Text(stringResource(R.string.account_send_code))
                     }
                 }
