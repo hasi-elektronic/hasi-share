@@ -2,6 +2,7 @@ import Foundation
 import IPTVCore
 import IPTVKit
 import Observation
+import StoreKit
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
@@ -113,9 +114,22 @@ enum AppBootstrap {
         return (try? JSONEncoder().encode(keys)) ?? Data("{}".utf8)
     }
 
+    /// TestFlight builds run in the StoreKit sandbox: with `TESTFLIGHT_FULL_ACCESS = YES`
+    /// (Config/Shared.xcconfig) testers get full access without buying. App Store installs
+    /// report `.production` and keep the normal trial/purchase flow.
+    static func applyTesterAccess(env: AppEnvironment) async {
+        guard info("TESTFLIGHT_FULL_ACCESS").uppercased() == "YES" else { return }
+        guard case .verified(let transaction) = try? await AppTransaction.shared else { return }
+        if transaction.environment == .sandbox {
+            env.license.testerFullAccess = true
+            SafeLog.info("TestFlight build: tester full access enabled")
+        }
+    }
+
     /// Debug/UI-test hooks: `-seedM3U <url>` adds a source, `-uiScreen <name>` opens a screen,
     /// `-uiTrial` simulates an active StoreKit trial (only in DEBUG builds).
     static func applyDebugHooks(env: AppEnvironment, router: Router) async {
+        await applyTesterAccess(env: env)
         #if DEBUG
         if arguments.contains("-uiTrial") {
             env.license.update(store: StoreSnapshot(trialStartMs: env.license.nowMs() - 2 * 86_400_000, trialTransactionId: nil))

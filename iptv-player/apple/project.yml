@@ -64,6 +64,7 @@ targetTemplates:
         PRODUCT_LIFETIME: $(PRODUCT_LIFETIME)
         PRODUCT_TRIAL: $(PRODUCT_TRIAL)
         APP_BUNDLE_ID: $(APP_BUNDLE_ID)
+        TESTFLIGHT_FULL_ACCESS: $(TESTFLIGHT_FULL_ACCESS)
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations: [en, tr]
         # Users add arbitrary (mostly plain-HTTP) IPTV servers (ARCHITECTURE V17).

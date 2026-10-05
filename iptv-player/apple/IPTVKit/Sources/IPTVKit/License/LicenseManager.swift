@@ -39,6 +39,12 @@ public final class LicenseManager {
     public private(set) var trialDays: Int
     public private(set) var store = StoreSnapshot()
     public private(set) var lastSyncAt: Date?
+    /// TestFlight testers get full access without a store purchase (set by the app when
+    /// `AppTransaction.environment == .sandbox` and `TESTFLIGHT_FULL_ACCESS` is YES).
+    /// App Store builds run in `.production` and are never affected.
+    public var testerFullAccess = false {
+        didSet { if testerFullAccess != oldValue { evaluate() } }
+    }
 
     @ObservationIgnored private let backend: any LicenseBackend
     @ObservationIgnored private let verifier: LicenseTokenVerifier
@@ -95,6 +101,10 @@ public final class LicenseManager {
     /// Re-evaluates the policy at the current trusted time (call when a timer fires or the
     /// app becomes active – a trial can expire while the app is open).
     public func evaluate() {
+        if testerFullAccess {
+            decision = AccessDecision(state: .purchased, trialEndMs: nil, canPlay: true, pendingPurchase: false)
+            return
+        }
         decision = AccessPolicy.evaluate(store: store.lifetime, token: license?.claims.lic,
                                          localTrialStartMs: store.trialStartMs, trialDays: trialDays,
                                          nowMs: nowMs(), platformStore: .apple)

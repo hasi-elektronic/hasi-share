@@ -38,6 +38,25 @@ final class LicenseManagerTests: XCTestCase {
                               readClock: { clock.read() })
     }
 
+    func testTesterFullAccessUnlocksAndCanBeTurnedOff() throws {
+        let clock = TestClock(wallMs: t0)
+        let manager = try make(FakeLicenseBackend(), TestSigner(), clock)
+        XCTAssertFalse(manager.canPlay)
+
+        manager.testerFullAccess = true
+        XCTAssertEqual(manager.decision.state, .purchased)
+        XCTAssertTrue(manager.canPlay)
+        // Survives re-evaluation (timer / foreground) and store updates.
+        clock.advance(ms: 30 * day)
+        manager.evaluate()
+        manager.update(store: StoreSnapshot())
+        XCTAssertTrue(manager.canPlay)
+
+        manager.testerFullAccess = false
+        XCTAssertEqual(manager.decision.state, .trialNotStarted)
+        XCTAssertFalse(manager.canPlay)
+    }
+
     func testStoreTrialPurchaseAndRefundTransitions() throws {
         let clock = TestClock(wallMs: t0)
         let manager = try make(FakeLicenseBackend(), TestSigner(), clock)
