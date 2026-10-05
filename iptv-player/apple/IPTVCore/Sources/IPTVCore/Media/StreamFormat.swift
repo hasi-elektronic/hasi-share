@@ -29,6 +29,9 @@ public enum PlayerEngine: String, Sendable, Hashable, CaseIterable {
     case avPlayer = "avplayer"
     /// AndroidX Media3 / ExoPlayer.
     case media3
+    /// VLCKit 3.x (libVLC) – second engine of the Apple apps (MobileVLCKit / TVVLCKit) for
+    /// everything AVPlayer cannot open (CONTRACT §6.1).
+    case vlcKit = "vlckit"
 }
 
 extension StreamContainer {
@@ -46,12 +49,43 @@ extension StreamContainer {
             case .rtmp, .udp: return false
             default: return true
             }
+        case .vlcKit:
+            // UDP/RTP multicast needs the restricted multicast entitlement on iOS/tvOS.
+            return self != .udp
         }
     }
 
     /// Pre-playback check: nil if playable, else the `PlaybackError` to show.
     public func playbackError(for engine: PlayerEngine) -> PlaybackError? {
         isSupported(by: engine) ? nil : .unsupportedFormat(container: rawValue)
+    }
+}
+
+/// Engine choice of the Apple apps (CONTRACT §6.1): AVPlayer for what it plays natively
+/// (HLS, MP4/MOV, unknown → try), VLCKit for everything else; one fallback AVPlayer → VLCKit
+/// when AVPlayer reports a format/codec error.
+public enum ApplePlayback {
+    /// Engine for a detected container; nil = not playable on Apple (`UnsupportedFormat`).
+    /// - Parameter vlcAvailable: false when the app is built without VLCKit (AVPlayer only).
+    public static func engine(for container: StreamContainer, vlcAvailable: Bool = true) -> PlayerEngine? {
+        if container.isSupported(by: .avPlayer) { return .avPlayer }
+        if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
+        return nil
+    }
+
+    /// Pre-playback check: nil if playable on Apple, else the error to show.
+    public static func playbackError(for container: StreamContainer, vlcAvailable: Bool = true) -> PlaybackError? {
+        engine(for: container, vlcAvailable: vlcAvailable) == nil ? .unsupportedFormat(container: container.rawValue) : nil
+    }
+
+    /// Engine to retry with after `error` on `engine` (at most once per opened stream): only
+    /// AVPlayer → VLCKit, only for `UnsupportedFormat` / `UnsupportedCodec`.
+    public static func fallbackEngine(after error: PlaybackError, on engine: PlayerEngine, vlcAvailable: Bool = true) -> PlayerEngine? {
+        guard vlcAvailable, engine == .avPlayer else { return nil }
+        switch error {
+        case .unsupportedFormat, .unsupportedCodec: return .vlcKit
+        default: return nil
+        }
     }
 }
 

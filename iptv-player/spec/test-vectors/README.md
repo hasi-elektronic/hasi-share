@@ -9,15 +9,15 @@ loads these files in its unit tests. A change in behaviour = change the vector f
 | `xmltv/epg_basic.xml` + `.expected.json` | §5 | Kotlin, Swift |
 | `xmltv/time-parsing.json` | §5 | Kotlin, Swift |
 | `xmltv/name-normalization.json` | §5 | Kotlin, Swift |
-| `xtream/*.json` + `*.expected.json`, `url-vectors.json` | §4 | Kotlin, Swift |
+| `xtream/*.json` + `*.expected.json`, `url-vectors.json` | §4 (`liveExtAppleVlc`: Swift only – §4.5) | Kotlin, Swift |
 | `content-keys.json` | §1.1, §7.1 | Kotlin, Swift, backend (deviceKey format) |
 | `license-token.json` | §7.2 | Kotlin, Swift (verify), backend (sign + verify) |
 | `pair-crypto.json` | §9 | Kotlin, Swift (decrypt + encrypt with fixed iv), backend page JS (encrypt) |
 | `trusted-clock.json` | §7.3 | Kotlin, Swift |
 | `access-policy.json` | §7.4 | Kotlin, Swift |
 | `redaction.json` | §10 | Kotlin, Swift, backend |
-| `media/*` + `media/expected.json` | §6 | Kotlin, Swift |
-| `stream-samples.json` | §6 | Diagnostics screen on devices (manual) |
+| `media/*` + `media/expected.json` | §6 (`support.media3/avplayer`: Kotlin + Swift; `support.vlckit`, `appleEngine`: Swift – §6.1) | Kotlin, Swift |
+| `stream-samples.json` | §6 (`expect.media3` / `expect.avplayer` / `expect.apple`) | Diagnostics screen on devices (manual) |
 
 Regenerate computed vectors: `node spec/tools/gen-vectors.mjs` (fresh keys each run).
 

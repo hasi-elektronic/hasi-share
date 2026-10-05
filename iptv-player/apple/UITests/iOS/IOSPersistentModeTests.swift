@@ -33,6 +33,6 @@ final class IOSPersistentModeTests: XCTestCase {
         UITestSupport.snap("persist-02-after-connect", in: self)
         XCTAssertTrue(ok, "source should load in persistent mode")
         done.tap()
-        XCTAssertTrue(app.tabBars.buttons["Live TV"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 10), "home with the header tabs")
     }
 }

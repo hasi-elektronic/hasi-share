@@ -8,10 +8,11 @@ Bu doküman hem mobil (Android / iOS) hem TV (Android TV / Apple TV) arayüzleri
 
 | Token | Değer | Not |
 |---|---|---|
-| `bg` | `#0B0D12` | Ana arka plan (neredeyse siyah, hafif mavi) |
-| `surface` | `#151922` | Kart / liste satırı |
-| `surfaceElevated` | `#1E2430` | Sheet, dialog, odaklı kart zemini |
-| `primary` | `#5B8CFF` | Vurgu (odak halkası, seçili sekme, ilerleme çubuğu) |
+| `bg` | `#000000` | Ana arka plan (saf siyah; hero görselleri buna doğru kararır) |
+| `surface` | `#16181D` | Kart / liste satırı / çip |
+| `surfaceElevated` | `#24272F` | Sheet, dialog, yuvarlak ikon butonu, odaklı kart zemini |
+| `stroke` | `#FFFFFF` %10 | Kart / çip ince kenarlığı |
+| `primary` | `#5B8CFF` | Vurgu (odak halkası, seçili sekme alt çizgisi, ilerleme çubuğu, "Tümünü gör", "YENİ" rozeti) |
 | `primaryVariant` | `#7C5CFF` | Gradyan ikinci rengi (premium rozeti, paywall) |
 | `textPrimary` | `#F2F4F8` | |
 | `textSecondary` | `#A3ACBD` | |
@@ -21,35 +22,47 @@ Bu doküman hem mobil (Android / iOS) hem TV (Android TV / Apple TV) arayüzleri
 * Tipografi: sistem fontu (Roboto / SF Pro). Mobil gövde 15–16 sp/pt.
   TV gövde **≥ 18 sp**, başlıklar ≥ 28 sp, 3 m mesafeden okunur. TV kenar boşluğu
   (overscan-safe) yatay 48 dp / dikey 27 dp.
-* Köşe yarıçapı: kart 12, poster 10, buton 24 (pill).
-* Posterler 2:3, kanal logoları 16:9 içinde `fit`, arka plan `surface`.
+* Köşe yarıçapı: kart 12 (TV 16), poster 10 (TV 14), buton pill. Yuvarlak ikon butonları daire.
+* Posterler 2:3, "İzlemeye devam et" kartları 16:9 (poster `fill` + kırpma). Kanal logosu kare/16:9
+  kutuda `fit`; logo zemini **kanal adından deterministik renk** (FNV-1a → 14 renklik palet), logo
+  yoksa ad kısaltması (ör. "ABB").
+* Ana birincil eylem ("▶ Oynat") hero üzerinde **beyaz pill, siyah metin**; detayda yuvarlak oynat
+  butonu. Başlık satırı solda kalın başlık + sağda `primary` renkli "Tümünü gör".
 * Hareket: 150–200 ms; TV'de odaklanan kart 1.08× büyür + 3 dp `primary` halka + gölge.
 * Yalnızca koyu tema (sistem açık temada da koyu kalır – içerik odaklı tasarım).
 
 ## 2. Navigasyon
 
-### Mobil
-Alt gezinme (5 sekme): **Ana Sayfa · Canlı TV · Filmler · Diziler · Favoriler**.
-Üst çubukta: arama (🔍) ve ayarlar (⚙️). Kaynak yoksa sekmeler yerine Karşılama ekranı.
-Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; "Bu kaynakta film yok" boş durumu gösterir.
-Dikey ve yatay desteklenir; yatayda grid sütun sayısı artar (poster min. genişlik 110 dp).
+### Mobil (iPhone / iPad)
+**Alt sekme çubuğu ve başlık açılır menüsü yok.** Üstte tek başlık şeridi: solda uygulama işareti,
+ortada yatay kaydırılabilir **metin sekmeleri** **Ana Sayfa · Filmler · Diziler · Canlı TV · TV Rehberi**
+(seçili = beyaz metin + `primary` alt çizgi, diğerleri gri), sağda 🔍 Ara ve ⚙️ Ayarlar ikonları.
+Şerit hero üzerinde **şeffaf** durur, içerik kaydırılınca **siyaha** döner (hero'suz ekranlarda
+hep siyah). Ara → genel arama ekranı (kanal + film + dizi). Ayarlar **sheet** olarak açılır (§3.9).
+Favoriler ayrı sekme değildir: Ana Sayfa'da "Favoriler" satırı (+ "Tümünü gör" → Favoriler ekranı:
+Kanallar · Filmler · Diziler segmenti), Filmler/Diziler'de "Favoriler" satırı, Canlı TV ve TV Rehberi'nde
+kategori seçicinin ilk öğesi "Favoriler".
+Kaynak yoksa Karşılama ekranı. Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; boş durum gösterir.
+Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster min. 104 pt).
 
 ### TV
-Solda daraltılabilir gezinme menüsü (ikon + metin): **Ara · Ana Sayfa · Canlı TV ·
-Filmler · Diziler · Favoriler · Ayarlar**. Menü odak alınca genişler.
+Üstte yerel tvOS sekme çubuğu (Apple TV uygulaması gibi): **🔍 · Ana Sayfa · Filmler · Diziler ·
+Canlı TV · TV Rehberi · ⚙️**. Sekmeye odaklanmak onu seçer; aşağı ok içeriğe iner (açılışta odak
+sekme çubuğundadır – tvOS standardı; içeriğin ★ öğesi aşağı okla ilk ulaşılan öğedir). Canlı TV
+kartlarında tek odak hedefi vardır (favori / arşiv uzun OK menüsünde).
 
 **Geri tuşu kuralları (TV, öngörülebilir):**
 1. Oynatıcıda: açık panel/menü varsa kapatır → yoksa oynatıcıdan çıkar (önceki ekrana, odak
    oynatılan öğede).
 2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir.
-3. Bir bölümün içeriğinde (liste/grid): odağı sol menüye taşır.
-4. Sol menüdeyken: Ana Sayfa değilse Ana Sayfa'ya gider; Ana Sayfa'da uygulamadan çıkar.
+3. Bir bölümün içeriğinde (satır/grid/EPG): odağı üst sekme çubuğuna taşır.
+4. Sekme çubuğundayken: Ana Sayfa değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
 5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında).
 
 **Odak kuralları:** Her ekranın varsayılan odak öğesi tanımlıdır (aşağıda ★). Satırlar arası
 dikey geçişte odak, satırdaki son odaklanan öğeye döner (focus restorer). Liste yeniden
 yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "kaçmaz"
-(wrap yok, menüye sadece sola basınca geçer).
+(wrap yok; sekme çubuğuna yalnızca yukarı basınca / geri tuşuyla geçer).
 
 ## 3. Ekranlar
 
@@ -69,39 +82,69 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   Telefon formu doldurup gönderince TV otomatik "Kaynak alındı – bağlanılıyor…" ekranına geçer.
   Süre dolarsa "Yeni kod al".
 
-### 3.2 Ana sayfa
-Yatay satırlar (TV'de satır başlığı + kart rafı, mobilde aynı):
-1. **İzlemeye devam et** (film/bölüm, ilerleme çubuklu) ★
-2. **Son izlenen kanallar** (logo + şu anki program)
-3. **Favori kanallar**
-4. **Yeni eklenen filmler** / **Yeni diziler** (kaynakta varsa, `added` sırasına göre)
-Üstte kaynak seçici (birden fazla kaynak varsa) ve deneme durum çipi ("Deneme: 5 gün kaldı").
+### 3.2 Ana sayfa, Filmler, Diziler (göz atma ekranları)
+Üçü aynı iskeleti kullanır: **hero** + Netflix tarzı yatay satırlar. Her satır: başlık + sağda
+"Tümünü gör" (anlamlı olduğu satırlarda → o satırın/kategorinin poster grid'i, sıralama menülü).
+* **Hero** (iPhone'da ekran yüksekliğinin ~%55'i, TV'de ~640 pt): öne çıkan öğe = son "izlemeye devam"
+  öğesi, yoksa en yeni film / dizi. Görsel `fill` (poster bulanık uzantı + net poster), alta doğru
+  siyaha gradyan; büyük kalın başlık; "tür · yıl · süre" satırı; üç eylem: **☆ Favori** (ikon + etiket)
+  · **beyaz pill "▶ Oynat"** (devam ediyorsa "Devam et (01:12:30)") ★ · **ⓘ Bilgi** (detay).
+* **Ana Sayfa satırları:** İzlemeye devam et (16:9 kart, ortada oynat ikonu, başlık kartın altında
+  görsel üstünde, kartın altında `primary` ilerleme çubuğu) · Favoriler (posterler) · Favori kanallar ·
+  Yeni eklenen filmler · Yeni eklenen diziler · Canlı kanallar (kanal kartları).
+* **Filmler / Diziler satırları:** İzlemeye devam et (yalnız o tür) · Favoriler · **Yeni eklenenler**
+  (2:3 poster, altta küçük `primary` "YENİ" rozeti) · **Top 10** (posterin arkasında büyük, içi boş
+  çerçeveli sıra numarası 1–10) · ardından kaynaktaki **her kategori için bir satır** (kategori adı,
+  ülke adı/kodu içeriyorsa bayrak emojisi; ilk 12 kategori, satır başına 20 öğe).
+* **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
+  (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
+  gönderilmez – sıralama tamamen yereldir.)
+* Üstte deneme durum çipi ve (birden fazla kaynak varsa) kaynak seçici Ana Sayfa hero'sunun üstünde.
 
-### 3.3 Canlı TV ve EPG
-* **Mobil:** üstte kategori çipleri (Tümü, Favoriler, kategoriler…); liste satırı: numara, logo,
-  ad, şimdiki program + ilerleme çubuğu, sıradaki program saati. Dokun → oynatıcı.
-  Uzun bas → favori ekle/çıkar. Sağ üst "Rehber" → tam EPG ızgarası (yatay zaman ekseni,
-  30 dk = 120 dp, "şimdi" çizgisi kırmızı).
-* **TV:** 3 sütun: kategoriler | kanallar ★ | önizleme paneli (logo, şimdiki/sıradaki program,
-  açıklama, mini oynatıcı 600 ms odak beklemesinden sonra opsiyonel – ayar). OK → tam ekran.
-  Menü/uzun OK → favori. "Rehber" butonu → EPG ızgarası (D-pad ile programlar arası gezinme,
-  geçmiş program + catch-up varsa "Baştan izle").
-* Saatler cihaz saat diliminde (ayar ile değiştirilebilir), 24 saat biçimi TR, sistem biçimi EN.
+### 3.3 Canlı TV
+* **Kanal kartı grid'i:** iPhone dikeyde 2 sütun, iPad 3–4, TV 4. Kart: renkli logo karosu + kanal
+  adı + kalite rozeti (adındaki HD/FHD/4K/UHD/SD etiketinden), şimdiki programın saat aralığı + başlığı,
+  ince `primary` ilerleme çubuğu, alt satırda küçük eylem ikonları: ☆ favori, ⟲ geçmiş yayın (yalnız
+  kanal destekliyorsa → arşiv sheet'i §3.4). EPG yoksa "Program bilgisi yok".
+* Üstte ortada **yüzen kategori çipi** ("🇹🇷 Türkiye ⌄") → menü: Tümü · Favoriler · kategoriler (bayraklı)
+  · "Gizlenenleri göster (n)".
+* Dokun / OK → oynatıcı. **Uzun bas** (iOS bağlam menüsü / TV uzun OK) → Favorilere ekle/çıkar ·
+  **Kanalı gizle** · **Kategoriyi gizle**. Gizlenen kanal/kategori listeleri kaynak başına **yerel**
+  saklanır (UserDefaults, senkronize edilmez); "Gizlenenleri göster" hepsini geri getirir.
 * Büyük listeler: sayfalı (Paging / lazy), arama debounced 250 ms, FTS.
 
-### 3.4 Filmler
-Kategori çipleri/menü + poster grid. Sıralama: Eklenme · A-Z · Puan. Detay: arka plan
-(poster blur), başlık, yıl, puan, süre, özet, **★ Oynat / Devam et (01:12:30)** · Baştan oynat ·
-Favori.
+### 3.4 TV Rehberi (EPG)
+* Kanal başına bir satır: solda sabit renkli logo karosu (genişliğin ~¼'ü), sağda yatay kaydırılan
+  program blokları; **tüm satırlar aynı zaman eksenini paylaşır** (üstte "Bugün" + 30 dk işaretleri,
+  "şimdi" ▼ işareti ve kırmızı `live` dikey çizgi). Şu an yayındaki blok kanal rengiyle vurgulu, geçen
+  kısım koyu; bloklar karonun altına kayar, metin görünür kalır.
+* Üstte kategori çipleri (Tümü · Favoriler · kategoriler).
+* **iPad (geniş) ve TV:** sağda panel — **"Şimdi yayında"** (seçili/odaklı kanalın programı, saat, açıklama,
+  "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok.
+* Dokun / OK → kanal oynar (iPad'de karoya dokunmak paneli o kanala getirir). TV'de D-pad ▲▼ kanallar,
+  ◀▶ programlar arası. Uzun bas → favori / gizle menüsü.
+* **Geçmiş yayın (catch-up) arşivi:** kanal destekliyorsa panelde/kartta ⟲ → sheet "TV arşivi ·
+  Geçmiş yayınlar": gün başlıkları (bugün → arşiv gün sayısı), her satır saat + başlık + açıklama +
+  "Tekrar izle". Tekrar izleme Xtream kaynaklarında `timeshift` URL'siyle (CONTRACT §4) yapılır;
+  M3U `catchup-source` şablonları için yalnızca liste gösterilir (bilgi notu).
+* Saatler cihaz saat diliminde (ayar ile değiştirilebilir), 24 saat biçimi TR, sistem biçimi EN.
 
-### 3.5 Diziler ve bölüm detayları
-Grid → Dizi detayı: kapak, özet, sezon seçici (çip / TV'de yatay sekme), bölüm listesi
-(numara, başlık, süre, izlenme ilerlemesi, ✓ izlendi). ★ "Devam et S02E05" (son izlenen
-bölüm; bitmişse sonraki). Bölüm bitince sonraki bölüm için 10 sn geri sayım kartı.
+### 3.5 Film ve dizi detayı
+* Tam genişlikte hero görsel (iPhone ~%50 yükseklik, TV tam ekran arka plan), ortada büyük **yuvarlak
+  ▶ oynat** butonu, sağ üstte **✕ kapat**. Altında büyük başlık; "★ 7.8 · 2024 · 1 sa 52 dk" (dizide
+  sezon sayısı); kısa açıklama; "Tür: …" satırı; küçük eylem satırı: ☆ favori · ⟲ baştan oynat
+  (devam varsa) · format pill ("MKV · HD"). Birincil eylem metni: "Oynat" / "Devam et (01:12:30)" /
+  "Devam et S02E05".
+* **Dizi:** sezonlar yatay **metin sekmeleri** ("Sezon 1 · Sezon 2 …", seçili `primary` alt çizgi);
+  bölüm satırı = 16:9 küçük resim (ortada oynat ikonu, altta ilerleme) + "1. Başlık" + süre /
+  izlendi ✓. ★ "Devam et S02E05" (son izlenen bölüm; bitmişse sonraki). Bölüm bitince sonraki bölüm
+  için 10 sn geri sayım kartı. TV'de bölümler yatay 16:9 kart rafı.
 
-### 3.6 Favoriler
-Sekmeler: Kanallar · Filmler · Diziler. Düzenle modu (mobil: sürükle sırala, kaldır; TV:
-seçenek menüsünden "Kaldır"). Hesap varsa senkronize edilir (son senkron saati gösterilir).
+### 3.6 Favoriler ve arama
+* Favoriler ekranı (Ana Sayfa "Favoriler" satırı → "Tümünü gör"): segment Kanallar · Filmler ·
+  Diziler; kanallar TV Rehberi satırlarıyla, filmler/diziler poster grid'i. Kaldırma: uzun bas menüsü.
+  Hesap varsa senkronize edilir (son senkron saati gösterilir).
+* Arama: tek alan, sonuçlar satır olarak (Kanallar kartları · Filmler · Diziler posterleri).
 
 ### 3.7 Oynatıcı
 * Tam ekran, sistem çubukları gizli, ekran açık kalır.
@@ -123,6 +166,7 @@ seçenek menüsünden "Kaldır"). Hesap varsa senkronize edilir (son senkron saa
   aralıklarla 5 deneme, ardından hata kartı (Tekrar dene ★ / Kanal listesi / Geri).
   Canlıda "canlı pencerenin gerisinde" hatası sessizce canlı uca atlar.
 * **Kilit:** deneme bittiyse oynatıcı açılmaz → Paywall (§3.8) açılır, geri tuşu listeye döner.
+  (Diğer ekranlara referans: göz atma §3.2, Canlı TV §3.3, Rehber §3.4, detay §3.5.)
 * Kaynaklar: ekran kapanınca / uygulama arka plana geçince oynatıcı **serbest bırakılır**
   (pozisyon kaydedilir). Arka planda ses oynatma yok (varsayım).
 
@@ -149,8 +193,10 @@ seçenek menüsünden "Kaldır"). Hesap varsa senkronize edilir (son senkron saa
 * **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
   senkronizasyon durumu, çıkış, **hesabı sil**.
 * **Satın alma:** durum, geri yükle.
-* **Gelişmiş/Tanılama:** Format testi (`stream-samples.json`), önbelleği temizle (görsel / EPG),
-  uygulama sürümü, açık kaynak lisansları, gizlilik politikası.
+* **Gelişmiş/Tanılama:** Format testi (`stream-samples.json`; Apple'da her örneğin motoru –
+  AVPlayer/VLCKit – gösterilir ve `expect.apple` ile karşılaştırılır), önbelleği temizle (görsel / EPG),
+  uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +
+  tam metin, diğer bileşenler), gizlilik politikası.
 * Kilitliyken bu ekran tamamen erişilebilir.
 
 ## 4. Hata ve boş durumlar (ayrı ayrı mesajlar)

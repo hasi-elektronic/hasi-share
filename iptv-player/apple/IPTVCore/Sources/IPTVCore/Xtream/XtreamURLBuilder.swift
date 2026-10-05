@@ -93,7 +93,11 @@ public struct XtreamURLBuilder: Sendable, Hashable {
     /// - Android: `ts` if allowed, else `m3u8`.
     /// - Apple: `m3u8`; throws `PlaybackError.unsupportedFormat("mpegts")` when the account
     ///   allows TS but not HLS (AVPlayer cannot play progressive MPEG-TS).
-    public static func liveExtension(platform: StreamPlatform, allowedOutputFormats: [String]) throws -> String {
+    ///
+    /// - Parameter vlcAvailable: Apple apps with the VLCKit engine (CONTRACT §4.5): `m3u8`
+    ///   stays preferred (AVPlayer), but `ts`-only accounts get `ts` (played by VLCKit)
+    ///   instead of an error. Ignored on Android.
+    public static func liveExtension(platform: StreamPlatform, allowedOutputFormats: [String], vlcAvailable: Bool = false) throws -> String {
         let allowed = Set(allowedOutputFormats.map { $0.lowercased() })
         let tsAllowed = allowed.isEmpty || allowed.contains("ts")
         let hlsAllowed = allowed.isEmpty || allowed.contains("m3u8") || allowed.contains("hls")
@@ -101,7 +105,10 @@ public struct XtreamURLBuilder: Sendable, Hashable {
         case .android:
             return tsAllowed ? "ts" : "m3u8"
         case .apple:
-            if !hlsAllowed && tsAllowed { throw PlaybackError.unsupportedFormat(container: StreamContainer.mpegts.rawValue) }
+            if !hlsAllowed && tsAllowed {
+                if vlcAvailable { return "ts" }
+                throw PlaybackError.unsupportedFormat(container: StreamContainer.mpegts.rawValue)
+            }
             return "m3u8"
         }
     }

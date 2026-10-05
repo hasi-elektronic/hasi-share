@@ -242,6 +242,37 @@
     <string name="account_dev_code">Geliştirme kodu: %1$s</string>
     <string name="format_test_run" formatted="false">Testi başlat</string>
     <string name="format_test_host" formatted="false">Test sunucusu (yerel örnekler için host)</string>
+    <string name="nav_guide" formatted="false">TV Rehberi</string>
+    <string name="home_live_channels" formatted="false">Canlı kanallar</string>
+    <string name="home_featured" formatted="false">Öne çıkan</string>
+    <string name="epg_today" formatted="false">Bugün</string>
+    <string name="epg_now_on_air" formatted="false">Şimdi yayında</string>
+    <string name="action_more" formatted="false">Daha fazla</string>
+    <string name="action_see_all" formatted="false">Tümünü gör</string>
+    <string name="action_info" formatted="false">Bilgi</string>
+    <string name="action_favorite_short" formatted="false">Favori</string>
+    <string name="episodes" formatted="false">Bölümler</string>
+    <string name="rating_value">Puan %1$s</string>
+    <string name="genres_value">Tür: %1$s</string>
+    <string name="seasons_value">Sezon: %1$s</string>
+    <string name="badge_new" formatted="false">YENİ</string>
+    <string name="row_top10" formatted="false">Top 10</string>
+    <string name="catchup_title" formatted="false">TV arşivi · Geçmiş yayınlar</string>
+    <string name="catchup_replay" formatted="false">Tekrar izle</string>
+    <string name="catchup_on_air" formatted="false">Yayında</string>
+    <string name="catchup_xtream_only" formatted="false">Tekrar izleme Xtream kaynaklarında kullanılabilir.</string>
+    <string name="catchup_empty" formatted="false">Arşivde geçmiş program yok.</string>
+    <string name="channel_hide" formatted="false">Kanalı gizle</string>
+    <string name="category_hide" formatted="false">Kategoriyi gizle</string>
+    <string name="hidden_show_all">Gizlenenleri göster (%1$s)</string>
+    <string name="category_picker" formatted="false">Kategori</string>
+    <string name="licenses_vlckit_notice" formatted="false">Bu uygulama VLCKit/libVLC (© VideoLAN ve VLC yazarları) kullanır; GNU LGPL sürüm 2.1 altında lisanslıdır. Kaynak kodu: https://code.videolan.org/videolan/VLCKit</string>
+    <string name="licenses_vlckit_linking" formatted="false">VLCKit dinamik bağlanır ve değiştirilmeden ayrı bir framework olarak gelir; kendi derlemenizle değiştirebilirsiniz.</string>
+    <string name="licenses_source_code" formatted="false">Kaynak kodu</string>
+    <string name="licenses_full_text" formatted="false">Lisansın tam metni</string>
+    <string name="licenses_apache_notice" formatted="false">Apache Lisansı 2.0 altında lisanslıdır.</string>
+    <string name="format_test_engine">Motor: %1$s</string>
+    <string name="format_test_expected">Beklenen: %1$s</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

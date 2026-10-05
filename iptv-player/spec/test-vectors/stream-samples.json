@@ -1,5 +1,5 @@
 {
-  "_note": "Public test streams for ON-DEVICE format verification (Settings > Diagnostics > Format test). Availability of third-party URLs is not guaranteed; 'local' items are served from spec/test-vectors/media via `python3 -m http.server 8000` on the LAN.",
+  "_note": "Public test streams for ON-DEVICE format verification (Settings > Diagnostics > Format test). Availability of third-party URLs is not guaranteed; 'local' items are served from spec/test-vectors/media via `python3 -m http.server 8000` on the LAN. expect.avplayer = AVPlayer engine alone; expect.apple = Apple apps (AVPlayer + VLCKit, CONTRACT §6.1).",
   "samples": [
     {
       "id": "apple-adv-fmp4",
@@ -8,7 +8,8 @@
       "container": "hls",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       },
       "checks": [
         "audio tracks >= 2",
@@ -22,7 +23,8 @@
       "container": "hls",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       },
       "checks": [
         "closed captions"
@@ -35,7 +37,8 @@
       "container": "hls",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       }
     },
     {
@@ -45,7 +48,8 @@
       "container": "hls",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       },
       "checks": [
         "live edge",
@@ -59,7 +63,8 @@
       "container": "dash",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -69,7 +74,8 @@
       "container": "mp4",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       },
       "checks": [
         "resume position after app restart"
@@ -82,7 +88,8 @@
       "container": "mpegts",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -92,7 +99,8 @@
       "container": "mpegts",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       },
       "checks": [
         "audio track switch tur/eng"
@@ -105,7 +113,8 @@
       "container": "mkv",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -115,7 +124,8 @@
       "container": "webm",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -125,7 +135,8 @@
       "container": "flv",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -135,7 +146,8 @@
       "container": "avi",
       "expect": {
         "media3": "play-or-codec-error",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play-or-codec-error"
       }
     },
     {
@@ -145,7 +157,8 @@
       "container": "hls",
       "expect": {
         "media3": "play",
-        "avplayer": "play"
+        "avplayer": "play",
+        "apple": "play"
       }
     },
     {
@@ -155,7 +168,8 @@
       "container": "dash",
       "expect": {
         "media3": "play",
-        "avplayer": "error:UnsupportedFormat"
+        "avplayer": "error:UnsupportedFormat",
+        "apple": "play"
       }
     },
     {
@@ -165,7 +179,8 @@
       "container": "hls",
       "expect": {
         "media3": "error:StreamOffline",
-        "avplayer": "error:StreamOffline"
+        "avplayer": "error:StreamOffline",
+        "apple": "error:StreamOffline"
       }
     },
     {
@@ -175,7 +190,8 @@
       "container": "hls",
       "expect": {
         "media3": "error:Network",
-        "avplayer": "error:Network"
+        "avplayer": "error:Network",
+        "apple": "error:Network"
       },
       "checks": [
         "retry with backoff, then error UI"

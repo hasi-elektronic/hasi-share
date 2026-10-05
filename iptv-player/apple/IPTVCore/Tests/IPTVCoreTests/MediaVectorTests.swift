@@ -31,7 +31,7 @@ final class MediaVectorTests: XCTestCase {
 
     func testSupportMatrix() throws {
         let support = try XCTUnwrap(expected().obj("support"))
-        for (name, engine) in [("media3", PlayerEngine.media3), ("avplayer", PlayerEngine.avPlayer)] {
+        for (name, engine) in [("media3", PlayerEngine.media3), ("avplayer", PlayerEngine.avPlayer), ("vlckit", PlayerEngine.vlcKit)] {
             let matrix = try XCTUnwrap(support.obj(name))
             XCTAssertEqual(Set(matrix.keys), Set(StreamContainer.allCases.map(\.rawValue)), "matrix covers all containers")
             for (wire, value) in matrix {
@@ -40,6 +40,40 @@ final class MediaVectorTests: XCTestCase {
                 XCTAssertEqual(container.isSupported(by: engine), ok, "\(name)/\(wire)")
                 XCTAssertEqual(container.playbackError(for: engine), ok ? nil : .unsupportedFormat(container: wire))
             }
+        }
+    }
+
+    /// CONTRACT §6.1 – Apple engine choice (AVPlayer + VLCKit) and the AVPlayer → VLCKit fallback.
+    func testAppleEngineSelection() throws {
+        let apple = try XCTUnwrap(expected().obj("appleEngine"))
+        for (key, vlc) in [("select", true), ("selectWithoutVlc", false)] {
+            let table = try XCTUnwrap(apple.obj(key))
+            XCTAssertEqual(Set(table.keys), Set(StreamContainer.allCases.map(\.rawValue)), key)
+            for (wire, value) in table {
+                let container = try XCTUnwrap(StreamContainer(rawValue: wire))
+                let want = try XCTUnwrap(value as? String)
+                let got = ApplePlayback.engine(for: container, vlcAvailable: vlc)
+                if want == "error:UnsupportedFormat" {
+                    XCTAssertNil(got, "\(key)/\(wire)")
+                    XCTAssertEqual(ApplePlayback.playbackError(for: container, vlcAvailable: vlc), .unsupportedFormat(container: wire))
+                } else {
+                    XCTAssertEqual(got?.rawValue, want, "\(key)/\(wire)")
+                    XCTAssertNil(ApplePlayback.playbackError(for: container, vlcAvailable: vlc))
+                }
+            }
+        }
+        let errors: [String: PlaybackError] = [
+            "UnsupportedFormat": .unsupportedFormat(container: "mkv"), "UnsupportedCodec": .unsupportedCodec(codec: nil),
+            "Network": .network(.timeout), "StreamOffline": .streamOffline(httpStatus: 404),
+            "AccessDenied": .accessDenied(httpStatus: 403), "Drm": .drm, "Unknown": .unknown(message: "x"),
+        ]
+        let fallback = try XCTUnwrap(apple.arr("fallback"))
+        XCTAssertFalse(fallback.isEmpty)
+        for f in fallback {
+            let engine = try XCTUnwrap(PlayerEngine(rawValue: try XCTUnwrap(f.str("engine"))))
+            let error = try XCTUnwrap(errors[try XCTUnwrap(f.str("error"))])
+            XCTAssertEqual(ApplePlayback.fallbackEngine(after: error, on: engine)?.rawValue, f.str("expected"), "\(f)")
+            XCTAssertNil(ApplePlayback.fallbackEngine(after: error, on: engine, vlcAvailable: false))
         }
     }
 
@@ -57,6 +91,12 @@ final class MediaVectorTests: XCTestCase {
                 XCTAssertEqual(container.playbackError(for: .avPlayer), .unsupportedFormat(container: container.rawValue), id)
             } else {
                 XCTAssertNil(container.playbackError(for: .avPlayer), id)
+            }
+            let apple = try XCTUnwrap(s.obj("expect")?.str("apple"), id)
+            if apple == "error:UnsupportedFormat" {
+                XCTAssertNotNil(ApplePlayback.playbackError(for: container), id)
+            } else {
+                XCTAssertNil(ApplePlayback.playbackError(for: container), id)
             }
         }
     }

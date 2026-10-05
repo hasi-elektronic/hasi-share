@@ -134,7 +134,7 @@ final class PlayerControllerTests: XCTestCase {
         controller.open(PlaybackRequest(item: .url("http://a.example.com/x.mkv", title: "x"), source: nil))
         for _ in 0..<50 where controller.phase == .loading { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertEqual(controller.phase, .failed(.unsupportedFormat(container: "mkv")))
-        XCTAssertNil(controller.player.currentItem)
+        XCTAssertNil(controller.engine, "no engine created for a rejected stream")
     }
 
     func testZapDebounceOpensOnlyLastChannel() async throws {
@@ -180,6 +180,17 @@ final class ViewModelLogicTests: XCTestCase {
         XCTAssertEqual(FormatTestViewModel.evaluate(expected: "play", observed: "play"), .ok)
         XCTAssertEqual(FormatTestViewModel.evaluate(expected: "error:UnsupportedFormat", observed: "UnsupportedFormat"), .expectedError("UnsupportedFormat"))
         XCTAssertEqual(FormatTestViewModel.evaluate(expected: "play", observed: "Network"), .unexpected("Network"))
+        XCTAssertEqual(FormatTestViewModel.evaluate(expected: "play-or-codec-error", observed: "UnsupportedCodec"), .expectedError("UnsupportedCodec"))
+        XCTAssertEqual(FormatTestViewModel.evaluate(expected: "play-or-codec-error", observed: "play"), .ok)
+    }
+
+    func testFormatSamplesUseAppleColumnWithVLC() throws {
+        let data = try Data(contentsOf: vectorURL("stream-samples.json"))
+        let vm = FormatTestViewModel(samplesJSON: data, lanHost: "localhost")
+        let mkv = try XCTUnwrap(vm.samples.first { $0.container == "mkv" })
+        XCTAssertEqual(mkv.expected(vlcAvailable: false), "error:UnsupportedFormat")
+        XCTAssertEqual(mkv.expected(vlcAvailable: true), "play")
+        XCTAssertEqual(vm.expected(mkv), "error:UnsupportedFormat", "no engines → AVPlayer column")
     }
 
     func testFormatSamplesLoadWithHostSubstitution() throws {

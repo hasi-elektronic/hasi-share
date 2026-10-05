@@ -134,7 +134,63 @@
       "rtsp": false,
       "udp": false,
       "unknown": true
+    },
+    "vlckit": {
+      "hls": true,
+      "dash": true,
+      "mpegts": true,
+      "mp4": true,
+      "mkv": true,
+      "webm": true,
+      "flv": true,
+      "avi": true,
+      "rtmp": true,
+      "rtsp": true,
+      "udp": false,
+      "unknown": true
     }
+  },
+  "appleEngine": {
+    "_why": "CONTRACT §6.1 – Apple apps: AVPlayer first, VLCKit for the rest; 'withoutVlc' = build without VLCKit",
+    "select": {
+      "hls": "avplayer",
+      "dash": "vlckit",
+      "mpegts": "vlckit",
+      "mp4": "avplayer",
+      "mkv": "vlckit",
+      "webm": "vlckit",
+      "flv": "vlckit",
+      "avi": "vlckit",
+      "rtmp": "vlckit",
+      "rtsp": "vlckit",
+      "udp": "error:UnsupportedFormat",
+      "unknown": "avplayer"
+    },
+    "selectWithoutVlc": {
+      "hls": "avplayer",
+      "dash": "error:UnsupportedFormat",
+      "mpegts": "error:UnsupportedFormat",
+      "mp4": "avplayer",
+      "mkv": "error:UnsupportedFormat",
+      "webm": "error:UnsupportedFormat",
+      "flv": "error:UnsupportedFormat",
+      "avi": "error:UnsupportedFormat",
+      "rtmp": "error:UnsupportedFormat",
+      "rtsp": "error:UnsupportedFormat",
+      "udp": "error:UnsupportedFormat",
+      "unknown": "avplayer"
+    },
+    "fallback": [
+      { "engine": "avplayer", "error": "UnsupportedFormat", "expected": "vlckit" },
+      { "engine": "avplayer", "error": "UnsupportedCodec", "expected": "vlckit" },
+      { "engine": "avplayer", "error": "Network", "expected": null },
+      { "engine": "avplayer", "error": "StreamOffline", "expected": null },
+      { "engine": "avplayer", "error": "AccessDenied", "expected": null },
+      { "engine": "avplayer", "error": "Drm", "expected": null },
+      { "engine": "avplayer", "error": "Unknown", "expected": null },
+      { "engine": "vlckit", "error": "UnsupportedFormat", "expected": null },
+      { "engine": "vlckit", "error": "UnsupportedCodec", "expected": null }
+    ]
   },
   "_unknown": "unknown => try to play and map the player error"
 }

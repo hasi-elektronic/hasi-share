@@ -233,10 +233,13 @@ U and P are percent-encoded: **every UTF-8 byte except the RFC 3986 unreserved s
 `A–Z a–z 0–9 - . _ ~` is encoded as `%XX` (uppercase hex)** – for path segments and
 query values alike (space → `%20`, never `+`). Same rule for all query strings built
 by the apps.
-Live `ext`: Android → `ts` if allowed else `m3u8`; Apple → `m3u8` (AVPlayer cannot
-play progressive MPEG-TS). `allowed_output_formats` missing/empty ⇒ both allowed.
-Apple + only `ts` allowed ⇒ `PlaybackError.UnsupportedFormat("mpegts")`
-with the "ask your provider for HLS" message.
+Live `ext`: Android → `ts` if allowed else `m3u8`; Apple → `m3u8` (preferred: AVPlayer).
+`allowed_output_formats` missing/empty ⇒ both allowed.
+Apple + only `ts` allowed:
+* Apple apps with the VLCKit engine (§6.1, the shipped iOS/tvOS apps) ⇒ `ts`, played by
+  VLCKit (vectors `liveExtAppleVlc`).
+* AVPlayer-only rule (vectors `liveExt`, also run by Kotlin with `AVPLAYER`) ⇒
+  `PlaybackError.UnsupportedFormat("mpegts")` with the "ask your provider for HLS" message.
 
 ---
 
@@ -278,18 +281,39 @@ mkv | webm | flv | avi | rtmp | rtsp | udp | unknown`, order:
 
 Support matrix (enforced before playback; unknown → try and map player error):
 
-| Container | Media3 | AVPlayer |
-|---|---|---|
-| hls | ✅ | ✅ |
-| dash | ✅ | ❌ |
-| mpegts (progressive) | ✅ | ❌ |
-| mp4 / mov / m4v | ✅ | ✅ |
-| mkv / webm | ✅ | ❌ |
-| flv | ✅ | ❌ |
-| avi | ✅ | ❌ |
-| rtmp | ❌ (extension not bundled) | ❌ |
-| rtsp | ✅ | ❌ |
-| udp/rtp multicast | ❌ | ❌ |
+| Container | Media3 | AVPlayer | VLCKit (Apple) | **Apple app** (§6.1) |
+|---|---|---|---|---|
+| hls | ✅ | ✅ | ✅ | AVPlayer |
+| dash | ✅ | ❌ | ✅ | VLCKit |
+| mpegts (progressive) | ✅ | ❌ | ✅ | VLCKit |
+| mp4 / mov / m4v | ✅ | ✅ | ✅ | AVPlayer |
+| mkv / webm | ✅ | ❌ | ✅ | VLCKit |
+| flv | ✅ | ❌ | ✅ | VLCKit |
+| avi | ✅ | ❌ | ✅ | VLCKit |
+| rtmp | ❌ (extension not bundled) | ❌ | ✅ | VLCKit |
+| rtsp | ✅ | ❌ | ✅ | VLCKit |
+| udp/rtp multicast | ❌ | ❌ | ❌ (multicast entitlement) | `UnsupportedFormat` |
+| unknown | try | try | try | AVPlayer (+ fallback) |
+
+Vectors: `media/expected.json` → `support.{media3,avplayer,vlckit}`.
+
+### 6.1 Apple: two playback engines
+The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic framework).
+`ApplePlayback.engine(container, vlcAvailable)`:
+1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
+2. else VLCKit supports it ⇒ **VLCKit**.
+3. else ⇒ `UnsupportedFormat(container)` before playback.
+
+Fallback (once per opened stream, kept for its reconnects): AVPlayer fails with
+`UnsupportedFormat` or `UnsupportedCodec` ⇒ the same stream is reopened in VLCKit (VOD at
+the current/resume position). No fallback for network/HTTP/DRM errors and never VLCKit →
+AVPlayer. Without VLCKit (`vlcAvailable = false`) the rules reduce to the AVPlayer column.
+VLCKit failures carry no reason; the app classifies them with a 1 KiB range request to the
+stream: HTTP 401/403/404/410/5xx as in §2, transport error ⇒ `Network`, reachable but
+never played ⇒ `UnsupportedCodec`, played then dropped (or a live stream "ended") ⇒
+`Network` (reconnect policy).
+Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, fallback}`;
+`stream-samples.json` → `expect.apple`.
 
 ---
 

@@ -31,15 +31,12 @@ struct NovaPlayerApp: App {
     }
 }
 
-enum MobileTab: Hashable {
-    case home, live, movies, series, favorites
-}
-
-/// iPhone/iPad root: welcome when there is no source, otherwise 5 tabs (SCREENS §2).
+/// iPhone/iPad root (SCREENS §2): welcome when there is no source; otherwise one navigation stack
+/// whose root is the current section under the header (app mark · text tabs · search · settings).
+/// No tab bar; Settings opens as a sheet; search, details and "See all" grids are pushed.
 struct RootView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
-    @State private var tab: MobileTab = .home
 
     var body: some View {
         @Bindable var router = router
@@ -47,27 +44,18 @@ struct RootView: View {
             if env.sources.isEmpty || router.onboarding {
                 WelcomeView()
             } else {
-                TabView(selection: $tab) {
-                    tabStack { HomeView().navigationTitle(L10n.t("nav_home")) }
-                        .tabItem { Label(L10n.t("nav_home"), systemImage: "house") }.tag(MobileTab.home)
-                    tabStack { LiveTVView() }
-                        .tabItem { Label(L10n.t("nav_live"), systemImage: "tv") }.tag(MobileTab.live)
-                    tabStack { MoviesView() }
-                        .tabItem { Label(L10n.t("nav_movies"), systemImage: "film") }.tag(MobileTab.movies)
-                    tabStack { SeriesView() }
-                        .tabItem { Label(L10n.t("nav_series"), systemImage: "rectangle.stack") }.tag(MobileTab.series)
-                    tabStack { FavoritesView() }
-                        .tabItem { Label(L10n.t("nav_favorites"), systemImage: "star") }.tag(MobileTab.favorites)
-                }
-                .onAppear {
-                    switch router.debugScreen {
-                    case "live", "player": tab = .live
-                    case "movies": tab = .movies
-                    case "series": tab = .series
-                    case "favorites": tab = .favorites
-                    default: break
+                NavigationStack(path: $router.path) {
+                    ZStack(alignment: .top) {
+                        // Hero sections run under the (transparent) header; the others start below it.
+                        sectionContent
+                            .safeAreaPadding(.top, hasHero ? 0 : 50)
+                        MobileTopBar(solid: router.headerSolid || !hasHero)
                     }
+                    .toolbar(.hidden, for: .navigationBar)
+                    .catalogDestinations()
                 }
+                .onAppear(perform: applyDebugScreen)
+                .onChange(of: router.section) { router.headerSolid = false }
             }
         }
         .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
@@ -76,38 +64,56 @@ struct RootView: View {
         .sheet(isPresented: $router.paywallPresented) {
             PaywallView().environment(env)
         }
+        .sheet(isPresented: $router.settingsPresented) {
+            SettingsSheet().environment(env).environment(router)
+        }
     }
 
-    private func tabStack<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
-        TabStack(content: content)
+    private var hasHero: Bool { [.home, .movies, .series].contains(router.section) }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch router.section {
+        case .movies: MoviesView()
+        case .series: SeriesView()
+        case .live: LiveTVView()
+        case .guide: GuideView()
+        default: HomeView()
+        }
+    }
+
+    private func applyDebugScreen() {
+        switch router.debugScreen {
+        case "live", "player": router.section = .live
+        case "guide": router.section = .guide
+        case "movies": router.section = .movies
+        case "series": router.section = .series
+        case "favorites": router.path.append(BrowseRoute.favorites)
+        case "settings": router.settingsPresented = true
+        case "search": router.path.append(BrowseRoute.search)
+        case "movieDetail":
+            if let id = env.currentSource?.id, let movie = (try? env.catalog.movies(sourceId: id, limit: 1))?.first { router.path.append(CatalogItem.movie(movie)) }
+        case "seriesDetail":
+            if let id = env.currentSource?.id, let series = (try? env.catalog.series(sourceId: id, limit: 1))?.first { router.path.append(CatalogItem.series(series)) }
+        default: break
+        }
     }
 }
 
-/// One tab's navigation stack with the search / settings toolbar.
-private struct TabStack<Content: View>: View {
-    @Environment(Router.self) private var router
-    let content: () -> Content
-    @State private var path = NavigationPath()
+/// Settings presented as a sheet from the gear button (own navigation stack, Done button).
+private struct SettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack(path: $path) {
-            content()
-                .catalogDestinations()
-                .navigationDestination(for: String.self) { route in
-                    if route == "search" { SearchView() } else { SettingsView() }
-                }
+        NavigationStack {
+            SettingsView()
                 .toolbar {
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Button { path.append("search") } label: { Image(systemName: "magnifyingglass") }
-                            .accessibilityLabel(L10n.t("action_search"))
-                        Button { path.append("settings") } label: { Image(systemName: "gearshape") }
-                            .accessibilityLabel(L10n.t("action_settings"))
-                            .accessibilityIdentifier("open_settings")
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(L10n.t("action_close")) { dismiss() }
+                            .accessibilityIdentifier("settings_close")
                     }
                 }
         }
-        .onAppear {
-            if router.debugScreen == "settings", path.isEmpty { path.append("settings") }
-        }
+        .presentationDragIndicator(.visible)
     }
 }

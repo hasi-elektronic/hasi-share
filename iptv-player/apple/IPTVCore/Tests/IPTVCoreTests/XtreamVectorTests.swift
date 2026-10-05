@@ -218,6 +218,16 @@ final class XtreamVectorTests: XCTestCase {
         }
     }
 
+    func testLiveExtensionAppleWithVLC() throws {
+        let list = try XCTUnwrap(Vectors.object("xtream/url-vectors.json").arr("liveExtAppleVlc"))
+        XCTAssertFalse(list.isEmpty)
+        for c in list {
+            let allowed = try XCTUnwrap(c["allowed"] as? [String])
+            XCTAssertEqual(try XtreamURLBuilder.liveExtension(platform: .apple, allowedOutputFormats: allowed, vlcAvailable: true),
+                           c.str("expected"), "\(allowed)")
+        }
+    }
+
     func testPercentEncoding() {
         XCTAssertEqual(PercentEncoding.encode("p@ss/w rd"), "p%40ss%2Fw%20rd")
         XCTAssertEqual(PercentEncoding.encode("AZaz09-._~"), "AZaz09-._~")

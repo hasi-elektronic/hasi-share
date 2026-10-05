@@ -136,5 +136,38 @@
       ],
       "expected": "m3u8"
     }
-  ]
+  ],
+  "liveExtAppleVlc": [
+    {
+      "allowed": [
+        "ts"
+      ],
+      "expected": "ts"
+    },
+    {
+      "allowed": [],
+      "expected": "m3u8"
+    },
+    {
+      "allowed": [
+        "m3u8",
+        "ts"
+      ],
+      "expected": "m3u8"
+    },
+    {
+      "allowed": [
+        "rtmp",
+        "m3u8"
+      ],
+      "expected": "m3u8"
+    },
+    {
+      "allowed": [
+        "TS"
+      ],
+      "expected": "ts"
+    }
+  ],
+  "_liveExtAppleVlc": "CONTRACT §4.5: Apple apps with the VLCKit engine – m3u8 preferred (AVPlayer), ts-only accounts get ts (VLCKit). 'liveExt' keeps the AVPlayer-only rule."
 }

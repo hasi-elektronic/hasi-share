@@ -1,5 +1,6 @@
 import IPTVKit
 import SwiftUI
+import UIKit
 
 @main
 struct NovaPlayerTVApp: App {
@@ -31,38 +32,17 @@ struct NovaPlayerTVApp: App {
     }
 }
 
-/// Sections of the left navigation menu (SCREENS §2 TV).
-enum TVSection: String, CaseIterable, Hashable {
-    case search, home, live, movies, series, favorites, settings
-
-    var icon: String {
-        switch self {
-        case .search: return "magnifyingglass"
-        case .home: return "house"
-        case .live: return "tv"
-        case .movies: return "film"
-        case .series: return "rectangle.stack"
-        case .favorites: return "star"
-        case .settings: return "gearshape"
-        }
-    }
-
-    var titleKey: String { "nav_\(rawValue)" }
-}
-
-/// Apple TV root: collapsible left menu + section content; predictable Menu-button rules.
+/// Apple TV root (SCREENS §2 TV): native top tab bar (like Apple's TV app)
+/// Search · Home · Movies · Series · Live TV · TV Guide · Settings.
+///
+/// Back (Menu) rules: in content the system moves focus up to the tab bar; on the tab bar a
+/// section other than Home switches to Home; on Home's tab the press goes to the system (exit).
+/// Pushed screens (details, settings pages) pop themselves first.
 struct TVRootView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
-    @State private var section: TVSection = .home
-    @State private var paths: [TVSection: NavigationPath] = [:]
-    @FocusState private var menuFocus: TVSection?
-    @Namespace private var focusNamespace
-    /// The menu becomes focusable only after the content took the initial focus
-    /// (SCREENS §2: each screen's default focus is in the content, ★).
-    @State private var menuFocusable = false
-
-    private var menuExpanded: Bool { menuFocus != nil }
+    @State private var paths: [AppSection: NavigationPath] = [:]
+    @State private var focusInTabBar = false
 
     var body: some View {
         @Bindable var router = router
@@ -70,29 +50,30 @@ struct TVRootView: View {
             if env.sources.isEmpty || router.onboarding {
                 WelcomeView()
             } else {
-                HStack(spacing: 0) {
-                    menu
-                        .prefersDefaultFocus(false, in: focusNamespace)
-                    content
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .prefersDefaultFocus(true, in: focusNamespace)
-                }
-                .focusScope(focusNamespace)
-                .screenBackground()
-                // Back rules 3 and 4: content → menu; menu (not Home) → Home; Home menu → system (exit).
-                .onExitCommand(perform: exitHandler)
-                .task {
-                    try? await Task.sleep(for: .milliseconds(600))
-                    menuFocusable = true
-                }
-                .onAppear {
-                    switch router.debugScreen {
-                    case "live", "player": section = .live
-                    case "settings": section = .settings
-                    case "movies": section = .movies
-                    default: break
+                TabView(selection: $router.section) {
+                    ForEach(AppSection.allCases, id: \.self) { section in
+                        stack(for: section)
+                            .tabItem {
+                                if section == .search || section == .settings {
+                                    Image(systemName: section.icon).accessibilityLabel(L10n.t(section.titleKey))
+                                } else {
+                                    Text(L10n.t(section.titleKey))
+                                }
+                            }
+                            .tag(section)
+                            .accessibilityIdentifier("tab_\(section.rawValue)")
                     }
-                    if router.debugScreen == "menu" { menuFocus = section }
+                }
+                .onExitCommand(perform: exitHandler)
+                .onReceive(NotificationCenter.default.publisher(for: UIFocusSystem.didUpdateNotification)) { note in
+                    guard let context = note.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext else { return }
+                    focusInTabBar = Self.isInTabBar(context.nextFocusedItem)
+                }
+                .onAppear(perform: applyDebugScreen)
+                .onChange(of: router.tvPushRequest) { _, item in
+                    guard let item else { return }
+                    paths[router.section, default: NavigationPath()].append(item)
+                    router.tvPushRequest = nil
                 }
             }
         }
@@ -104,46 +85,13 @@ struct TVRootView: View {
         }
     }
 
+    /// `nil` lets the system act: content → tab bar, Home tab → leave the app, pushed page → pop.
     private var exitHandler: (() -> Void)? {
-        if !(paths[section]?.isEmpty ?? true) { return nil }            // NavigationStack pops itself
-        if menuFocus == nil { return { menuFocus = section } }           // content → menu
-        if section != .home { return { section = .home; menuFocus = .home } }
-        return nil                                                       // Home + menu → leave app
+        guard focusInTabBar, router.section != .home, paths[router.section]?.isEmpty ?? true else { return nil }
+        return { router.section = .home }
     }
 
-    private var menu: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: "play.tv.fill").font(.system(size: 44)).foregroundStyle(Theme.premiumGradient)
-                .padding(.bottom, 30).padding(.leading, 18)
-            ForEach(TVSection.allCases, id: \.self) { item in
-                Button { section = item } label: {
-                    HStack(spacing: 20) {
-                        Image(systemName: item.icon).font(.system(size: 30)).frame(width: 44)
-                        if menuExpanded { LText(item.titleKey).font(Theme.body).lineLimit(1) }
-                    }
-                    .foregroundStyle(section == item ? Theme.primary : Theme.textPrimary)
-                    .padding(.vertical, 14).padding(.horizontal, 18)
-                    .frame(width: menuExpanded ? 340 : 84, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(menuFocus == item ? Theme.surfaceElevated : .clear))
-                }
-                .buttonStyle(MenuItemButtonStyle())
-                .disabled(!menuFocusable)
-                .focused($menuFocus, equals: item)
-                .accessibilityIdentifier("menu_\(item.rawValue)")
-                .onChange(of: menuFocus) { _, focused in
-                    if let focused, focused != section, focused != .search, focused != .settings { section = focused }
-                }
-            }
-            Spacer()
-        }
-        .padding(.vertical, Theme.safeV)
-        .padding(.leading, 40)
-        .background(Theme.surface.opacity(menuExpanded ? 0.95 : 0.5).ignoresSafeArea())
-        .animation(.easeOut(duration: 0.18), value: menuExpanded)
-        .focusSection()
-    }
-
-    private var content: some View {
+    private func stack(for section: AppSection) -> some View {
         let binding = Binding(get: { paths[section] ?? NavigationPath() }, set: { paths[section] = $0 })
         return NavigationStack(path: binding) {
             Group {
@@ -151,22 +99,48 @@ struct TVRootView: View {
                 case .search: SearchView()
                 case .home: HomeView()
                 case .live: LiveTVView()
+                case .guide: GuideView()
                 case .movies: MoviesView()
                 case .series: SeriesView()
-                case .favorites: FavoritesView()
                 case .settings: SettingsView()
                 }
             }
             .catalogDestinations()
         }
-        .id(section)
-        .focusSection()
     }
-}
 
-/// Menu items draw their own focus background (no system platter).
-private struct MenuItemButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(configuration.isPressed ? 0.8 : 1)
+    private func applyDebugScreen() {
+        switch router.debugScreen {
+        case "live", "player": router.section = .live
+        case "settings": router.section = .settings
+        case "movies": router.section = .movies
+        case "series": router.section = .series
+        case "guide": router.section = .guide
+        case "favorites": paths[.home] = { var p = NavigationPath(); p.append(BrowseRoute.favorites); return p }()
+        case "search": router.section = .search
+        case "movieDetail":
+            if let id = env.currentSource?.id, let movie = (try? env.catalog.movies(sourceId: id, limit: 1))?.first {
+                var path = NavigationPath()
+                path.append(CatalogItem.movie(movie))
+                paths[.home] = path
+            }
+        case "seriesDetail":
+            if let id = env.currentSource?.id, let series = (try? env.catalog.series(sourceId: id, limit: 1))?.first {
+                var path = NavigationPath()
+                path.append(CatalogItem.series(series))
+                paths[.home] = path
+            }
+        default: break
+        }
+    }
+
+    /// True when the focused item lives inside the system tab bar.
+    private static func isInTabBar(_ item: UIFocusItem?) -> Bool {
+        var view = item as? UIView
+        while let v = view {
+            if v is UITabBar { return true }
+            view = v.superview
+        }
+        return false
     }
 }

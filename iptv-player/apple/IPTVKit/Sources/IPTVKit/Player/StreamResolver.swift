@@ -77,40 +77,57 @@ public struct ResolvedStream: Sendable, Hashable {
     public var url: URL
     public var container: StreamContainer
     public var headers: [String: String]
+    /// Engine chosen by `ApplePlayback.engine(for:)` (CONTRACT §6.1).
+    public var engine: PlayerEngine
+
+    public init(url: URL, container: StreamContainer, headers: [String: String], engine: PlayerEngine = .avPlayer) {
+        self.url = url
+        self.container = container
+        self.headers = headers
+        self.engine = engine
+    }
 }
 
 /// Builds the stream URL at play time (Xtream URLs contain credentials and are never stored)
-/// and runs the format pre-check against the AVPlayer support matrix (CONTRACT §6).
+/// and runs the format pre-check against the Apple engine matrix (CONTRACT §6.1): AVPlayer for
+/// HLS/MP4/unknown, VLCKit for the rest when available.
 public struct StreamResolver: Sendable {
     public typealias Sniffer = @Sendable (URL, [String: String]) async -> (contentType: String?, bytes: Data?, status: Int?)
 
     private let secrets: @Sendable (String) -> SourceSecrets?
     private let sniffer: Sniffer?
+    /// VLCKit engine present (MKV/TS/… playable, Xtream `ts`-only accounts allowed).
+    public let vlcAvailable: Bool
 
     /// - Parameters:
     ///   - secrets: lookup of source secrets by source id.
     ///   - sniffer: optional network probe for URLs whose container is not evident (fetches the
     ///     first bytes); nil disables probing (tests).
-    public init(secrets: @escaping @Sendable (String) -> SourceSecrets?, sniffer: Sniffer? = StreamResolver.networkSniffer) {
+    ///   - vlcAvailable: the app ships the VLCKit engine.
+    public init(secrets: @escaping @Sendable (String) -> SourceSecrets?, sniffer: Sniffer? = StreamResolver.networkSniffer,
+                vlcAvailable: Bool = false) {
         self.secrets = secrets
         self.sniffer = sniffer
+        self.vlcAvailable = vlcAvailable
     }
 
-    /// Resolves the URL or throws a `PlaybackError` (e.g. Apple + MPEG-TS → "ask for HLS").
+    /// Resolves the URL or throws a `PlaybackError` (e.g. without VLCKit: MKV → unsupported,
+    /// MPEG-TS → "ask for HLS").
     public func resolve(_ request: PlaybackRequest) async throws -> ResolvedStream {
         let (urlString, headers) = try buildURL(request)
         guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             throw PlaybackError.unknown(message: "invalid url")
         }
         var container = StreamFormatDetector.detect(url: url.absoluteString)
-        if let error = container.playbackError(for: .avPlayer) { throw error }
+        if let error = ApplePlayback.playbackError(for: container, vlcAvailable: vlcAvailable) { throw error }
         if container == .unknown, let sniffer, let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
             let probe = await sniffer(url, headers)
             if let status = probe.status, let error = ErrorClassifier.playbackError(httpStatus: status) { throw error }
             container = StreamFormatDetector.detect(url: url.absoluteString, contentType: probe.contentType, firstBytes: probe.bytes)
-            if let error = container.playbackError(for: .avPlayer) { throw error }
+            if let error = ApplePlayback.playbackError(for: container, vlcAvailable: vlcAvailable) { throw error }
         }
-        return ResolvedStream(url: url, container: container, headers: headers)
+        let engine = ApplePlayback.engine(for: container, vlcAvailable: vlcAvailable) ?? .avPlayer
+        return ResolvedStream(url: url, container: container, headers: headers, engine: engine)
     }
 
     func buildURL(_ request: PlaybackRequest) throws -> (String, [String: String]) {
@@ -129,7 +146,8 @@ public struct StreamResolver: Sendable {
                 throw PlaybackError.unknown(message: "missing source")
             }
             let ext = try XtreamURLBuilder.liveExtension(platform: .apple,
-                                                         allowedOutputFormats: request.source?.xtreamAccount?.allowedOutputFormats ?? [])
+                                                         allowedOutputFormats: request.source?.xtreamAccount?.allowedOutputFormats ?? [],
+                                                         vlcAvailable: vlcAvailable)
             return (builder.liveURL(streamId: channel.id, ext: ext).absoluteString, [:])
         case .movie(let movie):
             if let url = movie.url { return (url, [:]) }

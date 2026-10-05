@@ -105,7 +105,7 @@ cd android
 ### Apple
 ```
 brew install xcodegen
-cd apple && xcodegen generate     # NovaPlayer.xcodeproj
+cd apple && xcodegen generate     # NovaPlayer.xcodeproj (önce scripts/fetch-vlckit.sh: VLCKit ~260+120 MB indirir, ilk seferde)
 open NovaPlayer.xcodeproj         # Xcode 16+, şema: NovaPlayer-iOS / NovaPlayer-tvOS
 # Çekirdek testleri (macOS'ta): cd IPTVCore && swift test
 ```

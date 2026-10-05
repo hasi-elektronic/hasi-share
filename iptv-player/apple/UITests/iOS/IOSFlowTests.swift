@@ -1,9 +1,18 @@
 import XCTest
 
-/// iPhone flows + screenshots: welcome → add M3U source → live list → player; paywall; settings.
+/// iPhone flows + screenshots: welcome → add M3U source → home (header text tabs, no tab bar) →
+/// live channel grid → player; paywall; settings sheet; redesign screens (hero, rows, detail, guide, search).
 final class IOSFlowTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
+    }
+
+    /// Switches the section with the header text tabs (`tab_home`, `tab_movies`, `tab_series`, `tab_live`, `tab_guide`).
+    @MainActor
+    static func openSection(_ id: String, in app: XCUIApplication) {
+        let tab = app.buttons["tab_\(id)"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "header tab \(id)")
+        tab.tap()
     }
 
     @MainActor
@@ -28,10 +37,11 @@ final class IOSFlowTests: XCTestCase {
         UITestSupport.snap("ios-04-source-added", in: self)
         done.tap()
 
-        let liveTab = app.tabBars.buttons["Live TV"]
-        XCTAssertTrue(liveTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.tabBars.firstMatch.exists, "redesign: no bottom tab bar")
+        sleep(1)
         UITestSupport.snap("ios-05-home", in: self)
-        liveTab.tap()
+        Self.openSection("live", in: app)
         let firstChannel = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch
         XCTAssertTrue(firstChannel.waitForExistence(timeout: 10))
         UITestSupport.snap("ios-06-live-channels", in: self)
@@ -56,11 +66,23 @@ final class IOSFlowTests: XCTestCase {
     }
 
     @MainActor
-    func testSettings() throws {
-        let app = UITestSupport.launch(["-uiScreen", "settings"])
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 30))
+    func testSettingsSheet() throws {
+        let app = UITestSupport.launch()
+        let gear = app.buttons["open_settings"]
+        XCTAssertTrue(gear.waitForExistence(timeout: 30))
+        gear.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
         sleep(1)
         UITestSupport.snap("ios-10-settings", in: self)
+        // Open-source licenses (LGPL-2.1 notice for VLCKit).
+        let licenses = app.buttons["settings_licenses"]
+        for _ in 0..<6 where !(licenses.exists && licenses.isHittable) { app.swipeUp() }
+        licenses.tap()
+        XCTAssertTrue(app.staticTexts["LGPL-2.1-or-later"].waitForExistence(timeout: 5), "VLCKit license entry")
+        UITestSupport.snap("ios-10b-licenses", in: self)
+        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["settings_close"].tap()
+        XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -71,5 +93,74 @@ final class IOSFlowTests: XCTestCase {
         firstChannel.tap()
         XCTAssertTrue(app.buttons["purchase_restore"].waitForExistence(timeout: 10), "locked → paywall")
         UITestSupport.snap("ios-11-locked-paywall", in: self)
+    }
+
+    /// Redesign walkthrough: hero + rows, movies/series tabs, detail screens, live grid, guide, favorites, search.
+    @MainActor
+    func testRedesignScreens() throws {
+        let dir = "redesign-ios"
+        let app = UITestSupport.launch(["-uiSeedLibrary"])
+        XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 30), "home hero")
+        sleep(3)   // artwork
+        UITestSupport.snap("\(dir)-01-home", in: self)
+        app.swipeUp()
+        sleep(1)
+        UITestSupport.snap("\(dir)-02-home-rows", in: self)
+
+        Self.openSection("movies", in: app)
+        XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 10))
+        sleep(2)
+        UITestSupport.snap("\(dir)-03-movies", in: self)
+        app.swipeUp()
+        sleep(1)
+        UITestSupport.snap("\(dir)-04-movies-rows", in: self)
+        let top = app.buttons["top10_1"]
+        if top.exists && top.isHittable { top.tap() } else { app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'poster_'")).firstMatch.tap() }
+        XCTAssertTrue(app.buttons["detail_play"].waitForExistence(timeout: 10))
+        sleep(2)
+        UITestSupport.snap("\(dir)-05-movie-detail", in: self)
+        app.buttons["detail_close"].tap()
+
+        Self.openSection("series", in: app)
+        XCTAssertTrue(app.buttons["hero_info"].waitForExistence(timeout: 10))
+        app.buttons["hero_info"].tap()
+        XCTAssertTrue(app.buttons["detail_play"].waitForExistence(timeout: 10))
+        sleep(2)
+        UITestSupport.snap("\(dir)-06-series-detail", in: self)
+        app.swipeUp()
+        sleep(1)
+        UITestSupport.snap("\(dir)-07-series-episodes", in: self)
+        app.buttons["detail_close"].tap()
+
+        Self.openSection("live", in: app)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch.waitForExistence(timeout: 10))
+        sleep(2)
+        UITestSupport.snap("\(dir)-08-live-grid", in: self)
+        app.buttons["category_menu"].tap()
+        sleep(1)
+        UITestSupport.snap("\(dir)-09-live-category-menu", in: self)
+        app.buttons["Favorites"].firstMatch.tap()
+        sleep(1)
+
+        Self.openSection("guide", in: app)
+        XCTAssertTrue(app.buttons["guide_filter_0"].waitForExistence(timeout: 10), "guide chips")
+        sleep(2)
+        UITestSupport.snap("\(dir)-10-guide", in: self)
+
+        app.buttons["open_settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
+        sleep(1)
+        UITestSupport.snap("\(dir)-11-settings", in: self)
+        app.buttons["settings_close"].tap()
+        Self.openSection("home", in: app)
+        app.buttons["open_search"].tap()
+        let field = app.searchFields.firstMatch
+        let found = field.waitForExistence(timeout: 5)
+        if !found { UITestSupport.snap("\(dir)-debug-search", in: self); print(app.debugDescription) }
+        XCTAssertTrue(found)
+        field.typeText("ha")
+        sleep(2)
+        UITestSupport.snap("\(dir)-12-search", in: self)
+
     }
 }

@@ -956,6 +956,161 @@
   "format_test_host": {
    "en": "Test server (host for local samples)",
    "tr": "Test sunucusu (yerel örnekler için host)"
+  },
+  "nav_guide": {
+   "en": "TV Guide",
+   "tr": "TV Rehberi",
+   "de": "TV-Guide"
+  },
+  "home_live_channels": {
+   "en": "Live channels",
+   "tr": "Canlı kanallar",
+   "de": "Live-Sender"
+  },
+  "home_featured": {
+   "en": "Featured",
+   "tr": "Öne çıkan",
+   "de": "Empfohlen"
+  },
+  "epg_today": {
+   "en": "Today",
+   "tr": "Bugün",
+   "de": "Heute"
+  },
+  "epg_now_on_air": {
+   "en": "Now on air",
+   "tr": "Şimdi yayında",
+   "de": "Jetzt läuft"
+  },
+  "action_more": {
+   "en": "More",
+   "tr": "Daha fazla",
+   "de": "Mehr"
+  },
+  "action_see_all": {
+   "en": "See all",
+   "tr": "Tümünü gör",
+   "de": "Alle anzeigen"
+  },
+  "action_info": {
+   "en": "Info",
+   "tr": "Bilgi",
+   "de": "Info"
+  },
+  "action_favorite_short": {
+   "en": "Favorite",
+   "tr": "Favori",
+   "de": "Favorit"
+  },
+  "episodes": {
+   "en": "Episodes",
+   "tr": "Bölümler",
+   "de": "Folgen"
+  },
+  "rating_value": {
+   "en": "Rating {0}",
+   "tr": "Puan {0}",
+   "de": "Bewertung {0}"
+  },
+  "genres_value": {
+   "en": "Genre: {0}",
+   "tr": "Tür: {0}",
+   "de": "Genre: {0}"
+  },
+  "seasons_value": {
+   "en": "Seasons: {0}",
+   "tr": "Sezon: {0}",
+   "de": "Staffeln: {0}"
+  },
+  "badge_new": {
+   "en": "NEW",
+   "tr": "YENİ",
+   "de": "NEU"
+  },
+  "row_top10": {
+   "en": "Top 10",
+   "tr": "Top 10",
+   "de": "Top 10"
+  },
+  "catchup_title": {
+   "en": "TV archive · Catch-up",
+   "tr": "TV arşivi · Geçmiş yayınlar",
+   "de": "TV-Archiv · Catch-up"
+  },
+  "catchup_replay": {
+   "en": "Replay",
+   "tr": "Tekrar izle",
+   "de": "Erneut ansehen"
+  },
+  "catchup_on_air": {
+   "en": "On air",
+   "tr": "Yayında",
+   "de": "Läuft gerade"
+  },
+  "catchup_xtream_only": {
+   "en": "Replay is available for Xtream sources.",
+   "tr": "Tekrar izleme Xtream kaynaklarında kullanılabilir.",
+   "de": "Wiedergabe ist für Xtream-Quellen verfügbar."
+  },
+  "catchup_empty": {
+   "en": "No past programmes in the archive.",
+   "tr": "Arşivde geçmiş program yok.",
+   "de": "Keine vergangenen Sendungen im Archiv."
+  },
+  "channel_hide": {
+   "en": "Hide channel",
+   "tr": "Kanalı gizle",
+   "de": "Sender ausblenden"
+  },
+  "category_hide": {
+   "en": "Hide category",
+   "tr": "Kategoriyi gizle",
+   "de": "Kategorie ausblenden"
+  },
+  "hidden_show_all": {
+   "en": "Show hidden ({0})",
+   "tr": "Gizlenenleri göster ({0})",
+   "de": "Ausgeblendete einblenden ({0})"
+  },
+  "category_picker": {
+   "en": "Category",
+   "tr": "Kategori",
+   "de": "Kategorie"
+  },
+  "licenses_vlckit_notice": {
+   "en": "This app uses VLCKit/libVLC (© VideoLAN and the VLC authors), licensed under the GNU LGPL version 2.1. Source code: https://code.videolan.org/videolan/VLCKit",
+   "tr": "Bu uygulama VLCKit/libVLC (© VideoLAN ve VLC yazarları) kullanır; GNU LGPL sürüm 2.1 altında lisanslıdır. Kaynak kodu: https://code.videolan.org/videolan/VLCKit",
+   "de": "Diese App verwendet VLCKit/libVLC (© VideoLAN und die VLC-Autoren), lizenziert unter der GNU LGPL Version 2.1. Quellcode: https://code.videolan.org/videolan/VLCKit"
+  },
+  "licenses_vlckit_linking": {
+   "en": "VLCKit is linked dynamically and shipped unmodified as a separate framework; you may replace it with your own build.",
+   "tr": "VLCKit dinamik bağlanır ve değiştirilmeden ayrı bir framework olarak gelir; kendi derlemenizle değiştirebilirsiniz.",
+   "de": "VLCKit wird dynamisch gelinkt und unverändert als separates Framework ausgeliefert; Sie können es durch einen eigenen Build ersetzen."
+  },
+  "licenses_source_code": {
+   "en": "Source code",
+   "tr": "Kaynak kodu",
+   "de": "Quellcode"
+  },
+  "licenses_full_text": {
+   "en": "Full license text",
+   "tr": "Lisansın tam metni",
+   "de": "Vollständiger Lizenztext"
+  },
+  "licenses_apache_notice": {
+   "en": "Licensed under the Apache License 2.0.",
+   "tr": "Apache Lisansı 2.0 altında lisanslıdır.",
+   "de": "Lizenziert unter der Apache License 2.0."
+  },
+  "format_test_engine": {
+   "en": "Engine: {0}",
+   "tr": "Motor: {0}",
+   "de": "Engine: {0}"
+  },
+  "format_test_expected": {
+   "en": "Expected: {0}",
+   "tr": "Beklenen: {0}",
+   "de": "Erwartet: {0}"
   }
  }
 }

@@ -7,12 +7,12 @@ vektörlerini** (`spec/test-vectors/`) geçmek zorundadır.
 | Klasör | Durum | İçerik |
 |---|---|---|
 | `IPTVCore/` | ✅ `swift test`: 86 test yeşil | Platformdan bağımsız Swift Package: modeller, ayrıştırıcılar, ağ, lisans mantığı |
-| `IPTVKit/` | ✅ `swift test`: 37 test yeşil | Apple'a özel paket: SQLite + FTS5, Keychain, StoreKit 2, lisans, hesap/senkron, eşleştirme, AVPlayer `PlayerController`, `@Observable` ViewModel'ler |
+| `IPTVKit/` | ✅ `swift test`: 52 test yeşil | Apple'a özel paket: SQLite + FTS5, Keychain, StoreKit 2, lisans, hesap/senkron, eşleştirme, iki motorlu `PlayerController` (AVPlayer + VLCKit, `PlaybackEngine`), `@Observable` ViewModel'ler |
 | `Shared/` | ✅ | Ortak SwiftUI ekranları (iOS + tvOS), tema, `L10n`, `Resources/Localizable.xcstrings` (üretilmiş) |
-| `Apps/iOS`, `Apps/tvOS` | ✅ derleniyor, simülatörde çalıştı | Uygulama giriş noktaları: iPhone/iPad `TabView`, Apple TV sol menü |
+| `Apps/iOS`, `Apps/tvOS` | ✅ derleniyor, simülatörde çalıştı | Uygulama giriş noktaları: iPhone/iPad üst başlık (metin sekmeleri, sekme çubuğu yok), Apple TV üst sekme çubuğu |
 | `Config/` | ✅ | `Shared.xcconfig` (ad, bundle id, ürünler, backend), `Products.storekit`, `PrivacyInfo.xcprivacy`, `license-keys.json`, entitlements |
 | `AppTests/iOS` | ⚠️ yalnızca Xcode'dan | StoreKit akış testleri (`SKTestSession`) – komut satırında atlanır, aşağıya bakın |
-| `UITests/` | ✅ iOS 4 + tvOS 4 UI testi yeşil | Ekran görüntüleri, Siri Remote ile odak gezinmesi, kilitli oynatma → paywall |
+| `UITests/` | ✅ iOS 6 + tvOS 6 akış testi yeşil (+ VLC testleri) | Ekran görüntüleri (yeniden tasarım turu), Siri Remote ile odak/geri kuralları, Xtream formu (şifre alanı), kilitli oynatma → paywall |
 | `project.yml` | ✅ | XcodeGen tanımı (tek doğruluk kaynağı) |
 
 ## Yapı
@@ -38,18 +38,23 @@ apple/
 │   │   ├── License/            LicenseManager (AccessPolicy + TrustedClock + /v1/license/sync + son bilinen token)
 │   │   ├── Account/            AccountManager (e-posta kodu, TV cihaz kodu), SyncManager (actor, LWW, 500'lük partiler)
 │   │   ├── Pairing/            PairingManager (ECDH/HKDF/AES-GCM, 2 sn yoklama, 10 dk)
-│   │   ├── Player/             PlayerController (AVPlayer), StreamResolver (format ön kontrolü), PlaybackErrorMapper
+│   │   ├── Player/             PlayerController (motordan bağımsız politika), PlaybackEngine (protokol, EngineEvent,
+│   │                       TrackNaming, VLCFailureClassifier), AVPlayerEngine, StreamResolver (format ön kontrolü
+│   │                       + motor seçimi), PlaybackErrorMapper
 │   │   ├── ViewModels/         AddSource, LiveTV, Movies, Series(+Detail), Home, Favorites, Search, EpgGrid, Paywall, FormatTest
 │   │   ├── Support/            SafeLog (Redactor), ImageLoader (URLCache 200 MB + NSCache, küçültülmüş çözümleme), AppSettings
 │   │   └── AppEnvironment.swift  Manuel DI + uygulama durumu
 │   └── Tests/IPTVKitTests/     macOS'ta `swift test`
 ├── Shared/
+│   ├── Player/                 VLCPlaybackEngine (MobileVLCKit/TVVLCKit), EngineVideoSurface (AVPlayerLayer / VLC drawable)
 │   ├── Support/                Theme (SCREENS §1 token'ları), L10n, AppBootstrap (+ Router, debug kancaları)
-│   ├── Views/                  Welcome/TrialCard, AddSource, Pairing (QR), Home, LiveTV + EPG ızgarası (+ TV 3 sütun),
+│   ├── Views/                  Welcome/TrialCard, AddSource, Pairing (QR), Home/Filmler/Diziler (hero + satırlar, BrowseView),
+│   │                           Canlı TV kart grid'i, TV Rehberi (EPG listesi + yan panel + catch-up arşivi),
 │   │                           Movies/Series/Favorites/Search, Player (overlay), Paywall, Settings/Kaynak/Hesap/Format testi
 │   └── Resources/Localizable.xcstrings   (node spec/tools/gen-strings.mjs – elle düzenleme yok)
-├── Apps/iOS/                   NovaPlayerApp (TabView 5 sekme + arama/ayarlar), Assets (ikon)
-├── Apps/tvOS/                  NovaPlayerTVApp (sol menü, odak kapsamı, Menü tuşu kuralları)
+├── scripts/fetch-vlckit.sh     VLCKit ikililerini indirir, SHA-256 doğrular, inceltir → Vendor/VLCKit (git dışı)
+├── Apps/iOS/                   NovaPlayerApp (üst başlık: metin sekmeleri + arama + ayarlar sheet'i), Assets (ikon)
+├── Apps/tvOS/                  NovaPlayerTVApp (yerel üst TabView, Menü tuşu kuralları)
 ├── AppTests/iOS/               StoreKitFlowTests
 └── UITests/{Shared,iOS,tvOS}/  XCUITest akışları + ekran görüntüsü yardımcısı
 ```
@@ -68,14 +73,100 @@ apple/
 * **Lisans:** `StoreSnapshot` (StoreKit) + doğrulanmış token + güvenilir saat → `AccessPolicy`.
   Backend erişilemezse son geçerli token kullanılır ve "lisans sunucusuna ulaşılamıyor" bandı görünür.
   Deneme başlangıcı Apple'da ücretsiz `…trial` ürününün `purchaseDate` değeridir.
-* **Oynatıcı:** tek `AVPlayer`; oynatmadan önce `StreamFormatDetector` + AVPlayer destek matrisi
-  (MPEG-TS/MKV/DASH/RTMP… → anlaşılır hata, TS için "HLS isteyin"); uzantı belirsizse ilk 1 KiB
-  okunur. Yeniden bağlanma `ReconnectPolicy` (1-2-4-8-15 sn), kanal değiştirme 400 ms debounce
-  (bilgi kartı anında), `AVMediaSelectionGroup` ile ses/altyazı, `videoGravity` + 16:9/4:3 sabit
-  çerçeve, `scenePhase != .active` olunca release + pozisyon kaydı.
-* **tvOS geri tuşu:** içerikte → odak sol menüye; menüde (Ana Sayfa değilse) → Ana Sayfa; Ana
-  Sayfa menüsünde → sistem (uygulamadan çıkış); alt sayfalarda `NavigationStack` kendisi geri gider;
-  oynatıcıda önce panel/overlay kapanır, sonra oynatıcıdan çıkılır. İlk odak içerikte (★).
+* **Oynatıcı – iki motor** (ayrıntı aşağıda "Oynatıcı: AVPlayer + VLCKit"): HLS/MP4/MOV AVPlayer,
+  MKV/WebM/AVI/FLV/progresif TS/DASH/RTSP/RTMP VLCKit. Oynatmadan önce `StreamFormatDetector` +
+  `ApplePlayback.engine(for:)`; uzantı belirsizse ilk 1 KiB okunur. Yeniden bağlanma
+  `ReconnectPolicy` (1-2-4-8-15 sn), kanal değiştirme 400 ms debounce (bilgi kartı anında),
+  ses/altyazı, görüntü oranı (Sığdır/Doldur/Uzat/16:9/4:3), `scenePhase != .active` olunca
+  release + pozisyon kaydı – hepsi her iki motorda aynı.
+* **tvOS geri tuşu:** içerikte → odak üst sekme çubuğuna (sistem); sekme çubuğunda (Ana Sayfa
+  değilse) → Ana Sayfa (`UIFocusSystem` bildirimiyle odağın `UITabBar` içinde olduğu izlenir); Ana
+  Sayfa sekmesinde → sistem (uygulamadan çıkış); alt sayfalarda `NavigationStack` kendisi geri gider;
+  oynatıcıda önce panel/overlay kapanır, sonra oynatıcıdan çıkılır.
+
+### Arayüz (SCREENS §2–3.6, IPTVX tarzı)
+
+* **iPhone/iPad:** sekme çubuğu yok; üstte uygulama işareti + yatay kayan metin sekmeleri
+  (Ana Sayfa · Filmler · Diziler · Canlı TV · TV Rehberi, seçili = beyaz + `primary` alt çizgi) + 🔍 + ⚙️
+  (Ayarlar sheet). Başlık hero üzerinde şeffaf, kaydırınca siyah.
+* **Ana Sayfa / Filmler / Diziler:** hero (☆ Favori · beyaz "▶ Oynat/Devam et" · ⓘ Bilgi) + satırlar:
+  İzlemeye devam et (16:9, ortada oynat ikonu, altta ilerleme), Favoriler, Yeni eklenenler ("YENİ"),
+  Top 10 (çerçeveli sıra numaraları; puan, yoksa en yeni), kategori satırları; "Tümünü gör" → grid.
+* **Detay:** tam genişlik hero + yuvarlak ▶ + ✕, puan/yıl/süre, açıklama, tür; dizide sezon metin
+  sekmeleri + 16:9 bölüm satırları. M3U adlarındaki "(2024) HD" ve "Dizi S01E02" başlıktan temizlenir.
+* **Canlı TV:** kanal kartı grid'i (iPhone 2 sütun, TV 4) + yüzen kategori çipi (bayraklı);
+  uzun bas → favori / kanalı gizle / kategoriyi gizle (yerel, `HiddenStore`).
+* **TV Rehberi:** ortak zaman eksenli EPG listesi; iPad/Apple TV'de "Şimdi yayında" + "Bugün" paneli;
+  catch-up arşivi (Xtream `timeshift` ile tekrar izleme).
+* **Ayarlar → Açık kaynak lisansları:** VLCKit (LGPL-2.1, kaynak bağlantısı, `Vendor/VLCKit/COPYING.txt`
+  tam metni paketlenir), swift-crypto / swift-asn1 (Apache-2.0). Format testi motoru (AVPlayer/VLCKit)
+  gösterir ve `expect.apple` ile karşılaştırır.
+* **Ekran görüntüleri:** `IOSFlowTests.testRedesignScreens` + `TVFlowTests` (`TEST_RUNNER_SCREENSHOT_DIR`),
+  demo verisi için `-uiSeedLibrary` (devam/favori tohumlar) ve `-uiScreen movieDetail|seriesDetail|guide|search`.
+
+## Oynatıcı: AVPlayer + VLCKit
+
+```
+PlayerView ──► PlayerController (IPTVKit, @Observable)          ◄── politika: faz, yeniden bağlanma,
+                 │  StreamResolver → ResolvedStream.engine            zap debounce, ilerleme, geri dönüş
+                 ▼
+          PlaybackEngine (protokol, EngineEvent)
+           ├─ AVPlayerEngine      (IPTVKit)   HLS, MP4/MOV, bilinmeyen
+           └─ VLCPlaybackEngine   (Shared/Player, MobileVLCKit | TVVLCKit)  MKV, WebM, AVI, FLV, TS, DASH, RTSP, RTMP
+EngineVideoSurface (UIViewRepresentable): AVPlayerLayer veya VLC drawable UIView
+```
+
+* **Seçim** (CONTRACT §6.1, vektör `media/expected.json` → `appleEngine`): AVPlayer'ın oynattığı
+  her şey AVPlayer'da kalır (yerel HLS, enerji, AirPlay); geri kalanı VLCKit. UDP multicast
+  desteklenmez. Xtream canlıda `m3u8` tercih; hesap yalnızca `ts` izin veriyorsa `ts` + VLCKit.
+* **Geri dönüş:** AVPlayer `UnsupportedFormat`/`UnsupportedCodec` verirse aynı yayın **bir kez**
+  VLCKit ile açılır (VOD kaldığı yerden); bu yayının sonraki yeniden bağlanmaları da VLCKit'te kalır.
+  VLCKit → AVPlayer geri dönüşü yoktur.
+* **VLCKit hataları:** libVLC neden bildirmez → `VLCFailureClassifier` 1 KiB'lık range isteğiyle
+  sınıflandırır (401/403 → AccessDenied, 404/410 → StreamOffline, 5xx → ServerError, bağlantı yok →
+  Network, erişilebilir ama hiç oynamadı → UnsupportedCodec, oynarken koptu / canlı "bitti" →
+  Network → yeniden bağlanma politikası).
+* **Parçalar:** `audioTrackIndexes` / `videoSubTitlesIndexes` ("Disable" hariç) + dil
+  `media.tracksInformation`'dan; adlar `TrackNaming` ile UI dilinde ("tur" → "Türkçe"/"Turkish"),
+  bilinmiyorsa "Parça n". Tercih edilen ses/altyazı dili ilk parçalar gelince uygulanır.
+* **Görüntü oranı (VLCKit):** Sığdır → varsayılan; Doldur → `videoCropGeometry` = görünüm oranı;
+  Uzat / 16:9 / 4:3 → `videoAspectRatio` = görünüm oranı (16:9 ve 4:3'te SwiftUI çerçeveyi zaten
+  o orana sabitler, AVPlayer'daki `.resize` ile aynı sonuç).
+* **Önbellek:** canlı `:network-caching=1500`, VOD 2000 ms; `User-Agent`/`Referer` M3U'dan
+  `:http-user-agent` / `:http-referrer`; devam pozisyonu `:start-time`.
+* **Test:** `IPTVKit/Tests/IPTVKitTests/EngineTests.swift` sahte motorlarla (VLCKit gerekmez).
+
+### VLCKit bağımlılığı
+
+| | |
+|---|---|
+| Sürüm | **VLCKit 3.7.3** (`319ed2c0-79128878`, Şubat 2026) – son kararlı 3.x; VLCKit 4 hâlâ alfa |
+| Kaynak | Resmî VideoLAN ikilileri: `https://download.videolan.org/pub/cocoapods/prod/MobileVLCKit-3.7.3-319ed2c0-79128878.tar.xz` ve `TVVLCKit-…` (Carthage/CocoaPods JSON'ları `code.videolan.org/videolan/VLCKit/-/tree/master/Packaging`) |
+| Neden SPM değil | Resmî `Package.swift` yalnızca VLCKit 4 alfa (`cocoapods/unstable`) nightly zip'ini gösteriyor; 3.x için resmî SPM yok, gayriresmî paketler doğrulanamaz |
+| Bütünlük | `scripts/fetch-vlckit.sh` SHA-256 doğrular (`0d040599…a0a9` iOS, `b5f90c22…e46c` tvOS) |
+| İnceltme | cihaz: yalnızca `arm64` (armv7/armv7s silinir), simülatör: `arm64 x86_64` (i386 silinir), simülatör dSYM'leri silinir; bitcode yok |
+| Bağlama | **Dinamik** framework, `embed: true` (LGPL-2.1, bkz. `docs/SECURITY.md §7`) |
+| Boyut | `MobileVLCKit` arm64 ≈ 36 MB, `TVVLCKit` arm64 ≈ 35 MB (sıkıştırılmamış, uygulamaya eklenen) |
+
+`xcodegen generate` betiği `preGenCommand` olarak otomatik çalıştırır (sürüm damgası tutuyorsa hiçbir şey
+yapmaz). İndirme önbelleği `~/Library/Caches/NovaPlayer/vlckit` (`VLCKIT_CACHE`), yeniden kurmak için
+`VLCKIT_FORCE=1 scripts/fetch-vlckit.sh`. Güncelleme: betikteki `VERSION`, `BUILD`, iki SHA-256.
+
+### VLCKit doğrulaması (simülatör)
+
+Range destekli yerel sunucu (VLC, HTTP üzerinden MKV'de atlama için Range ister; `python3 -m
+http.server` desteklemez) ve iki liste: `vlc-live.m3u` (1: uzantısız MKV, 2: progresif MPEG-TS
+MPEG-2/MP2, 3: Apple HLS) ve `vlc-movie.m3u` (MKV film). Test medyası ffmpeg ile üretilir
+(H.264 + AC-3 `tur` + AAC `eng`, SRT `tur`/`eng`).
+
+```sh
+TEST_RUNNER_SCREENSHOT_DIR=/tmp/screens/vlc TEST_RUNNER_VLC_MEDIA_BASE=http://localhost:8766 \
+xcodebuild test -project NovaPlayer.xcodeproj -scheme NovaPlayer-iOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:NovaPlayer-iOSUITests/IOSVLCPlaybackTests
+# tvOS: -scheme NovaPlayer-tvOS … -only-testing:NovaPlayer-tvOSUITests/TVVLCPlaybackTests
+```
+
+Sunucu yoksa bu testler **atlanır** (`XCTSkip`), normal UI test koşusu etkilenmez.
 
 ## Proje üretimi (XcodeGen)
 
@@ -86,7 +177,7 @@ platform hedefi ve şemalar tek yerde tanımlıdır.
 ```sh
 brew install xcodegen          # 2.46 ile doğrulandı
 cd apple
-xcodegen generate              # → NovaPlayer.xcodeproj
+xcodegen generate              # → NovaPlayer.xcodeproj (preGenCommand: scripts/fetch-vlckit.sh → Vendor/VLCKit)
 open NovaPlayer.xcodeproj      # Şemalar: NovaPlayer-iOS, NovaPlayer-tvOS
 ```
 
@@ -99,8 +190,8 @@ ekip seçin veya `DEVELOPMENT_TEAM` ayarını komut satırından verin.
 ```sh
 cd apple
 # Paketler (macOS)
-(cd IPTVCore && swift test)    # 86 test
-(cd IPTVKit && swift test)     # 37 test: SQLite repo'ları (bellek içi), atomik yenileme, FTS5,
+(cd IPTVCore && swift test)    # 88 test
+(cd IPTVKit && swift test)     # 52 test: SQLite repo'ları (bellek içi), atomik yenileme, FTS5, motor seçimi/geri dönüş,
                                # LicenseManager geçişleri (sahte backend + ES256 imzalayıcı),
                                # SyncManager partileri/debounce/LWW, eşleştirme, hata eşleme, resolver
 

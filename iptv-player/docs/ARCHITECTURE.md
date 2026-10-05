@@ -11,7 +11,7 @@
  │       └─ TvActivity     (Compose for TV, sol menü)      │   │  Apps/tvOS (SwiftUI, odak motoru)                     │
  │  shared ─ ViewModel'ler · Room · Keystore · DataStore   │   │  Shared (ortak SwiftUI bileşenleri + xcstrings)       │
  │          Media3 PlayerController · Play Billing 8       │   │  IPTVKit ─ ViewModel'ler · SQLite(FTS5) · Keychain     │
- │          LicenseManager · Sync · Pairing · WorkManager  │   │           AVPlayer PlayerController · StoreKit 2      │
+ │          LicenseManager · Sync · Pairing · WorkManager  │   │   PlayerController (AVPlayer + VLCKit) · StoreKit 2   │
  │  core (saf Kotlin/JVM, test edilir)                     │   │  IPTVCore (saf Swift, Linux'ta test edilir)           │
  │   M3U · XMLTV · Xtream · format tespiti · lisans/saat   │   │   M3U · XMLTV · Xtream · format tespiti · lisans/saat │
  │   erişim politikası · eşleştirme şifreleme · redaksiyon │   │   erişim politikası · eşleştirme şifreleme · redaksiyon│
@@ -40,7 +40,7 @@ tanımlıdır; Kotlin, Swift ve TypeScript kodları aynı test vektörlerini (`s
 | Konu | Android / Android TV | iOS / tvOS |
 |---|---|---|
 | Dil / UI | Kotlin 2.2, Jetpack Compose (mobil: Material 3, TV: `androidx.tv:tv-material`) | Swift 5.10+/6, SwiftUI (iOS 17+, tvOS 17+) |
-| Oynatıcı | Media3 ExoPlayer 1.8 (HLS, DASH, RTSP, progresif TS/MP4/MKV/FLV/AVI) | AVPlayer (HLS, MP4/MOV) |
+| Oynatıcı | Media3 ExoPlayer 1.8 (HLS, DASH, RTSP, progresif TS/MP4/MKV/FLV/AVI) | İki motor: AVPlayer (HLS, MP4/MOV) + VLCKit 3.7 (MKV/WebM, AVI, FLV, progresif TS, DASH, RTSP, RTMP) – CONTRACT §6.1 |
 | Paket yapısı | **Tek APK / tek applicationId**, iki launcher aktivitesi (LAUNCHER + LEANBACK_LAUNCHER) → telefon ve TV aynı satın alımı görür | **Aynı bundle id** ile iOS + tvOS hedefleri → Universal Purchase |
 | Paylaşılan kod | `core` (JVM) + `shared` (Android library: veri, oynatıcı, lisans, ViewModel) | `IPTVCore` (cross-platform) + `IPTVKit` (Apple-only: veri, oynatıcı, StoreKit, ViewModel) |
 | Veritabanı | Room + FTS4 + Paging 3 | SQLite (sistem `SQLite3`) + FTS5, sayfalı sorgular |
@@ -79,12 +79,24 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 `PlayerController` (her iki platformda aynı sorumluluklar):
 * URL'yi oynatma anında oluşturur (Xtream URL'leri kimlik bilgisi içerdiği için saklanmaz).
 * Oynatmadan önce `StreamFormatDetector` + platform destek matrisi → desteklenmeyen biçimde
-  anlaşılır hata (ör. Apple + MPEG-TS: "sağlayıcıdan HLS isteyin").
+  anlaşılır hata (ör. Apple'da UDP multicast).
+* **Apple'da iki motor** (`PlaybackEngine` protokolü, CONTRACT §6.1): HLS, MP4/MOV ve bilinmeyen
+  biçimler **AVPlayer** ile (yerel HLS, enerji verimi); MKV/WebM, AVI, FLV, progresif MPEG-TS,
+  DASH, RTSP, RTMP **VLCKit** (libVLC 3.7, LGPL-2.1, dinamik framework) ile. Seçim
+  `ApplePlayback.engine(for:)`; AVPlayer biçim/kodek hatası verirse aynı yayın **bir kez** VLCKit
+  ile yeniden açılır (VOD kaldığı yerden). Her motorun tek örneği kanal değişimlerinde yeniden
+  kullanılır; yeniden bağlanma, debounce, ilerleme ve yaşam döngüsü `PlayerController`'da
+  motordan bağımsızdır. VLCKit hata nedeni vermediği için hata 1 KiB'lık bir HTTP yoklamasıyla
+  sınıflandırılır (403 → AccessDenied, 404 → StreamOffline, erişilemiyor → Network, erişilebilir
+  ama hiç oynamadı → UnsupportedCodec). Xtream canlıda `m3u8` tercih edilir; hesap yalnızca `ts`
+  izin veriyorsa `ts` + VLCKit.
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
-* Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup`.
+* Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /
+  VLCKit `audioTrackIndexes` + `videoSubTitlesIndexes` (dil `tracksInformation`'dan).
 * Görüntü oranı: Media3 `resizeMode` (+ 16:9 / 4:3 için `AspectRatioFrameLayout` oranı) /
-  AVPlayerLayer `videoGravity` (+ sabit oranlı çerçeve).
+  AVPlayerLayer `videoGravity` (+ sabit oranlı çerçeve) / VLCKit `videoAspectRatio` +
+  `videoCropGeometry` (görünüm oranına göre; 16:9 / 4:3 aynı sabit çerçevede).
 * İlerleme: VOD'da 10 sn'de bir + duraklat/çıkışta kaydedilir; `≥ %95` → izlendi.
 * Yaşam döngüsü: ekran kapanınca / arka plana geçince oynatıcı **release** edilir
   (Android `ON_STOP`, iOS `scenePhase != .active`), pozisyon kaydedilir.
@@ -209,9 +221,9 @@ imzalı; deneme süresi cihaz saatine dayanmaz; eşleştirme uçtan uca şifreli
 | V8 | Kilitliyken içerik listelerine göz atılabilir, yalnızca oynatma kilitli | Kullanıcı neyi açacağını görür; gereksinim "oynatma kilitlenecek" |
 | V9 | Backend erişilemezse son geçerli token kullanılır; hiç token yoksa Android'de deneme başlatılamaz (Apple'da StoreKit yerel denemesi çalışır) | IPTV zaten internet ister; kötüye kullanım riski düşük tutulur |
 | V10 | Arka planda ses / PiP ilk sürümde yok | Kapsam; oynatıcı kaynakları ekran kapanınca serbest bırakılır |
-| V11 | Apple'da MPEG-TS, MKV, AVI, FLV, DASH, RTMP oynatılmaz (AVPlayer); anlaşılır hata + Xtream'de otomatik m3u8 | Gereksinim AVPlayer; VLCKit/ffmpeg ileride değerlendirilebilir |
+| V11 | Apple'da AVPlayer (HLS, MP4/MOV) + VLCKit (MKV/WebM, AVI, FLV, progresif TS, DASH, RTSP, RTMP); yalnızca UDP/RTP multicast desteklenmez. Xtream canlıda `m3u8` tercih, yalnızca `ts` varsa VLCKit. DASH VLCKit ile (libVLC 3 `adaptive` modülü, DRM'siz) | Sağlayıcıların VOD'ları çoğunlukla `.mkv`; VLCKit LGPL-2.1 (dinamik bağlama + lisans bildirimi, `SECURITY.md §7`), uygulamaya ~35 MB (arm64) ekler |
 | V12 | DRM (Widevine/FairPlay) desteklenmez; KODIPROP içeren kanallar "korumalı yayın" hatası verir | Lisans sunucusu entegrasyonu kapsam dışı |
-| V13 | Catch-up: Xtream `timeshift` + M3U `catchup` öznitelikleri; Apple'da yalnızca m3u8 timeshift | Sağlayıcı desteğine bağlı |
+| V13 | Catch-up: Xtream `timeshift` + M3U `catchup` öznitelikleri; Apple'da m3u8 timeshift tercih edilir (ts timeshift VLCKit ile oynatılabilir) | Sağlayıcı desteğine bağlı |
 | V14 | EPG saatleri cihaz saat diliminde gösterilir (ayardan değişir); XMLTV'de ofset yoksa UTC; kaynak başına manuel kaydırma | XMLTV DTD + hatalı sağlayıcılar |
 | V15 | M3U'da film/dizi ayrımı sezgiseldir (URL yolu, uzantı, `SxxEyy`) | M3U standardı türü taşımaz |
 | V16 | Görüntü oranı tercihi global (kanal başına değil) | Basitlik |

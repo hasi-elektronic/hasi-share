@@ -6,30 +6,6 @@ import SwiftUI
 import UIKit
 #endif
 
-/// `AVPlayerLayer` host (videoGravity from the aspect mode).
-struct VideoSurface: UIViewRepresentable {
-    let player: AVPlayer
-    let gravity: AVLayerVideoGravity
-
-    final class LayerView: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-    }
-
-    func makeUIView(context: Context) -> LayerView {
-        let view = LayerView()
-        view.backgroundColor = .black
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = gravity
-        return view
-    }
-
-    func updateUIView(_ view: LayerView, context: Context) {
-        if view.playerLayer.player !== player { view.playerLayer.player = player }
-        view.playerLayer.videoGravity = gravity
-    }
-}
-
 /// Full-screen player with overlay (SCREENS §3.7).
 struct PlayerView: View {
     @Environment(AppEnvironment.self) private var env
@@ -56,7 +32,16 @@ struct PlayerView: View {
                 }
             } else {
                 statusLayer
+                #if os(iOS)
+                // Faded, not removed: an audio/subtitle/aspect menu opened from the overlay must
+                // survive the 3 s auto-hide (removing its source view would close the menu).
+                overlay
+                    .opacity(overlayVisible ? 1 : 0)
+                    .allowsHitTesting(overlayVisible)
+                    .accessibilityHidden(!overlayVisible)
+                #else
                 if overlayVisible { overlay.transition(.opacity) }
+                #endif
             }
             if let target = player.zapTarget { zapCard(target) }
             if channelListVisible { channelList }
@@ -67,8 +52,6 @@ struct PlayerView: View {
         .onDisappear { hideTask?.cancel() }
         #if os(iOS)
         .statusBarHidden()
-        .contentShape(Rectangle())
-        .onTapGesture { overlayVisible ? (overlayVisible = false) : showOverlay() }
         .gesture(DragGesture(minimumDistance: 40).onEnded { value in
             guard player.request?.isLive == true, abs(value.translation.height) > abs(value.translation.width) else { return }
             player.zap(by: value.translation.height < 0 ? 1 : -1)
@@ -105,11 +88,18 @@ struct PlayerView: View {
                 let w = min(geo.size.width, geo.size.height * ratio)
                 return CGSize(width: w, height: w / ratio)
             }()
-            VideoSurface(player: player.player, gravity: player.aspect.videoGravity)
+            // AVPlayer layer or VLCKit drawable, whichever engine plays this stream.
+            EngineVideoSurface(engine: player.engine, aspect: player.aspect)
                 .frame(width: size.width, height: size.height)
                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
         .ignoresSafeArea()
+        #if os(iOS)
+        // Tap on the picture toggles the overlay. Kept off the root view so taps on the overlay
+        // tools (audio/subtitle/aspect menus) do not also toggle – and thereby close – it.
+        .contentShape(Rectangle())
+        .onTapGesture { overlayVisible ? (overlayVisible = false) : showOverlay() }
+        #endif
         .accessibilityIdentifier("video_surface")
     }
 
@@ -184,7 +174,13 @@ struct PlayerView: View {
         }
         .padding(.horizontal, Theme.safeH)
         .padding(.vertical, Theme.safeV)
-        .background(LinearGradient(colors: [.black.opacity(0.7), .clear, .clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
+        .background(
+            LinearGradient(colors: [.black.opacity(0.7), .clear, .clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+                #if os(iOS)
+                .onTapGesture { overlayVisible = false }   // tap outside the controls hides the overlay
+                #endif
+        )
         #if os(tvOS)
         .focusSection()
         #endif
@@ -200,7 +196,7 @@ struct PlayerView: View {
             if !player.audioOptions.isEmpty {
                 Menu {
                     ForEach(player.audioOptions) { option in
-                        Button { player.selectAudio(option.id) } label: {
+                        Button { player.selectAudio(option.id); showOverlay() } label: {
                             Label(option.name ?? L10n.t("unknown_track", String(option.id + 1)), systemImage: player.selectedAudio == option.id ? "checkmark" : "")
                         }
                     }
@@ -209,9 +205,9 @@ struct PlayerView: View {
             }
             if !player.subtitleOptions.isEmpty {
                 Menu {
-                    Button { player.selectSubtitle(nil) } label: { Label(L10n.t("off"), systemImage: player.selectedSubtitle == nil ? "checkmark" : "") }
+                    Button { player.selectSubtitle(nil); showOverlay() } label: { Label(L10n.t("off"), systemImage: player.selectedSubtitle == nil ? "checkmark" : "") }
                     ForEach(player.subtitleOptions) { option in
-                        Button { player.selectSubtitle(option.id) } label: {
+                        Button { player.selectSubtitle(option.id); showOverlay() } label: {
                             Label(option.name ?? L10n.t("unknown_track", String(option.id + 1)), systemImage: player.selectedSubtitle == option.id ? "checkmark" : "")
                         }
                     }
@@ -220,7 +216,7 @@ struct PlayerView: View {
             }
             Menu {
                 ForEach(AspectMode.allCases, id: \.self) { mode in
-                    Button { env.player.aspect = mode } label: { Label(L10n.t(mode.titleKey), systemImage: player.aspect == mode ? "checkmark" : "") }
+                    Button { env.player.aspect = mode; showOverlay() } label: { Label(L10n.t(mode.titleKey), systemImage: player.aspect == mode ? "checkmark" : "") }
                 }
             } label: { Image(systemName: "aspectratio") }
             .accessibilityLabel(L10n.t("player_aspect"))

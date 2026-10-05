@@ -118,11 +118,18 @@ private struct AddSourceForm: View {
                     TextField(L10n.t("field_username"), text: $model.username)
                         .plainField()
                         .accessibilityIdentifier("field_username")
+                    #if os(tvOS)
+                    // tvOS: a Form row focuses only ONE control – an eye button next to the field
+                    // would take the focus and the password could never be entered.
+                    SecureField(L10n.t("field_password"), text: $model.password)
+                        .plainField()
+                        .accessibilityIdentifier("field_password")
+                    #else
                     HStack {
                         if model.showPassword {
                             TextField(L10n.t("field_password"), text: $model.password).plainField()
                         } else {
-                            SecureField(L10n.t("field_password"), text: $model.password)
+                            SecureField(L10n.t("field_password"), text: $model.password).plainField()
                         }
                         Button {
                             model.showPassword.toggle()
@@ -131,6 +138,8 @@ private struct AddSourceForm: View {
                         }
                         .accessibilityLabel(L10n.t(model.showPassword ? "action_hide_password" : "action_show_password"))
                     }
+                    .accessibilityIdentifier("field_password")
+                    #endif
                 }
             }
             Section {

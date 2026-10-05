@@ -8,6 +8,7 @@ enum SettingsRoute: Hashable {
     case account
     case formatTest
     case paywall
+    case licenses
 }
 
 /// Settings and source management (SCREENS §3.9) – always reachable, also when locked.
@@ -75,7 +76,8 @@ struct SettingsView: View {
                 Button(L10n.t("diagnostics_clear_images")) { ImageLoader.shared.clear() }
                 Button(L10n.t("diagnostics_clear_epg")) { env.clearEpgCache() }
                 LText("about_version", env.config.appVersion).foregroundStyle(Theme.textSecondary)
-                LText("about_licenses").foregroundStyle(Theme.textSecondary)
+                NavigationLink(value: SettingsRoute.licenses) { LText("about_licenses") }
+                    .accessibilityIdentifier("settings_licenses")
                 LText("privacy").foregroundStyle(Theme.textSecondary)
             }
         }
@@ -91,6 +93,7 @@ struct SettingsView: View {
             case .account: AccountView()
             case .formatTest: FormatTestView()
             case .paywall: PaywallView()
+            case .licenses: LicensesView()
             }
         }
     }
@@ -167,6 +170,14 @@ struct SourceDetailView: View {
                         Task { lastError = await env.refreshSource(id: sourceId) }
                     }
                     .disabled(env.refreshing.contains(sourceId))
+                    #if os(tvOS)
+                    // tvOS rows focus a single control → one picker instead of −/+ buttons.
+                    Picker(L10n.t("source_epg_shift"), selection: Binding(get: { source.epgShiftMinutes }, set: { v in
+                        shift(source, by: v - source.epgShiftMinutes)
+                    })) {
+                        ForEach(Array(stride(from: -720, through: 720, by: 15)), id: \.self) { Text(Self.shiftText($0)).tag($0) }
+                    }
+                    #else
                     HStack {
                         Text("\(L10n.t("source_epg_shift")): \(Self.shiftText(source.epgShiftMinutes))")
                         Spacer()
@@ -176,6 +187,7 @@ struct SourceDetailView: View {
                             .disabled(source.epgShiftMinutes >= 720)
                     }
                     .buttonStyle(.borderless)
+                    #endif
                     Picker(L10n.t("source_auto_refresh"), selection: Binding(get: { source.autoRefreshHours }, set: { v in
                         var s = source; s.autoRefreshHours = v; env.updateSource(s)
                     })) {
@@ -307,7 +319,7 @@ struct FormatTestView: View {
             Section {
                 TextField(L10n.t("format_test_host"), text: $settings.formatTestHost).plainField()
                 Button(L10n.t("format_test_run")) {
-                    let m = FormatTestViewModel(samplesJSON: Self.samplesJSON, lanHost: settings.formatTestHost)
+                    let m = FormatTestViewModel(samplesJSON: Self.samplesJSON, lanHost: settings.formatTestHost, engines: .app)
                     model = m
                     Task { await m.runAll() }
                 }
@@ -319,7 +331,11 @@ struct FormatTestView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sample.name).font(Theme.body)
-                            Text(sample.expect.avplayer).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                            Text(L10n.t("format_test_expected", model.expected(sample))).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                            if let engine = model.engines[sample.id] {
+                                Text(L10n.t("format_test_engine", engine == .vlcKit ? "VLCKit" : "AVPlayer"))
+                                    .font(Theme.caption).foregroundStyle(engine == .vlcKit ? Theme.warning : Theme.primary)
+                            }
                         }
                         Spacer()
                         result(model.results[sample.id] ?? .pending)
@@ -331,7 +347,7 @@ struct FormatTestView: View {
         .screenBackground()
         .navigationTitle(L10n.t("diagnostics_format_test"))
         .onAppear {
-            if model == nil { model = FormatTestViewModel(samplesJSON: Self.samplesJSON, lanHost: env.settings.formatTestHost) }
+            if model == nil { model = FormatTestViewModel(samplesJSON: Self.samplesJSON, lanHost: env.settings.formatTestHost, engines: .app) }
         }
     }
 
@@ -348,5 +364,81 @@ struct FormatTestView: View {
         case .expectedError(let name): LText("format_test_result_expected_error", name).foregroundStyle(Theme.success)
         case .unexpected(let name): LText("format_test_result_fail", name).foregroundStyle(Theme.error)
         }
+    }
+}
+
+extension View {
+    /// tvOS: makes a read-only list row focusable (otherwise the remote cannot scroll to it).
+    @ViewBuilder
+    func tvFocusableRow() -> some View {
+        #if os(tvOS)
+        focusable()
+        #else
+        self
+        #endif
+    }
+}
+
+/// Settings → Open-source licenses (LGPL-2.1 notice for VLCKit, docs/SECURITY.md §7).
+struct LicensesView: View {
+    private struct Component: Identifiable {
+        let name: String
+        let license: String
+        let noticeKey: String
+        let source: String
+        var id: String { name }
+    }
+
+    private let components = [
+        Component(name: "VLCKit / libVLC (MobileVLCKit, TVVLCKit)", license: "LGPL-2.1-or-later", noticeKey: "licenses_vlckit_notice",
+                  source: "https://code.videolan.org/videolan/VLCKit"),
+        Component(name: "swift-crypto (Apple)", license: "Apache-2.0", noticeKey: "licenses_apache_notice",
+                  source: "https://github.com/apple/swift-crypto"),
+        Component(name: "swift-asn1 (Apple)", license: "Apache-2.0", noticeKey: "licenses_apache_notice",
+                  source: "https://github.com/apple/swift-asn1"),
+    ]
+    @State private var showFullText = false
+
+    /// LGPL-2.1 text bundled from Vendor/VLCKit/COPYING.txt (copied by scripts/fetch-vlckit.sh).
+    private static let lgplText: String? = Bundle.main.url(forResource: "COPYING", withExtension: "txt")
+        .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+
+    var body: some View {
+        List {
+            ForEach(components) { c in
+                Section(c.name) {
+                    Text(c.license).font(Theme.body.weight(.semibold)).tvFocusableRow()
+                    LText(c.noticeKey).font(Theme.caption).foregroundStyle(Theme.textSecondary).tvFocusableRow()
+                    if c.noticeKey == "licenses_vlckit_notice" {
+                        LText("licenses_vlckit_linking").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                    #if os(tvOS)
+                    Text("\(L10n.t("licenses_source_code")): \(c.source)").font(Theme.caption)
+                    #else
+                    if let url = URL(string: c.source) {
+                        Link(destination: url) { Label(L10n.t("licenses_source_code"), systemImage: "arrow.up.right.square") }
+                    }
+                    #endif
+                }
+            }
+            if let text = Self.lgplText {
+                Section {
+                    Button(L10n.t("licenses_full_text")) { showFullText.toggle() }
+                        .accessibilityIdentifier("licenses_full_text")
+                    if showFullText {
+                        // Paragraph rows: on tvOS each row is focusable so the remote can scroll the text.
+                        ForEach(Array(text.components(separatedBy: "\n\n").enumerated()), id: \.offset) { _, paragraph in
+                            Text(paragraph).font(.system(size: Theme.isTV ? 20 : 11, design: .monospaced)).foregroundStyle(Theme.textSecondary)
+                                .tvFocusableRow()
+                        }
+                    }
+                } header: {
+                    Text("GNU LGPL 2.1")
+                }
+            }
+        }
+        .hiddenListBackground()
+        .screenBackground()
+        .navigationTitle(L10n.t("about_licenses"))
     }
 }

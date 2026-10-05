@@ -44,6 +44,12 @@ public struct MediaOption: Identifiable, Hashable, Sendable {
     /// Display name (language name, or nil → UI shows "Track n").
     public var name: String?
     public var languageCode: String?
+
+    public init(id: Int, name: String?, languageCode: String?) {
+        self.id = id
+        self.name = name
+        self.languageCode = languageCode
+    }
 }
 
 /// Playback state for the overlay.
@@ -59,22 +65,31 @@ public enum PlayerPhase: Equatable, Sendable {
     case ended
 }
 
-/// Single AVPlayer instance reused across channel switches (docs/ARCHITECTURE.md §3.2): format
-/// pre-check, reconnect policy (1-2-4-8-15 s), audio/subtitle selection via
-/// `AVMediaSelectionGroup`, aspect modes, 400 ms channel-switch debounce, progress saving and
-/// release when the scene leaves `.active`.
+/// Playback controller shared by iOS and tvOS (docs/ARCHITECTURE.md §3.2). Two engines behind
+/// `PlaybackEngine`: AVPlayer for HLS/MP4/MOV, VLCKit for MKV/TS/AVI/FLV/DASH/RTSP/RTMP…
+/// (`ApplePlayback.engine(for:)`, CONTRACT §6.1), each a single instance reused across channel
+/// switches. One fallback per opened stream: AVPlayer format/codec error → same stream in
+/// VLCKit. The controller owns the reconnect policy (1-2-4-8-15 s), 400 ms channel-switch
+/// debounce, progress saving and release when the scene leaves `.active`.
 @MainActor
 @Observable
 public final class PlayerController {
-    public let player = AVPlayer()
     public private(set) var phase: PlayerPhase = .idle
     public private(set) var request: PlaybackRequest?
     public private(set) var stream: ResolvedStream?
+    /// Engine currently showing video (nil before the first open).
+    public private(set) var engine: (any PlaybackEngine)?
+    public var engineKind: PlayerEngine? { engine?.kind }
     public private(set) var audioOptions: [MediaOption] = []
     public private(set) var subtitleOptions: [MediaOption] = []
     public private(set) var selectedAudio: Int?
     public private(set) var selectedSubtitle: Int?
-    public var aspect: AspectMode = .fit { didSet { onAspectChange?(aspect) } }
+    public var aspect: AspectMode = .fit {
+        didSet {
+            engine?.setAspect(aspect)
+            onAspectChange?(aspect)
+        }
+    }
     /// Channel shown on the zap info card (immediately on key press).
     public private(set) var zapTarget: Channel?
     public private(set) var currentTime: Double = 0
@@ -86,17 +101,17 @@ public final class PlayerController {
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
     @ObservationIgnored private let reconnectPolicy: ReconnectPolicy
+    @ObservationIgnored private let engines: PlaybackEngines
+    @ObservationIgnored private var avEngine: (any PlaybackEngine)?
+    @ObservationIgnored private var vlcEngine: (any PlaybackEngine)?
     @ObservationIgnored private var reconnectState = ReconnectState()
-    @ObservationIgnored private var observers: [NSObjectProtocol] = []
-    @ObservationIgnored private var playerKVO: NSKeyValueObservation?
-    @ObservationIgnored private var itemKVO: NSKeyValueObservation?
-    @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var zapTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var openTask: Task<Void, Never>?
     @ObservationIgnored private var stallTask: Task<Void, Never>?
     @ObservationIgnored private var lastProgressSave: Date = .distantPast
-    @ObservationIgnored private var mediaGroups: (audio: AVMediaSelectionGroup?, legible: AVMediaSelectionGroup?) = (nil, nil)
+    /// Engine forced for the current stream after a fallback (survives reconnects).
+    @ObservationIgnored private var fallbackEngine: PlayerEngine?
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
     @ObservationIgnored public var nowMs: @MainActor () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     @ObservationIgnored public var onLibraryChange: (@MainActor () -> Void)?
@@ -105,20 +120,27 @@ public final class PlayerController {
     @ObservationIgnored public var preferredSubtitleLanguage: String?
     /// Channel-switch debounce (ms).
     public static let zapDebounceMs = 400
+    /// Stall → `Network(timeout)` after this long without playback.
+    public static let stallTimeoutSeconds = 12
 
-    public init(resolver: StreamResolver, library: LibraryRepository?, reconnectPolicy: ReconnectPolicy = ReconnectPolicy()) {
+    /// - Parameter engines: engine factories; engines are created lazily on first use.
+    public init(resolver: StreamResolver, library: LibraryRepository?, reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
+                engines: PlaybackEngines) {
         self.resolver = resolver
         self.library = library
         self.reconnectPolicy = reconnectPolicy
-        player.automaticallyWaitsToMinimizeStalling = true
-        player.preventsDisplaySleepDuringVideoPlayback = true
-        playerKVO = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in self?.timeControlChanged() }
-        }
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.tick(time) }
-        }
+        self.engines = engines
     }
+
+    #if canImport(AVFoundation)
+    /// AVPlayer-only controller (no VLCKit).
+    public convenience init(resolver: StreamResolver, library: LibraryRepository?, reconnectPolicy: ReconnectPolicy = ReconnectPolicy()) {
+        self.init(resolver: resolver, library: library, reconnectPolicy: reconnectPolicy, engines: .avPlayerOnly)
+    }
+    #endif
+
+    /// Whether the VLCKit engine is available (resolver pre-check and fallback use it).
+    public var vlcAvailable: Bool { engines.vlcAvailable }
 
     // MARK: Opening
 
@@ -128,6 +150,7 @@ public final class PlayerController {
         openTask?.cancel()
         retryTask?.cancel()
         reconnectState = ReconnectState()
+        fallbackEngine = nil
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
         }
@@ -163,83 +186,91 @@ public final class PlayerController {
         }
     }
 
+    /// Engine kind for a resolved stream (fallback wins; VLCKit only when available).
+    func engineKind(for stream: ResolvedStream) -> PlayerEngine {
+        if let fallbackEngine { return fallbackEngine }
+        if stream.engine == .vlcKit, engines.vlcAvailable { return .vlcKit }
+        return .avPlayer
+    }
+
+    private func engineInstance(_ kind: PlayerEngine) -> any PlaybackEngine {
+        if kind == .vlcKit, let make = engines.vlc {
+            if let vlcEngine { return vlcEngine }
+            let e = wire(make())
+            vlcEngine = e
+            return e
+        }
+        if let avEngine { return avEngine }
+        let e = wire(engines.avPlayer())
+        avEngine = e
+        return e
+    }
+
+    /// Routes an engine's events to the controller while it is the active engine.
+    private func wire(_ e: any PlaybackEngine) -> any PlaybackEngine {
+        e.onEvent = { [weak self, weak e] event in
+            guard let self, let e, self.engine === e else { return }
+            self.handle(event)
+        }
+        return e
+    }
+
     private func load(_ stream: ResolvedStream, startMs: Int64?) {
-        var options: [String: Any] = [:]
-        if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
-        let asset = AVURLAsset(url: stream.url, options: options)
-        let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = request?.isLive == true ? 2 : 0
-        attach(item)
-        player.replaceCurrentItem(with: item)
-        if let startMs, startMs > 0 {
-            resumedFromMs = startMs
-            player.seek(to: CMTime(value: startMs, timescale: 1000))
-        }
-        player.play()
-        loadMediaOptions(asset: asset)
+        let next = engineInstance(engineKind(for: stream))
+        if let current = engine, current !== next { current.stop() }
+        engine = next
+        next.setAspect(aspect)
+        if let startMs, startMs > 0 { resumedFromMs = startMs }
+        SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
+        next.load(stream, isLive: request?.isLive == true, startMs: startMs,
+                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage)
     }
 
-    private func attach(_ item: AVPlayerItem) {
-        for o in observers { NotificationCenter.default.removeObserver(o) }
-        observers.removeAll()
-        itemKVO = item.observe(\.status, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in self?.itemStatusChanged() }
-        }
-        let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
-            let error = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError
-            MainActor.assumeIsolated { self?.handleFailure(error) }
-        })
-        observers.append(center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleStall() }
-        })
-        observers.append(center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleEnded() }
-        })
-    }
+    // MARK: Engine events
 
-    private func itemStatusChanged() {
-        guard let item = player.currentItem else { return }
-        switch item.status {
-        case .failed: handleFailure(item.error as NSError?)
-        case .readyToPlay:
-            let d = item.duration.seconds
-            duration = d.isFinite ? d : 0
-        default: break
-        }
-    }
-
-    private func timeControlChanged() {
-        switch player.timeControlStatus {
+    /// Applies an engine event (internal for tests).
+    func handle(_ event: EngineEvent) {
+        switch event {
         case .playing:
             stallTask?.cancel()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             if phase != .playing { phase = .playing }
         case .paused:
             if phase == .playing || phase == .buffering { phase = .paused }
-        case .waitingToPlayAtSpecifiedRate:
+        case .buffering:
             if phase == .playing { phase = .buffering }
-        @unknown default: break
+        case .ready(let d):
+            duration = d.isFinite && d > 0 ? d : 0
+        case .time(let seconds):
+            currentTime = seconds
+            reconnectState = reconnectPolicy.tick(reconnectState, nowMs: SystemClock.monotonicMs())
+            if Date().timeIntervalSince(lastProgressSave) >= 10 { saveProgress(force: false) }
+        case .tracks(let audio, let subtitles, let selA, let selS):
+            audioOptions = audio
+            subtitleOptions = subtitles
+            selectedAudio = selA
+            selectedSubtitle = selS
+        case .failed(let error):
+            handle(error)
+        case .stalled:
+            handleStall()
+        case .ended:
+            handleEnded()
         }
-    }
-
-    private func tick(_ time: CMTime) {
-        let seconds = time.seconds
-        if seconds.isFinite { currentTime = seconds }
-        reconnectState = reconnectPolicy.tick(reconnectState, nowMs: SystemClock.monotonicMs())
-        if Date().timeIntervalSince(lastProgressSave) >= 10 { saveProgress(force: false) }
     }
 
     // MARK: Errors & reconnect
 
-    private func handleFailure(_ error: NSError?) {
-        let mapped = error.map { PlaybackErrorMapper.map($0, container: stream?.container ?? .unknown) } ?? .network(.other)
-        handle(mapped)
-    }
-
-    /// Applies the reconnect policy to a playback error (internal for tests).
+    /// Applies the fallback and reconnect policy to a playback error (internal for tests).
     func handle(_ error: PlaybackError) {
         if case .failed = phase { return }
+        if let stream, let current = engine?.kind, fallbackEngine == nil,
+           let next = ApplePlayback.fallbackEngine(after: error, on: current, vlcAvailable: engines.vlcAvailable) {
+            SafeLog.info("\(current.rawValue) failed (\(error)) – retrying with \(next.rawValue)")
+            fallbackEngine = next
+            load(stream, startMs: request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs))
+            return
+        }
         guard PlaybackErrorMapper.isRecoverable(error), stream != nil else {
             stopPlayback()
             phase = .failed(error)
@@ -267,8 +298,8 @@ public final class PlayerController {
     private func handleStall() {
         stallTask?.cancel()
         stallTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(12))
-            guard !Task.isCancelled, let self, self.player.timeControlStatus != .playing else { return }
+            try? await Task.sleep(for: .seconds(Self.stallTimeoutSeconds))
+            guard !Task.isCancelled, let self, self.engine?.isPlaying != true else { return }
             self.handle(.network(.timeout))
         }
     }
@@ -324,80 +355,46 @@ public final class PlayerController {
     // MARK: Transport
 
     public func togglePlayPause() {
-        if player.timeControlStatus == .playing {
-            player.pause()
+        guard let engine else { return }
+        if engine.isPlaying {
+            engine.pause()
             saveProgress(force: true)
         } else {
-            player.play()
+            engine.play()
         }
     }
 
     public func seek(by seconds: Double) {
         guard request?.isLive == false else { return }
         let target = max(0, min(duration > 0 ? duration - 1 : .greatestFiniteMagnitude, currentTime + seconds))
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        currentTime = target
+        engine?.seek(to: target)
     }
 
     public func seek(toFraction fraction: Double) {
         guard duration > 0 else { return }
-        player.seek(to: CMTime(seconds: duration * min(1, max(0, fraction)), preferredTimescale: 600))
+        let target = duration * min(1, max(0, fraction))
+        currentTime = target
+        engine?.seek(to: target)
     }
 
     public func restartFromBeginning() {
         resumedFromMs = nil
-        player.seek(to: .zero)
+        currentTime = 0
+        engine?.seek(to: 0)
     }
 
     // MARK: Audio / subtitles
 
-    private func loadMediaOptions(asset: AVURLAsset) {
-        Task { [weak self] in
-            let audible = try? await asset.loadMediaSelectionGroup(for: .audible)
-            let legible = try? await asset.loadMediaSelectionGroup(for: .legible)
-            guard let self else { return }
-            self.mediaGroups = (audible, legible)
-            self.audioOptions = Self.options(audible)
-            self.subtitleOptions = Self.options(legible)
-            if let audible, let item = self.player.currentItem {
-                if let lang = self.preferredAudioLanguage,
-                   let match = audible.options.first(where: { $0.extendedLanguageTag?.hasPrefix(lang) == true }) {
-                    item.select(match, in: audible)
-                }
-                self.selectedAudio = item.currentMediaSelection.selectedMediaOption(in: audible).flatMap { audible.options.firstIndex(of: $0) }
-            }
-            if let legible, let item = self.player.currentItem {
-                if let lang = self.preferredSubtitleLanguage,
-                   let match = legible.options.first(where: { $0.extendedLanguageTag?.hasPrefix(lang) == true }) {
-                    item.select(match, in: legible)
-                }
-                self.selectedSubtitle = item.currentMediaSelection.selectedMediaOption(in: legible).flatMap { legible.options.firstIndex(of: $0) }
-            }
-        }
-    }
-
-    private static func options(_ group: AVMediaSelectionGroup?) -> [MediaOption] {
-        guard let group else { return [] }
-        return group.options.enumerated().map { index, option in
-            let tag = option.extendedLanguageTag ?? option.locale?.identifier
-            let name = tag.flatMap { Locale.current.localizedString(forIdentifier: $0) } ?? (option.displayName.isEmpty ? nil : option.displayName)
-            return MediaOption(id: index, name: name, languageCode: tag)
-        }
-    }
-
     public func selectAudio(_ id: Int) {
-        guard let group = mediaGroups.audio, group.options.indices.contains(id), let item = player.currentItem else { return }
-        item.select(group.options[id], in: group)
+        guard audioOptions.contains(where: { $0.id == id }) else { return }
+        engine?.selectAudio(id)
         selectedAudio = id
     }
 
     /// nil → subtitles off.
     public func selectSubtitle(_ id: Int?) {
-        guard let group = mediaGroups.legible, let item = player.currentItem else { return }
-        if let id, group.options.indices.contains(id) {
-            item.select(group.options[id], in: group)
-        } else {
-            item.select(nil, in: group)
-        }
+        engine?.selectSubtitle(id)
         selectedSubtitle = id
     }
 
@@ -436,10 +433,7 @@ public final class PlayerController {
     private func stopPlayback() {
         retryTask?.cancel()
         stallTask?.cancel()
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        for o in observers { NotificationCenter.default.removeObserver(o) }
-        observers.removeAll()
+        engine?.stop()
     }
 
     // MARK: Progress

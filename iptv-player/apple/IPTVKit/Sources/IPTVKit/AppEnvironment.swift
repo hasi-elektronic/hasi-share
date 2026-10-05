@@ -63,7 +63,8 @@ public final class AppEnvironment {
     public private(set) var refreshing: Set<String> = []
 
     public init(config: AppConfig, database: AppDatabase, secureStore: any SecureStore, kv: any KeyValueStore,
-                settings: AppSettings = AppSettings(), transport: any HTTPTransport = URLSessionTransport.shared) throws {
+                settings: AppSettings = AppSettings(), transport: any HTTPTransport = URLSessionTransport.shared,
+                engines: PlaybackEngines? = nil) throws {
         self.config = config
         self.database = database
         self.secureStore = secureStore
@@ -85,7 +86,10 @@ public final class AppEnvironment {
         syncManager = SyncManager(backend: backend, library: library, database: database,
                                   sessionToken: { tokenStore.string(forKey: AccountManager.sessionKey) })
         let repo = sourceRepository
-        player = PlayerController(resolver: StreamResolver(secrets: { repo.secrets(id: $0) }), library: library)
+        // AVPlayer + (iOS/tvOS app) VLCKit engines – docs/ARCHITECTURE.md §3.2, CONTRACT §6.1.
+        let engines = engines ?? .avPlayerOnly
+        player = PlayerController(resolver: StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable),
+                                  library: library, engines: engines)
         wire()
         sourceRepository.registerSecretsForRedaction()
         reloadSources()

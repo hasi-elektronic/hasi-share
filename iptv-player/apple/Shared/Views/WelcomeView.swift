@@ -33,13 +33,17 @@ struct WelcomeView: View {
                 destination(route)
             }
         }
-        .onAppear {
-            switch router.debugScreen {
-            case "addSource": path = [.m3u]
-            case "addXtream": path = [.xtream]
-            case "pairing": path = [.pairing]
-            default: break
-            }
+        .onAppear(perform: applyDebugScreen)
+        .onChange(of: router.debugScreen) { applyDebugScreen() }   // debug hooks may arrive after appear
+    }
+
+    private func applyDebugScreen() {
+        guard path.isEmpty else { return }
+        switch router.debugScreen {
+        case "addSource": path = [.m3u]
+        case "addXtream": path = [.xtream]
+        case "pairing": path = [.pairing]
+        default: break
         }
     }
 

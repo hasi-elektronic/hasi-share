@@ -64,3 +64,22 @@ sonra siler. Özel anahtar TV belleğinden hiç çıkmaz.
 * Gizlilik politikası ve Impressum URL'leri mağaza kayıtlarında ve Ayarlar'da gösterilmeli
   (harici: hukuki metinler hazırlanmalı).
 * Google Play "Data safety" ve Apple "App Privacy" formları için beyan tablosu: `STORE_SETUP.md §5`.
+
+## 7. Üçüncü taraf bileşenler ve lisanslar (Apple: VLCKit)
+* **VLCKit 3.7.3** (MobileVLCKit / TVVLCKit, VideoLAN) – **LGPL-2.1-or-later** (libVLC ve
+  eklentileri; bazı bağımlılıklar LGPL/BSD/MIT). Kaynak: `code.videolan.org/videolan/VLCKit`,
+  ikili: `download.videolan.org/pub/cocoapods/prod/` (resmî CocoaPods/Carthage dağıtımı).
+  `apple/scripts/fetch-vlckit.sh` sürümü ve SHA-256'yı sabitler; ikili depoya girmez.
+* LGPL koşulları için yapılanlar: framework **dinamik** bağlanır ve uygulama paketinde ayrı
+  `Frameworks/MobileVLCKit.framework` / `TVVLCKit.framework` olarak durur (kullanıcı/üçüncü taraf
+  kütüphaneyi değiştirip yeniden bağlayabilir); VLCKit kodu değiştirilmez; kullanılan sürüm ve
+  kaynak adresi burada ve `apple/README.md`'de belgelidir.
+* **Yapılması gereken (yayından önce):** Ayarlar'daki "Açık kaynak lisansları" satırı şu an
+  yalnızca bir etikettir; bir lisans ekranı eklenmeli ve en az şu metni içermelidir:
+  *"Bu uygulama VLCKit/libVLC (© VideoLAN ve VLC yazarları) kullanır; GNU LGPL sürüm 2.1
+  altında lisanslıdır. Kaynak kodu: https://code.videolan.org/videolan/VLCKit"* + LGPL-2.1 tam
+  metni (`apple/Vendor/VLCKit/COPYING.txt`, fetch betiği kopyalar).
+* App Store: LGPL-2.1 dinamik framework ile App Store dağıtımı VideoLAN'ın kendi "VLC for iOS"
+  uygulamasıyla aynı modeldir; ek DRM/kısıtlama getirilmez.
+* Güvenlik: libVLC güvenilmeyen ağ içeriğini ayrıştırır (demuxer/codec) → VideoLAN güvenlik
+  bültenleri izlenmeli, VLCKit düzenli güncellenmeli (`VERSION`/`BUILD`/SHA-256 betikte).

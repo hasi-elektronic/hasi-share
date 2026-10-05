@@ -242,6 +242,37 @@
     <string name="account_dev_code">Development code: %1$s</string>
     <string name="format_test_run" formatted="false">Run test</string>
     <string name="format_test_host" formatted="false">Test server (host for local samples)</string>
+    <string name="nav_guide" formatted="false">TV Guide</string>
+    <string name="home_live_channels" formatted="false">Live channels</string>
+    <string name="home_featured" formatted="false">Featured</string>
+    <string name="epg_today" formatted="false">Today</string>
+    <string name="epg_now_on_air" formatted="false">Now on air</string>
+    <string name="action_more" formatted="false">More</string>
+    <string name="action_see_all" formatted="false">See all</string>
+    <string name="action_info" formatted="false">Info</string>
+    <string name="action_favorite_short" formatted="false">Favorite</string>
+    <string name="episodes" formatted="false">Episodes</string>
+    <string name="rating_value">Rating %1$s</string>
+    <string name="genres_value">Genre: %1$s</string>
+    <string name="seasons_value">Seasons: %1$s</string>
+    <string name="badge_new" formatted="false">NEW</string>
+    <string name="row_top10" formatted="false">Top 10</string>
+    <string name="catchup_title" formatted="false">TV archive · Catch-up</string>
+    <string name="catchup_replay" formatted="false">Replay</string>
+    <string name="catchup_on_air" formatted="false">On air</string>
+    <string name="catchup_xtream_only" formatted="false">Replay is available for Xtream sources.</string>
+    <string name="catchup_empty" formatted="false">No past programmes in the archive.</string>
+    <string name="channel_hide" formatted="false">Hide channel</string>
+    <string name="category_hide" formatted="false">Hide category</string>
+    <string name="hidden_show_all">Show hidden (%1$s)</string>
+    <string name="category_picker" formatted="false">Category</string>
+    <string name="licenses_vlckit_notice" formatted="false">This app uses VLCKit/libVLC (© VideoLAN and the VLC authors), licensed under the GNU LGPL version 2.1. Source code: https://code.videolan.org/videolan/VLCKit</string>
+    <string name="licenses_vlckit_linking" formatted="false">VLCKit is linked dynamically and shipped unmodified as a separate framework; you may replace it with your own build.</string>
+    <string name="licenses_source_code" formatted="false">Source code</string>
+    <string name="licenses_full_text" formatted="false">Full license text</string>
+    <string name="licenses_apache_notice" formatted="false">Licensed under the Apache License 2.0.</string>
+    <string name="format_test_engine">Engine: %1$s</string>
+    <string name="format_test_expected">Expected: %1$s</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>
