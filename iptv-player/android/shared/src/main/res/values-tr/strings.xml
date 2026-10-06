@@ -124,6 +124,12 @@
     <string name="player_buffering" formatted="false">Arabelleğe alınıyor…</string>
     <string name="player_resumed_from">%1$s konumundan devam ediliyor</string>
     <string name="player_previous_channel" formatted="false">Önceki kanal</string>
+    <string name="player_play" formatted="false">Oynat</string>
+    <string name="player_pause" formatted="false">Duraklat</string>
+    <string name="player_seek_back_10" formatted="false">10 saniye geri</string>
+    <string name="player_seek_forward_10" formatted="false">10 saniye ileri</string>
+    <string name="player_seek_delta">%1$s sn</string>
+    <string name="player_position" formatted="false">Oynatma konumu</string>
     <string name="player_locked" formatted="false">Deneme süreniz bitti. İzlemeye devam etmek için satın alın.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
     <string name="paywall_subtitle" formatted="false">Tek seferlik satın alma · abonelik yok</string>

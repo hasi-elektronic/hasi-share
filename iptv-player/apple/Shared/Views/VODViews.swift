@@ -220,8 +220,9 @@ struct MovieDetailView: View {
     @State private var progress: SyncItem?
 
     var body: some View {
-        let resumeMs = progress?.data.positionMs ?? 0
-        let canResume = resumeMs > 5000 && !WatchHistory.isCompleted(positionMs: resumeMs, durationMs: progress?.data.durationMs ?? 0)
+        // Same rule as the request the Play button builds (AppEnvironment.request → ResumePolicy).
+        let resumeMs = ResumePolicy.startPositionMs(positionMs: progress?.data.positionMs, durationMs: progress?.data.durationMs) ?? 0
+        let canResume = resumeMs > 0
         let fav = env.isFavorite(sourceId: movie.sourceId, kind: .movie, itemId: movie.id)
         let duration = info?.durationSec ?? progress?.data.durationMs.map { Int($0 / 1000) }
         let clean = MediaTags.clean(movie.name)

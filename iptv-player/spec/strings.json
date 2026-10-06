@@ -615,6 +615,36 @@
    "tr": "Önceki kanal",
    "de": "Vorheriger Sender"
   },
+  "player_play": {
+   "en": "Play",
+   "tr": "Oynat",
+   "de": "Abspielen"
+  },
+  "player_pause": {
+   "en": "Pause",
+   "tr": "Duraklat",
+   "de": "Pause"
+  },
+  "player_seek_back_10": {
+   "en": "Back 10 seconds",
+   "tr": "10 saniye geri",
+   "de": "10 Sekunden zurück"
+  },
+  "player_seek_forward_10": {
+   "en": "Forward 10 seconds",
+   "tr": "10 saniye ileri",
+   "de": "10 Sekunden vor"
+  },
+  "player_seek_delta": {
+   "en": "{0} s",
+   "tr": "{0} sn",
+   "de": "{0} s"
+  },
+  "player_position": {
+   "en": "Playback position",
+   "tr": "Oynatma konumu",
+   "de": "Wiedergabeposition"
+  },
   "player_locked": {
    "en": "Your trial has ended. Purchase to keep watching.",
    "tr": "Deneme süreniz bitti. İzlemeye devam etmek için satın alın.",

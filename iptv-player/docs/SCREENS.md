@@ -165,7 +165,28 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   açılır). TV'de rakam tuşları: 1,5 sn içinde girilen numaraya geçer. "Önceki kanal" (TV: geri
   değil, OK uzun basış menüsünde / mobil buton).
 * **VOD:** ◀▶ 10 sn ileri/geri (basılı tutunca hızlanır), OK oynat/duraklat. Kaldığı yerden
-  devam: açılışta otomatik devam + "Baştan başla" kısa düğmesi (5 sn görünür).
+  devam: açılışta otomatik devam + "Baştan başla" kısa düğmesi (5 sn görünür, katmandan
+  bağımsız; kayıtlı konum ≥ 10 sn ve < %95 ise).
+  * **Mobil (iOS):** katmanın ortasında büyük taşıma satırı: ⟲10 · oynat/duraklat (64 pt) ·
+    10⟳ (canlıda yalnızca oynat/duraklat). Görüntüye çift dokunma: sol üçte bir −10 sn, sağ
+    üçte bir +10 sn, kısa "−10 sn"/"+10 sn" halkası (ard arda çift dokunmalar toplanır, katman
+    açılıp kapanmaz); tek dokunma katmanı açar/kapatır. Altta sürüklenebilir zaman çizgisi
+    (44 pt dokunma yüksekliği): sürüklerken hedef zaman balonda görünür, gelen zaman
+    güncellemeleri başparmağı oynatmaz, bırakınca atlar. Süre bilinmiyorsa çizgi yalnızca
+    gösterir (sürükleme yok), süre "--:--".
+  * **TV (tvOS):** ◀▶ 10 sn; basılı tutunca 0,3 sn'de bir tekrar, 1 sn sonra 30 sn adım. Katman
+    görünürken odak oynat/duraklat'tadır: OK oynat/duraklat, ◀▶ atlar (odak yana kaymaz);
+    ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Katman kapalıyken OK
+    duraklatır/sürdürür ve katmanı açar (canlıda yalnızca katmanı açar). Siri Remote dokunmatik
+    yüzeyinde kaydırarak sarma v1'de yok (SwiftUI odak modeliyle güvenilir değil); basılı tutma
+    aynı ihtiyacı karşılar.
+  * Katman 3 sn sonra yalnızca oynarken kaybolur: duraklatılmışken, çizgi sürüklenirken,
+    ses/altyazı/oran menüsü açıkken veya kanal listesi açıkken kalır; her atlama/duraklatma
+    sayacı yeniden başlatır.
+  * **İlerleme kaydı:** oynarken 10 sn'de bir, duraklatınca, kapatınca ve uygulama arka plana
+    geçince (her iki motor). Motor süre bildirmezse (bazı MKV/Xtream VOD) konum `durationMs` 0
+    ile yine kaydedilir (devam çalışır; "izlendi" (≥ %95) ve "İzlemeye devam et" satırı süre
+    ister). Dosya sonu = tamamı izlendi.
 * **Görüntü oranı:** Sığdır · Doldur (kırp) · Uzat · 16:9 · 4:3 – seçim kanal başına değil,
   global hatırlanır.
 * **Ses / altyazı:** dil adıyla listelenir (`Türkçe`, `English`, bilinmiyorsa `Parça 2`),

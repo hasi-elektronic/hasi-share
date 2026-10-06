@@ -124,6 +124,12 @@
     <string name="player_buffering" formatted="false">Buffering…</string>
     <string name="player_resumed_from">Resumed from %1$s</string>
     <string name="player_previous_channel" formatted="false">Previous channel</string>
+    <string name="player_play" formatted="false">Play</string>
+    <string name="player_pause" formatted="false">Pause</string>
+    <string name="player_seek_back_10" formatted="false">Back 10 seconds</string>
+    <string name="player_seek_forward_10" formatted="false">Forward 10 seconds</string>
+    <string name="player_seek_delta">%1$s s</string>
+    <string name="player_position" formatted="false">Playback position</string>
     <string name="player_locked" formatted="false">Your trial has ended. Purchase to keep watching.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
     <string name="paywall_subtitle" formatted="false">One-time purchase · no subscription</string>

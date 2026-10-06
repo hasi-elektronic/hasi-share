@@ -315,10 +315,8 @@ public final class AppEnvironment {
         let source = sourceId.flatMap { id in sources.first { $0.id == id } }
         var request = PlaybackRequest(item: item, source: source, channels: channels)
         request.sourceFingerprint = sourceId.flatMap(fingerprint(sourceId:))
-        if !fromStart, !request.isLive, let key = request.contentKey, let progress = try? library.progress(contentKey: key),
-           let position = progress.data.positionMs, let duration = progress.data.durationMs,
-           !WatchHistory.isCompleted(positionMs: position, durationMs: duration), position > 5000 {
-            request.startPositionMs = position
+        if !fromStart, !request.isLive, let key = request.contentKey, let progress = try? library.progress(contentKey: key) {
+            request.startPositionMs = ResumePolicy.startPositionMs(positionMs: progress.data.positionMs, durationMs: progress.data.durationMs)
         }
         return request
     }

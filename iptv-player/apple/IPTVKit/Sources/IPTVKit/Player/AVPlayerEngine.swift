@@ -28,6 +28,8 @@ public final class AVPlayerEngine: PlaybackEngine {
     private var pendingRelax: (item: AVPlayerItem, tuning: LiveStartTuning)?
     /// True once this load forwarded its first `.playing` (which waits for a ready item).
     private var firstPlayingEmitted = false
+    /// Duration last sent with `.ready` (0 = unknown) – a later known length is reported again.
+    private var reportedDuration: Double = 0
 
     public init() {
         player.automaticallyWaitsToMinimizeStalling = true
@@ -40,6 +42,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
                 let seconds = time.seconds
+                self?.reportDurationIfKnown()
                 if seconds.isFinite { self?.onEvent?(.time(seconds)) }
             }
         }
@@ -65,6 +68,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         cancelRelax()
         wantsToPlay = true
         firstPlayingEmitted = false
+        reportedDuration = 0
         var options: [String: Any] = [:]
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
         let asset = AVURLAsset(url: stream.url, options: options)
@@ -117,13 +121,24 @@ public final class AVPlayerEngine: PlaybackEngine {
             onEvent?(.failed(item.error.map { PlaybackErrorMapper.map($0, container: container) } ?? .network(.other)))
         case .readyToPlay:
             let d = item.duration.seconds
-            onEvent?(.ready(duration: d.isFinite ? d : 0))
+            reportedDuration = d.isFinite && d > 0 ? d : 0
+            onEvent?(.ready(duration: reportedDuration))
             if player.timeControlStatus == .playing {
                 scheduleRelaxIfNeeded()
                 emitPlayingIfDue()
             }
         default: break
         }
+    }
+
+    /// Some VOD items (progressive MP4 over slow links, some HLS VOD) only know their length after
+    /// `readyToPlay`; report it once it is known so the scrubber and "watched" work.
+    private func reportDurationIfKnown() {
+        guard reportedDuration == 0, let item = player.currentItem, item.status == .readyToPlay else { return }
+        let d = item.duration.seconds
+        guard d.isFinite, d > 0 else { return }
+        reportedDuration = d
+        onEvent?(.ready(duration: d))
     }
 
     private func timeControlChanged() {
@@ -204,8 +219,11 @@ public final class AVPlayerEngine: PlaybackEngine {
     public func play() { wantsToPlay = true; player.play() }
     public func pause() { wantsToPlay = false; player.pause() }
 
+    /// ±1 s tolerance: the default (keyframe) seek can land several seconds before the target,
+    /// so "+10 s" would only move +5 s on a file with sparse keyframes.
     public func seek(to seconds: Double) {
-        player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600))
+        let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
+        player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance)
     }
 
     // MARK: Audio / subtitles

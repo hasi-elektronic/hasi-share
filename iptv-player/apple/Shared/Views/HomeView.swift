@@ -376,8 +376,8 @@ private struct BrowseHero: View {
     }
 
     private var playTitle: String {
-        let pos = entry?.progress.data.positionMs ?? 0
-        return pos > 5000 ? L10n.t("action_resume_at", L10n.clock(Double(pos) / 1000)) : L10n.t("action_play")
+        let pos = ResumePolicy.startPositionMs(positionMs: entry?.progress.data.positionMs, durationMs: entry?.progress.data.durationMs) ?? 0
+        return pos > 0 ? L10n.t("action_resume_at", L10n.clock(Double(pos) / 1000)) : L10n.t("action_play")
     }
 
     private func play() {

@@ -3,7 +3,8 @@ import XCTest
 
 /// Dual-engine (AVPlayer + VLCKit) player checks. Needs a Range-capable HTTP server with
 /// `vlc-live.m3u` (1: MKV without extension, 2: progressive MPEG-TS, 3: HLS) and
-/// `vlc-movie.m3u` (MKV movie) – see apple/README.md "VLCKit doğrulaması". Skipped when the
+/// `vlc-movie.m3u` (MKV movie) and `vod-movie.m3u` (the same film as progressive MP4 → AVPlayer)
+/// – see apple/README.md "VLCKit doğrulaması". Skipped when the
 /// server is not reachable, so the normal UI test run does not depend on it.
 enum VLCTestSupport {
     static var base: String {
@@ -12,6 +13,7 @@ enum VLCTestSupport {
 
     static var liveM3U: String { "\(base)/vlc-live.m3u" }
     static var movieM3U: String { "\(base)/vlc-movie.m3u" }
+    static var mp4MovieM3U: String { "\(base)/vod-movie.m3u" }
 
     /// Throws `XCTSkip` when the media server is down.
     static func requireServer() throws {

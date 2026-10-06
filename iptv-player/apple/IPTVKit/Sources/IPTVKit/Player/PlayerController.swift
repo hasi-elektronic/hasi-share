@@ -109,7 +109,10 @@ public final class PlayerController {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var openTask: Task<Void, Never>?
     @ObservationIgnored private var stallTask: Task<Void, Never>?
-    @ObservationIgnored private var lastProgressSave: Date = .distantPast
+    /// Time (`nowMs`) of the last progress save of the current request; nil → the next tick saves.
+    @ObservationIgnored private var lastProgressSaveMs: Int64?
+    /// Seek in flight: `.time` ticks far from the target are stale until the engine caught up.
+    @ObservationIgnored private var pendingSeek: (target: Double, atMs: Int64)?
     /// Engine forced for the current stream after a fallback (survives reconnects).
     @ObservationIgnored private var fallbackEngine: PlayerEngine?
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -160,6 +163,8 @@ public final class PlayerController {
         retryTask?.cancel()
         reconnectState = ReconnectState()
         fallbackEngine = nil
+        lastProgressSaveMs = nil
+        pendingSeek = nil
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
         }
@@ -170,7 +175,13 @@ public final class PlayerController {
         selectedSubtitle = nil
         currentTime = 0
         duration = 0
-        resumedFromMs = nil
+        // Resume position applied at open (not on reconnects / engine fallback).
+        resumedFromMs = request.isLive ? nil : request.startPositionMs.flatMap { $0 > 0 ? $0 : nil }
+        if let resumedFromMs {
+            // The time label starts at the resume point; ticks from before the engine got there are stale.
+            currentTime = Double(resumedFromMs) / 1000
+            pendingSeek = (currentTime, nowMs())
+        }
         guard canPlay() else {
             stopPlayback()
             phase = .locked
@@ -240,7 +251,6 @@ public final class PlayerController {
         if let current = engine, current !== next { current.stop() }
         engine = next
         next.setAspect(aspect)
-        if let startMs, startMs > 0 { resumedFromMs = startMs }
         SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
         let isLive = request?.isLive == true
         next.load(stream, isLive: isLive, startMs: startMs,
@@ -261,15 +271,24 @@ public final class PlayerController {
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             if phase != .playing { phase = .playing }
         case .paused:
-            if phase == .playing || phase == .buffering { phase = .paused }
+            if phase == .playing || phase == .buffering {
+                phase = .paused
+                saveProgress(force: true)
+            }
         case .buffering:
             if phase == .playing { phase = .buffering }
         case .ready(let d):
             duration = d.isFinite && d > 0 ? d : 0
         case .time(let seconds):
+            if let seek = pendingSeek {
+                // A tick from before the seek completed would make the time label jump back.
+                if abs(seconds - seek.target) > Self.seekToleranceSeconds, nowMs() - seek.atMs < Self.seekSettleMs { break }
+                pendingSeek = nil
+            }
             currentTime = seconds
             reconnectState = reconnectPolicy.tick(reconnectState, nowMs: SystemClock.monotonicMs())
-            if Date().timeIntervalSince(lastProgressSave) >= 10 { saveProgress(force: false) }
+            if let last = lastProgressSaveMs, nowMs() - last < Self.progressSaveIntervalMs { break }
+            saveProgress(force: false)
         case .tracks(let audio, let subtitles, let selA, let selS):
             audioOptions = audio
             subtitleOptions = subtitles
@@ -337,6 +356,8 @@ public final class PlayerController {
     }
 
     private func handleEnded() {
+        // End of file = fully watched (the last tick can be a second or more before the end).
+        if request?.isLive == false, duration > 0 { currentTime = duration }
         saveProgress(force: true)
         phase = .ended
     }
@@ -388,32 +409,43 @@ public final class PlayerController {
 
     public func togglePlayPause() {
         guard let engine else { return }
-        if engine.isPlaying {
+        if phase == .ended {
+            // Play again from the start after the end of a VOD.
+            seek(to: 0)
+            engine.play()
+        } else if engine.isPlaying || phase == .playing || phase == .buffering {
+            // Intent, not only `isPlaying`: a pause during buffering must pause too.
             engine.pause()
+            phase = .paused
             saveProgress(force: true)
         } else {
             engine.play()
         }
     }
 
+    /// ±seconds (VOD), clamped to [0, duration − 1 s] (unknown duration: no upper limit).
+    /// Repeated presses accumulate from the pending target.
     public func seek(by seconds: Double) {
         guard request?.isLive == false else { return }
-        let target = max(0, min(duration > 0 ? duration - 1 : .greatestFiniteMagnitude, currentTime + seconds))
-        currentTime = target
-        engine?.seek(to: target)
+        let upper = duration > 0 ? max(0, duration - 1) : .greatestFiniteMagnitude
+        seek(to: max(0, min(upper, currentTime + seconds)))
     }
 
+    /// Scrubber release (0…1 of the duration; no-op while the duration is unknown).
     public func seek(toFraction fraction: Double) {
-        guard duration > 0 else { return }
-        let target = duration * min(1, max(0, fraction))
-        currentTime = target
-        engine?.seek(to: target)
+        guard request?.isLive == false, duration > 0 else { return }
+        seek(to: duration * min(1, max(0, fraction)))
     }
 
     public func restartFromBeginning() {
         resumedFromMs = nil
-        currentTime = 0
-        engine?.seek(to: 0)
+        seek(to: 0)
+    }
+
+    private func seek(to target: Double) {
+        currentTime = target
+        pendingSeek = (target, nowMs())
+        engine?.seek(to: target)
     }
 
     // MARK: Audio / subtitles
@@ -496,16 +528,24 @@ public final class PlayerController {
         onLibraryChange?()
     }
 
+    /// Progress save interval while playing (SCREENS §3.7: every 10 s + on pause/exit).
+    public static let progressSaveIntervalMs: Int64 = 10_000
+    /// Time ticks within this distance of a seek target count as "seek done".
+    static let seekToleranceSeconds: Double = 3
+    /// After this long the engine's ticks are trusted again even if far from the target.
+    static let seekSettleMs: Int64 = 3_000
+
+    /// Saves the VOD position. Without a reported duration the position is still saved with
+    /// `durationMs` 0 (resume works; "watched" needs the duration).
     private func saveProgress(force: Bool) {
-        lastProgressSave = Date()
-        guard let request, !request.isLive, let key = request.contentKey, let library,
-              duration > 0, currentTime > 1 else { return }
+        guard let request, !request.isLive, let key = request.contentKey, let library, currentTime > 1 else { return }
+        lastProgressSaveMs = nowMs()
         var seriesKey: String?
         if case .episode(let e, _) = request.item, let fp = request.sourceFingerprint {
             seriesKey = ContentKey.make(fingerprint: fp, kind: .series, itemId: e.seriesId)
         }
         _ = try? library.saveProgress(contentKey: key, title: request.title, kind: request.contentKind,
-                                      positionMs: Int64(currentTime * 1000), durationMs: Int64(duration * 1000),
+                                      positionMs: Int64(currentTime * 1000), durationMs: Int64(max(0, duration) * 1000),
                                       posterUrl: request.posterUrl, seriesKey: seriesKey, nowMs: nowMs())
         onLibraryChange?()
     }
