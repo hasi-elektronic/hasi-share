@@ -307,6 +307,9 @@
     <string name="fav_category_add" formatted="false">Add category to favorites</string>
     <string name="fav_category_remove" formatted="false">Remove category from favorites</string>
     <string name="live_all_channels" formatted="false">All channels</string>
+    <string name="live_next_at">Next %1$s · %2$s</string>
+    <string name="live_watching" formatted="false">Watching</string>
+    <string name="live_open_guide" formatted="false">Show in TV guide</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

@@ -49,8 +49,8 @@ boyutu başlıkta `accessibility2` ile sınırlıdır.
 Şerit hero üzerinde **şeffaf** durur, içerik kaydırılınca **siyaha** döner (hero'suz ekranlarda
 hep siyah). Ara → genel arama ekranı (kanal + film + dizi). Ayarlar **sheet** olarak açılır (§3.9).
 Favoriler ayrı sekme değildir: Ana Sayfa'da "Favoriler" satırı (+ "Tümünü gör" → Favoriler ekranı:
-Kanallar · Filmler · Diziler segmenti), Filmler/Diziler'de "Favoriler" satırı, Canlı TV ve TV Rehberi'nde
-kategori seçicinin ilk öğesi "Favoriler".
+Kanallar · Filmler · Diziler segmenti), Filmler/Diziler'de "Favoriler" satırı, Canlı TV'de ilk
+kategori çipi "★ Favoriler", TV Rehberi'nde "Tümü"nün ardından "Favoriler".
 **Favori: her yerde tek dokunuş, onaysız, 4 sn geri al.**
 1. ☆/★ düğmesi kanal kartında, film/dizi posterinin köşesinde (iOS), detay sayfasında, hero'da ve
    oynatıcı katmanında; tek dokunuş durumu **anında** değiştirir (iyimser güncelleme, onay diyaloğu yok).
@@ -71,7 +71,7 @@ Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster
 Üstte yerel tvOS sekme çubuğu (Apple TV uygulaması gibi): **🔍 · Ana Sayfa · Filmler · Diziler ·
 Canlı TV · TV Rehberi · ⚙️**. Sekmeye odaklanmak onu seçer; aşağı ok içeriğe iner (açılışta odak
 sekme çubuğundadır – tvOS standardı; içeriğin ★ öğesi aşağı okla ilk ulaşılan öğedir). Canlı TV
-kartlarında tek odak hedefi vardır (favori / arşiv uzun OK menüsünde).
+listesinde satır başına tek odak hedefi vardır (favori / arşiv uzun OK menüsünde).
 
 **Geri tuşu kuralları (TV, öngörülebilir):**
 1. Oynatıcıda: açık panel/menü varsa kapatır → yoksa oynatıcıdan çıkar (önceki ekrana, odak
@@ -137,21 +137,32 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   edilir) QuickStart çalışmaz. Hedef: soğuk başlangıç → ilk kare ≤ 1,5 sn.
 
 ### 3.3 Canlı TV
-* **Kanal kartı grid'i:** iPhone dikeyde 2 sütun, iPad 3–4, TV 4. Kart: renkli logo karosu + kanal
-  adı + kalite rozeti (adındaki HD/FHD/4K/UHD/SD etiketinden), şimdiki programın saat aralığı + başlığı,
-  ince `primary` ilerleme çubuğu, alt satırda küçük eylem ikonları (44 pt): ☆ favori (tek dokunuş, §2),
-  ⟲ geçmiş yayın (yalnız kanal destekliyorsa → arşiv sheet'i §3.4). EPG yoksa "Program bilgisi yok".
-  TV'de ikonlar yalnızca göstergedir (kart başına tek odak).
-* **Favoriler önce:** "Tümü" seçiliyken grid bölümlüdür: **★ Favoriler** (favori kanallar, cihazdaki sıra) →
-  her favori kategori için bir bölüm (ilk 24 kanal + "Tümünü gör" → o kategori) → **Tüm kanallar**
-  (sayfalı). ⭐ değişince yalnızca favori bölümleri yeniden yüklenir.
-* Üstte ortada **yüzen kategori çipi** ("🇹🇷 Türkiye ⌄") → menü: Tümü · Favoriler · favori kategoriler (⭐)
-  · diğer kategoriler (bayraklı) · "Gizlenenleri göster (n)". Bir kategori seçiliyken menünün başında
-  "⭐ Kategoriyi favorilere ekle / favorilerden çıkar" (kaynak başına, yalnız bu cihazda).
-* Dokun / OK → oynatıcı. **Uzun bas** (iOS bağlam menüsü / TV uzun OK) → Favorilere ekle/çıkar ·
-  **Kanalı gizle** · **Kategoriyi gizle**. Gizlenen kanal/kategori listeleri kaynak başına **yerel**
-  saklanır (UserDefaults, senkronize edilmez); "Gizlenenleri göster" hepsini geri getirir.
-* Büyük listeler: sayfalı (Paging / lazy), arama debounced 250 ms, FTS.
+**Liste görünümü** (TestFlight build 6 sonrası kullanıcı kararı: kart grid'i yerine, ekranda daha çok kanal).
+* **Satır** (iPhone ~76 pt): kanal numarası (soluk, eş aralıklı) · 48 pt renkli logo karosu (logo sığdırılmış)
+  · ad (yarı kalın, tek satır) + kalite rozeti (adındaki HD/FHD/4K/UHD/SD) + ⟲ (geçmiş yayın varsa) ·
+  **Şimdi:** saat aralığı + program başlığı (tek satır) + ince `primary` ilerleme çubuğu · **Sonra:**
+  "Sonra 21:00 · Başlık" (ikincil, tek satır) · sağda **☆/★** (tek dokunuş, §2; yalnız iOS). EPG yoksa
+  "Program bilgisi yok". Oynatılan kanalın satırı: solda `primary` çubuk + "● İzleniyor".
+* **Kategori çipleri** (iOS: başlığın altında sabit, yatay kaydırılır): **★ Favoriler (n)** · **Tümü (n)** ·
+  favori kategoriler (⭐) · diğer kategoriler; bayrak emojisi kategori adından (TR/Türkiye → 🇹🇷, DE → 🇩🇪 …),
+  yanında kanal sayısı (çoklu kategori üyeliği dahil, tek sorgu). Seçili çip dolu beyaz. Kategori çipine
+  uzun bas → "⭐ Kategoriyi favorilere ekle / çıkar" (kaynak başına, yalnız bu cihazda). Gizlenen varsa
+  sonda "Gizlenenleri göster (n)".
+* **Favoriler önce:** "Tümü" seçiliyken önce **★ Favoriler** bölümü (cihazdaki sıra), sonra **Tüm kanallar**
+  (sayfalı). ⭐ değişince yalnızca favori bölümü ve sayılar yeniden yüklenir.
+* Dokun → oynatıcı. **Uzun bas** (iOS bağlam menüsü / TV uzun OK) → Favorilere ekle/çıkar (ilk öğe) ·
+  **Kanalı gizle** · **Kategoriyi gizle** · ⟲ Arşiv (varsa) · **Rehberde göster**. Gizlenen kanal/kategori
+  listeleri kaynak başına **yerel** saklanır (UserDefaults, senkronize edilmez).
+* **Geniş ekran** (iPad, iPhone yatay; genişlik ≥ 700 pt): solda liste (~%55), sağda **bilgi paneli**: logo + ad,
+  **ŞİMDİ YAYINDA** başlık + saat + ilerleme + açıklama, ▶ Oynat · ☆ · 📅 Rehber · ⟲ Arşiv, **BUGÜN** sıradaki
+  programlar (saat · başlık · süre). İlk dokunuş satırı seçer (panel), seçili satıra dokunmak oynatır.
+  Otomatik video önizlemesi yok.
+* **Apple TV:** solda kategori sütunu (dikey, sayılı; OK seçer) | kanal listesi | bilgi paneli (butonsuz).
+  Satır başına **tek odak hedefi** (⭐ gösterge; favori: uzun OK menüsü veya oynatıcıda ▲ bilgi kartı).
+  D-pad ▲▼ satırlar arasında akıcı; panel odağı 150 ms gecikmeyle izler; OK oynatır.
+* Performans: lazy liste, sabit id'ler, sayfa başına (120) tek now/next sorgusu (§ bütçe ≤ 20 ms), logolar
+  küçültülerek önbellekli (ImageLoader); 5 000+ kanallı kategoride 60 fps kaydırma hedefi. Arama ayrı
+  ekranda (debounce 250 ms, FTS).
 
 ### 3.4 TV Rehberi (EPG)
 * Kanal başına bir satır: solda sabit renkli logo karosu (genişliğin ~¼'ü), sağda yatay kaydırılan

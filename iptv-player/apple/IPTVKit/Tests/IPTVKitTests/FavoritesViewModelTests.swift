@@ -22,14 +22,17 @@ final class FavoritesViewModelTests: XCTestCase {
         env.toggleFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id, title: channel.name, posterUrl: nil)
     }
 
-    func testLiveGridShowsFavoritesThenFavoriteCategories() async throws {
+    func testLiveListShowsFavoritesFirstAndChipCounts() async throws {
         let env = try await makeEnvironment()
-        let sourceId = try XCTUnwrap(env.currentSource?.id)
         let model = LiveTVViewModel(env: env)
         model.showsFavoriteSections = true
         model.reload()
         XCTAssertTrue(model.favoriteRows.isEmpty)
-        XCTAssertTrue(model.favoriteCategorySections.isEmpty)
+        XCTAssertEqual(model.favoriteCount, 0)
+        XCTAssertEqual(model.allCount, model.totalCount)
+        let category = try XCTUnwrap(model.categories.first)
+        let inCategory = try env.catalog.channelCount(sourceId: XCTUnwrap(env.currentSource?.id), categoryId: category.id)
+        XCTAssertEqual(model.categoryCounts[category.id], inCategory, "chip count = category membership")
         let last = try XCTUnwrap(model.rows.last?.channel)
         let first = try XCTUnwrap(model.rows.first?.channel)
 
@@ -37,23 +40,12 @@ final class FavoritesViewModelTests: XCTestCase {
         favorite(env, first)
         model.reloadFavorites()
         XCTAssertEqual(model.favoriteRows.map(\.channel.id), [first.id, last.id], "newest first")
+        XCTAssertEqual(model.favoriteCount, 2)
         XCTAssertEqual(model.rows.count, model.totalCount, "the paged rest stays")
 
-        let category = try XCTUnwrap(model.categories.first)
-        env.favorites.toggleCategory(sourceId: sourceId, categoryId: category.id)
-        model.reloadFavorites()
-        XCTAssertEqual(model.favoriteCategorySections.map(\.category.id), [category.id])
-        let section = try XCTUnwrap(model.favoriteCategorySections.first)
-        XCTAssertFalse(section.rows.isEmpty)
-        XCTAssertTrue(section.rows.allSatisfy { $0.channel.categoryId == category.id })
-
-        // Other sources' categories with the same id do not leak in; a category filter has no sections.
-        env.favorites.toggleCategory(sourceId: sourceId, categoryId: category.id)
-        env.favorites.toggleCategory(sourceId: "other-source", categoryId: category.id)
-        model.reloadFavorites()
-        XCTAssertTrue(model.favoriteCategorySections.isEmpty)
         model.filter = .category(category.id)
-        XCTAssertTrue(model.favoriteRows.isEmpty)
+        XCTAssertTrue(model.favoriteRows.isEmpty, "favorites section only in All")
+        XCTAssertEqual(model.favoriteCount, 2, "chip count stays")
         model.filter = .favorites
         XCTAssertEqual(model.rows.map(\.channel.id), [first.id, last.id], "Favorites filter: the favorites as rows")
     }

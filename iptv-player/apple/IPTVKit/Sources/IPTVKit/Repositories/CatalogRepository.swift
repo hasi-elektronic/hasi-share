@@ -120,6 +120,13 @@ public final class CatalogRepository: Sendable {
         return try db.scalar("SELECT COUNT(*) FROM channels WHERE source_id = ?", [.text(sourceId)])
     }
 
+    /// Live channels per category (all memberships) in one query – the category chips' counts.
+    public func channelCountsByCategory(sourceId: String) throws -> [String: Int] {
+        let pairs = try db.query("SELECT category_id, COUNT(*) FROM item_categories WHERE source_id = ? AND kind = 'live' GROUP BY category_id",
+                                 [.text(sourceId)]) { ($0.string(0), $0.int(1)) }
+        return Dictionary(pairs, uniquingKeysWith: +)
+    }
+
     public func channel(sourceId: String, id: String) throws -> Channel? {
         try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id = ?",
                           [.text(sourceId), .text(id)], map: Self.channel)

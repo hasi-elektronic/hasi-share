@@ -218,11 +218,9 @@ final class IOSFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch.waitForExistence(timeout: 10))
         sleep(2)
         UITestSupport.snap("\(dir)-08-live-grid", in: self)
-        app.buttons["category_menu"].tap()
+        app.buttons["live_chip_0"].tap()   // ★ Favorites chip
         sleep(1)
-        UITestSupport.snap("\(dir)-09-live-category-menu", in: self)
-        app.buttons["Favorites"].firstMatch.tap()
-        sleep(1)
+        UITestSupport.snap("\(dir)-09-live-favorites-chip", in: self)
 
         Self.openSection("guide", in: app)
         XCTAssertTrue(app.buttons["guide_filter_0"].waitForExistence(timeout: 10), "guide chips")

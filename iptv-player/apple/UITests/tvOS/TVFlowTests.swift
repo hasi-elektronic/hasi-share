@@ -55,17 +55,21 @@ final class TVFlowTests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Home"].hasFocus, "focus should be on the Home tab")
         UITestSupport.snap("tvos-03-tab-bar-focused", in: self)
 
-        // Home → Movies → Series → Live TV (selection follows focus), down into the channel grid.
+        // Home → Movies → Series → Live TV (selection follows focus), down into the channel list.
         XCTAssertTrue(focus(liveTab, pressing: .right, limit: 5))
         sleep(2)
         let firstCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch
         XCTAssertTrue(firstCard.waitForExistence(timeout: 10))
-        remote.press(.down)   // category chip
+        remote.press(.down)   // into the content (category column or list)
         sleep(1)
-        remote.press(.down)   // first card row
-        sleep(1)
-        UITestSupport.snap("tvos-04-live-grid", in: self)
-        remote.press(.right)
+        let focusedRow = app.buttons.matching(NSPredicate(format: "(identifier BEGINSWITH 'channel_' OR identifier BEGINSWITH 'live_favorite_') AND hasFocus == true"))
+        for _ in 0..<4 where focusedRow.count == 0 {
+            remote.press(.right)   // category column → channel list
+            sleep(1)
+        }
+        XCTAssertEqual(focusedRow.count, 1, "a channel row has the focus")
+        UITestSupport.snap("tvos-04-live-list", in: self)
+        remote.press(.down)
         sleep(1)
         UITestSupport.snap("tvos-05-live-focus-moved", in: self)
 

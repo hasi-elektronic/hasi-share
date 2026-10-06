@@ -20,17 +20,8 @@ public enum ChannelFilter: Hashable, Sendable {
     case category(String)
 }
 
-/// A favorite category's preview section in the live grid ("All" filter).
-public struct LiveCategorySection: Identifiable, Sendable {
-    public var category: IPTVCore.Category
-    public var rows: [ChannelRow]
-    /// All channels of the category (the section shows the first `LiveTVViewModel.categoryPreview`).
-    public var total: Int
-    public var id: String { category.id }
-}
-
-/// Live TV list (docs/SCREENS.md §3.3): category chips, paged channel rows, now/next EPG.
-/// With the "All" filter favorite channels come first, then favorite categories, then the rest.
+/// Live TV list (docs/SCREENS.md §3.3): category chips with counts, paged channel rows, now/next EPG.
+/// With the "All" filter the favorite channels come first (own section), then all channels.
 @MainActor
 @Observable
 public final class LiveTVViewModel {
@@ -39,10 +30,12 @@ public final class LiveTVViewModel {
     public private(set) var rows: [ChannelRow] = []
     /// "All" filter: favorite channels (manual order), shown as the first section.
     public private(set) var favoriteRows: [ChannelRow] = []
-    /// "All" filter: one preview section per favorite category (after the favorites).
-    public private(set) var favoriteCategorySections: [LiveCategorySection] = []
-    public static let categoryPreview = 24
-    /// Live grid only: build the favorite sections (the guide shows plain rows).
+    /// Channels per category id (chips) and in the whole source.
+    public private(set) var categoryCounts: [String: Int] = [:]
+    public private(set) var allCount = 0
+    /// Favorite channels of the current source (the "★ Favorites" chip).
+    public private(set) var favoriteCount = 0
+    /// Live list only: build the favorites section and the chip counts (the guide shows plain rows).
     @ObservationIgnored public var showsFavoriteSections = false
     public private(set) var totalCount = 0
     public private(set) var isLoading = false
@@ -57,6 +50,13 @@ public final class LiveTVViewModel {
     public func reload() {
         sourceId = env.currentSource?.id
         categories = sourceId.flatMap { try? env.catalog.categories(sourceId: $0, kind: .live) } ?? []
+        if showsFavoriteSections, let sourceId {
+            categoryCounts = (try? env.catalog.channelCountsByCategory(sourceId: sourceId)) ?? [:]
+            allCount = (try? env.catalog.channelCount(sourceId: sourceId)) ?? 0
+        } else {
+            categoryCounts = [:]
+            allCount = 0
+        }
         rows = []
         totalCount = 0
         if let sourceId, filter != .favorites {
@@ -66,24 +66,20 @@ public final class LiveTVViewModel {
         reloadFavorites()
     }
 
-    /// Re-reads only what favorites change (after a ⭐ toggle): the favorite sections of "All" or
+    /// Re-reads only what favorites change (after a ⭐ toggle): the favorites section of "All" or
     /// the rows of the Favorites filter; the paged rows of "All" stay as they are.
     public func reloadFavorites() {
         favoriteRows = []
-        favoriteCategorySections = []
+        favoriteCount = 0
         guard let sourceId else { return }
+        guard filter == .favorites || showsFavoriteSections else { return }
+        let favorites = favoriteChannels(sourceId: sourceId)
+        favoriteCount = favorites.count
         if filter == .favorites {
-            rows = attachEpg(favoriteChannels(sourceId: sourceId))
+            rows = attachEpg(favorites)
             totalCount = rows.count
-            return
-        }
-        guard filter == .all, showsFavoriteSections else { return }
-        favoriteRows = attachEpg(favoriteChannels(sourceId: sourceId))
-        let ids = env.favorites.favoriteCategoryIds(sourceId: sourceId)
-        favoriteCategorySections = categories.filter { ids.contains($0.id) }.map { category in
-            let channels = (try? env.catalog.channels(sourceId: sourceId, categoryId: category.id, offset: 0, limit: Self.categoryPreview)) ?? []
-            let total = (try? env.catalog.channelCount(sourceId: sourceId, categoryId: category.id)) ?? channels.count
-            return LiveCategorySection(category: category, rows: attachEpg(channels), total: total)
+        } else if filter == .all {
+            favoriteRows = attachEpg(favorites)
         }
     }
 

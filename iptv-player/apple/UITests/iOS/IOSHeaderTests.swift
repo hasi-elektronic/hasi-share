@@ -49,7 +49,7 @@ final class IOSHeaderTests: XCTestCase {
     static func assertContent(_ id: String, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let element: XCUIElement
         switch id {
-        case "live": element = app.buttons["category_menu"]
+        case "live": element = app.buttons["live_chip_0"]
         case "guide": element = app.buttons["guide_filter_0"]
         default: element = app.buttons["hero_play"]
         }
@@ -151,12 +151,12 @@ final class IOSHeaderTests: XCTestCase {
         UITestSupport.snap("header-05-large-type-home", in: self)
         Self.fingerTap("live", in: app)
         Self.assertSelected("live", in: app)
-        let menu = app.buttons["category_menu"]
+        let menu = app.buttons["live_chip_0"]
         XCTAssertTrue(menu.waitForExistence(timeout: 10))
         sleep(1)
         UITestSupport.snap("header-06-large-type-live", in: self)
         let headerBottom = Self.tabs.map { app.buttons["tab_\($0)"].frame.maxY }.max() ?? 0
-        XCTAssertGreaterThanOrEqual(menu.frame.minY, headerBottom, "category menu below the header (menu \(menu.frame), header bottom \(headerBottom))")
+        XCTAssertGreaterThanOrEqual(menu.frame.minY, headerBottom, "category chips below the header (chip \(menu.frame), header bottom \(headerBottom))")
         Self.fingerTap("guide", in: app)
         Self.assertSelected("guide", in: app)
     }

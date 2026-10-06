@@ -33,150 +33,22 @@ private func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow
     return rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
 }
 
-/// Floating category chip ("🇹🇷 Türkiye ⌄") with the category menu (SCREENS §3.3).
-private struct CategoryChipMenu: View {
-    @Environment(AppEnvironment.self) private var env
-    @Bindable var model: LiveTVViewModel
-
-    var body: some View {
-        let items = channelFilters(model, env: env)
-        let current = items.first { $0.id == model.filter }?.title ?? L10n.t("all")
-        let hiddenCount = env.currentSource.map { HiddenStore.shared.count($0.id) } ?? 0
-        Menu {
-            // ⭐ for the selected category (device-local, per source): favorite categories come
-            // right after "Favorites" here and as sections after the favorite channels in "All".
-            if case .category(let categoryId) = model.filter, let sid = env.currentSource?.id {
-                let on = env.favorites.isFavoriteCategory(sourceId: sid, categoryId: categoryId)
-                Button { env.favorites.toggleCategory(sourceId: sid, categoryId: categoryId) } label: {
-                    Label(L10n.t(on ? "fav_category_remove" : "fav_category_add"), systemImage: on ? "star.slash" : "star")
-                }
-                .accessibilityIdentifier("fav_category_toggle")
-                Divider()
-            }
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                Button {
-                    model.filter = item.id
-                } label: {
-                    let flag = CountryFlag.emoji(for: item.title).map { "\($0)  " } ?? ""
-                    let star = isStarred(item.id, env: env) && item.id != .favorites ? "⭐ " : ""
-                    if model.filter == item.id {
-                        Label(star + flag + CountryFlag.strippedTitle(item.title), systemImage: "checkmark")
-                    } else {
-                        Text(star + flag + CountryFlag.strippedTitle(item.title))
-                    }
-                }
-            }
-            if hiddenCount > 0, let sid = env.currentSource?.id {
-                Divider()
-                Button { HiddenStore.shared.showAll(sourceId: sid); model.reload() } label: {
-                    Label(L10n.t("hidden_show_all", String(hiddenCount)), systemImage: "eye")
-                }
-            }
-        } label: {
-            HStack(spacing: Theme.isTV ? 12 : 6) {
-                if isStarred(model.filter, env: env) {
-                    Image(systemName: "star.fill").foregroundStyle(Theme.warning)
-                }
-                if model.filter != .favorites, let flag = CountryFlag.emoji(for: current) {
-                    Text(flag)
-                }
-                Text(CountryFlag.strippedTitle(current)).lineLimit(1)
-                Image(systemName: "chevron.down").font(Theme.isTV ? .system(size: 20, weight: .bold) : .caption.weight(.bold))
-            }
-            .font(Theme.isTV ? Theme.caption.weight(.semibold) : .subheadline.weight(.semibold))
-            .foregroundStyle(Theme.textPrimary)
-            .padding(.horizontal, Theme.isTV ? 28 : 16).padding(.vertical, Theme.isTV ? 14 : 8)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .background(Capsule().fill(Theme.surfaceElevated.opacity(0.6)))
-            .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
-        }
-        #if os(tvOS)
-        .buttonStyle(CardButtonStyle(radius: 40, scale: 1.08))
-        #endif
-        .accessibilityLabel(L10n.t("category_picker"))
-        .accessibilityValue(current)
-        .accessibilityIdentifier("category_menu")
-    }
-}
-
-/// Live TV (SCREENS §3.3): grid of channel cards with a floating category chip.
+/// Live TV (SCREENS §3.3): a channel LIST (more channels on screen than the old card grid).
+/// iPhone portrait: sticky category chips + list. Wide (iPad, iPhone landscape): list + info panel.
+/// Apple TV: category column | list | info panel (focus drives the panel, 150 ms debounce).
 struct LiveTVView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @State private var model: LiveTVViewModel?
     @State private var archiveChannel: Channel?
-
-    private var columns: [GridItem] {
-        #if os(tvOS)
-        Array(repeating: GridItem(.flexible(), spacing: 40, alignment: .top), count: 4)
-        #else
-        [GridItem(.adaptive(minimum: 160, maximum: 320), spacing: 10, alignment: .top)]
-        #endif
-    }
+    /// Row shown in the info panel (wide layouts / tvOS focus).
+    @State private var selected: Channel?
+    @State private var selectTask: Task<Void, Never>?
 
     var body: some View {
-        ZStack(alignment: .top) {
+        Group {
             if let model {
-                let sid = env.currentSource?.id
-                let rows = visibleRows(model.rows, sourceId: sid)
-                let favorites = visibleRows(model.favoriteRows, sourceId: sid)
-                let categorySections = model.favoriteCategorySections
-                let hasSections = !favorites.isEmpty || !categorySections.isEmpty
-                ScrollView {
-                    #if os(tvOS)
-                    CategoryChipMenu(model: model).padding(.top, 20).padding(.bottom, 10)
-                    #endif
-                    if rows.isEmpty && !hasSections {
-                        EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
-                                       text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
-                            .frame(height: 400)
-                    }
-                    // "All": favorite channels first (manual order), then favorite categories, then the rest.
-                    // Separate grids per section: a Section inserted above existing LazyVGrid content
-                    // was not rendered until the view was rebuilt.
-                    VStack(alignment: .leading, spacing: Theme.isTV ? 40 : 10) {
-                        if !favorites.isEmpty {
-                            sectionHeader(L10n.t("nav_favorites"), icon: "star.fill", id: "live_section_favorites")
-                            let zap = favorites.map(\.channel)
-                            LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
-                                ForEach(favorites) { row in
-                                    LiveChannelCard(row: row, zapList: zap, identifier: "live_favorite_\(row.channel.id)",
-                                                    onArchive: { archiveChannel = row.channel })
-                                }
-                            }
-                        }
-                        ForEach(categorySections) { section in
-                            let title = [CountryFlag.emoji(for: section.category.name), CountryFlag.strippedTitle(section.category.name)]
-                                .compactMap { $0 }.joined(separator: " ")
-                            sectionHeader(title, icon: "star", id: "live_section_category_\(section.category.id)",
-                                          seeAll: section.total > section.rows.count ? { model.filter = .category(section.category.id) } : nil)
-                            let sectionRows = visibleRows(section.rows, sourceId: sid)
-                            let zap = sectionRows.map(\.channel)
-                            LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
-                                ForEach(sectionRows) { row in
-                                    LiveChannelCard(row: row, zapList: zap, identifier: "live_category_channel_\(row.channel.id)",
-                                                    onArchive: { archiveChannel = row.channel })
-                                }
-                            }
-                        }
-                        if hasSections, !rows.isEmpty { sectionHeader(L10n.t("live_all_channels"), icon: nil, id: "live_section_all") }
-                        LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
-                            ForEach(rows) { row in
-                                LiveChannelCard(row: row, zapList: model.channels, onArchive: { archiveChannel = row.channel })
-                                    .onAppear { model.loadMoreIfNeeded(current: row) }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, Theme.safeH)
-                    .padding(.top, Theme.isTV ? 10 : 56)
-                    .padding(.bottom, Theme.isTV ? 60 : 30)
-                }
-                #if os(tvOS)
-                .scrollClipDisabled()
-                #endif
-                #if !os(tvOS)
-                CategoryChipMenu(model: model).padding(.top, 6)
-                #endif
+                content(model)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -194,137 +66,389 @@ struct LiveTVView: View {
         }
         .onChange(of: env.catalogVersion) { model?.reload() }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+        .onChange(of: model?.filter) { selected = nil }
     }
 
-    /// Section title of the grid ("Favorites", favorite categories with "See all", "All channels").
-    private func sectionHeader(_ title: String, icon: String?, id: String, seeAll: (() -> Void)? = nil) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.isTV ? 12 : 6) {
-            if let icon { Image(systemName: icon).foregroundStyle(Theme.warning) }
-            Text(title).font(Theme.rowTitle).foregroundStyle(Theme.textPrimary).lineLimit(1)
-            Spacer(minLength: 12)
-            if let seeAll {
-                Button(action: seeAll) {
-                    LText("action_see_all").font(Theme.isTV ? Theme.caption.weight(.semibold) : .subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.primary)
-                        #if os(tvOS)
-                        .padding(.horizontal, 20).padding(.vertical, 8)
-                        #endif
+    @ViewBuilder
+    private func content(_ model: LiveTVViewModel) -> some View {
+        #if os(tvOS)
+        HStack(alignment: .top, spacing: 30) {
+            LiveCategoryColumn(model: model).frame(width: 360)
+            list(model, wide: true)
+            panel(model).frame(width: 500)
+        }
+        .padding(.leading, Theme.safeH)
+        .padding(.trailing, Theme.safeH)
+        #else
+        VStack(spacing: 0) {
+            LiveCategoryChips(model: model)
+            GeometryReader { geo in
+                let wide = geo.size.width >= 700
+                HStack(alignment: .top, spacing: 16) {
+                    list(model, wide: wide)
+                        .frame(width: wide ? geo.size.width * 0.55 : geo.size.width)
+                    if wide { panel(model).padding(.trailing, Theme.safeH).padding(.vertical, 8) }
                 }
-                #if os(tvOS)
-                .buttonStyle(CardButtonStyle(radius: 30, scale: 1.08))
-                #else
-                .buttonStyle(.plain)
-                #endif
-                .accessibilityIdentifier("\(id)_see_all")
             }
         }
-        .padding(.top, Theme.isTV ? 20 : 8)
+        #endif
+    }
+
+    private func panel(_ model: LiveTVViewModel) -> some View {
+        let sid = env.currentSource?.id
+        let shown = selected ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel ?? visibleRows(model.rows, sourceId: sid).first?.channel
+        return GuidePanel(channel: shown, zapList: model.channels, onArchive: { archiveChannel = $0 },
+                          liveActions: true, identifier: "live_info_panel")
+    }
+
+    /// Wide layouts: a tap selects (panel), a tap on the selected row plays. Compact: a tap plays.
+    private func list(_ model: LiveTVViewModel, wide: Bool) -> some View {
+        let sid = env.currentSource?.id
+        let rows = visibleRows(model.rows, sourceId: sid)
+        let favorites = model.filter == .all ? visibleRows(model.favoriteRows, sourceId: sid) : []
+        let playing = env.player.currentChannel?.id
+        let zapAll = model.channels   // once per update, not per row
+        return ScrollView {
+            if rows.isEmpty && favorites.isEmpty {
+                EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
+                               text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
+                    .frame(height: 400)
+            }
+            // Favorites are a plain VStack above the lazy rows: a section inserted at the top of a lazy
+            // stack after a ⭐ toggle was not rendered until the view was rebuilt.
+            VStack(alignment: .leading, spacing: Theme.isTV ? 12 : 0) {
+                if !favorites.isEmpty {
+                    sectionHeader(L10n.t("nav_favorites"), icon: "star.fill", id: "live_section_favorites")
+                    let zap = favorites.map(\.channel)
+                    ForEach(favorites) { row in
+                        rowView(row, zap: zap, wide: wide, playing: playing, id: "live_favorite_\(row.channel.id)")
+                    }
+                    if !rows.isEmpty { sectionHeader(L10n.t("live_all_channels"), icon: nil, id: "live_section_all") }
+                }
+                LazyVStack(alignment: .leading, spacing: Theme.isTV ? 12 : 0) {
+                    ForEach(rows) { row in
+                        rowView(row, zap: zapAll, wide: wide, playing: playing, id: "channel_\(row.channel.id)")
+                            .onAppear { model.loadMoreIfNeeded(current: row) }
+                    }
+                }
+            }
+            .padding(.bottom, Theme.isTV ? 60 : 30)
+        }
+        #if os(tvOS)
+        .scrollClipDisabled()
+        .focusSection()
+        #endif
+        .accessibilityIdentifier("live_list")
+    }
+
+    private func rowView(_ row: ChannelRow, zap: [Channel], wide: Bool, playing: String?, id: String) -> some View {
+        let channel = row.channel
+        return LiveChannelRow(row: row, isPlaying: playing == channel.id, isSelected: wide && selected?.id == channel.id,
+                              identifier: id,
+                              onTap: {
+                                  if wide && !Theme.isTV && selected?.id != channel.id { selected = channel } else { router.play(.channel(channel), channels: zap) }
+                              },
+                              onFocus: { focusSelect(channel) },
+                              onArchive: { archiveChannel = channel },
+                              onGuide: { router.section = .guide })
+    }
+
+    /// tvOS: the panel follows the focus after 150 ms (fast D-pad runs do not reload it per row).
+    private func focusSelect(_ channel: Channel) {
+        selectTask?.cancel()
+        selectTask = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            if !Task.isCancelled { selected = channel }
+        }
+    }
+
+    private func sectionHeader(_ title: String, icon: String?, id: String) -> some View {
+        HStack(spacing: Theme.isTV ? 12 : 6) {
+            if let icon { Image(systemName: icon).foregroundStyle(Theme.warning) }
+            Text(title).font(Theme.isTV ? Theme.caption.weight(.heavy) : .footnote.weight(.heavy)).textCase(.uppercase)
+                .foregroundStyle(Theme.textSecondary).lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.isTV ? 4 : Theme.safeH)
+        .padding(.top, Theme.isTV ? 16 : 10)
+        .padding(.bottom, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
+        .background(Theme.bg)
+        .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier(id)
     }
 }
 
-/// Live channel card: logo tile, name, quality badge, programme time + title, progress, action icons.
-private struct LiveChannelCard: View {
+/// One channel row (~76 pt iOS): number · logo tile · name + quality + ⟲ · NOW (time, title, progress)
+/// · NEXT line · ⭐ (iOS; tvOS: one focus target per row, favorite via long OK / player ▲ card).
+private struct LiveChannelRow: View {
     @Environment(AppEnvironment.self) private var env
-    @Environment(Router.self) private var router
     let row: ChannelRow
-    let zapList: [Channel]
-    /// Play button id; favorites / category sections use their own ids (same channel twice in the grid).
-    var identifier: String?
+    let isPlaying: Bool
+    let isSelected: Bool
+    let identifier: String
+    let onTap: () -> Void
+    let onFocus: () -> Void
     let onArchive: () -> Void
+    let onGuide: () -> Void
 
     private var channel: Channel { row.channel }
 
     var body: some View {
         let target = env.favoriteTarget(channel)
-        let fav = target.map { env.favorites.isFavorite($0.contentKey) } ?? false
-        VStack(alignment: .leading, spacing: Theme.isTV ? 14 : 8) {
-            Button { router.play(.channel(channel), channels: zapList) } label: { main }
-                .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
+        HStack(spacing: 0) {
+            Button(action: onTap) { label(isFavorite: target.map { env.favorites.isFavorite($0.contentKey) } ?? false) }
+                #if os(tvOS)
+                .buttonStyle(CardButtonStyle(radius: 14, scale: 1.02))
+                #else
+                .buttonStyle(.plain)
+                #endif
                 .contextMenu {
                     ChannelMenuItems(channel: channel)
                     if channel.catchup.isAvailable {
                         Button(action: onArchive) { Label(L10n.t("catchup_title"), systemImage: "clock.arrow.circlepath") }
                     }
+                    Button(action: onGuide) { Label(L10n.t("live_open_guide"), systemImage: "calendar") }
                 }
-                .accessibilityLabel([channel.name, row.nowNext?.now?.title].compactMap { $0 }.joined(separator: ", "))
-                .accessibilityIdentifier(identifier ?? "channel_\(channel.id)")
-            #if os(tvOS)
-            // TV: one focus target per card (D-pad stays on the cards); the icons are indicators,
-            // favorite / archive are in the long-press menu.
-            HStack(spacing: 24) {
-                Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? Theme.warning : Theme.textSecondary)
-                if channel.catchup.isAvailable { Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.textSecondary) }
-                Spacer(minLength: 0)
+                .accessibilityLabel(accessibilityText)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier(identifier)
+            #if !os(tvOS)
+            if let target {
+                FavoriteButton(target: target, minTapSize: 44)
+                    .foregroundStyle(Theme.textSecondary)
+                    .buttonStyle(.plain)
+                    .padding(.trailing, Theme.safeH - 6)
             }
-            .font(.system(size: 26))
-            .padding(.horizontal, 18)
-            .padding(.bottom, 12)
-            .accessibilityHidden(true)
-            #else
-            // One tap ⭐ (spec §2) and ⟲ archive: 44 pt targets.
-            HStack(spacing: 4) {
-                if let target {
-                    FavoriteButton(target: target, minTapSize: 44)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                if channel.catchup.isAvailable {
-                    Button(action: onArchive) {
-                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.textSecondary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(L10n.t("catchup_title"))
-                    .accessibilityIdentifier("live_archive_\(channel.id)")
-                }
-                Spacer(minLength: 0)
-            }
-            .font(.subheadline)
-            .buttonStyle(.plain)
-            .padding(.horizontal, 2)
-            .padding(.bottom, 0)
             #endif
         }
-        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+        .background(isSelected ? Theme.surfaceElevated : Color.clear)
+        .overlay(alignment: .leading) {
+            if isPlaying { Rectangle().fill(Theme.primary).frame(width: 3) }
+        }
+        #if !os(tvOS)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.stroke).frame(height: 0.5).padding(.leading, Theme.safeH + 88) }
+        #endif
     }
 
-    private var main: some View {
+    private var accessibilityText: String {
+        var parts = [channel.name]
+        if isPlaying { parts.append(L10n.t("live_watching")) }
+        if let now = row.nowNext?.now { parts.append(now.title) }
+        if let next = row.nowNext?.next { parts.append(L10n.t("live_next_at", env.timeFormatter.time(next.start), next.title)) }
+        return parts.joined(separator: ", ")
+    }
+
+    private func label(isFavorite: Bool) -> some View {
+        let tile: CGFloat = Theme.isTV ? 84 : 48
         let now = row.nowNext?.now
-        let tile: CGFloat = Theme.isTV ? 80 : 46
-        return VStack(alignment: .leading, spacing: Theme.isTV ? 10 : 6) {
-            HStack(spacing: Theme.isTV ? 16 : 10) {
+        return RowFocusReporter(onFocus: onFocus) {
+            HStack(alignment: .center, spacing: Theme.isTV ? 20 : 12) {
+                Text(channel.number.map(String.init) ?? "")
+                    .font((Theme.isTV ? Theme.caption : .caption).monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: Theme.isTV ? 56 : 28, alignment: .trailing)
                 ChannelTile(channel: channel, width: tile, height: tile, radius: Theme.isTV ? 12 : 9)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(channel.name).font(Theme.isTV ? Theme.caption.weight(.bold) : .subheadline.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary).lineLimit(1).minimumScaleFactor(0.75)
-                    if let q = MediaTags.quality(in: channel.name) {
-                        Text(q).font(.system(size: Theme.isTV ? 16 : 9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.textSecondary, lineWidth: 1))
+                VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 2) {
+                    HStack(spacing: 6) {
+                        Text(channel.name).font(Theme.isTV ? Theme.body.weight(.semibold) : .subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        if let q = MediaTags.quality(in: channel.name) {
+                            Text(q).font(.system(size: Theme.isTV ? 15 : 9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.textSecondary, lineWidth: 1))
+                                .fixedSize()
+                        }
+                        if channel.catchup.isAvailable {
+                            Image(systemName: "clock.arrow.circlepath").font(Theme.isTV ? .system(size: 18) : .caption2).foregroundStyle(Theme.textSecondary)
+                        }
+                        #if os(tvOS)
+                        if isFavorite { Image(systemName: "star.fill").font(.system(size: 18)).foregroundStyle(Theme.warning) }
+                        #endif
+                        if isPlaying {
+                            Text("● " + L10n.t("live_watching")).font(.system(size: Theme.isTV ? 16 : 10, weight: .heavy))
+                                .foregroundStyle(Theme.live).lineLimit(1).fixedSize()
+                        }
+                    }
+                    if let now {
+                        HStack(spacing: 6) {
+                            Text(env.timeFormatter.range(start: now.start, end: now.end))
+                                .font((Theme.isTV ? Font.system(size: 20) : .caption2).monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1).fixedSize()
+                            Text(now.title).font(Theme.isTV ? .system(size: 22, weight: .medium) : .caption.weight(.medium))
+                                .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        }
+                        ProgressBar(value: EpgSchedule.progress(of: now, at: Date())).frame(maxWidth: Theme.isTV ? 360 : 160).frame(height: Theme.isTV ? 4 : 2.5)
+                    } else {
+                        LText("epg_no_info").font(Theme.isTV ? .system(size: 20) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    }
+                    if let next = row.nowNext?.next {
+                        Text(L10n.t("live_next_at", env.timeFormatter.time(next.start), next.title))
+                            .font(Theme.isTV ? .system(size: 19) : .caption2).foregroundStyle(Theme.textSecondary).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 0)
             }
-            if let now {
-                Text(env.timeFormatter.range(start: now.start, end: now.end))
-                    .font(Theme.isTV ? .system(size: 20).monospacedDigit() : .caption2.monospacedDigit()).foregroundStyle(Theme.textSecondary)
-                Text(now.title).font(Theme.isTV ? .system(size: 23, weight: .medium) : .caption.weight(.medium))
-                    .foregroundStyle(Theme.textPrimary).lineLimit(1)
-                ProgressBar(value: EpgSchedule.progress(of: now, at: Date())).frame(height: Theme.isTV ? 4 : 3)
-            } else {
-                Text(" ").font(Theme.isTV ? .system(size: 20) : .caption2)
-                LText("epg_no_info").font(Theme.isTV ? .system(size: 23) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                ProgressBar(value: 0).frame(height: Theme.isTV ? 4 : 3).opacity(0.4)
+            .padding(.leading, Theme.isTV ? 12 : Theme.safeH - 12)
+            .padding(.trailing, Theme.isTV ? 16 : 0)
+            .padding(.vertical, Theme.isTV ? 12 : 8)
+            .frame(minHeight: Theme.isTV ? 108 : 76)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+/// Reports focus (tvOS) of the row label to its parent.
+private struct RowFocusReporter<Content: View>: View {
+    @Environment(\.isFocused) private var isFocused
+    let onFocus: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content().onChange(of: isFocused) { _, focused in if focused { onFocus() } }
+    }
+}
+
+/// Chip title: flag + name (+ count).
+@MainActor
+private func chipTitle(_ title: String, count: Int?) -> String {
+    let flag = CountryFlag.emoji(for: title).map { "\($0) " } ?? ""
+    return flag + CountryFlag.strippedTitle(title) + (count.map { "  \($0)" } ?? "")
+}
+
+#if !os(tvOS)
+/// iOS: sticky horizontal category chips – ★ Favorites · All · favorite categories (⭐) · the rest,
+/// with channel counts. Long press on a category chip: add/remove favorite category; "show hidden".
+private struct LiveCategoryChips: View {
+    @Environment(AppEnvironment.self) private var env
+    @Bindable var model: LiveTVViewModel
+
+    var body: some View {
+        let items = chipItems(model, env: env)
+        let sid = env.currentSource?.id
+        let hiddenCount = sid.map { HiddenStore.shared.count($0) } ?? 0
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        chip(item, index: index)
+                    }
+                    if hiddenCount > 0, let sid {
+                        Button { HiddenStore.shared.showAll(sourceId: sid); model.reload() } label: {
+                            Label(L10n.t("hidden_show_all", String(hiddenCount)), systemImage: "eye")
+                                .font(.subheadline.weight(.medium)).foregroundStyle(Theme.textSecondary)
+                                .padding(.horizontal, 12).frame(minHeight: 36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("live_show_hidden")
+                    }
+                }
+                .padding(.horizontal, Theme.safeH)
+                .padding(.vertical, 8)
+            }
+            .onChange(of: model.filter) { _, filter in
+                if let index = items.firstIndex(where: { $0.id == filter }) { withAnimation { proxy.scrollTo(index, anchor: .center) } }
             }
         }
-        .padding(.horizontal, Theme.isTV ? 18 : 12)
-        .padding(.top, Theme.isTV ? 18 : 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
+        .background(Theme.bg)
+        .accessibilityIdentifier("live_category_chips")
+    }
+
+    private func chip(_ item: ChipItem, index: Int) -> some View {
+        let selected = model.filter == item.id
+        return Button { model.filter = item.id } label: {
+            HStack(spacing: 5) {
+                if item.starred { Image(systemName: "star.fill").font(.caption.weight(.bold)).foregroundStyle(selected ? Color.black : Theme.warning) }
+                Text(item.title).lineLimit(1)
+            }
+            .font(.subheadline.weight(selected ? .semibold : .medium))
+            .foregroundStyle(selected ? Color.black : Theme.textPrimary)
+            .padding(.horizontal, 14).frame(minHeight: 36)
+            .background(Capsule().fill(selected ? Color.white : Theme.surface))
+            .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
+        .id(index)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("live_chip_\(index)")
+    }
+}
+#endif
+
+#if os(tvOS)
+/// tvOS: categories as a left column (vertical list with counts); OK selects, long OK = ⭐ category.
+private struct LiveCategoryColumn: View {
+    @Environment(AppEnvironment.self) private var env
+    @Bindable var model: LiveTVViewModel
+
+    var body: some View {
+        let items = chipItems(model, env: env)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    let selected = model.filter == item.id
+                    Button { model.filter = item.id } label: {
+                        HStack(spacing: 10) {
+                            if item.starred { Image(systemName: "star.fill").font(.system(size: 20)).foregroundStyle(Theme.warning) }
+                            Text(item.title).lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        .font(Theme.caption.weight(selected ? .bold : .medium))
+                        .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
+                        .padding(.horizontal, 20).padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Theme.surfaceElevated : Color.clear))
+                    }
+                    .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+                    .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("live_chip_\(index)")
+                }
+            }
+            .padding(.vertical, 20)
+        }
+        .scrollClipDisabled()
+        .focusSection()
+        .accessibilityIdentifier("live_category_chips")
+    }
+}
+#endif
+
+private struct ChipItem {
+    let id: ChannelFilter
+    let title: String
+    let starred: Bool
+}
+
+/// ★ Favorites · All · favorite categories · other categories (hidden ones removed), with counts.
+@MainActor
+private func chipItems(_ model: LiveTVViewModel, env: AppEnvironment) -> [ChipItem] {
+    let items = channelFilters(model, env: env).map { item in
+        switch item.id {
+        case .favorites: return ChipItem(id: .favorites, title: chipTitle(item.title, count: model.favoriteCount), starred: true)
+        case .all: return ChipItem(id: .all, title: chipTitle(item.title, count: model.allCount), starred: false)
+        case .category(let id):
+            return ChipItem(id: item.id, title: chipTitle(item.title, count: model.categoryCounts[id]), starred: isStarred(item.id, env: env))
+        }
+    }
+    return items.filter { $0.id == .favorites } + items.filter { $0.id != .favorites }
+}
+
+/// Long press on a category chip: ⭐ add/remove the category (per source, this device only).
+private struct CategoryFavoriteMenuItem: View {
+    @Environment(AppEnvironment.self) private var env
+    let filter: ChannelFilter
+
+    var body: some View {
+        if case .category(let categoryId) = filter, let sid = env.currentSource?.id {
+            let on = env.favorites.isFavoriteCategory(sourceId: sid, categoryId: categoryId)
+            Button { env.favorites.toggleCategory(sourceId: sid, categoryId: categoryId) } label: {
+                Label(L10n.t(on ? "fav_category_remove" : "fav_category_add"), systemImage: on ? "star.slash" : "star")
+            }
+        }
     }
 }
 
@@ -396,6 +520,9 @@ private struct GuidePanel: View {
     let channel: Channel?
     let zapList: [Channel]
     let onArchive: (Channel) -> Void
+    /// Live list panel: ▶ Play · ⭐ · Guide · ⟲ (iOS; tvOS keeps one focus target per list row).
+    var liveActions = false
+    var identifier = "guide_panel"
 
     var body: some View {
         let programs = channel.map(load) ?? []
@@ -425,7 +552,16 @@ private struct GuidePanel: View {
                     HStack(spacing: 10) {
                         Button { router.play(.channel(channel), channels: zapList) } label: { Label(L10n.t("action_play"), systemImage: "play.fill") }
                             .buttonStyle(WhitePillButtonStyle())
-                            .accessibilityIdentifier("guide_play")
+                            .accessibilityIdentifier(liveActions ? "live_panel_play" : "guide_play")
+                        if liveActions, let target = env.favoriteTarget(channel) {
+                            FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: 40))
+                        }
+                        if liveActions {
+                            Button { router.section = .guide } label: { Image(systemName: "calendar") }
+                                .buttonStyle(RoundIconButtonStyle(size: 40))
+                                .accessibilityLabel(L10n.t("live_open_guide"))
+                                .accessibilityIdentifier("live_panel_guide")
+                        }
                         if channel.catchup.isAvailable {
                             Button { onArchive(channel) } label: { Image(systemName: "clock.arrow.circlepath") }
                                 .buttonStyle(RoundIconButtonStyle(size: 40))
@@ -454,7 +590,7 @@ private struct GuidePanel: View {
             .padding(Theme.isTV ? 28 : 16)
         }
         .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
-        .accessibilityIdentifier("guide_panel")
+        .accessibilityIdentifier(identifier)
     }
 
     private func header(_ key: String) -> some View {

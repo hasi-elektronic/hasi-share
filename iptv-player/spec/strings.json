@@ -1523,6 +1523,21 @@
    "en": "All channels",
    "tr": "Tüm kanallar",
    "de": "Alle Sender"
+  },
+  "live_next_at": {
+   "en": "Next {0} · {1}",
+   "tr": "Sonra {0} · {1}",
+   "de": "Danach {0} · {1}"
+  },
+  "live_watching": {
+   "en": "Watching",
+   "tr": "İzleniyor",
+   "de": "Läuft"
+  },
+  "live_open_guide": {
+   "en": "Show in TV guide",
+   "tr": "Rehberde göster",
+   "de": "Im TV-Guide zeigen"
   }
  }
 }
