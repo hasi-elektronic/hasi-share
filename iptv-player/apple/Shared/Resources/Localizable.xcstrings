@@ -3500,6 +3500,52 @@
         }
       }
     },
+    "settings_quick_start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick start"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı başlat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schnellstart"
+          }
+        }
+      }
+    },
+    "settings_quick_start_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the last live channel right away when the app starts."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama açıldığında son canlı kanalı hemen oynatır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startet beim Öffnen der App sofort den zuletzt gesehenen Live-Sender."
+          }
+        }
+      }
+    },
     "settings_appearance": {
       "extractionState": "manual",
       "localizations": {

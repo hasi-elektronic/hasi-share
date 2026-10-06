@@ -18,7 +18,8 @@ final class IOSPersistentModeTests: XCTestCase {
     @MainActor
     func testAddSourceInPersistentMode() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTrial", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        // QuickStart off for this launch: a session left by another test must not open the player here.
+        app.launchArguments = ["-uiTrial", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-pref.quickStart", "NO"]
         app.launch()
 
         let welcomeM3U = app.buttons["add_add_source_m3u"]
@@ -68,6 +69,63 @@ final class IOSPersistentModeTests: XCTestCase {
             app.buttons["settings_close"].tap()
             XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 10), "home with the header tabs")
         }
+    }
+
+    /// QuickStart: a live channel playing when the app is sent home and terminated reopens straight
+    /// in the player on the next launch (no `-uiTestReset`: real UserDefaults + SQLite). Ends by closing the
+    /// player (Back) so the persisted session no longer counts as "ended in player" for other tests.
+    @MainActor
+    func testQuickStartReopensLastChannel() throws {
+        let base = ["-uiTrial", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        let app = XCUIApplication()
+        app.launchArguments = base + ["-pref.quickStart", "NO"]   // first launch: never resume a stale session
+        app.launch()
+
+        let welcomeM3U = app.buttons["add_add_source_m3u"]
+        let tabHome = app.buttons["tab_home"]
+        let start = Date()
+        while !welcomeM3U.exists && !tabHome.exists && Date().timeIntervalSince(start) < 15 {
+            _ = welcomeM3U.waitForExistence(timeout: 0.5)
+        }
+        if welcomeM3U.exists {
+            welcomeM3U.tap()
+            try addM3U(app, name: "QuickStart TV")
+        }
+        XCTAssertTrue(tabHome.waitForExistence(timeout: 10), "home with the header tabs")
+
+        IOSFlowTests.openSection("live", in: app)
+        let firstChannel = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch
+        XCTAssertTrue(firstChannel.waitForExistence(timeout: 10), "live channels of the current source")
+        firstChannel.tap()
+        XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 10))
+        sleep(6)   // first frame → LastSession(endedInPlayer: true) is stored
+
+        XCUIDevice.shared.press(.home)
+        app.terminate()
+
+        // Relaunch the way a user does: no reset, quick start at its default (on).
+        let relaunched = XCUIApplication()
+        relaunched.launchArguments = base
+        relaunched.launch()
+        let surface = relaunched.otherElements["video_surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 5), "quick start should open the last channel in the player within 5 s")
+
+        // Leave cleanly: Back clears the session, so the next launch shows home again. The overlay
+        // (with the close button) is visible for the first 3 s after the player opens – close right away.
+        let close = relaunched.buttons["player_close"]
+        XCTAssertTrue(close.isHittable, "overlay should still be visible right after quick start")
+        close.tap()
+        XCTAssertTrue(surface.waitForNonExistence(timeout: 10), "player closed")
+        XCTAssertTrue(relaunched.buttons["tab_home"].waitForExistence(timeout: 10), "home after closing the player")
+        relaunched.terminate()
+
+        let again = XCUIApplication()
+        again.launchArguments = base
+        again.launch()
+        XCTAssertTrue(again.buttons["tab_home"].waitForExistence(timeout: 15), "closing the player disables quick start for the next launch")
+        sleep(2)   // quick start would present the player right after launch
+        XCTAssertFalse(again.otherElements["video_surface"].exists)
+        again.terminate()
     }
 
     /// Fills the M3U form (already on screen), connects, runs `atSummary` and confirms the summary.

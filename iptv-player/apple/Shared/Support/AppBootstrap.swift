@@ -184,6 +184,30 @@ enum AppBootstrap {
         }
     }
 
+    /// QuickStart (docs/SCREENS.md §3.2): when the app was left while a live channel was playing, open that
+    /// channel in the player right away – before any source refresh (`env.start()`). Call AFTER
+    /// `applyTesterAccess` (TestFlight full access decides `canPlay`). Without a decision to play, the
+    /// "ended in player" flag is consumed so a later launch does not resume a stale session.
+    static func quickStart(env: AppEnvironment, router: Router) {
+        guard !router.playerPresented, !router.onboarding, !env.sources.isEmpty else { return }
+        env.license.evaluate()
+        let last = env.settings.lastSession
+        let channel = last.flatMap { (try? env.catalog.channel(sourceId: $0.sourceId, id: $0.channelId)) ?? nil }
+        switch QuickStart.decide(enabled: env.settings.quickStart, last: last, canPlay: env.license.canPlay, channelExists: channel != nil) {
+        case .play:
+            guard let channel else { return }
+            // Zapping list: the channel's category (first 200); the channel itself always belongs to it.
+            var page = (try? env.catalog.channels(sourceId: channel.sourceId, categoryId: channel.categoryId, limit: 200)) ?? []
+            if !page.contains(where: { $0.id == channel.id }) { page.insert(channel, at: 0) }
+            router.play(.channel(channel), channels: page)
+        case .none:
+            if var last, last.endedInPlayer {
+                last.endedInPlayer = false
+                env.settings.lastSession = last
+            }
+        }
+    }
+
     /// Debug/UI-test hooks: `-seedM3U <url>` adds a source, `-uiScreen <name>` opens a screen,
     /// `-uiTrial` simulates an active StoreKit trial (only in DEBUG builds).
     static func applyDebugHooks(env: AppEnvironment, router: Router) async {

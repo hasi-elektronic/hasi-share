@@ -121,6 +121,7 @@ public final class AppEnvironment {
         player.onLibraryChange = { [weak self] in self?.libraryChanged() }
         player.aspect = settings.aspect
         player.largeBuffer = settings.largeBuffer
+        player.onLastSessionChange = { [weak self] in self?.settings.lastSession = $0 }
         player.onAspectChange = { [weak self] mode in self?.settings.aspect = mode }
         applyLanguagePreferences()
     }

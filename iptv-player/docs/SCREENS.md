@@ -101,6 +101,13 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
   gönderilmez – sıralama tamamen yereldir.)
 * Üstte deneme durum çipi ve (birden fazla kaynak varsa) kaynak seçici Ana Sayfa hero'sunun üstünde.
+* **QuickStart (Hızlı başlat, Ayarlar → Oynatma, varsayılan açık):** uygulama bir canlı kanal oynarken
+  arka plana alındıysa / sonlandırıldıysa (`LastSession.endedInPlayer = true`), sonraki açılışta Ana Sayfa
+  beklenmeden — kaynak yenilemesinden (`env.start()`) önce — o kanal doğrudan oynatıcıda açılır (kanal
+  zapping listesi = kanalın kategorisi, ilk 200). Kullanıcı oynatıcıyı Geri / Kapat ile kapattıysa ya da en
+  son VOD oynattıysa bayrak düşer ve normal Ana Sayfa açılır. Hiç kaynak yoksa (karşılama), kanal artık
+  yoksa veya oynatma kilitliyse (`canPlay` false; TestFlight tam erişimi değerlendirildikten SONRA kontrol
+  edilir) QuickStart çalışmaz. Hedef: soğuk başlangıç → ilk kare ≤ 1,5 sn.
 
 ### 3.3 Canlı TV
 * **Kanal kartı grid'i:** iPhone dikeyde 2 sütun, iPad 3–4, TV 4. Kart: renkli logo karosu + kanal

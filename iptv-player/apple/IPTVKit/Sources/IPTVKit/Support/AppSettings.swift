@@ -28,6 +28,12 @@ public final class AppSettings {
             if appLanguage.isEmpty { defaults.removeObject(forKey: "AppleLanguages") } else { defaults.set([appLanguage], forKey: "AppleLanguages") }
         }
     }
+    /// Settings → Playback: resume the last live channel straight into the player on launch.
+    public var quickStart: Bool { didSet { defaults.set(quickStart, forKey: "pref.quickStart") } }
+    /// Last live channel + whether the app left while it was playing (QuickStart, docs/SCREENS.md §3.2).
+    public var lastSession: LastSession? {
+        didSet { defaults.set(lastSession.flatMap { try? JSONEncoder().encode($0) }, forKey: "state.lastSession") }
+    }
     public var currentSourceId: String? { didSet { defaults.set(currentSourceId, forKey: "pref.currentSource") } }
     /// Host used for `<LAN-IP>` in the format test (simulator: localhost).
     public var formatTestHost: String { didSet { defaults.set(formatTestHost, forKey: "pref.formatTestHost") } }
@@ -45,6 +51,9 @@ public final class AppSettings {
         appLanguage = Self.supportedLanguages.contains(lang) ? lang : ""
         let h = defaults.object(forKey: "pref.24h") as? Int ?? -1
         use24Hour = h < 0 ? nil : h == 1
+        // bool(forKey:) so a launch argument (`-pref.quickStart NO`, string in the argument domain) works too.
+        quickStart = defaults.object(forKey: "pref.quickStart") == nil ? true : defaults.bool(forKey: "pref.quickStart")
+        lastSession = defaults.data(forKey: "state.lastSession").flatMap { try? JSONDecoder().decode(LastSession.self, from: $0) }
         currentSourceId = defaults.string(forKey: "pref.currentSource")
         formatTestHost = defaults.string(forKey: "pref.formatTestHost") ?? "localhost"
     }

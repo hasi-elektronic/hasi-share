@@ -122,6 +122,9 @@ public final class PlayerController {
     @ObservationIgnored public var prefetcher: ZapPrefetcher?
     /// Channel id whose neighbours were already prefetched (a resume `.playing` does not restart it).
     @ObservationIgnored private var prefetchedFor: String?
+    /// QuickStart bookkeeping (docs/SCREENS.md §3.2): called whenever the last live session changes; set by `AppEnvironment`.
+    @ObservationIgnored public var onLastSessionChange: (@MainActor (LastSession?) -> Void)?
+    @ObservationIgnored private var lastSession: LastSession?
     @ObservationIgnored public var preferredAudioLanguage: String?
     @ObservationIgnored public var preferredSubtitleLanguage: String?
     /// Channel-switch debounce (ms).
@@ -175,6 +178,7 @@ public final class PlayerController {
         }
         phase = .loading
         PerfTrace.shared.mark(.playRequested)
+        if !request.isLive { updateLastSession(nil) }   // VOD / raw URL playback: nothing to quick-start
         prefetchedFor = nil
         // A neighbour warmed up while the previous channel played: skip the resolver. Anything else
         // (not warmed, VOD) cancels the old prefetch right away so it does not compete with this start.
@@ -251,6 +255,7 @@ public final class PlayerController {
         switch event {
         case .playing:
             PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
+            if let channel = currentChannel { updateLastSession(LastSession(sourceId: channel.sourceId, channelId: channel.id, endedInPlayer: true)) }
             prefetchNeighboursIfNeeded()
             stallTask?.cancel()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
@@ -445,11 +450,25 @@ public final class PlayerController {
 
     /// Closes the player screen.
     public func close() {
+        // Explicit exit (Back / close): the next launch must not quick-start this channel.
+        // (`release()` – scene left .active – deliberately keeps `endedInPlayer`.)
+        if let channel = currentChannel {
+            updateLastSession(LastSession(sourceId: channel.sourceId, channelId: channel.id, endedInPlayer: false))
+        } else if var last = lastSession, last.endedInPlayer {
+            last.endedInPlayer = false
+            updateLastSession(last)
+        }
         release()
         request = nil
         stream = nil
         zapTarget = nil
         phase = .idle
+    }
+
+    private func updateLastSession(_ new: LastSession?) {
+        guard new != lastSession else { return }
+        lastSession = new
+        onLastSessionChange?(new)
     }
 
     private var isFailed: Bool {

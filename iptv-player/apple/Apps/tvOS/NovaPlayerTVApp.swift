@@ -26,6 +26,7 @@ struct NovaPlayerTVApp: App {
                 .tint(Theme.primary)
                 .task {
                     await AppBootstrap.applyDebugHooks(env: env, router: router)
+                    AppBootstrap.quickStart(env: env, router: router)   // after tester access / license evaluation, before env.start()
                     await env.start()
                 }
         }

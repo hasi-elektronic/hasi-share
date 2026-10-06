@@ -30,7 +30,9 @@ struct SettingsView: View {
                 NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
                 #endif
             }
-            Section(L10n.t("settings_playback")) {
+            Section {
+                Toggle(L10n.t("settings_quick_start"), isOn: $settings.quickStart)
+                    .accessibilityIdentifier("settings_quick_start")
                 Picker(L10n.t("pref_default_aspect"), selection: $settings.aspect) {
                     ForEach(AspectMode.allCases, id: \.self) { Text(L10n.t($0.titleKey)).tag($0) }
                 }
@@ -54,6 +56,10 @@ struct SettingsView: View {
                 #if os(tvOS)
                 Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
                 #endif
+            } header: {
+                Text(L10n.t("settings_playback"))
+            } footer: {
+                Text(L10n.t("settings_quick_start_hint"))
             }
             Section(L10n.t("settings_appearance")) {
                 // Switching re-renders the whole app in the new language (root views are keyed by it).

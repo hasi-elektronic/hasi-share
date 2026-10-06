@@ -155,6 +155,8 @@
     <string name="license_server_unreachable" formatted="false">Lisans sunucusuna ulaşılamıyor – son bilinen durum kullanılıyor.</string>
     <string name="settings_sources" formatted="false">Kaynaklar</string>
     <string name="settings_playback" formatted="false">Oynatma</string>
+    <string name="settings_quick_start" formatted="false">Hızlı başlat</string>
+    <string name="settings_quick_start_hint" formatted="false">Uygulama açıldığında son canlı kanalı hemen oynatır.</string>
     <string name="settings_appearance" formatted="false">Görünüm ve dil</string>
     <string name="settings_account" formatted="false">Hesap</string>
     <string name="settings_purchase" formatted="false">Satın alma</string>

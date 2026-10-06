@@ -764,6 +764,16 @@
    "tr": "Oynatma",
    "de": "Wiedergabe"
   },
+  "settings_quick_start": {
+   "en": "Quick start",
+   "tr": "Hızlı başlat",
+   "de": "Schnellstart"
+  },
+  "settings_quick_start_hint": {
+   "en": "Opens the last live channel right away when the app starts.",
+   "tr": "Uygulama açıldığında son canlı kanalı hemen oynatır.",
+   "de": "Startet beim Öffnen der App sofort den zuletzt gesehenen Live-Sender."
+  },
   "settings_appearance": {
    "en": "Appearance & language",
    "tr": "Görünüm ve dil",
