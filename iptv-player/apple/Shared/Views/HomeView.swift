@@ -249,7 +249,7 @@ struct BrowseView: View {
                 ForEach(model.continueEntries) { entry in
                     Button { if let item = entry.item { router.play(item) } } label: {
                         ContinueCard(title: entry.title, subtitle: entry.subtitle, imageURL: entry.progress.data.posterUrl,
-                                     progress: entry.progress.data.fraction)
+                                     progress: entry.progress.data.fraction, showsProgress: entry.progress.data.fraction != nil)
                     }
                     .buttonStyle(ArtworkButtonStyle())
                     .accessibilityIdentifier("continue_\(entry.id)")

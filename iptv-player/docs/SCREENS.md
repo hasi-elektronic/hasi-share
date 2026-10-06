@@ -91,7 +91,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   siyaha gradyan; büyük kalın başlık; "tür · yıl · süre" satırı; üç eylem: **☆ Favori** (ikon + etiket)
   · **beyaz pill "▶ Oynat"** (devam ediyorsa "Devam et (01:12:30)") ★ · **ⓘ Bilgi** (detay).
 * **Ana Sayfa satırları:** İzlemeye devam et (16:9 kart, ortada oynat ikonu, başlık kartın altında
-  görsel üstünde, kartın altında `primary` ilerleme çubuğu) · Favoriler (posterler) · Favori kanallar ·
+  görsel üstünde, kartın altında `primary` ilerleme çubuğu; kural CONTRACT §8: %5 < konum < %95,
+  süre bilinmiyorsa konum ≥ 10 sn ve çubuk gizli; en son `updatedAt` önce) · Favoriler (posterler) · Favori kanallar ·
   Yeni eklenen filmler · Yeni eklenen diziler · Canlı kanallar (kanal kartları).
 * **Filmler / Diziler satırları:** İzlemeye devam et (yalnız o tür) · Favoriler · **Yeni eklenenler**
   (2:3 poster, altta küçük `primary` "YENİ" rozeti) · **Top 10** (posterin arkasında büyük, içi boş
@@ -185,8 +186,11 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     sayacı yeniden başlatır.
   * **İlerleme kaydı:** oynarken 10 sn'de bir, duraklatınca, kapatınca ve uygulama arka plana
     geçince (her iki motor). Motor süre bildirmezse (bazı MKV/Xtream VOD) konum `durationMs` 0
-    ile yine kaydedilir (devam çalışır; "izlendi" (≥ %95) ve "İzlemeye devam et" satırı süre
-    ister). Dosya sonu = tamamı izlendi.
+    ile yine kaydedilir (devam çalışır ve ≥ 10 sn ise "İzlemeye devam et" satırında çubuksuz
+    görünür; "izlendi" (≥ %95) süre ister). Dosya sonu = tamamı izlendi.
+  * **Kendiliğinden duraklama yok** (canlı + VOD): oynatıcı yalnızca kullanıcı duraklatınca (veya
+    kulaklık çıkarılınca / ses kesintisinde) duraklar; motorun başka her "paused" bildirimi
+    takılmadır (yükleniyor göstergesi, otomatik sürdürme, 12 sn sonra yeniden bağlanma).
 * **Görüntü oranı:** Sığdır · Doldur (kırp) · Uzat · 16:9 · 4:3 – seçim kanal başına değil,
   global hatırlanır.
 * **Ses / altyazı:** dil adıyla listelenir (`Türkçe`, `English`, bilinmiyorsa `Parça 2`),
@@ -249,6 +253,12 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 | Playback `AccessDenied` | Yayına erişim reddedildi | Bağlantı sınırı aşılmış veya hesap süresi dolmuş olabilir. | Tekrar dene |
 | Playback `StreamOffline` | Yayın şu anda kapalı | Kanal yayında değil. | Tekrar dene · Kanal listesi |
 | Playback `Drm` | Korumalı yayın | DRM korumalı yayınlar desteklenmiyor. | Geri |
+
+Oynatma HTTP hataları birkaç saniye içinde karta dönüşür, sonsuz yükleniyor göstergesi olmaz:
+AVPlayer'da hata kodu (401/403/404) doğrudan, nedensiz hata ilk karede önce veya öğe 8 sn hâlâ
+hazır değilse 1 KiB HTTP yoklamasıyla (CONTRACT §6.1, VLCKit ile aynı) sınıflandırılır:
+401/403 → AccessDenied, 404/410 → StreamOffline (kart hemen), 5xx → ServerError (yeniden
+bağlanma politikası, sonra kart).
 
 ## 5. Erişilebilirlik
 * Tüm ikon butonlarda içerik açıklaması (TalkBack/VoiceOver).

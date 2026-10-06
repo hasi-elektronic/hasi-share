@@ -158,7 +158,9 @@ Range destekli yerel sunucu (VLC, HTTP üzerinden MKV'de atlama için Range iste
 http.server` desteklemez) ve üç liste: `vlc-live.m3u` (1: uzantısız MKV, 2: progresif MPEG-TS
 MPEG-2/MP2, 3: Apple HLS), `vlc-movie.m3u` (MKV film) ve `vod-movie.m3u` (aynı film progresif MP4
 olarak → AVPlayer; `ffmpeg -i sintel.mkv -map 0:v:0 -map 0:a:1 -c copy -movflags +faststart
-sintel.mp4`). Test medyası ffmpeg ile üretilir (H.264 + AC-3 `tur` + AAC `eng`, SRT `tur`/`eng`).
+sintel.mp4`) ile `vod-403.m3u` (HTTP 403 dönen bir film: sunucu `/status/<kod>/…` yollarını o HTTP
+durumuyla yanıtlar → `IOSPlaybackRobustnessTests`/`TVPlaybackRobustnessTests` AccessDenied kartı).
+Test medyası ffmpeg ile üretilir (H.264 + AC-3 `tur` + AAC `eng`, SRT `tur`/`eng`).
 Oynatıcı kontrolleri (`IOSPlayerControlsTests`, `TVPlayerControlsTests`: ±10 sn, çift dokunma,
 zaman çizgisi, devam + "Baştan başla", katman yeniden gösterilince düğmeler) da bu sunucuyu
 kullanır.

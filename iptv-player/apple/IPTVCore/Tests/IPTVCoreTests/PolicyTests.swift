@@ -114,6 +114,11 @@ final class PolicyTests: XCTestCase {
                      prog("live", 999, 0, 6, kind: .live)]
         XCTAssertEqual(WatchHistory.continueWatching(items).map(\.contentKey), ["b", "d"])
         XCTAssertEqual(WatchHistory.recentlyWatched(items).map(\.contentKey), ["live", "b", "d", "c", "a"])
+        // Unknown duration (durationMs 0 – the engine could not tell the length): included from 10 s
+        // on, ordered by updatedAt with the rest; watched items (≥ 95 %) stay out.
+        let unknown = items + [prog("e", 60_000, 0, 7, kind: .episode), prog("f", 9_999, 0, 8), prog("g", 10_000, 0, 2)]
+        XCTAssertEqual(WatchHistory.continueWatching(unknown).map(\.contentKey), ["e", "b", "d", "g"])
+        XCTAssertEqual(WatchHistory.continueWatching(unknown, limit: 1).map(\.contentKey), ["e"])
         XCTAssertEqual(items.last?.data.positionMs, 0, "live progress is stored as 0")
         XCTAssertTrue(WatchHistory.isCompleted(positionMs: 95, durationMs: 100))
         XCTAssertFalse(WatchHistory.isCompleted(positionMs: 94, durationMs: 100))

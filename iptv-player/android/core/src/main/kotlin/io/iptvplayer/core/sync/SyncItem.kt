@@ -152,15 +152,22 @@ public object WatchHistory {
     public const val STARTED_FRACTION: Double = 0.05
     public const val RECENT_LIMIT: Int = 50
 
+    /** Position from which an item with unknown duration counts as "continue watching" (resume threshold). */
+    public const val UNKNOWN_DURATION_MIN_POSITION_MS: Long = 10_000
+
     /** ≥ 95 % watched. */
     public fun isCompleted(positionMs: Long, durationMs: Long): Boolean =
         durationMs > 0 && positionMs.toDouble() / durationMs >= COMPLETED_FRACTION
 
-    /** "Continue watching": progress items with 5 % < position/duration < 95 %, newest first. */
+    /**
+     * "Continue watching" (CONTRACT §8): non-live progress items with 5 % < position/duration < 95 %,
+     * or – duration unknown (durationMs 0/null) – position ≥ 10 s; newest first.
+     */
     public fun continueWatching(items: Collection<SyncItem>, limit: Int? = null): List<SyncItem> {
         val list = items.filter { item ->
-            val f = item.data.fraction
-            item.kind == SyncKind.PROGRESS && !item.deleted && f != null && f > STARTED_FRACTION && f < COMPLETED_FRACTION
+            if (item.kind != SyncKind.PROGRESS || item.deleted || item.data.contentKind == ContentKind.LIVE) return@filter false
+            val f = item.data.fraction ?: return@filter (item.data.positionMs ?: 0) >= UNKNOWN_DURATION_MIN_POSITION_MS
+            f > STARTED_FRACTION && f < COMPLETED_FRACTION
         }.sortedByDescending { it.updatedAt }
         return if (limit != null) list.take(limit) else list
     }

@@ -130,12 +130,27 @@ public final class PlayerController {
     /// QuickStart bookkeeping (docs/SCREENS.md §3.2): called whenever the last live session changes; set by `AppEnvironment`.
     @ObservationIgnored public var onLastSessionChange: (@MainActor (LastSession?) -> Void)?
     @ObservationIgnored private var lastSession: LastSession?
+    /// HTTP probe of the stream (1 KiB range request) that classifies AVPlayer failures without a
+    /// usable reason (docs/SCREENS.md §4); injectable for tests.
+    @ObservationIgnored public var probe: @MainActor (URL, [String: String]) async -> VLCFailureClassifier.Probe? = { url, headers in
+        await VLCFailureClassifier.probe(url, headers: headers)
+    }
+    /// AVPlayer still not ready after this long → probe the stream (internal for tests).
+    @ObservationIgnored var notReadyProbeDelay: Duration = .seconds(PlayerController.notReadyProbeSeconds)
+    /// Stall → `Network(timeout)` after this long (internal for tests).
+    @ObservationIgnored var stallTimeout: Duration = .seconds(PlayerController.stallTimeoutSeconds)
+    /// The engine reported `.ready`/`.playing` for the current load.
+    @ObservationIgnored private var loadReady = false
+    /// Not-ready watchdog / failure probe of the current load.
+    @ObservationIgnored private var probeTask: Task<Void, Never>?
     @ObservationIgnored public var preferredAudioLanguage: String?
     @ObservationIgnored public var preferredSubtitleLanguage: String?
     /// Channel-switch debounce (ms).
     public static let zapDebounceMs = 400
     /// Stall → `Network(timeout)` after this long without playback.
     public static let stallTimeoutSeconds = 12
+    /// AVPlayer not ready after this long → HTTP probe (SCREENS §4: error card within a few seconds).
+    public static let notReadyProbeSeconds = 8
 
     /// - Parameter engines: engine factories; engines are created lazily on first use.
     public init(resolver: StreamResolver, library: LibraryRepository?, reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
@@ -163,6 +178,7 @@ public final class PlayerController {
         saveProgress()
         openTask?.cancel()
         retryTask?.cancel()
+        probeTask?.cancel()
         reconnectState = ReconnectState()
         fallbackEngine = nil
         lastProgressSaveMs = nil
@@ -262,24 +278,70 @@ public final class PlayerController {
         }
         SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
         let isLive = request?.isLive == true
+        loadReady = false
+        probeTask?.cancel()
+        cancelStallTimer()   // a new item starts without the previous item's stall deadline
         next.load(stream, isLive: isLive, startMs: startMs,
                   preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage,
                   tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
+        if next.kind == .avPlayer { watchNotReady(stream) }
+    }
+
+    // MARK: AVPlayer failure classification
+
+    /// AVPlayer can stay "not ready" (spinner) for a long time on an HTTP error; after
+    /// `notReadyProbeDelay` the stream is probed and an HTTP error status ends the wait.
+    private func watchNotReady(_ stream: ResolvedStream) {
+        let delay = notReadyProbeDelay
+        probeTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self, !self.loadReady else { return }
+            let probe = await self.probe(stream.url, stream.headers)
+            guard !Task.isCancelled, !self.loadReady, self.stream == stream,
+                  let status = probe?.httpStatus, let error = ErrorClassifier.playbackError(httpStatus: status) else { return }
+            SafeLog.warning("avplayer not ready after \(delay) – probe \(error)")
+            self.handle(error)
+        }
+    }
+
+    /// An AVPlayer failure before the first ready/playing whose error carries no usable reason
+    /// (`Network(other)`, `Unknown`): probe the stream; an HTTP error status replaces the error.
+    private func classifyAVPlayerFailure(_ error: PlaybackError) {
+        guard let stream else { handle(error); return }
+        probeTask?.cancel()
+        probeTask = Task { [weak self] in
+            let probe = await self?.probe(stream.url, stream.headers)
+            guard !Task.isCancelled, let self, self.stream == stream else { return }
+            let mapped = probe?.httpStatus.flatMap(ErrorClassifier.playbackError(httpStatus:)) ?? error
+            SafeLog.warning("avplayer failed before ready: \(error) – probe \(mapped)")
+            self.handle(mapped)
+        }
+    }
+
+    /// Errors AVPlayer reports without a cause the user can act on.
+    static func needsProbe(_ error: PlaybackError) -> Bool {
+        switch error {
+        case .network(.other), .unknown: return true
+        default: return false
+        }
     }
 
     // MARK: Engine events
 
     /// Applies an engine event (internal for tests).
     func handle(_ event: EngineEvent) {
+        if case .time = event {} else { SafeLog.debug("player event \(event) phase=\(phase)") }
         switch event {
         case .playing:
+            loadReady = true
             PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
             if let channel = currentChannel { updateLastSession(LastSession(sourceId: channel.sourceId, channelId: channel.id, endedInPlayer: true)) }
             prefetchNeighboursIfNeeded()
-            stallTask?.cancel()
+            cancelStallTimer()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             if phase != .playing { phase = .playing }
         case .paused:
+            cancelStallTimer()   // a real pause ends any stall recovery
             if phase == .playing || phase == .buffering {
                 phase = .paused
                 saveProgress()
@@ -287,6 +349,7 @@ public final class PlayerController {
         case .buffering:
             if phase == .playing { phase = .buffering }
         case .ready(let d):
+            loadReady = true
             duration = d.isFinite && d > 0 ? d : 0
         case .time(let seconds):
             if let seek = pendingSeek {
@@ -304,7 +367,11 @@ public final class PlayerController {
             selectedAudio = selA
             selectedSubtitle = selS
         case .failed(let error):
-            handle(error)
+            if engine?.kind == .avPlayer, !loadReady, Self.needsProbe(error) {
+                classifyAVPlayerFailure(error)
+            } else {
+                handle(error)
+            }
         case .stalled:
             handleStall()
         case .ended:
@@ -355,13 +422,23 @@ public final class PlayerController {
         prefetcher.prefetch(around: channel, request: request)
     }
 
+    /// Starts the stall timer; a further stall before playback resumed keeps the first deadline, so
+    /// repeated stalls (or unexpected pauses the engine keeps resuming) end in the reconnect policy.
     private func handleStall() {
-        stallTask?.cancel()
+        guard stallTask == nil else { return }
+        let timeout = stallTimeout
         stallTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Self.stallTimeoutSeconds))
-            guard !Task.isCancelled, let self, self.engine?.isPlaying != true else { return }
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled, let self else { return }
+            self.stallTask = nil
+            guard self.engine?.isPlaying != true else { return }
             self.handle(.network(.timeout))
         }
+    }
+
+    private func cancelStallTimer() {
+        stallTask?.cancel()
+        stallTask = nil
     }
 
     private func handleEnded() {
@@ -421,7 +498,7 @@ public final class PlayerController {
         if case .reconnecting = phase {
             // Pause = user intent: no further attempts until play.
             retryTask?.cancel()
-            stallTask?.cancel()
+            cancelStallTimer()
             engine.pause()
             phase = .paused
             pausedDuringReconnect = true
@@ -434,7 +511,9 @@ public final class PlayerController {
             seek(to: 0)
             engine.play()
         } else if engine.isPlaying || phase == .playing || phase == .buffering {
-            // Intent, not only `isPlaying`: a pause during buffering must pause too.
+            // Intent, not only `isPlaying`: a pause during buffering must pause too (and must not
+            // be "recovered" by the stall timer).
+            cancelStallTimer()
             engine.pause()
             phase = .paused
             saveProgress()
@@ -535,7 +614,8 @@ public final class PlayerController {
         prefetcher?.cancelAll()
         prefetchedFor = nil
         retryTask?.cancel()
-        stallTask?.cancel()
+        probeTask?.cancel()
+        cancelStallTimer()
         engine?.stop()
     }
 

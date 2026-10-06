@@ -88,14 +88,17 @@ class SyncTest {
             prog(2, 51, 1000, 2), // > 5 %
             prog(3, 949, 1000, 3), // < 95 %
             prog(4, 950, 1000, 4), // completed
-            prog(5, 500, 0, 5), // no duration
+            prog(5, 500, 0, 5), // no duration, < 10 s
             prog(6, 500, 1000, 6, deleted = true),
             prog(7, 0, 0, 7, ContentKind.LIVE),
             SyncItem.favorite("fp:movie:8", "fav", ContentKind.MOVIE, null, 8),
+            prog(9, 60_000, 0, 9, ContentKind.EPISODE), // unknown duration, ≥ 10 s → included
+            prog(10, 9_999, 0, 10), // unknown duration, < 10 s
+            prog(11, 10_000, 0, 0), // unknown duration, exactly 10 s → included (oldest)
         )
-        assertEquals(listOf("t3", "t2"), WatchHistory.continueWatching(items).map { it.data.title })
-        assertEquals(listOf("t3"), WatchHistory.continueWatching(items, limit = 1).map { it.data.title })
-        assertEquals(listOf("t7", "t5", "t4", "t3", "t2", "t1"), WatchHistory.recentlyWatched(items).map { it.data.title })
+        assertEquals(listOf("t9", "t3", "t2", "t11"), WatchHistory.continueWatching(items).map { it.data.title })
+        assertEquals(listOf("t9"), WatchHistory.continueWatching(items, limit = 1).map { it.data.title })
+        assertEquals(listOf("t10", "t9", "t7", "t5", "t4", "t3", "t2", "t1", "t11"), WatchHistory.recentlyWatched(items).map { it.data.title })
         assertEquals(listOf("t7"), WatchHistory.recentlyWatched(items, kind = ContentKind.LIVE).map { it.data.title })
         assertTrue(WatchHistory.isCompleted(950, 1000))
         assertFalse(WatchHistory.isCompleted(949, 1000))

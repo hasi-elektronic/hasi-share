@@ -206,12 +206,17 @@ fun Shelf(title: String, content: androidx.compose.foundation.lazy.LazyListScope
 fun ContinueCard(e: LibraryEntity, onClick: () -> Unit) {
     Column(Modifier.width(200.dp).clip(RoundedCornerShape(Tokens.CardRadius)).background(Tokens.Surface).clickable(onClick = onClick)) {
         RemoteImage(e.posterUrl, e.title, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-        LinearProgressIndicator(
-            progress = { ((e.positionMs ?: 0).toFloat() / (e.durationMs ?: 1).coerceAtLeast(1)).coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(3.dp),
-            color = Tokens.Primary,
-            trackColor = Tokens.SurfaceElevated,
-        )
+        val durationMs = e.durationMs ?: 0
+        if (durationMs > 0) {
+            LinearProgressIndicator(
+                progress = { ((e.positionMs ?: 0).toFloat() / durationMs).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(3.dp),
+                color = Tokens.Primary,
+                trackColor = Tokens.SurfaceElevated,
+            )
+        } else {
+            Spacer(Modifier.fillMaxWidth().height(3.dp)) // unknown duration: no progress bar (CONTRACT §8)
+        }
         Text(e.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Tokens.TextPrimary, modifier = Modifier.padding(8.dp))
     }
 }

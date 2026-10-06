@@ -88,7 +88,12 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   kullanılır; yeniden bağlanma, debounce, ilerleme ve yaşam döngüsü `PlayerController`'da
   motordan bağımsızdır. VLCKit hata nedeni vermediği için hata 1 KiB'lık bir HTTP yoklamasıyla
   sınıflandırılır (403 → AccessDenied, 404 → StreamOffline, erişilemiyor → Network, erişilebilir
-  ama hiç oynamadı → UnsupportedCodec). Xtream canlıda `m3u8` tercih edilir; hesap yalnızca `ts`
+  ama hiç oynamadı → UnsupportedCodec). AVPlayer'da 401/403/404 hata kodundan doğrudan eşlenir
+  (`NSURLErrorUserAuthenticationRequired`/`NoPermissionsToReadFile`/`FileDoesNotExist`); ilk
+  hazır olmadan gelen nedensiz hata (`Network(other)`, `Unknown`; ör. 410/5xx'te
+  `NSURLErrorResourceUnavailable`) ve **8 sn** hâlâ hazır olmayan öğe aynı yoklamayla
+  sınıflandırılır (401/403 → AccessDenied, 404/410 → StreamOffline, 5xx → ServerError; 2xx/3xx
+  → beklemeye devam). Xtream canlıda `m3u8` tercih edilir; hesap yalnızca `ts`
   izin veriyorsa `ts` + VLCKit.
 * **Canlı başlangıç ayarı** (`LiveStartTuning`, her `load`'a verilir; "Büyük tampon" ayarı `largeBuffer`):
   | | AVPlayer | VLCKit `network-caching` |
@@ -98,6 +103,16 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   | VOD | 0 (sistem varsayılanı), sınır yok | 2000 ms (büyük tampon: 4000 ms) |
 
   Zamanlayıcılar (sınırı kaldırma / bekleme açma) yeni `load`'da ve `stop()`'ta iptal edilir.
+  Bekleme kapalıyken `play()` öğe hazır olmadan çağrılırsa AVPlayer hız 1'de saati hiç
+  başlatmayabilir (ilk karede donar; 3 sn sonra bekleme açılınca `paused`'a düşer) → öğe
+  `readyToPlay` olunca `play()` yeniden çağrılır.
+* **Kendiliğinden duraklama yok:** AVPlayer `paused` bildirdiğinde kullanıcı oynatmak istiyorsa
+  (`pause()`/`stop()` çağrılmadı, öğe bitmedi/başarısız değil) bu her zaman takılma sayılır:
+  `.buffering` + `.stalled`, bekleme açılır ve en fazla saniyede bir `play()`. Sınır:
+  `PlayerController`'ın 12 sn takılma zamanlayıcısı (ilk takılmadan itibaren; tekrar eden takılma
+  süreyi uzatmaz) → `Network(timeout)` → yeniden bağlanma politikası. Gerçek duraklatma (kullanıcı,
+  motorun `.paused`'ı) zamanlayıcıyı iptal eder. Kulaklık/Bluetooth çıkışının kaybolması
+  (`oldDeviceUnavailable`) ve ses kesintisi başlangıcı kullanıcı duraklatması sayılır.
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
 * Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /

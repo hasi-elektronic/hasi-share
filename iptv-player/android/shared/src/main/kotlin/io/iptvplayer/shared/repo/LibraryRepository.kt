@@ -32,7 +32,7 @@ class LibraryRepository(
     val favorites: Flow<List<LibraryEntity>> = dao.observeFavorites()
     val favoriteKeys: Flow<Set<String>> = favorites.map { l -> l.mapTo(HashSet()) { it.contentKey } }
 
-    /** "Continue watching" (5 % < progress < 95 %). */
+    /** "Continue watching" (CONTRACT §8: 5 % < progress < 95 %, or ≥ 10 s with unknown duration). */
     val continueWatching: Flow<List<LibraryEntity>> = dao.observeProgress(200).map { list ->
         val items = list.map { it.toSyncItem() }
         val keep = WatchHistory.continueWatching(items).mapTo(HashSet()) { it.key }

@@ -609,12 +609,14 @@ struct PlayCircle: View {
 }
 
 /// "Continue watching" card: 16:9 artwork, centered play icon, title on the image bottom,
-/// accent progress bar under the card (SCREENS §3.2).
+/// accent progress bar under the card (SCREENS §3.2; hidden while the duration is unknown).
 struct ContinueCard: View {
     let title: String
     var subtitle: String?
     let imageURL: String?
     var progress: Double?
+    /// false while the duration is unknown (the bar would be meaningless).
+    var showsProgress = true
     var width: CGFloat = Theme.isTV ? 480 : 250
 
     var body: some View {
@@ -637,7 +639,8 @@ struct ContinueCard: View {
             .frame(width: width, height: width * 9 / 16)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .modifier(TVFocusCard())
-            ProgressBar(value: progress ?? 0).frame(width: width, height: Theme.isTV ? 5 : 3)
+            // Unknown duration: no bar, same height (CONTRACT §8).
+            ProgressBar(value: progress ?? 0).frame(width: width, height: Theme.isTV ? 5 : 3).opacity(showsProgress ? 1 : 0)
         }
         .accessibilityElement(children: .combine)
     }

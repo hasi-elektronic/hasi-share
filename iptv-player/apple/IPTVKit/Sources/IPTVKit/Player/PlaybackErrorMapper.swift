@@ -34,7 +34,9 @@ public enum PlaybackErrorMapper {
             cursor = underlying
         }
         for e in chain {
-            if let status = httpStatus(in: e), let mapped = ErrorClassifier.playbackError(httpStatus: status) { return mapped }
+            if let status = httpStatus(in: e) ?? httpStatus(forCode: e), let mapped = ErrorClassifier.playbackError(httpStatus: status) {
+                return mapped
+            }
             if e.domain == NSURLErrorDomain {
                 if let reason = ErrorClassifier.networkReason(for: URLError.Code(rawValue: e.code)) { return .network(reason) }
             }
@@ -51,13 +53,36 @@ public enum PlaybackErrorMapper {
         }
         for e in chain where e.domain == coreMediaDomain {
             switch e.code {
-            case -12938: return .streamOffline(httpStatus: 404)      // HTTP 404
-            case -12660, -12937: return .accessDenied(httpStatus: 403) // HTTP 403 / 401
             case -12971, -12318, -12888: return .network(.other)    // segment/playlist load failures, stalls
             default: continue
             }
         }
         return .unknown(message: "\(ns.domain) \(ns.code)")
+    }
+
+    /// HTTP status behind the codes AVPlayer reports for a progressive file / playlist answering an
+    /// HTTP error: NSURLErrorDomain (userAuthenticationRequired 401, noPermissionsToReadFile 403,
+    /// fileDoesNotExist 404) and the underlying CoreMedia/OSStatus code (-12937 401, -12660 403,
+    /// -12938 404). 410/5xx come as NSURLErrorResourceUnavailable with undocumented OSStatus codes –
+    /// those are left to the HTTP probe (`PlayerController`).
+    static func httpStatus(forCode error: NSError) -> Int? {
+        switch error.domain {
+        case NSURLErrorDomain:
+            switch error.code {
+            case NSURLErrorUserAuthenticationRequired: return 401
+            case NSURLErrorNoPermissionsToReadFile: return 403
+            case NSURLErrorFileDoesNotExist: return 404
+            default: return nil
+            }
+        case coreMediaDomain, NSOSStatusErrorDomain:
+            switch error.code {
+            case -12937: return 401
+            case -12660: return 403
+            case -12938: return 404
+            default: return nil
+            }
+        default: return nil
+        }
     }
 
     /// Status from "HTTP 404: File Not Found"-style descriptions CoreMedia uses.

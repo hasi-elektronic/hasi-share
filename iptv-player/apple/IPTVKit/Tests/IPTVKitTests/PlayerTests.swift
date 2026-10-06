@@ -22,6 +22,21 @@ final class PlaybackErrorMapperTests: XCTestCase {
         XCTAssertEqual(PlaybackErrorMapper.map(http503), .serverError(httpStatus: 503))
     }
 
+    /// What AVPlayer reports for a progressive file answering an HTTP error (iOS 26 / macOS 27):
+    /// NSURLErrorDomain code ← NSOSStatusErrorDomain code. 401/403/404 map directly; 410/5xx share
+    /// NSURLErrorResourceUnavailable and are left to the HTTP probe.
+    func testAVPlayerHTTPStatusErrors() {
+        func avError(_ urlCode: Int, _ status: Int) -> NSError {
+            NSError(domain: NSURLErrorDomain, code: urlCode,
+                    userInfo: [NSUnderlyingErrorKey: NSError(domain: NSOSStatusErrorDomain, code: status)])
+        }
+        XCTAssertEqual(PlaybackErrorMapper.map(avError(-1013, -16840)), .accessDenied(httpStatus: 401))
+        XCTAssertEqual(PlaybackErrorMapper.map(avError(-1102, -12660)), .accessDenied(httpStatus: 403))
+        XCTAssertEqual(PlaybackErrorMapper.map(avError(-1100, -12938)), .streamOffline(httpStatus: 404))
+        XCTAssertEqual(PlaybackErrorMapper.map(avError(-1008, -16847)), .network(.other), "ambiguous → probe")
+        XCTAssertEqual(PlaybackErrorMapper.map(NSError(domain: NSOSStatusErrorDomain, code: -12660)), .accessDenied(httpStatus: 403))
+    }
+
     func testAVFoundationCodes() {
         XCTAssertEqual(PlaybackErrorMapper.map(NSError(domain: "AVFoundationErrorDomain", code: -11831)), .drm)
         XCTAssertEqual(PlaybackErrorMapper.map(NSError(domain: "AVFoundationErrorDomain", code: -11833)), .unsupportedCodec(codec: nil))

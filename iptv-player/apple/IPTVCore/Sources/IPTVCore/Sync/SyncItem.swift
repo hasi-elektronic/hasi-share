@@ -123,10 +123,17 @@ public enum WatchHistory {
         durationMs > 0 && Double(positionMs) / Double(durationMs) >= completedFraction
     }
 
-    /// "Continue watching": live progress items with 5 % < position/duration < 95 %, newest first.
+    /// Position from which an item with unknown duration counts as "continue watching" (the resume threshold).
+    public static let unknownDurationMinPositionMs: Int64 = 10_000
+
+    /// "Continue watching" (CONTRACT §8): non-live progress items with 5 % < position/duration < 95 %,
+    /// or – duration unknown (`durationMs` 0/nil) – position ≥ 10 s; newest first.
     public static func continueWatching(_ items: [SyncItem], limit: Int? = nil) -> [SyncItem] {
         let selected = items.filter { item in
-            guard item.kind == .progress, !item.deleted, let fraction = item.data.fraction else { return false }
+            guard item.kind == .progress, !item.deleted, item.data.contentKind != .live else { return false }
+            guard let fraction = item.data.fraction else {
+                return (item.data.positionMs ?? 0) >= unknownDurationMinPositionMs
+            }
             return fraction > startedFraction && fraction < completedFraction
         }.sorted { $0.updatedAt > $1.updatedAt }
         return limit.map { Array(selected.prefix($0)) } ?? selected

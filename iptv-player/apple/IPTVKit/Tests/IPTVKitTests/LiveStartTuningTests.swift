@@ -26,17 +26,38 @@ final class LiveStartTuningTests: XCTestCase {
 }
 
 #if canImport(AVFoundation)
-/// A `.paused` AVPlayer status is a user pause only when stall-waiting is on or the user did not ask to play.
+/// A `.paused` AVPlayer status is a user pause only when the user did not ask to play (or the item
+/// ended/failed). Task 4c: the simulator's frozen tuned start fell to `.paused` once the relax timer had
+/// re-enabled stall-waiting – AVPlayer reported paused while the user still wanted to play.
 final class AVPlayerEnginePausedStatusTests: XCTestCase {
     func testStallWithWaitingDisabledBecomesBuffering() {
-        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, stallWaitEnabled: false), .buffering)
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, itemFinished: false), .buffering)
     }
     func testUserPauseStaysPaused() {
-        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, stallWaitEnabled: false), .paused)
-        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, stallWaitEnabled: true), .paused)
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, itemFinished: false), .paused)
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, itemFinished: true), .paused)
     }
-    func testPauseWithWaitingEnabledStaysPaused() {
-        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, stallWaitEnabled: true), .paused)
+    /// Any time, not only in the stall-wait-off window: paused while wanting to play = stall.
+    func testPauseWithoutUserIntentIsAStallAtAnyTime() {
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, itemFinished: false), .buffering)
+    }
+    /// End of a VOD or a failed item: nothing to resume.
+    func testFinishedItemStaysPaused() {
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, itemFinished: true), .paused)
+    }
+    /// With stall-waiting off, `play()` before the item is ready can leave AVPlayer at rate 1 with a
+    /// frozen clock; the engine re-issues `play()` once the item is ready.
+    func testStartKickOnlyForTunedStartWhileWantingToPlay() {
+        XCTAssertTrue(AVPlayerEngine.needsStartKick(wantsToPlay: true, stallWaitEnabled: false))
+        XCTAssertFalse(AVPlayerEngine.needsStartKick(wantsToPlay: true, stallWaitEnabled: true))
+        XCTAssertFalse(AVPlayerEngine.needsStartKick(wantsToPlay: false, stallWaitEnabled: false))
+    }
+    /// Unexpected pauses are resumed at most once per second (the controller's stall timeout bounds the rest).
+    func testResumeThrottle() {
+        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: nil), 0)
+        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 1_500), 0)
+        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 300), 700)
+        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 0), 1_000)
     }
 }
 

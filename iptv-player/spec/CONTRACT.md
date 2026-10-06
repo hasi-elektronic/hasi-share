@@ -311,7 +311,9 @@ AVPlayer. Without VLCKit (`vlcAvailable = false`) the rules reduce to the AVPlay
 VLCKit failures carry no reason; the app classifies them with a 1 KiB range request to the
 stream: HTTP 401/403/404/410/5xx as in §2, transport error ⇒ `Network`, reachable but
 never played ⇒ `UnsupportedCodec`, played then dropped (or a live stream "ended") ⇒
-`Network` (reconnect policy).
+`Network` (reconnect policy). AVPlayer: an error without a usable reason before the first
+frame, or an item still not ready after 8 s, is classified with the same probe (2xx/3xx →
+keep the original error / keep waiting).
 Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, fallback}`;
 `stream-samples.json` → `expect.apple`.
 
@@ -449,7 +451,9 @@ SyncItem {
 Server rule: upsert when `incoming.updatedAt > stored.updatedAt` (ties keep stored).
 Cursor = server sequence number; `GET /v1/sync?since=cursor` returns items with
 `seq > cursor` (max 500/page, `hasMore`). Client merges with the same LWW rule.
-"Continue watching": progress items with `5% < position/duration < 95%`.
+"Continue watching": progress items (not live) with `5% < position/duration < 95%`; when the
+duration is unknown (`durationMs` 0/absent – the player could not tell the length) the item
+counts from `positionMs ≥ 10 000` (shown without a progress bar). Newest `updatedAt` first.
 "Recently watched": most recent progress items (any kind), max 50.
 A progress item counts as completed at ≥ 95 %.
 
