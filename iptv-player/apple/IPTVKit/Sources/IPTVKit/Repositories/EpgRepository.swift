@@ -37,31 +37,47 @@ public final class EpgRepository: Sendable {
 
     private static let columns = "source_id, channel_epg_id, start, end, title, description, category"
 
-    /// Programmes of one channel overlapping `interval`, ordered by start.
-    public func programs(sourceId: String, epgId: String, in interval: DateInterval) throws -> [EpgProgram] {
-        try db.query("""
-            SELECT \(Self.columns) FROM epg WHERE source_id = ? AND lower(channel_epg_id) = ?
-            AND start < ? AND end > ? ORDER BY start
-            """, [.text(sourceId), .text(epgId.lowercased()), .from(interval.end), .from(interval.start)], map: Self.program)
+    /// Single-channel lookup. Both sides go through SQLite's `lower()` (ASCII-only folding) so the
+    /// expression index `epg_lookup_lc` serves it and ids with non-ASCII capitals ("ÖRF.at") still match.
+    static let programsSQL = """
+        SELECT \(columns) FROM epg WHERE source_id = ? AND lower(channel_epg_id) = lower(?)
+        AND start < ? AND end > ? ORDER BY start
+        """
+
+    static func nowNextSQL(idCount: Int) -> String {
+        let placeholders = Array(repeating: "lower(?)", count: idCount).joined(separator: ",")
+        return """
+            SELECT \(columns) FROM epg WHERE source_id = ? AND lower(channel_epg_id) IN (\(placeholders))
+            AND end > ? AND start < ? ORDER BY start
+            """
     }
 
-    /// Now/next for many channels at once (keyed by lowercased epg id).
+    /// SQLite `lower()` semantics (A-Z only), used to match rows back to the ids that were asked for.
+    static func sqliteLower(_ s: String) -> String {
+        String(String.UnicodeScalarView(s.unicodeScalars.map { ("A"..."Z").contains($0) ? Unicode.Scalar($0.value + 32)! : $0 }))
+    }
+
+    /// Programmes of one channel overlapping `interval`, ordered by start.
+    public func programs(sourceId: String, epgId: String, in interval: DateInterval) throws -> [EpgProgram] {
+        try db.query(Self.programsSQL, [.text(sourceId), .text(epgId), .from(interval.end), .from(interval.start)],
+                     map: Self.program)
+    }
+
+    /// Now/next for many channels at once (keyed by the Unicode-lowercased epg id).
     public func nowNext(sourceId: String, epgIds: [String], at date: Date) throws -> [String: NowNext] {
-        let ids = Array(Set(epgIds.map { $0.lowercased() }))
+        let ids = Array(Set(epgIds))
         guard !ids.isEmpty else { return [:] }
         var result: [String: NowNext] = [:]
         // Chunk to stay below SQLite's parameter limit.
         for chunk in stride(from: 0, to: ids.count, by: 400).map({ Array(ids[$0..<min($0 + 400, ids.count)]) }) {
-            let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ",")
-            let rows = try db.query("""
-                SELECT \(Self.columns) FROM epg WHERE source_id = ? AND lower(channel_epg_id) IN (\(placeholders))
-                AND end > ? AND start < ? ORDER BY start
-                """, [.text(sourceId)] + chunk.map(SQLiteValue.text) + [.from(date), .from(date.addingTimeInterval(12 * 3600))],
-                map: Self.program)
-            let grouped = Dictionary(grouping: rows, by: { $0.channelEpgId.lowercased() })
-            for (id, programs) in grouped {
+            let rows = try db.query(Self.nowNextSQL(idCount: chunk.count),
+                                    [.text(sourceId)] + chunk.map(SQLiteValue.text) + [.from(date), .from(date.addingTimeInterval(12 * 3600))],
+                                    map: Self.program)
+            let grouped = Dictionary(grouping: rows, by: { Self.sqliteLower($0.channelEpgId) })
+            for id in chunk {
+                guard let programs = grouped[Self.sqliteLower(id)] else { continue }
                 let pair = EpgSchedule.nowAndNext(programs, at: date)
-                result[id] = NowNext(now: pair.now, next: pair.next)
+                result[id.lowercased()] = NowNext(now: pair.now, next: pair.next)
             }
         }
         return result

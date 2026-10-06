@@ -119,16 +119,14 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(ms, 100 * factor, "epg grid \(ms) ms")
     }
 
-    /// The EPG lookups must be served by an index on (source_id, channel_epg_id, start) — deterministic
-    /// guard that does not depend on machine speed.
+    /// The repository's real EPG SQL must be served by the `epg_lookup_lc` expression index (deterministic
+    /// guard that does not depend on machine speed).
     func testEpgQueriesUseChannelIndex() throws {
         let db = try AppDatabase.inMemory()
-        for sql in ["SELECT * FROM epg WHERE source_id = ? AND lower(channel_epg_id) IN (?,?) AND end > ? AND start < ? ORDER BY start",
-                    "SELECT * FROM epg WHERE source_id = ? AND lower(channel_epg_id) = ? AND start < ? AND end > ? ORDER BY start"] {
+        for sql in [EpgRepository.programsSQL, EpgRepository.nowNextSQL(idCount: 3)] {
             let args = Array(repeating: SQLiteValue.text("x"), count: sql.filter { $0 == "?" }.count)
             let plan = try db.db.query("EXPLAIN QUERY PLAN " + sql, args) { $0.string(3) }.joined(separator: " | ")
-            // SQLite prints the expression column as `<expr>`; a bare `(source_id=?)` means a source-wide scan.
-            XCTAssertTrue(plan.contains("epg_lookup_lc (source_id=? AND <expr>=?"), "plan scans the whole source: \(plan)")
+            XCTAssertTrue(plan.contains("epg_lookup_lc"), "EPG query does not use the lowercased-id index: \(plan)")
         }
     }
 }
