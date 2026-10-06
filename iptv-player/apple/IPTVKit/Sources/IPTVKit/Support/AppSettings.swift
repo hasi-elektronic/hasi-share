@@ -13,6 +13,8 @@ public final class AppSettings {
     /// ISO language code, "" (automatic) or "off".
     public var subtitleLanguage: String { didSet { defaults.set(subtitleLanguage, forKey: "pref.subLang") } }
     public var largeBuffer: Bool { didSet { defaults.set(largeBuffer, forKey: "pref.largeBuffer") } }
+    /// Settings → Diagnostics: performance overlay on the player (zap time, buffer, bitrate…).
+    public var showPerfOverlay: Bool { didSet { defaults.set(showPerfOverlay, forKey: "pref.perfOverlay") } }
     public var tvPreview: Bool { didSet { defaults.set(tvPreview, forKey: "pref.tvPreview") } }
     /// IANA id or "" (device).
     public var epgTimeZone: String { didSet { defaults.set(epgTimeZone, forKey: "pref.epgTz") } }
@@ -36,6 +38,7 @@ public final class AppSettings {
         audioLanguage = defaults.string(forKey: "pref.audioLang") ?? ""
         subtitleLanguage = defaults.string(forKey: "pref.subLang") ?? ""
         largeBuffer = defaults.bool(forKey: "pref.largeBuffer")
+        showPerfOverlay = defaults.bool(forKey: "pref.perfOverlay")
         tvPreview = defaults.object(forKey: "pref.tvPreview") as? Bool ?? false
         epgTimeZone = defaults.string(forKey: "pref.epgTz") ?? ""
         let lang = defaults.string(forKey: Self.appLanguageKey) ?? ""

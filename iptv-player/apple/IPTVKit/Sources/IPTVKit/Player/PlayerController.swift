@@ -168,6 +168,7 @@ public final class PlayerController {
             return
         }
         phase = .loading
+        PerfTrace.shared.mark(.playRequested)
         openTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -232,6 +233,7 @@ public final class PlayerController {
     func handle(_ event: EngineEvent) {
         switch event {
         case .playing:
+            PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
             stallTask?.cancel()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             if phase != .playing { phase = .playing }

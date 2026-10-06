@@ -191,6 +191,12 @@
     <string name="diagnostics_format_test" formatted="false">Format testi</string>
     <string name="diagnostics_clear_images" formatted="false">Görsel önbelleğini temizle</string>
     <string name="diagnostics_clear_epg" formatted="false">Yayın akışı önbelleğini temizle</string>
+    <string name="perf_overlay" formatted="false">Performans katmanı</string>
+    <string name="perf_zap" formatted="false">Kanal geçiş süresi</string>
+    <string name="perf_engine" formatted="false">Motor</string>
+    <string name="perf_buffer" formatted="false">Arabellek</string>
+    <string name="perf_bitrate" formatted="false">Bit hızı</string>
+    <string name="perf_dropped" formatted="false">Atlanan kareler</string>
     <string name="about_version">Sürüm %1$s</string>
     <string name="about_licenses" formatted="false">Açık kaynak lisansları</string>
     <string name="format_test_result_ok" formatted="false">Oynatılıyor ✓</string>

@@ -191,6 +191,12 @@
     <string name="diagnostics_format_test" formatted="false">Formattest</string>
     <string name="diagnostics_clear_images" formatted="false">Bild-Cache leeren</string>
     <string name="diagnostics_clear_epg" formatted="false">TV-Guide-Cache leeren</string>
+    <string name="perf_overlay" formatted="false">Leistungs-Overlay</string>
+    <string name="perf_zap" formatted="false">Umschaltzeit</string>
+    <string name="perf_engine" formatted="false">Engine</string>
+    <string name="perf_buffer" formatted="false">Puffer</string>
+    <string name="perf_bitrate" formatted="false">Bitrate</string>
+    <string name="perf_dropped" formatted="false">Verworfene Bilder</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_licenses" formatted="false">Open-Source-Lizenzen</string>
     <string name="format_test_result_ok" formatted="false">Wird abgespielt ✓</string>

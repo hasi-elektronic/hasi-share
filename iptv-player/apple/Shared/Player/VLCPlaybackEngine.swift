@@ -50,6 +50,18 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
 
     var isPlaying: Bool { player.isPlaying }
 
+    /// `VLCMedia.statistics`: `demuxBitrate` is bytes per microsecond (libVLC) → ×1 000 000 B/s
+    /// × 8 = bit/s; `lostPictures` is the session total. 0 bitrate = empty buffer → unknown.
+    var diagnostics: EngineDiagnostics {
+        guard let media = player.media, player.isPlaying else { return EngineDiagnostics() }
+        let stats = media.statistics
+        let size = player.videoSize
+        return EngineDiagnostics(
+            bitrate: stats.demuxBitrate > 0 ? Double(stats.demuxBitrate) * 8_000_000 : nil,
+            droppedFrames: Int(stats.lostPictures),
+            resolution: size.width > 0 && size.height > 0 ? "\(Int(size.width))x\(Int(size.height))" : nil)
+    }
+
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?) {
         failureTask?.cancel()
         self.stream = stream

@@ -8,6 +8,7 @@ struct NovaPlayerApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        PerfTrace.shared.mark(.appLaunch)
         let env = AppBootstrap.makeEnvironment()
         _env = State(initialValue: env)
         _router = State(initialValue: Router(env: env))

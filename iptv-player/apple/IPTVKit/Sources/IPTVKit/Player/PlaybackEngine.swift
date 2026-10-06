@@ -16,6 +16,22 @@ public enum EngineEvent: Equatable, Sendable {
     case ended
 }
 
+/// Live engine statistics for the performance overlay (Settings → Diagnostics). Any field may
+/// be unknown (nil) – the overlay then shows "—".
+public struct EngineDiagnostics: Sendable, Equatable {
+    /// Indicated/demux bitrate in bits per second.
+    public var bitrate: Double?
+    public var droppedFrames: Int?
+    /// "1920x1080" once known.
+    public var resolution: String?
+
+    public init(bitrate: Double? = nil, droppedFrames: Int? = nil, resolution: String? = nil) {
+        self.bitrate = bitrate
+        self.droppedFrames = droppedFrames
+        self.resolution = resolution
+    }
+}
+
 /// One playback engine behind `PlayerController` (docs/ARCHITECTURE.md §3.2): AVPlayer
 /// (`AVPlayerEngine`, IPTVKit) or VLCKit (`VLCPlaybackEngine`, app target – the VLCKit
 /// framework only exists for iOS/tvOS). The controller owns reconnect, zapping, progress and
@@ -29,6 +45,8 @@ public protocol PlaybackEngine: AnyObject {
     func play()
     func pause()
     var isPlaying: Bool { get }
+    /// Current statistics (polled by the performance overlay only).
+    var diagnostics: EngineDiagnostics { get }
     func seek(to seconds: Double)
     func selectAudio(_ id: Int)
     /// nil → subtitles off.

@@ -15,6 +15,7 @@ final class FakeEngine: PlaybackEngine {
     private(set) var selectedSubtitle: Int??
     private(set) var seeks: [Double] = []
     var isPlaying = false
+    var diagnostics = EngineDiagnostics()
 
     init(kind: PlayerEngine) { self.kind = kind }
 

@@ -944,6 +944,36 @@
    "tr": "Yayın akışı önbelleğini temizle",
    "de": "TV-Guide-Cache leeren"
   },
+  "perf_overlay": {
+   "en": "Performance overlay",
+   "tr": "Performans katmanı",
+   "de": "Leistungs-Overlay"
+  },
+  "perf_zap": {
+   "en": "Zap time",
+   "tr": "Kanal geçiş süresi",
+   "de": "Umschaltzeit"
+  },
+  "perf_engine": {
+   "en": "Engine",
+   "tr": "Motor",
+   "de": "Engine"
+  },
+  "perf_buffer": {
+   "en": "Buffer",
+   "tr": "Arabellek",
+   "de": "Puffer"
+  },
+  "perf_bitrate": {
+   "en": "Bitrate",
+   "tr": "Bit hızı",
+   "de": "Bitrate"
+  },
+  "perf_dropped": {
+   "en": "Dropped frames",
+   "tr": "Atlanan kareler",
+   "de": "Verworfene Bilder"
+  },
   "about_version": {
    "en": "Version {0}",
    "tr": "Sürüm {0}",

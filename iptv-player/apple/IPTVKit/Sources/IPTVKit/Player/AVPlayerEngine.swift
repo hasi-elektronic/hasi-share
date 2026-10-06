@@ -39,6 +39,20 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     public var isPlaying: Bool { player.timeControlStatus == .playing }
 
+    /// `indicatedBitrate` / `numberOfDroppedVideoFrames` from the newest access-log event;
+    /// resolution from `presentationSize`.
+    public var diagnostics: EngineDiagnostics {
+        guard let item = player.currentItem else { return EngineDiagnostics() }
+        var d = EngineDiagnostics()
+        if let event = item.accessLog()?.events.last {
+            if event.indicatedBitrate > 0 { d.bitrate = event.indicatedBitrate }
+            if event.numberOfDroppedVideoFrames >= 0 { d.droppedFrames = event.numberOfDroppedVideoFrames }
+        }
+        let size = item.presentationSize
+        if size.width > 0, size.height > 0 { d.resolution = "\(Int(size.width))x\(Int(size.height))" }
+        return d
+    }
+
     public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?) {
         var options: [String: Any] = [:]
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }

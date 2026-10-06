@@ -43,6 +43,11 @@ struct PlayerView: View {
                 if overlayVisible { overlay.transition(.opacity) }
                 #endif
             }
+            if env.settings.showPerfOverlay {
+                PerfOverlayView(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(Theme.isTV ? 48 : 16)
+            }
             if let target = player.zapTarget { zapCard(target) }
             if channelListVisible { channelList }
         }
