@@ -59,13 +59,33 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(ms, 100 * factor, "deep page \(ms) ms")
     }
 
+    /// FTS search over 50 000 channels (+ 20 000 movies, 5 000 series) for a token every row matches:
+    /// per-kind limits (30 each) must stay within the 100 ms budget and return all three kinds.
     func testSearchUnderBudget() throws {
-        let (_, repo) = try makeCatalog()
+        let (db, _) = try makeCatalog()
+        let repo = CatalogRepository(database: db)
+        let session = try repo.beginRefresh(sourceId: "m")
+        let movies = (0..<20_000).map { Movie(sourceId: "m", id: "m\($0)", name: "Film \($0) \(Self.words[$0 % 4]) HD", sort: $0) }
+        let series = (0..<5_000).map { Series(sourceId: "m", id: "t\($0)", name: "Serie \($0) \(Self.words[$0 % 4])", sort: $0) }
+        try session.write(channels: (0..<Self.n).map {
+            TestData.channel(id: "c\($0)", sourceId: "m", name: "Kanal \($0) \(Self.words[$0 % 4]) HD", sort: $0)
+        }, movies: movies, series: series)
+        try session.commit()
+
         var hits: [SearchHit] = []
-        let ms = try median { hits = try repo.search("sport", sourceId: "s", limit: 60) }
-        report("search", ms, budget: 100)
-        XCTAssertEqual(hits.count, 60)
+        let ms = try median { hits = try repo.search("sport", sourceId: "m") }
+        report("search (50k channels + 20k movies + 5k series)", ms, budget: 100)
+        XCTAssertEqual(hits.filter { $0.kind == .live }.count, 30)
+        XCTAssertEqual(hits.filter { $0.kind == .movie }.count, 30)
+        XCTAssertEqual(hits.filter { $0.kind == .series }.count, 30)
         XCTAssertLessThan(ms, 100 * factor, "search \(ms) ms")
+
+        // Channels-only catalog (the original 50k budget case).
+        var chOnly: [SearchHit] = []
+        let ms2 = try median { chOnly = try repo.search("sport", sourceId: "s") }
+        report("search (50k channels)", ms2, budget: 100)
+        XCTAssertEqual(chOnly.count, 30)
+        XCTAssertLessThan(ms2, 100 * factor, "search \(ms2) ms")
     }
 
     /// Realistic retention window: 10 000 EPG channels x 20 programmes = 200 000 rows. Lookups must be
