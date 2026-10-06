@@ -209,6 +209,12 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
   aşımı (CONTRACT §2); ekran kapanınca coroutine/Task iptal edilir.
 * Oynatıcı: kanal değiştirmede örnek yeniden kullanımı, canlıda düşük başlangıç tamponu
   (AVPlayer 1 sn ileri tampon + 2,5 Mbps ilk varyant sınırı, VLCKit 1000 ms; ayrıntı §3.2).
+* Komşu kanal ön ısıtma (`ZapPrefetcher`, yalnızca Apple): canlı kanalın ilk karesinden sonra
+  önceki/sonraki kanalın akış URL'si çözülür ve en çok **256 KB** (manifest / ilk baytlar,
+  Range GET) okunur; **en çok 2 eşzamanlı**, **hücresel / Düşük Veri Modu'nda kapalı**
+  (`NWPath.isExpensive/isConstrained`). Çözümlenmiş akış bir kez tüketilir: komşuya geçişte
+  `StreamResolver` tekrar çağrılmaz. Kanal değişince, ekran/oynatıcı kapanınca ve uygulama
+  `.active` dışına çıkınca (`release()`) iptal edilir; URL'ler loglanmaz.
 
 ## 8. Güvenlik özeti
 Ayrıntı: `docs/SECURITY.md`. Kısaca: gizli bilgiler Keystore/Keychain'de; veritabanı ve

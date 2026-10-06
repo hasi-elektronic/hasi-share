@@ -26,6 +26,8 @@ public final class AVPlayerEngine: PlaybackEngine {
     /// status while this is true and stall-waiting is off is a stall, not a user pause.
     private var wantsToPlay = false
     private var pendingRelax: (item: AVPlayerItem, tuning: LiveStartTuning)?
+    /// True once this load forwarded its first `.playing` (which waits for a ready item).
+    private var firstPlayingEmitted = false
 
     public init() {
         player.automaticallyWaitsToMinimizeStalling = true
@@ -62,6 +64,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         cancelRelax()
         wantsToPlay = true
+        firstPlayingEmitted = false
         var options: [String: Any] = [:]
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
         let asset = AVURLAsset(url: stream.url, options: options)
@@ -115,7 +118,10 @@ public final class AVPlayerEngine: PlaybackEngine {
         case .readyToPlay:
             let d = item.duration.seconds
             onEvent?(.ready(duration: d.isFinite ? d : 0))
-            if player.timeControlStatus == .playing { scheduleRelaxIfNeeded() }
+            if player.timeControlStatus == .playing {
+                scheduleRelaxIfNeeded()
+                emitPlayingIfDue()
+            }
         default: break
         }
     }
@@ -124,7 +130,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         switch player.timeControlStatus {
         case .playing:
             scheduleRelaxIfNeeded()
-            onEvent?(.playing)
+            emitPlayingIfDue()
         case .paused:
             let event = Self.eventForPausedStatus(wantsToPlay: wantsToPlay,
                                                   stallWaitEnabled: player.automaticallyWaitsToMinimizeStalling)
@@ -139,6 +145,22 @@ public final class AVPlayerEngine: PlaybackEngine {
         case .waitingToPlayAtSpecifiedRate: onEvent?(.buffering)
         @unknown default: break
         }
+    }
+
+    /// Forwards `.playing`; the FIRST one of a load only once the item is `readyToPlay` (with
+    /// stall-waiting off AVPlayer reports `.playing` right at `play()`, before any frame), until
+    /// then `.buffering`. `itemStatusChanged` re-checks when the item becomes ready.
+    private func emitPlayingIfDue() {
+        let event = Self.eventForPlayingStatus(firstPlayingEmitted: firstPlayingEmitted,
+                                               itemReady: player.currentItem?.status == .readyToPlay)
+        if event == .playing { firstPlayingEmitted = true }
+        onEvent?(event)
+    }
+
+    /// Event for `timeControlStatus == .playing`: `.playing` once the first one was forwarded or the
+    /// item is ready, else `.buffering` (so the controller's first-frame mark is not understated).
+    nonisolated static func eventForPlayingStatus(firstPlayingEmitted: Bool, itemReady: Bool) -> EngineEvent {
+        firstPlayingEmitted || itemReady ? .playing : .buffering
     }
 
     /// On the first `.playing` of a tuned load: after the configured delays remove the bitrate cap
@@ -244,6 +266,7 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     public func stop() {
         wantsToPlay = false
+        firstPlayingEmitted = false
         cancelRelax()
         player.automaticallyWaitsToMinimizeStalling = true
         optionsTask?.cancel()

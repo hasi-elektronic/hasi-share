@@ -76,3 +76,10 @@ final class TestClock: @unchecked Sendable {
         reading = r
     }
 }
+
+/// Small model builders for tests.
+enum TestData {
+    static func channel(id: String, url: String? = nil) -> Channel {
+        Channel(sourceId: "s1", id: id, name: "Channel \(id)", url: url)
+    }
+}

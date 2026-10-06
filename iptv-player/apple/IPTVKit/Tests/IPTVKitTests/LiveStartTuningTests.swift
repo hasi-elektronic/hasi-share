@@ -39,4 +39,17 @@ final class AVPlayerEnginePausedStatusTests: XCTestCase {
         XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, stallWaitEnabled: true), .paused)
     }
 }
+
+/// The first `.playing` of a load is only forwarded once the item is ready (real first frame);
+/// before that the engine reports `.buffering`, so PerfTrace's firstFrame / zap times are not understated.
+final class AVPlayerEnginePlayingStatusTests: XCTestCase {
+    func testFirstPlayingWaitsForReadyItem() {
+        XCTAssertEqual(AVPlayerEngine.eventForPlayingStatus(firstPlayingEmitted: false, itemReady: false), .buffering)
+        XCTAssertEqual(AVPlayerEngine.eventForPlayingStatus(firstPlayingEmitted: false, itemReady: true), .playing)
+    }
+    func testLaterPlayingIsUnchanged() {
+        XCTAssertEqual(AVPlayerEngine.eventForPlayingStatus(firstPlayingEmitted: true, itemReady: false), .playing)
+        XCTAssertEqual(AVPlayerEngine.eventForPlayingStatus(firstPlayingEmitted: true, itemReady: true), .playing)
+    }
+}
 #endif

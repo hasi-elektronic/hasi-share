@@ -88,8 +88,10 @@ public final class AppEnvironment {
         let repo = sourceRepository
         // AVPlayer + (iOS/tvOS app) VLCKit engines – docs/ARCHITECTURE.md §3.2, CONTRACT §6.1.
         let engines = engines ?? .avPlayerOnly
-        player = PlayerController(resolver: StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable),
-                                  library: library, engines: engines)
+        let streamResolver = StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable)
+        player = PlayerController(resolver: streamResolver, library: library, engines: engines)
+        player.prefetcher = ZapPrefetcher(resolver: { try await streamResolver.resolve($0) },
+                                          fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()
         sourceRepository.registerSecretsForRedaction()
         reloadSources()

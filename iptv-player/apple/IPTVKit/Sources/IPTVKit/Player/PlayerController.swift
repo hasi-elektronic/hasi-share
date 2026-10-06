@@ -118,6 +118,10 @@ public final class PlayerController {
     @ObservationIgnored public var onAspectChange: (@MainActor (AspectMode) -> Void)?
     /// Settings → Playback → buffer size (large = no start tuning, bigger caches); set by `AppEnvironment`.
     @ObservationIgnored public var largeBuffer = false
+    /// Neighbour-channel warm-up (docs/ARCHITECTURE.md §7); nil = no prefetch. Set by `AppEnvironment`.
+    @ObservationIgnored public var prefetcher: ZapPrefetcher?
+    /// Channel id whose neighbours were already prefetched (a resume `.playing` does not restart it).
+    @ObservationIgnored private var prefetchedFor: String?
     @ObservationIgnored public var preferredAudioLanguage: String?
     @ObservationIgnored public var preferredSubtitleLanguage: String?
     /// Channel-switch debounce (ms).
@@ -171,10 +175,19 @@ public final class PlayerController {
         }
         phase = .loading
         PerfTrace.shared.mark(.playRequested)
+        prefetchedFor = nil
+        // A neighbour warmed up while the previous channel played: skip the resolver.
+        var cached: ResolvedStream?
+        if case .channel(let channel) = request.item {
+            cached = prefetcher?.takeResolved(channelId: channel.id)
+        } else {
+            prefetcher?.cancelAll()
+        }
         openTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let stream = try await resolver.resolve(request)
+                let stream: ResolvedStream
+                if let cached { stream = cached } else { stream = try await resolver.resolve(request) }
                 guard !Task.isCancelled else { return }
                 self.stream = stream
                 load(stream, startMs: request.startPositionMs)
@@ -238,6 +251,7 @@ public final class PlayerController {
         switch event {
         case .playing:
             PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
+            prefetchNeighboursIfNeeded()
             stallTask?.cancel()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             if phase != .playing { phase = .playing }
@@ -299,6 +313,13 @@ public final class PlayerController {
             stopPlayback()
             phase = .failed(error)
         }
+    }
+
+    /// After the first frame of a live channel: warm the previous/next channel (once per channel).
+    private func prefetchNeighboursIfNeeded() {
+        guard let prefetcher, let request, case .channel(let channel) = request.item, prefetchedFor != channel.id else { return }
+        prefetchedFor = channel.id
+        prefetcher.prefetch(around: channel, request: request)
     }
 
     private func handleStall() {
@@ -437,6 +458,8 @@ public final class PlayerController {
     }
 
     private func stopPlayback() {
+        prefetcher?.cancelAll()
+        prefetchedFor = nil
         retryTask?.cancel()
         stallTask?.cancel()
         engine?.stop()
