@@ -1,9 +1,11 @@
+import AVFoundation
 import IPTVCore
 import IPTVKit
 import SwiftUI
 
 /// Settings → Diagnostics → "Performance overlay": engine, last zap time (+ p50/p90), buffer
-/// state and the engine's bitrate / dropped frames, polled once a second. Durations only.
+/// state, the engine's bitrate / dropped frames, the audio output latency and the audio delay the
+/// engine applies (A/V sync diagnosis, docs/ARCHITECTURE.md §3.2), polled once a second. Durations only.
 struct PerfOverlayView: View {
     let player: PlayerController
 
@@ -23,6 +25,8 @@ struct PerfOverlayView: View {
                 row("perf_buffer", Self.bufferText(player.phase))
                 row("perf_bitrate", diag.bitrate.map { String(format: "%.2f Mbit/s", $0 / 1_000_000) } ?? "—")
                 row("perf_dropped", diag.droppedFrames.map(String.init) ?? "—")
+                row("perf_output_latency", "\(Int((AVAudioSession.sharedInstance().outputLatency * 1000).rounded())) ms")
+                row("perf_audio_delay", diag.audioDelayMs.map(Self.signedMs) ?? "—")
                 if let resolution = diag.resolution { Text(resolution) }
             }
             .font(.system(size: Self.fontSize, design: .monospaced))
@@ -56,6 +60,9 @@ struct PerfOverlayView: View {
         }
         return text
     }
+
+    /// "+150 ms" / "-50 ms" / "0 ms".
+    static func signedMs(_ ms: Int) -> String { ms > 0 ? "+\(ms) ms" : "\(ms) ms" }
 
     private static func bufferText(_ phase: PlayerPhase) -> String {
         switch phase {

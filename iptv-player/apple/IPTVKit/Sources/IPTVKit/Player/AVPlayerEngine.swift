@@ -403,6 +403,9 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     public func setAspect(_ mode: AspectMode) { aspect = mode }
 
+    /// AVPlayer has no audio delay; `PlayerController` moves a delayed stream to VLCKit (CONTRACT §6.1).
+    public func setAudioDelay(ms: Int) {}
+
     public func stop() {
         wantsToPlay = false
         firstPlayingEmitted = false

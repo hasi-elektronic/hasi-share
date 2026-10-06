@@ -234,6 +234,14 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   global hatırlanır.
 * **Ses / altyazı:** dil adıyla listelenir (`Türkçe`, `English`, bilinmiyorsa `Parça 2`),
   altyazı "Kapalı" seçeneği; tercih edilen ses/altyazı dili ayarlardan otomatik uygulanır.
+* **Ses senkronu:** Ses menüsünde her zaman "Senkron" satırı (ses izi olmasa da): açılan
+  panelde −2000…+2000 ms, 50 ms adımlı kontrol, değer "+150 ms" biçiminde; her değişiklik
+  canlı uygulanır ve bu kanal/içerik için kaydedilir. iOS: kaydırıcı + −/+ düğmeleri; tvOS:
+  tek odaklanabilir satır, ◀▶ 50 ms değiştirir. Motor AVPlayer ise not: "Gecikme ayarlanınca bu
+  kanal VLC motoruyla oynatılır". Katmanın araçlarında "Senkronu düzelt" düğmesi
+  (`arrow.triangle.2.circlepath`): canlıyı canlı uçtan, VOD'u mevcut konumdan yeniden açar.
+  Ayarlar → Oynatma → "Cihaz/soundbar gecikmesi" (aynı kontrol) her içeriğe eklenir (TV
+  hoparlörü/soundbar'ın sabit kayması için).
 * **Bağlantı koparsa:** katmanda "Yeniden bağlanılıyor… (2/5)" + son kare donuk; 1-2-4-8-15 sn
   aralıklarla 5 deneme, ardından hata kartı (Tekrar dene ★ / Kanal listesi / Geri).
   Canlıda "canlı pencerenin gerisinde" hatası sessizce canlı uca atlar.
@@ -259,7 +267,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   detay: Yenile · Düzenle · EPG URL · EPG saat kaydırma (−12..+12 saat, 15 dk adım) ·
   Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "+ Kaynak ekle".
 * **Oynatma:** tercih edilen ses dili, altyazı dili, görüntü oranı varsayılanı, canlı yayın
-  formatı (Android: Otomatik/TS/HLS), arabellek (Normal/Büyük), TV'de önizleme oynatıcısı.
+  formatı (Android: Otomatik/TS/HLS), arabellek (Normal/Büyük), TV'de önizleme oynatıcısı,
+  (Apple) cihaz/soundbar ses gecikmesi (§3.7).
 * **Görünüm & dil:** Uygulama dili (Sistem / Deutsch / Türkçe / English – dil adları her zaman
   kendi dilinde), EPG saat dilimi (Cihaz/özel), 24 saat biçimi. Arayüz üç dilde tamdır (EN/TR/DE);
   "Sistem" cihaz dilini izler, desteklenmeyen dillerde English. Dil değişince arayüz hemen yeniden

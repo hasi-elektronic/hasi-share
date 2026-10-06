@@ -180,6 +180,38 @@
       "udp": "error:UnsupportedFormat",
       "unknown": "avplayer"
     },
+    "audioDelay": {
+      "_why": "CONTRACT §6.1 – audio delay (content + device) ≠ 0 → VLCKit (AVPlayer has no audio delay); delay 0 → the plain select tables; without VLCKit the delay is ignored",
+      "audioDelayMs": 200,
+      "select": {
+        "hls": "vlckit",
+        "dash": "vlckit",
+        "mpegts": "vlckit",
+        "mp4": "vlckit",
+        "mkv": "vlckit",
+        "webm": "vlckit",
+        "flv": "vlckit",
+        "avi": "vlckit",
+        "rtmp": "vlckit",
+        "rtsp": "vlckit",
+        "udp": "error:UnsupportedFormat",
+        "unknown": "vlckit"
+      },
+      "selectWithoutVlc": {
+        "hls": "avplayer",
+        "dash": "error:UnsupportedFormat",
+        "mpegts": "error:UnsupportedFormat",
+        "mp4": "avplayer",
+        "mkv": "error:UnsupportedFormat",
+        "webm": "error:UnsupportedFormat",
+        "flv": "error:UnsupportedFormat",
+        "avi": "error:UnsupportedFormat",
+        "rtmp": "error:UnsupportedFormat",
+        "rtsp": "error:UnsupportedFormat",
+        "udp": "error:UnsupportedFormat",
+        "unknown": "avplayer"
+      }
+    },
     "fallback": [
       { "engine": "avplayer", "error": "UnsupportedFormat", "expected": "vlckit" },
       { "engine": "avplayer", "error": "UnsupportedCodec", "expected": "vlckit" },

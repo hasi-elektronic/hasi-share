@@ -62,6 +62,22 @@ final class MediaVectorTests: XCTestCase {
                 }
             }
         }
+        // Audio delay ≠ 0 → VLCKit when available; 0 → the plain tables above.
+        let delay = try XCTUnwrap(apple.obj("audioDelay"))
+        let delayMs = try XCTUnwrap(delay["audioDelayMs"] as? Int)
+        for (key, vlc) in [("select", true), ("selectWithoutVlc", false)] {
+            let table = try XCTUnwrap(delay.obj(key))
+            let plain = try XCTUnwrap(apple.obj(key))
+            XCTAssertEqual(Set(table.keys), Set(StreamContainer.allCases.map(\.rawValue)), "audioDelay/\(key)")
+            for (wire, value) in table {
+                let container = try XCTUnwrap(StreamContainer(rawValue: wire))
+                let want = try XCTUnwrap(value as? String)
+                let got = ApplePlayback.engine(for: container, vlcAvailable: vlc, audioDelayMs: delayMs)
+                XCTAssertEqual(got?.rawValue ?? "error:UnsupportedFormat", want, "audioDelay/\(key)/\(wire)")
+                let gotZero = ApplePlayback.engine(for: container, vlcAvailable: vlc, audioDelayMs: 0)
+                XCTAssertEqual(gotZero?.rawValue ?? "error:UnsupportedFormat", plain.str(wire), "delay 0/\(key)/\(wire)")
+            }
+        }
         let errors: [String: PlaybackError] = [
             "UnsupportedFormat": .unsupportedFormat(container: "mkv"), "UnsupportedCodec": .unsupportedCodec(codec: nil),
             "Network": .network(.timeout), "StreamOffline": .streamOffline(httpStatus: 404),

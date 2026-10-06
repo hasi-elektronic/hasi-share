@@ -208,6 +208,13 @@
     <string name="perf_buffer" formatted="false">Puffer</string>
     <string name="perf_bitrate" formatted="false">Bitrate</string>
     <string name="perf_dropped" formatted="false">Verworfene Bilder</string>
+    <string name="perf_output_latency" formatted="false">Ausgabelatenz</string>
+    <string name="perf_audio_delay" formatted="false">Audioverzögerung</string>
+    <string name="audio_sync" formatted="false">Audio-Sync</string>
+    <string name="audio_sync_hint" formatted="false">Ton zu früh? + wählen. Ton zu spät? − wählen. Wird für diesen Sender bzw. Titel gespeichert.</string>
+    <string name="audio_sync_fix" formatted="false">Sync korrigieren</string>
+    <string name="audio_sync_vlc_note" formatted="false">Mit Verzögerung läuft dieser Stream über die VLC-Engine</string>
+    <string name="settings_device_audio_delay" formatted="false">Geräte-/Soundbar-Verzögerung</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_licenses" formatted="false">Open-Source-Lizenzen</string>
     <string name="format_test_result_ok" formatted="false">Wird abgespielt ✓</string>

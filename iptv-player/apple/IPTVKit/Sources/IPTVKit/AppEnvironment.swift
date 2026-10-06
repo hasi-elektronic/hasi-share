@@ -96,6 +96,7 @@ public final class AppEnvironment {
         let engines = engines ?? .avPlayerOnly
         let streamResolver = StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable)
         player = PlayerController(resolver: streamResolver, library: library, engines: engines)
+        player.audioDelayStore = AudioDelayStore(kv: kv)   // per-content + device audio delay (SCREENS §3.7)
         player.prefetcher = ZapPrefetcher(resolver: { try await streamResolver.resolve($0) },
                                           fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()

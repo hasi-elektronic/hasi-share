@@ -136,6 +136,12 @@ public final class PlayerController {
     public private(set) var previousChannel: Channel?
     /// Resume position applied at open (for the "Play from start" chip).
     public private(set) var resumedFromMs: Int64?
+    /// Effective audio delay of the current request (content + device, ms; CONTRACT §6.1).
+    public private(set) var currentAudioDelay = 0
+    /// The current content's own delay (the player's "Sync" control edits it).
+    public private(set) var contentAudioDelay = 0
+    /// Device/soundbar delay (Settings → Playback), added to every content.
+    public private(set) var deviceAudioDelay = 0
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -167,6 +173,12 @@ public final class PlayerController {
     @ObservationIgnored private var reloadOnPlay = false
     /// Paused when the scene released the player: `resumeAfterRelease` restores the paused state, it does not play.
     @ObservationIgnored private var pausedAtRelease = false
+    /// Per-content + device audio delay (docs/SCREENS.md §3.7); set by `AppEnvironment`. nil = no delays.
+    @ObservationIgnored public var audioDelayStore: AudioDelayStore? { didSet { refreshAudioDelay() } }
+    /// Content delay of a request without content key (raw URL): this session only.
+    @ObservationIgnored private var unkeyedContentDelay = 0
+    /// A reconnect reload is in flight: its first `.playing` re-applies the sync once.
+    @ObservationIgnored private var resyncAfterReconnect = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
     @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -240,10 +252,13 @@ public final class PlayerController {
         lastProgressSaveMs = nil
         pendingSeek = nil
         pausedDuringReconnect = false
+        resyncAfterReconnect = false
+        if self.request?.id != request.id { unkeyedContentDelay = 0 }   // retry / resume keep a raw URL's delay
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
         }
         self.request = request
+        refreshAudioDelay()
         audioOptions = []
         subtitleOptions = []
         selectedAudio = nil
@@ -292,9 +307,13 @@ public final class PlayerController {
         }
     }
 
-    /// Engine kind for a resolved stream (fallback wins; VLCKit only when available).
+    /// Engine kind for a resolved stream (fallback wins; an audio delay ≠ 0 → VLCKit; VLCKit only when available).
     func engineKind(for stream: ResolvedStream) -> PlayerEngine {
         if let fallbackEngine { return fallbackEngine }
+        if currentAudioDelay != 0,
+           ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, audioDelayMs: currentAudioDelay) == .vlcKit {
+            return .vlcKit
+        }
         if stream.engine == .vlcKit, engines.vlcAvailable { return .vlcKit }
         return .avPlayer
     }
@@ -338,6 +357,7 @@ public final class PlayerController {
         loadReady = false
         probeTask?.cancel()
         cancelStallTimer()   // a new item starts without the previous item's stall deadline
+        next.setAudioDelay(ms: currentAudioDelay)   // before load: VLCKit starts the item with it
         next.load(stream, isLive: isLive, startMs: startMs,
                   preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage,
                   tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
@@ -398,6 +418,11 @@ public final class PlayerController {
             cancelStallTimer()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             systemPauseUnclaimed = false
+            if resyncAfterReconnect {
+                // The reconnect reopened the stream (live: at the live edge); re-apply the sync once.
+                resyncAfterReconnect = false
+                engine?.setAudioDelay(ms: currentAudioDelay)
+            }
             if phase != .playing { phase = .playing }
         case .paused, .pausedBySystem:
             cancelStallTimer()   // a real pause ends any stall recovery
@@ -467,6 +492,7 @@ public final class PlayerController {
             retryTask = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(delayMs))
                 guard !Task.isCancelled, let self, let stream = self.stream else { return }
+                self.resyncAfterReconnect = true
                 self.load(stream, startMs: resumeMs)
             }
         case .giveUp:
@@ -711,6 +737,78 @@ public final class PlayerController {
     public func selectSubtitle(_ id: Int?) {
         engine?.selectSubtitle(id)
         selectedSubtitle = id
+    }
+
+    // MARK: Audio sync
+
+    /// Re-reads the effective delay of the current request (store or raw-URL session value).
+    private func refreshAudioDelay() {
+        let device = audioDelayStore?.deviceDelay ?? 0
+        deviceAudioDelay = device
+        if let key = request?.contentKey, let audioDelayStore {
+            contentAudioDelay = audioDelayStore.contentDelay(key)
+            currentAudioDelay = audioDelayStore.effectiveDelay(key)
+        } else {
+            contentAudioDelay = unkeyedContentDelay
+            currentAudioDelay = AudioDelayStore.normalize(unkeyedContentDelay + device)
+        }
+    }
+
+    /// The player's "Sync" control: stores the delay for the current content and applies it live.
+    /// On AVPlayer (no audio delay) a delay ≠ 0 reloads the same position in VLCKit (CONTRACT §6.1).
+    public func setAudioDelay(_ ms: Int) {
+        let value = AudioDelayStore.normalize(ms)
+        if let key = request?.contentKey, let audioDelayStore {
+            audioDelayStore.setContentDelay(value, for: key)
+        } else {
+            unkeyedContentDelay = value
+        }
+        refreshAudioDelay()
+        applyAudioDelay()
+    }
+
+    /// Settings → Playback → device/soundbar delay (added to every content).
+    public func setDeviceAudioDelay(_ ms: Int) {
+        audioDelayStore?.setDeviceDelay(ms)
+        refreshAudioDelay()
+        applyAudioDelay()
+    }
+
+    private func applyAudioDelay() {
+        guard let engine, let stream, hasActiveItem else { return }
+        if engine.kind == .vlcKit {
+            engine.setAudioDelay(ms: currentAudioDelay)
+        } else if currentAudioDelay != 0, engineKind(for: stream) == .vlcKit {
+            SafeLog.info("audio delay \(currentAudioDelay) ms – reloading in vlckit")
+            fallbackEngine = .vlcKit
+            reload(stream)
+        }
+    }
+
+    /// "Fix sync": reopens the stream – live at the live edge, VOD at the current position.
+    public func resync() {
+        guard let stream, hasActiveItem else { return }
+        SafeLog.info("resync")
+        reload(stream)
+    }
+
+    /// Reopens the current stream in place (sync / engine change): live at the live edge, VOD at the position.
+    private func reload(_ stream: ResolvedStream) {
+        retryTask?.cancel()
+        reloadOnPlay = false
+        pausedDuringReconnect = false
+        pausedByInterruption = false
+        systemPauseUnclaimed = false
+        if phase == .paused || phase == .buffering { phase = .loading }
+        load(stream, startMs: request?.isLive == true ? nil : Int64(currentTime * 1000))
+    }
+
+    /// A stream is loaded or playing (not idle / failed / locked / ended / paused without an item).
+    private var hasActiveItem: Bool {
+        switch phase {
+        case .playing, .paused, .buffering, .loading, .reconnecting: return request != nil && !reloadOnPlay
+        case .idle, .failed, .locked, .ended: return false
+        }
     }
 
     // MARK: Lifecycle

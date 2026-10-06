@@ -27,11 +27,14 @@ public struct EngineDiagnostics: Sendable, Equatable {
     public var droppedFrames: Int?
     /// "1920x1080" once known.
     public var resolution: String?
+    /// Audio delay the engine actually applies (user + automatic latency term), ms; nil = none/unknown.
+    public var audioDelayMs: Int?
 
-    public init(bitrate: Double? = nil, droppedFrames: Int? = nil, resolution: String? = nil) {
+    public init(bitrate: Double? = nil, droppedFrames: Int? = nil, resolution: String? = nil, audioDelayMs: Int? = nil) {
         self.bitrate = bitrate
         self.droppedFrames = droppedFrames
         self.resolution = resolution
+        self.audioDelayMs = audioDelayMs
     }
 }
 
@@ -57,6 +60,10 @@ public protocol PlaybackEngine: AnyObject {
     /// nil → subtitles off.
     func selectSubtitle(_ id: Int?)
     func setAspect(_ mode: AspectMode)
+    /// User audio delay in ms (content + device, positive = audio later). Kept across loads: the engine
+    /// applies it to the current item and every item it loads later. No-op on AVPlayer (CONTRACT §6.1:
+    /// a delay ≠ 0 plays through VLCKit).
+    func setAudioDelay(ms: Int)
     /// Stops and frees the current item (the engine instance stays reusable).
     func stop()
 }

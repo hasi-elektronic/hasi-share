@@ -15,6 +15,7 @@ final class FakeEngine: PlaybackEngine {
     private(set) var selectedAudio: Int?
     private(set) var selectedSubtitle: Int??
     private(set) var seeks: [Double] = []
+    private(set) var audioDelays: [Int] = []
     var isPlaying = false
     var canPause = true
     var diagnostics = EngineDiagnostics()
@@ -31,6 +32,7 @@ final class FakeEngine: PlaybackEngine {
     func selectAudio(_ id: Int) { selectedAudio = id }
     func selectSubtitle(_ id: Int?) { selectedSubtitle = .some(id) }
     func setAspect(_ mode: AspectMode) { aspect = mode }
+    func setAudioDelay(ms: Int) { audioDelays.append(ms) }
     func stop() { stops += 1; isPlaying = false }
     func emit(_ event: EngineEvent) { onEvent?(event) }
 }

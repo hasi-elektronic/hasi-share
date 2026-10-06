@@ -208,6 +208,13 @@
     <string name="perf_buffer" formatted="false">Buffer</string>
     <string name="perf_bitrate" formatted="false">Bitrate</string>
     <string name="perf_dropped" formatted="false">Dropped frames</string>
+    <string name="perf_output_latency" formatted="false">Output latency</string>
+    <string name="perf_audio_delay" formatted="false">Audio delay</string>
+    <string name="audio_sync" formatted="false">Audio sync</string>
+    <string name="audio_sync_hint" formatted="false">Sound too early? Use +. Sound too late? Use −. Saved for this channel or title.</string>
+    <string name="audio_sync_fix" formatted="false">Fix sync</string>
+    <string name="audio_sync_vlc_note" formatted="false">With a delay set, this stream plays with the VLC engine</string>
+    <string name="settings_device_audio_delay" formatted="false">Device/soundbar delay</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_licenses" formatted="false">Open-source licenses</string>
     <string name="format_test_result_ok" formatted="false">Playing ✓</string>

@@ -19,7 +19,7 @@ final class TVVLCPlaybackTests: XCTestCase {
         remote.press(.select)   // overlay with the audio/subtitle/aspect tools
         sleep(1)
         UITestSupport.snap("vlc-tvos-02-mkv-overlay", in: self)
-        XCTAssertTrue(app.buttons["Audio"].exists, "VLCKit audio tracks listed")
+        XCTAssertTrue(app.buttons["Audio"].exists, "audio menu (always shown: Sync row)")
         XCTAssertTrue(app.buttons["Subtitles"].exists, "VLCKit subtitle tracks listed")
         remote.press(.menu)     // close overlay (back rule)
         sleep(4)

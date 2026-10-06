@@ -43,11 +43,10 @@ final class IOSVLCPlaybackTests: XCTestCase {
         showOverlay(app)
         UITestSupport.snap("vlc-ios-02-mkv-overlay", in: self)
 
-        // The tool buttons only appear when the engine reported tracks: VLCKit found the two audio
-        // tracks (tur/eng) and the two SRT subtitle tracks of the MKV. (Menu contents/language names:
-        // EngineTests + TrackNamingTests; XCUITest cannot open a SwiftUI Menu inside the player's
-        // full-screen cover on the iOS 26 simulator.)
-        XCTAssertTrue(app.buttons["Audio"].waitForExistence(timeout: 3), "VLCKit audio tracks")
+        // The Subtitles tool only appears when the engine reported tracks: VLCKit found the two SRT
+        // subtitle tracks of the MKV (Audio is always shown – it holds the Sync row). (Menu
+        // contents/language names: EngineTests + TrackNamingTests.)
+        XCTAssertTrue(app.buttons["Audio"].waitForExistence(timeout: 3), "audio menu")
         XCTAssertTrue(app.buttons["Subtitles"].exists, "VLCKit subtitle tracks")
         XCTAssertTrue(app.buttons["Aspect ratio"].exists)
 

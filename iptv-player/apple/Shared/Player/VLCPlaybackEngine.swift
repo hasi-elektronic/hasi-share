@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import IPTVCore
 import IPTVKit
@@ -17,6 +18,12 @@ import TVVLCKit
 /// libVLC reports no failure reason, so errors are classified with an HTTP probe
 /// (`VLCFailureClassifier`) to get the same error cards as AVPlayer (SCREENS §4). Tracks come
 /// from `audioTrackIndexes` / `videoSubTitlesIndexes` + `media.tracksInformation` languages.
+///
+/// Audio delay (docs/ARCHITECTURE.md §3.2): user delay (content + device) + `VLCLatencyCompensation`
+/// term, in libVLC's sign (+ = audio later, µs in `currentAudioPlaybackDelay`). libVLC keeps the delay
+/// on the input – it is reset with every new media and ignored before `play()` created the input – so
+/// each item starts with `:audio-desync` and the value is set again after `play()`, on `.playing`,
+/// on route changes and after a track switch.
 @MainActor
 final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     let kind: PlayerEngine = .vlcKit
@@ -39,6 +46,8 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     private var audioIds: [Int32] = []
     private var subtitleIds: [Int32] = []
     private var lastTracksSignature = ""
+    /// User audio delay (content + device) from the controller, ms.
+    private var userAudioDelayMs = 0
 
     override init() {
         player = VLCMediaPlayer()
@@ -46,6 +55,9 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         player.delegate = self
         player.drawable = videoView
         videoView.onLayout = { [weak self] _ in self?.applyAspect() }
+        // New output latency (route change): libVLC updates its own ≤ 1 s compensation; refresh the rest.
+        NotificationCenter.default.addObserver(self, selector: #selector(audioRouteChanged(_:)),
+                                               name: AVAudioSession.routeChangeNotification, object: nil)
     }
 
     var isPlaying: Bool { player.isPlaying }
@@ -53,14 +65,18 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
 
     /// `VLCMedia.statistics`: `demuxBitrate` is bytes per microsecond (libVLC) → ×1 000 000 B/s
     /// × 8 = bit/s; `lostPictures` is the session total. 0 bitrate = empty buffer → unknown.
+    /// `audioDelayMs` is read back from libVLC (what the input really applies).
     var diagnostics: EngineDiagnostics {
-        guard let media = player.media, player.isPlaying else { return EngineDiagnostics() }
+        guard let media = player.media else { return EngineDiagnostics() }
+        let applied = player.currentAudioPlaybackDelay / 1000
+        guard player.isPlaying else { return EngineDiagnostics(audioDelayMs: applied) }
         let stats = media.statistics
         let size = player.videoSize
         return EngineDiagnostics(
             bitrate: stats.demuxBitrate > 0 ? Double(stats.demuxBitrate) * 8_000_000 : nil,
             droppedFrames: Int(stats.lostPictures),
-            resolution: size.width > 0 && size.height > 0 ? "\(Int(size.width))x\(Int(size.height))" : nil)
+            resolution: size.width > 0 && size.height > 0 ? "\(Int(size.width))x\(Int(size.height))" : nil,
+            audioDelayMs: applied)
     }
 
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
@@ -84,9 +100,39 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         if let referer = stream.headers["Referer"] { media.addOption(":http-referrer=\(referer)") }
         if let startMs, startMs > 0 { media.addOption(":start-time=\(Double(startMs) / 1000)") }
         if stream.container == .rtsp { media.addOption(":rtsp-tcp") }
+        // Initial input audio delay (ms; libVLC: audio-delay = 1000 × audio-desync at input creation).
+        let delayMs = totalAudioDelayMs
+        if delayMs != 0 { media.addOption(":audio-desync=\(delayMs)") }
         player.media = media
         applyAspect()
         player.play()
+        applyAudioDelay()
+    }
+
+    // MARK: Audio delay
+
+    func setAudioDelay(ms: Int) {
+        userAudioDelayMs = ms
+        applyAudioDelay()
+    }
+
+    /// User delay + the output latency libVLC does not compensate itself.
+    private var totalAudioDelayMs: Int {
+        VLCLatencyCompensation.totalDelayMs(userMs: userAudioDelayMs, outputLatency: AVAudioSession.sharedInstance().outputLatency)
+    }
+
+    /// Sets the delay on the running input (no-op without media: the next load starts with it).
+    private func applyAudioDelay() {
+        guard player.media != nil else { return }
+        let micros = totalAudioDelayMs * 1000
+        if player.currentAudioPlaybackDelay != micros { player.currentAudioPlaybackDelay = micros }
+    }
+
+    @objc nonisolated private func audioRouteChanged(_ note: Notification) {
+        Self.onMain(self) { engine in
+            guard engine.stream != nil else { return }
+            engine.applyAudioDelay()
+        }
     }
 
     func play() { player.play() }
@@ -105,6 +151,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     func selectAudio(_ id: Int) {
         guard audioIds.indices.contains(id) else { return }
         player.currentAudioTrackIndex = audioIds[id]
+        applyAudioDelay()   // the input keeps it for new audio ES; re-applied defensively
         reportTracks(force: true)
     }
 
@@ -180,6 +227,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         case .playing:
             hadPlayed = true
             failureTask?.cancel()
+            applyAudioDelay()
             reportReadyIfNeeded()
             onEvent?(.playing)
             reportTracks(force: false)

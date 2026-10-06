@@ -21,6 +21,8 @@ struct PlayerView: View {
     /// "Play from start" chip after an automatic resume (5 s, independent of the overlay).
     @State private var resumeChipVisible = false
     @State private var resumeChipTask: Task<Void, Never>?
+    /// Audio → Sync panel (SCREENS §3.7).
+    @State private var syncPanelVisible = false
     #if os(iOS)
     /// Scrubber position while the finger is down (nil = follow playback).
     @State private var scrubFraction: Double?
@@ -61,6 +63,13 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             video
+            // Below the controls: an accessibility element above them (its label changes every second)
+            // kept the player's Menus from opening under accessibility / XCUITest.
+            if env.settings.showPerfOverlay {
+                PerfOverlayView(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(Theme.isTV ? 48 : 16)
+            }
             if case .failed(let error) = player.phase {
                 errorCard(error)
             } else if case .locked = player.phase {
@@ -80,11 +89,6 @@ struct PlayerView: View {
                 #endif
                 if overlayVisible { overlay.transition(.opacity) }
                 if resumeChipVisible, isVOD { resumeChip }
-            }
-            if env.settings.showPerfOverlay {
-                PerfOverlayView(player: player)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(Theme.isTV ? 48 : 16)
             }
             if let target = player.zapTarget { zapCard(target) }
             #if os(tvOS)
@@ -117,6 +121,7 @@ struct PlayerView: View {
         .onChange(of: player.resumedFromMs) { _, ms in
             if ms != nil { showResumeChip() } else { resumeChipVisible = false }
         }
+        .sheet(isPresented: $syncPanelVisible) { AudioSyncPanel(player: player) }
         #if os(iOS)
         .statusBarHidden()
         .gesture(DragGesture(minimumDistance: 40).onEnded { value in
@@ -606,14 +611,17 @@ struct PlayerView: View {
 
     private var tools: some View {
         HStack(spacing: Theme.isTV ? 24 : 18) {
-            if !player.audioOptions.isEmpty {
-                trackedMenu("speaker.wave.2", label: "player_audio") {
-                    ForEach(player.audioOptions) { option in
-                        Button { player.selectAudio(option.id); menuClosed() } label: {
-                            Label(option.name ?? L10n.t("unknown_track", String(option.id + 1)), systemImage: player.selectedAudio == option.id ? "checkmark" : "")
-                        }
+            // Always shown: the Sync row exists even without selectable audio tracks.
+            trackedMenu("speaker.wave.2", label: "player_audio") {
+                ForEach(player.audioOptions) { option in
+                    Button { player.selectAudio(option.id); menuClosed() } label: {
+                        Label(option.name ?? L10n.t("unknown_track", String(option.id + 1)), systemImage: player.selectedAudio == option.id ? "checkmark" : "")
                     }
                 }
+                Button { menuClosed(); syncPanelVisible = true } label: {
+                    Label("\(L10n.t("audio_sync")) (\(AudioDelayControl.label(player.contentAudioDelay)))", systemImage: "waveform")
+                }
+                .accessibilityIdentifier("player_audio_sync")
             }
             if !player.subtitleOptions.isEmpty {
                 trackedMenu("captions.bubble", label: "player_subtitles") {
@@ -630,6 +638,10 @@ struct PlayerView: View {
                     Button { env.player.aspect = mode; menuClosed() } label: { Label(L10n.t(mode.titleKey), systemImage: player.aspect == mode ? "checkmark" : "") }
                 }
             }
+            // "Fix sync": reopen the stream (live edge / current position).
+            Button { player.resync(); showOverlay() } label: { toolIcon("arrow.triangle.2.circlepath") }
+                .accessibilityLabel(L10n.t("audio_sync_fix"))
+                .accessibilityIdentifier("action_resync")
             if let target = favoriteTarget {
                 FavoriteButton(target: target, minTapSize: Theme.isTV ? 0 : 36)
             }

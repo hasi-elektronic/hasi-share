@@ -136,6 +136,9 @@ enum AppBootstrap {
         let secure: any SecureStore = isUITest ? InMemorySecureStore() : KeychainStore(service: (Bundle.main.bundleIdentifier ?? "app") + ".secrets")
         let kv = UserDefaultsStore(suite)
         let settings = AppSettings(defaults: suite)
+        #if DEBUG
+        if arguments.contains("-perfOverlay") { settings.showPerfOverlay = true }   // UI tests read the engine label
+        #endif
         L10n.setLanguage(settings.appLanguage)
         do {
             let env = try AppEnvironment(config: config, database: database, secureStore: secure, kv: kv,

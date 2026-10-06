@@ -208,6 +208,13 @@
     <string name="perf_buffer" formatted="false">Arabellek</string>
     <string name="perf_bitrate" formatted="false">Bit hızı</string>
     <string name="perf_dropped" formatted="false">Atlanan kareler</string>
+    <string name="perf_output_latency" formatted="false">Çıkış gecikmesi</string>
+    <string name="perf_audio_delay" formatted="false">Ses gecikmesi</string>
+    <string name="audio_sync" formatted="false">Senkron</string>
+    <string name="audio_sync_hint" formatted="false">Ses görüntüden önce mi? + kullan. Sonra mı? − kullan. Bu kanal/içerik için kaydedilir.</string>
+    <string name="audio_sync_fix" formatted="false">Senkronu düzelt</string>
+    <string name="audio_sync_vlc_note" formatted="false">Gecikme ayarlanınca bu kanal VLC motoruyla oynatılır</string>
+    <string name="settings_device_audio_delay" formatted="false">Cihaz/soundbar gecikmesi</string>
     <string name="about_version">Sürüm %1$s</string>
     <string name="about_licenses" formatted="false">Açık kaynak lisansları</string>
     <string name="format_test_result_ok" formatted="false">Oynatılıyor ✓</string>

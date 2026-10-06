@@ -131,6 +131,28 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   geri almaz: `release()` duraklamayı hatırlar, `resumeAfterRelease()` duraklamış hâlde kalır (konum korunur,
   oynat yeniden açar). VLCKit kendi ses çıkışında kategoriyi `.playback`/`.moviePlayback` olarak bırakır
   (simülatörde doğrulandı); `activate()` kategoriyi yine de yeniden uygular.
+* **Ses senkronu (A/V gecikmesi):** `AudioDelayStore` (cihaza yerel `KeyValueStore`) içerik anahtarı
+  başına bir gecikme + bir cihaz/soundbar gecikmesi tutar (−2000…+2000 ms, 50 ms adım; pozitif = ses
+  daha geç). Etkin gecikme = clamp(içerik + cihaz). Etkin gecikme ≠ 0 ⇒ **VLCKit** (CONTRACT §6.1;
+  AVPlayer'da ses gecikmesi yok, `setAudioDelay` AVPlayer'da işlemsiz). AVPlayer oynarken gecikme
+  değişirse aynı yayın VLCKit'te yeniden açılır (VOD aynı konumdan, canlı canlı uçtan) ve o açılışta
+  VLCKit'te kalır. VLCKit: libVLC işaretiyle (`currentAudioPlaybackDelay`, µs, + = ses geç); libVLC
+  gecikmeyi girdi (input) üzerinde tutar, her yeni medyada sıfırlar ve girdi oluşmadan yok sayar →
+  her öğe `:audio-desync=<ms>` ile başlar, `play()` sonrası, `playing`'de, rota değişiminde ve ses
+  izi değişiminde yeniden yazılır (iz değişiminde libVLC korur; savunma amaçlı). İşaret libVLC
+  kaynağından doğrulandı: `DecoderFixTs` ses zaman damgalarına gecikmeyi **ekler**.
+  **Otomatik çıkış gecikmesi:** libVLC 3'ün iOS/tvOS ses çıkışı (`audiounit_ios.m`)
+  `AVAudioSession.outputLatency`'yi çıkış başlarken ve her rota değişiminde zaten okuyup senkron
+  hesabına katar (`ca_SetDeviceLatency`, en fazla 1 sn). Bu yüzden uygulama gecikmeyi ikinci kez
+  eklemez; yalnızca 1 sn'nin üstündeki kısmı (AirPlay ≈ 2 sn) negatif gecikme olarak ekler
+  (`VLCLatencyCompensation`). "Senkronu düzelt" (`resync()`): canlıyı canlı uçtan, VOD'u mevcut
+  konumdan yeniden açar. Yeniden bağlanma zaten yayını yeniden açtığı için (canlı: canlı uç) başarılı
+  yeniden bağlanmanın ilk `playing`'inde yalnızca gecikme bir kez yeniden uygulanır (ikinci yükleme
+  yok). Performans katmanı motoru, `outputLatency`'yi (ms) ve libVLC'den geri okunan uygulanan
+  gecikmeyi gösterir.
+* **M3U canlı TS → HLS tercihi:** M3U'daki Xtream biçimli canlı `.ts` URL'si için önce aynı URL'nin
+  `.m3u8` hâli 1,5 sn'lik GET ile yoklanır (200 + `#EXTM3U` → HLS/AVPlayer; aksi hâlde `.ts`/VLCKit;
+  CONTRACT §4.5).
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
 * Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /

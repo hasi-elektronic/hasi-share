@@ -53,6 +53,9 @@ struct SettingsView: View {
                     Text(L10n.t("buffer_large")).tag(true)
                 }
                 .onChange(of: settings.largeBuffer) { env.player.largeBuffer = settings.largeBuffer }
+                // Constant A/V offset of this TV/soundbar (SCREENS §3.9); ≠ 0 plays through VLCKit.
+                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: env.player.deviceAudioDelay,
+                                  identifier: "settings_device_audio_delay") { env.player.setDeviceAudioDelay($0) }
                 #if os(tvOS)
                 Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
                 #endif

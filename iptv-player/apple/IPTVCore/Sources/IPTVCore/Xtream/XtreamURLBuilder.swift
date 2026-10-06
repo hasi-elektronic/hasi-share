@@ -88,6 +88,17 @@ public struct XtreamURLBuilder: Sendable, Hashable {
         return "\(pad(c.year, 4))-\(pad(c.month))-\(pad(c.day)):\(pad(c.hour))-\(pad(c.minute))"
     }
 
+    /// Xtream live URL shape in M3U lists: `{base}/[live/]U/P/{numericId}.ts`.
+    private static let liveTSPattern = try! NSRegularExpression(pattern: #"^(https?://[^/]+)/(live/)?([^/]+)/([^/]+)/(\d+)\.ts$"#)
+
+    /// HLS twin of an Xtream-shaped live `.ts` URL from an M3U list (CONTRACT §4.5): the same URL
+    /// with `.m3u8`, nil for any other URL. The resolver probes it before falling back to TS/VLCKit.
+    public static func hlsVariant(ofLiveTS url: String) -> String? {
+        let range = NSRange(url.startIndex..., in: url)
+        guard liveTSPattern.firstMatch(in: url, range: range) != nil else { return nil }
+        return String(url.dropLast(3)) + ".m3u8"
+    }
+
     /// Live stream extension for a platform (CONTRACT §4.5). `allowedOutputFormats`
     /// missing/empty ⇒ both allowed.
     /// - Android: `ts` if allowed, else `m3u8`.

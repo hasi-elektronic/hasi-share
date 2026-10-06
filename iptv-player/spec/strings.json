@@ -1029,6 +1029,41 @@
    "tr": "Atlanan kareler",
    "de": "Verworfene Bilder"
   },
+  "perf_output_latency": {
+   "en": "Output latency",
+   "tr": "Çıkış gecikmesi",
+   "de": "Ausgabelatenz"
+  },
+  "perf_audio_delay": {
+   "en": "Audio delay",
+   "tr": "Ses gecikmesi",
+   "de": "Audioverzögerung"
+  },
+  "audio_sync": {
+   "en": "Audio sync",
+   "tr": "Senkron",
+   "de": "Audio-Sync"
+  },
+  "audio_sync_hint": {
+   "en": "Sound too early? Use +. Sound too late? Use −. Saved for this channel or title.",
+   "tr": "Ses görüntüden önce mi? + kullan. Sonra mı? − kullan. Bu kanal/içerik için kaydedilir.",
+   "de": "Ton zu früh? + wählen. Ton zu spät? − wählen. Wird für diesen Sender bzw. Titel gespeichert."
+  },
+  "audio_sync_fix": {
+   "en": "Fix sync",
+   "tr": "Senkronu düzelt",
+   "de": "Sync korrigieren"
+  },
+  "audio_sync_vlc_note": {
+   "en": "With a delay set, this stream plays with the VLC engine",
+   "tr": "Gecikme ayarlanınca bu kanal VLC motoruyla oynatılır",
+   "de": "Mit Verzögerung läuft dieser Stream über die VLC-Engine"
+  },
+  "settings_device_audio_delay": {
+   "en": "Device/soundbar delay",
+   "tr": "Cihaz/soundbar gecikmesi",
+   "de": "Geräte-/Soundbar-Verzögerung"
+  },
   "about_version": {
    "en": "Version {0}",
    "tr": "Sürüm {0}",

@@ -252,6 +252,20 @@ final class XtreamVectorTests: XCTestCase {
         }
     }
 
+    /// CONTRACT §4.5: an M3U live entry with an Xtream-shaped `.ts` URL has an HLS twin (`.m3u8`).
+    func testHLSVariantOfXtreamLiveTS() {
+        XCTAssertEqual(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://panel.example.com:8080/live/u/p/42.ts"),
+                       "http://panel.example.com:8080/live/u/p/42.m3u8")
+        XCTAssertEqual(XtreamURLBuilder.hlsVariant(ofLiveTS: "https://panel.example.com/u/p%40x/7.ts"),
+                       "https://panel.example.com/u/p%40x/7.m3u8", "M3U variant without /live/")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://h.example.com/live/7.ts"), "too few path segments")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://h.example.com/live/u/p/abc.ts"), "non-numeric id")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://h.example.com/live/u/p/42.ts?token=1"), "query")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://h.example.com/live/u/p/42.m3u8"), "already HLS")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "http://h.example.com/a/b/c/d/42.ts"), "deeper path")
+        XCTAssertNil(XtreamURLBuilder.hlsVariant(ofLiveTS: "rtsp://h.example.com/u/p/42.ts"), "http(s) only")
+    }
+
     func testPercentEncoding() {
         XCTAssertEqual(PercentEncoding.encode("p@ss/w rd"), "p%40ss%2Fw%20rd")
         XCTAssertEqual(PercentEncoding.encode("AZaz09-._~"), "AZaz09-._~")

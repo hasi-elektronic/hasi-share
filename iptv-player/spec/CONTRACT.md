@@ -249,6 +249,14 @@ Apple + only `ts` allowed:
 * AVPlayer-only rule (vectors `liveExt`, also run by Kotlin with `AVPLAYER`) ⇒
   `PlaybackError.UnsupportedFormat("mpegts")` with the "ask your provider for HLS" message.
 
+Apple, M3U live entries with an Xtream-shaped TS URL
+(`^(https?://[^/]+)/(live/)?([^/]+)/([^/]+)/(\d+)\.ts$`): the resolver first probes the same
+URL with `.m3u8` (GET, 1.5 s budget, ≤ 1 KiB read). HTTP 200 and a body starting with
+`#EXTM3U` ⇒ play the `.m3u8` (HLS, AVPlayer); anything else ⇒ keep the `.ts` (VLCKit, or
+`UnsupportedFormat` without VLCKit). Other URLs are never probed. Unit-tested in
+`XtreamURLBuilder.hlsVariant(ofLiveTS:)` / `StreamResolver` (no shared vector: `url-vectors.json`
+covers Xtream-built URLs only).
+
 ---
 
 ## 5. XMLTV EPG (`test-vectors/xmltv/*`)
@@ -307,10 +315,21 @@ Vectors: `media/expected.json` → `support.{media3,avplayer,vlckit}`.
 
 ### 6.1 Apple: two playback engines
 The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic framework).
-`ApplePlayback.engine(container, vlcAvailable)`:
+`ApplePlayback.engine(container, vlcAvailable, audioDelayMs)`:
+0. `audioDelayMs ≠ 0` (effective user audio delay = content + device, −2000…+2000 ms in 50 ms
+   steps) and VLCKit available and supports it ⇒ **VLCKit** (AVPlayer cannot delay audio).
+   Without VLCKit the delay is ignored.
 1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
 2. else VLCKit supports it ⇒ **VLCKit**.
 3. else ⇒ `UnsupportedFormat(container)` before playback.
+
+Changing the delay while AVPlayer plays reopens the same stream in VLCKit (VOD at the current
+position, live at the live edge) and keeps VLCKit for that opened stream; back to 0 does not
+switch back until the next open. VLCKit applies the delay in libVLC's sign (positive = audio
+later; `currentAudioPlaybackDelay` in µs, reset by libVLC with every media → set at each start).
+Automatic latency term: libVLC 3 already compensates `AVAudioSession.outputLatency` up to 1 s
+itself; only the part above 1 s is added (negative = audio earlier). AVPlayer syncs to the output
+latency natively.
 
 Fallback (once per opened stream, kept for its reconnects): AVPlayer fails with
 `UnsupportedFormat` or `UnsupportedCodec` ⇒ the same stream is reopened in VLCKit (VOD at
@@ -322,7 +341,7 @@ never played ⇒ `UnsupportedCodec`, played then dropped (or a live stream "ende
 `Network` (reconnect policy). AVPlayer: an error without a usable reason before the first
 frame, or an item still not ready after 8 s, is classified with the same probe (2xx/3xx →
 keep the original error / keep waiting).
-Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, fallback}`;
+Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audioDelay, fallback}`;
 `stream-samples.json` → `expect.apple`.
 
 ---

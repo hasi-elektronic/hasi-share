@@ -67,7 +67,10 @@ extension StreamContainer {
 public enum ApplePlayback {
     /// Engine for a detected container; nil = not playable on Apple (`UnsupportedFormat`).
     /// - Parameter vlcAvailable: false when the app is built without VLCKit (AVPlayer only).
-    public static func engine(for container: StreamContainer, vlcAvailable: Bool = true) -> PlayerEngine? {
+    /// - Parameter audioDelayMs: effective user audio delay (content + device); ≠ 0 → VLCKit when
+    ///   available (AVPlayer cannot delay audio), ignored without VLCKit.
+    public static func engine(for container: StreamContainer, vlcAvailable: Bool = true, audioDelayMs: Int = 0) -> PlayerEngine? {
+        if audioDelayMs != 0, vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
         if container.isSupported(by: .avPlayer) { return .avPlayer }
         if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
         return nil
