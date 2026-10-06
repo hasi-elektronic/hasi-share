@@ -88,6 +88,19 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 1
         }
+        if db.userVersion < 2 {
+            // v1 looked EPG programmes up with `lower(channel_epg_id)` / COLLATE NOCASE, which the plain
+            // (source_id, channel_epg_id, start) index cannot serve → every now/next and grid query scanned
+            // the whole source's EPG. Index the lowercased id instead (expression index, built over the
+            // existing rows; the unused v1 index is dropped to keep EPG writes cheap).
+            try db.transaction {
+                try db.execute("""
+                CREATE INDEX IF NOT EXISTS epg_lookup_lc ON epg (source_id, lower(channel_epg_id), start);
+                DROP INDEX IF EXISTS epg_lookup;
+                """)
+            }
+            db.userVersion = 2
+        }
     }
 
     // MARK: Key/value (small app state such as sync cursor)

@@ -12,7 +12,7 @@ public struct NowNext: Sendable, Hashable {
 }
 
 /// EPG storage: only the retention window and only channels of the source are written
-/// (CONTRACT §5); `(source_id, channel_epg_id, start)` index serves now/next and grid queries.
+/// (CONTRACT §5); the `(source_id, lower(channel_epg_id), start)` index (migration v2) serves now/next and grid queries.
 public final class EpgRepository: Sendable {
     private let database: AppDatabase
     private var db: SQLiteDatabase { database.db }
@@ -40,9 +40,9 @@ public final class EpgRepository: Sendable {
     /// Programmes of one channel overlapping `interval`, ordered by start.
     public func programs(sourceId: String, epgId: String, in interval: DateInterval) throws -> [EpgProgram] {
         try db.query("""
-            SELECT \(Self.columns) FROM epg WHERE source_id = ? AND channel_epg_id = ? COLLATE NOCASE
+            SELECT \(Self.columns) FROM epg WHERE source_id = ? AND lower(channel_epg_id) = ?
             AND start < ? AND end > ? ORDER BY start
-            """, [.text(sourceId), .text(epgId), .from(interval.end), .from(interval.start)], map: Self.program)
+            """, [.text(sourceId), .text(epgId.lowercased()), .from(interval.end), .from(interval.start)], map: Self.program)
     }
 
     /// Now/next for many channels at once (keyed by lowercased epg id).

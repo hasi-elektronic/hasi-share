@@ -79,7 +79,9 @@ final class TestClock: @unchecked Sendable {
 
 /// Small model builders for tests.
 enum TestData {
-    static func channel(id: String, url: String? = nil) -> Channel {
-        Channel(sourceId: "s1", id: id, name: "Channel \(id)", url: url)
+    static func channel(id: String, url: String? = nil, sourceId: String = "s1", name: String? = nil,
+                        categoryId: String? = nil, epgId: String? = nil, sort: Int = 0) -> Channel {
+        Channel(sourceId: sourceId, id: id, name: name ?? "Channel \(id)", categoryId: categoryId, epgId: epgId,
+                url: url, sort: sort)
     }
 }
