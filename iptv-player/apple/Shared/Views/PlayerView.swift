@@ -14,6 +14,7 @@ import UIKit
 struct PlayerView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @State private var overlayVisible = true
     @State private var hideTask: Task<Void, Never>?
     @State private var channelListVisible = false
@@ -55,8 +56,12 @@ struct PlayerView: View {
                     router.paywallPresented = true
                 }
             } else {
-                // The overlay's play button carries the spinner while it is shown.
+                // The overlay's play button carries the spinner while it is shown; the reconnect
+                // status is always visible (above the transport row when the overlay is shown).
                 if !overlayVisible { statusLayer }
+                if case .reconnecting(let attempt, let max) = player.phase {
+                    reconnectingCard(attempt, max).offset(y: overlayVisible ? (Theme.isTV ? -190 : -120) : 0)
+                }
                 #if os(iOS)
                 if let ripple { rippleLabel(ripple) }
                 #endif
@@ -97,9 +102,13 @@ struct PlayerView: View {
         })
         #endif
         #if os(tvOS)
-        .background(TVHoldSeek { direction, heldMs in
-            if isVOD, !channelListVisible, !(overlayVisible && toolsActive) { tvSeek(direction, heldMs: heldMs) }
-        })
+        .background {
+            if isVOD {
+                TVHoldSeek { direction, heldMs in
+                    if !channelListVisible, !(overlayVisible && toolsActive) { tvSeek(direction, heldMs: heldMs) }
+                }
+            }
+        }
         .focusable(!overlayVisible && !channelListVisible)
         .focused($surfaceFocused)
         .onMoveCommand { direction in
@@ -158,6 +167,7 @@ struct PlayerView: View {
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("video_surface")
+        .accessibilityAction(named: L10n.t("player_show_controls")) { showOverlay() }
     }
 
     @ViewBuilder
@@ -165,8 +175,6 @@ struct PlayerView: View {
         switch player.phase {
         case .loading, .buffering:
             ProgressView().controlSize(.large).tint(.white)
-        case .reconnecting(let attempt, let max):
-            reconnectingCard(attempt, max)
         default:
             EmptyView()
         }
@@ -203,6 +211,7 @@ struct PlayerView: View {
         overlayVisible = false
         #if os(iOS)
         menuOpen = false   // a menu dismissed without a choice
+        scrubFraction = nil   // a drag cut off by the hide never ends
         #else
         toolsActive = false
         surfaceFocused = true
@@ -220,7 +229,8 @@ struct PlayerView: View {
     }
 
     private var canAutoHide: Bool {
-        guard player.phase == .playing, !channelListVisible else { return false }
+        // VoiceOver users navigate the controls element by element: never pull them away.
+        guard player.phase == .playing, !channelListVisible, !voiceOverEnabled else { return false }
         #if os(iOS)
         if scrubFraction != nil || menuOpen { return false }
         #endif
@@ -400,7 +410,12 @@ struct PlayerView: View {
 
     private var playPauseButton: some View {
         let size: CGFloat = Theme.isTV ? 110 : 64
-        let busy = player.phase == .loading || player.phase == .buffering
+        let busy: Bool = {
+            switch player.phase {
+            case .loading, .buffering, .reconnecting: return true
+            default: return false
+            }
+        }()
         return Button { togglePlayPause() } label: {
             ZStack {
                 if busy {
@@ -419,7 +434,7 @@ struct PlayerView: View {
         }
         .buttonStyle(CardButtonStyle(radius: size / 2, scale: 1.1))
         .accessibilityLabel(L10n.t(showsPlayIcon ? "player_play" : "player_pause"))
-        .accessibilityValue(showsPlayIcon ? "paused" : "playing")
+        .accessibilityValue(L10n.t(showsPlayIcon ? "player_state_paused" : "player_state_playing"))
         .accessibilityIdentifier("player_play_pause")
         #if os(tvOS)
         .focused($playPauseFocused)
@@ -694,6 +709,10 @@ private struct PlayerScrubber: View {
     let duration: Double
     @Binding var dragFraction: Double?
     let onCommit: (Double) -> Void
+    /// Finger position; SwiftUI resets it when the drag ends *or is cancelled* (view removed,
+    /// second touch, interruption) – mirrored into `dragFraction`, so a cancelled drag cannot
+    /// leave the timeline frozen and the overlay pinned.
+    @GestureState private var fingerFraction: Double?
 
     private var enabled: Bool { duration > 0 }
 
@@ -725,6 +744,7 @@ private struct PlayerScrubber: View {
             .frame(width: width, height: geo.size.height)
             .contentShape(Rectangle())
             .gesture(drag(width: width), including: enabled ? .all : .subviews)
+            .onChange(of: fingerFraction) { _, value in dragFraction = value }
             .animation(.easeOut(duration: 0.12), value: dragging)
         }
         .frame(height: 44)
@@ -737,16 +757,13 @@ private struct PlayerScrubber: View {
             onCommit(min(1, max(0, fraction + (direction == .increment ? step : -step))))
         }
         .accessibilityIdentifier("player_scrubber")
+        .onDisappear { dragFraction = nil }
     }
 
     private func drag(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
-            .onChanged { value in dragFraction = min(1, max(0, value.location.x / width)) }
-            .onEnded { value in
-                let target = min(1, max(0, value.location.x / width))
-                onCommit(target)
-                dragFraction = nil
-            }
+            .updating($fingerFraction) { value, state, _ in state = min(1, max(0, value.location.x / width)) }
+            .onEnded { value in onCommit(min(1, max(0, value.location.x / width))) }
     }
 }
 #endif

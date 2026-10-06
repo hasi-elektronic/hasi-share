@@ -44,7 +44,7 @@ final class IOSPlayerControlsTests: XCTestCase {
         XCTFail("overlay could not be shown")
     }
 
-    /// Time label (seconds) and play/pause state ("playing"/"paused") read from a fresh overlay.
+    /// Time label (seconds) and play/pause state ("Playing"/"Paused") read from a fresh overlay.
     @MainActor
     static func state(_ app: XCUIApplication) -> (time: Double, value: String) {
         freshOverlay(app)
@@ -62,13 +62,13 @@ final class IOSPlayerControlsTests: XCTestCase {
         return seconds(app.staticTexts["player_duration"].label) ?? 0
     }
 
-    /// Waits until playback runs (play/pause says "playing" and the time is past `after`).
+    /// Waits until playback runs (play/pause says "Playing" and the time is past `after`).
     @MainActor
     static func waitPlaying(_ app: XCUIApplication, after: Double = 0, timeout: TimeInterval = 40) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let (time, value) = state(app)
-            if time > after + 1, value == "playing" { return true }
+            if time > after + 1, value == "Playing" { return true }
             sleep(1)
         }
         return false
@@ -121,7 +121,7 @@ final class IOSPlayerControlsTests: XCTestCase {
         app.otherElements["video_surface"].tap()
         XCTAssertTrue(playPause.waitForExistence(timeout: 3), "overlay re-shown")
         playPause.tap()
-        XCTAssertEqual(playPause.value as? String, "paused", "play/pause works after re-show")
+        XCTAssertEqual(playPause.value as? String, "Paused", "play/pause works after re-show")
         sleep(4)
         XCTAssertTrue(playPause.exists, "overlay stays while paused")
         app.buttons["player_close"].tap()
@@ -169,34 +169,40 @@ final class IOSPlayerControlsTests: XCTestCase {
         Self.showOverlay(app)
         let playPause = app.buttons["player_play_pause"]
         playPause.tap()
-        XCTAssertEqual(playPause.value as? String, "paused")
+        XCTAssertEqual(playPause.value as? String, "Paused")
         UITestSupport.snap("controls-\(name)-02-paused", in: self)
         playPause.tap()
-        XCTAssertEqual(playPause.value as? String, "playing")
+        XCTAssertEqual(playPause.value as? String, "Playing")
 
-        // ±10 s.
+        // Measure the transport while paused, so playback does not blur the numbers (±2 s).
+        playPause.tap()
+        XCTAssertEqual(playPause.value as? String, "Paused")
         let before = Self.time(app)
         app.buttons["player_seek_forward"].tap()
-        let after = Self.time(app)
-        XCTAssertGreaterThanOrEqual(after - before, 9, "\(name): +10 s (\(before) → \(after))")
+        sleep(1)
+        XCTAssertEqual(Self.time(app), before + 10, accuracy: 2, "\(name): +10 s")
         app.buttons["player_seek_back"].tap()
-        XCTAssertLessThan(Self.time(app), after, "\(name): −10 s")
+        sleep(1)
+        XCTAssertEqual(Self.time(app), before, accuracy: 2, "\(name): −10 s")
 
         // Double tap on the right third: +10 s with a ripple, overlay not toggled.
-        let beforeDouble = Self.time(app)
         app.otherElements["video_surface"].coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45)).doubleTap()
         UITestSupport.snap("controls-\(name)-02b-double-tap", in: self)
-        XCTAssertGreaterThanOrEqual(Self.time(app) - beforeDouble, 9, "\(name): double tap +10 s")
+        sleep(1)
+        XCTAssertEqual(Self.time(app), before + 10, accuracy: 2, "\(name): double tap +10 s")
 
-        // Scrub to ~50 %.
+        // Scrub to 50 %.
         let duration = Self.duration(app)
         XCTAssertGreaterThan(duration, 60, "\(name): duration known")
         let scrubber = app.descendants(matching: .any)["player_scrubber"]
         XCTAssertTrue(scrubber.exists)
         scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
             .press(forDuration: 0.1, thenDragTo: scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        sleep(1)
         let scrubbed = Self.time(app)
-        XCTAssertEqual(scrubbed, duration / 2, accuracy: duration * 0.1, "\(name): scrubbed to half")
+        XCTAssertEqual(scrubbed, duration / 2, accuracy: 2, "\(name): scrubbed to half")
+        Self.showOverlay(app)
+        playPause.tap()
         XCTAssertTrue(Self.waitPlaying(app, after: scrubbed - 1, timeout: 30), "\(name): plays on after the scrub")
         UITestSupport.snap("controls-\(name)-03-scrubbed", in: self)
 
@@ -209,15 +215,22 @@ final class IOSPlayerControlsTests: XCTestCase {
             sleep(1)
         }
 
-        // Close → reopen: resumes at the saved position and offers "Play from start".
+        // Close (paused, exact position) → reopen: resumes there and offers "Play from start".
+        Self.showOverlay(app)
+        playPause.tap()
+        XCTAssertEqual(playPause.value as? String, "Paused")
         let position = Self.time(app)
         app.buttons["player_close"].tap()
         XCTAssertTrue(app.otherElements["video_surface"].waitForNonExistence(timeout: 5))
         Self.playFromDetail(app)
         let chip = app.buttons["player_play_from_start"]
         XCTAssertTrue(chip.waitForExistence(timeout: 5), "\(name): 'Play from start' after resume")
+        // The overlay is shown on open: read the label right away (≈ 1 s of playback after the resume).
+        let label = app.staticTexts["player_time"]
+        XCTAssertTrue(label.exists, "\(name): overlay shown on open")
+        let resumedAt = Self.seconds(label.label) ?? -1
         UITestSupport.snap("controls-\(name)-04-resumed", in: self)
-        XCTAssertGreaterThanOrEqual(Self.time(app), position - 2, "\(name): resumed at \(position)")
+        XCTAssertEqual(resumedAt, position + 1, accuracy: 2, "\(name): resumed at \(position)")
         XCTAssertTrue(Self.waitPlaying(app, after: position - 2, timeout: 30), "\(name): plays after resume")
         app.buttons["player_close"].tap()
     }

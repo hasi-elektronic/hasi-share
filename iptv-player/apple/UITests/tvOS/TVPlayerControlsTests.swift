@@ -29,7 +29,7 @@ final class TVPlayerControlsTests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let (time, value) = state(app)
-            if time > after + 1, value == "playing" { return true }
+            if time > after + 1, value == "Playing" { return true }
             sleep(1)
         }
         return false
@@ -53,45 +53,44 @@ final class TVPlayerControlsTests: XCTestCase {
         XCTAssertTrue(Self.waitPlaying(app), "movie plays")
         UITestSupport.snap("tv-controls-01-overlay", in: self)
 
-        // ▶ with the overlay shown (play/pause focused).
-        var before = Self.state(app).time
-        remote.press(.right)
-        var after = Self.state(app).time
-        XCTAssertGreaterThanOrEqual(after - before, 9, "▶ (overlay shown): \(before) → \(after)")
-
-        // ▶ with the overlay hidden.
-        sleep(5)
-        XCTAssertFalse(app.staticTexts["player_time"].exists, "overlay auto-hidden")
-        before = after
-        remote.press(.right)
-        after = Self.state(app).time
-        XCTAssertGreaterThanOrEqual(after - before, 9, "▶ (overlay hidden): \(before) → \(after)")
-
-        // ◀
-        remote.press(.left)
-        XCTAssertLessThan(Self.state(app).time, after, "◀ −10 s")
-
-        // Held ▶: accelerates to 30 s steps after 1 s.
-        before = Self.state(app).time
-        remote.press(.right, forDuration: 1.6)
-        after = Self.state(app).time
-        // 0.4 s until the hold is recognised, then 10 s steps every 0.3 s, 30 s steps after 1 s.
-        XCTAssertGreaterThanOrEqual(after - before, 60, "held ▶ accelerates (plain 10 s steps would give ≤ 50)")
-
-        // Select toggles play/pause (overlay shown: play/pause has the focus, ◀▶ did not move it).
-        _ = Self.state(app)
+        // Select toggles play/pause (overlay shown: play/pause has the focus).
         let playPause = app.buttons["player_play_pause"]
         remote.press(.select)
-        XCTAssertEqual(Self.state(app).value, "paused", "select pauses")
+        XCTAssertEqual(Self.state(app).value, "Paused", "select pauses")
         UITestSupport.snap("tv-controls-02-paused", in: self)
         remote.press(.select)
-        XCTAssertEqual(Self.state(app).value, "playing", "select resumes")
+        XCTAssertEqual(Self.state(app).value, "Playing", "select resumes")
 
         // Select on the picture (overlay hidden) pauses too, like the TV app.
         sleep(5)
         XCTAssertFalse(playPause.exists, "overlay auto-hidden")
         remote.press(.select)
-        XCTAssertEqual(Self.state(app).value, "paused", "select (overlay hidden) pauses")
+        XCTAssertEqual(Self.state(app).value, "Paused", "select (overlay hidden) pauses")
+
+        // Seeking measured while paused (±2 s). ▶ with the overlay shown: focus stays on play/pause.
+        let start = Self.state(app).time
+        remote.press(.right)
+        sleep(1)
+        XCTAssertEqual(Self.state(app).time, start + 10, accuracy: 2, "▶ (overlay shown)")
+        // ▶ with the overlay hidden (Menu hides it).
+        remote.press(.menu)
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["player_time"].exists, "overlay hidden")
+        remote.press(.right)
+        sleep(1)
+        XCTAssertEqual(Self.state(app).time, start + 20, accuracy: 2, "▶ (overlay hidden)")
+        remote.press(.left)
+        sleep(1)
+        XCTAssertEqual(Self.state(app).time, start + 10, accuracy: 2, "◀ −10 s")
+
+        // Held ▶ 1.6 s: recognised after 0.4 s, then a step every 0.3 s – 10 s, 30 s once held
+        // for 1 s (≈ 10+10+30+30+30); plain 10 s steps would give ≤ 50.
+        let beforeHold = Self.state(app).time
+        remote.press(.right, forDuration: 1.6)
+        sleep(1)
+        let held = Self.state(app).time - beforeHold
+        XCTAssertGreaterThanOrEqual(held, 60, "held ▶ accelerates")
+        XCTAssertLessThanOrEqual(held, 140, "held ▶ stops on release")
 
         // ▲ reaches the top row: OK on close leaves the player.
         remote.press(.up)

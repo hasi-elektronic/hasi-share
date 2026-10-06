@@ -82,7 +82,9 @@ public final class AVPlayerEngine: PlaybackEngine {
         attach(item, container: stream.container)
         player.replaceCurrentItem(with: item)
         if let startMs, startMs > 0 {
-            player.seek(to: CMTime(value: startMs, timescale: 1000))
+            // Resume: never past the saved position (a keyframe seek could skip a few seconds).
+            player.seek(to: CMTime(value: startMs, timescale: 1000), toleranceBefore: CMTime(seconds: 2, preferredTimescale: 600),
+                        toleranceAfter: .zero)
         }
         player.play()
         loadMediaOptions(asset: asset, audio: preferredAudioLanguage, subtitle: preferredSubtitleLanguage)

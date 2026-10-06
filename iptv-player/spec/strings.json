@@ -640,6 +640,21 @@
    "tr": "{0} sn",
    "de": "{0} s"
   },
+  "player_state_playing": {
+   "en": "Playing",
+   "tr": "Oynatılıyor",
+   "de": "Wird abgespielt"
+  },
+  "player_state_paused": {
+   "en": "Paused",
+   "tr": "Duraklatıldı",
+   "de": "Pausiert"
+  },
+  "player_show_controls": {
+   "en": "Show controls",
+   "tr": "Kontrolleri göster",
+   "de": "Steuerelemente anzeigen"
+  },
   "player_position": {
    "en": "Playback position",
    "tr": "Oynatma konumu",

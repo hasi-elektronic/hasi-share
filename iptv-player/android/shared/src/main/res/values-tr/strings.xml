@@ -129,6 +129,9 @@
     <string name="player_seek_back_10" formatted="false">10 saniye geri</string>
     <string name="player_seek_forward_10" formatted="false">10 saniye ileri</string>
     <string name="player_seek_delta">%1$s sn</string>
+    <string name="player_state_playing" formatted="false">Oynatılıyor</string>
+    <string name="player_state_paused" formatted="false">Duraklatıldı</string>
+    <string name="player_show_controls" formatted="false">Kontrolleri göster</string>
     <string name="player_position" formatted="false">Oynatma konumu</string>
     <string name="player_locked" formatted="false">Deneme süreniz bitti. İzlemeye devam etmek için satın alın.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>

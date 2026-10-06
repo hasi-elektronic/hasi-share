@@ -113,6 +113,8 @@ public final class PlayerController {
     @ObservationIgnored private var lastProgressSaveMs: Int64?
     /// Seek in flight: `.time` ticks far from the target are stale until the engine caught up.
     @ObservationIgnored private var pendingSeek: (target: Double, atMs: Int64)?
+    /// The user paused while a reconnect was pending: play reconnects at the saved position.
+    @ObservationIgnored private var pausedDuringReconnect = false
     /// Engine forced for the current stream after a fallback (survives reconnects).
     @ObservationIgnored private var fallbackEngine: PlayerEngine?
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -158,13 +160,14 @@ public final class PlayerController {
 
     /// Opens a request (locked → `.locked`, the UI shows the paywall).
     public func open(_ request: PlaybackRequest) {
-        saveProgress(force: true)
+        saveProgress()
         openTask?.cancel()
         retryTask?.cancel()
         reconnectState = ReconnectState()
         fallbackEngine = nil
         lastProgressSaveMs = nil
         pendingSeek = nil
+        pausedDuringReconnect = false
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
         }
@@ -251,6 +254,12 @@ public final class PlayerController {
         if let current = engine, current !== next { current.stop() }
         engine = next
         next.setAspect(aspect)
+        pausedDuringReconnect = false
+        if request?.isLive == false, let startMs, startMs > 0 {
+            // The stale-tick window starts now: until the engine reaches the start position its
+            // ticks (0, or the old item) would move the time label back.
+            pendingSeek = (Double(startMs) / 1000, nowMs())
+        }
         SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
         let isLive = request?.isLive == true
         next.load(stream, isLive: isLive, startMs: startMs,
@@ -273,7 +282,7 @@ public final class PlayerController {
         case .paused:
             if phase == .playing || phase == .buffering {
                 phase = .paused
-                saveProgress(force: true)
+                saveProgress()
             }
         case .buffering:
             if phase == .playing { phase = .buffering }
@@ -288,7 +297,7 @@ public final class PlayerController {
             currentTime = seconds
             reconnectState = reconnectPolicy.tick(reconnectState, nowMs: SystemClock.monotonicMs())
             if let last = lastProgressSaveMs, nowMs() - last < Self.progressSaveIntervalMs { break }
-            saveProgress(force: false)
+            saveProgress()
         case .tracks(let audio, let subtitles, let selA, let selS):
             audioOptions = audio
             subtitleOptions = subtitles
@@ -358,7 +367,7 @@ public final class PlayerController {
     private func handleEnded() {
         // End of file = fully watched (the last tick can be a second or more before the end).
         if request?.isLive == false, duration > 0 { currentTime = duration }
-        saveProgress(force: true)
+        saveProgress()
         phase = .ended
     }
 
@@ -409,7 +418,18 @@ public final class PlayerController {
 
     public func togglePlayPause() {
         guard let engine else { return }
-        if phase == .ended {
+        if case .reconnecting = phase {
+            // Pause = user intent: no further attempts until play.
+            retryTask?.cancel()
+            stallTask?.cancel()
+            engine.pause()
+            phase = .paused
+            pausedDuringReconnect = true
+            saveProgress()
+        } else if pausedDuringReconnect, phase == .paused, let stream {
+            phase = .loading
+            load(stream, startMs: request?.isLive == true ? nil : Int64(currentTime * 1000))
+        } else if phase == .ended {
             // Play again from the start after the end of a VOD.
             seek(to: 0)
             engine.play()
@@ -417,7 +437,7 @@ public final class PlayerController {
             // Intent, not only `isPlaying`: a pause during buffering must pause too.
             engine.pause()
             phase = .paused
-            saveProgress(force: true)
+            saveProgress()
         } else {
             engine.play()
         }
@@ -466,7 +486,7 @@ public final class PlayerController {
 
     /// Saves the position and frees the player (scene not active / screen closed).
     public func release() {
-        saveProgress(force: true)
+        saveProgress()
         openTask?.cancel()
         zapTask?.cancel()
         stopPlayback()
@@ -537,7 +557,7 @@ public final class PlayerController {
 
     /// Saves the VOD position. Without a reported duration the position is still saved with
     /// `durationMs` 0 (resume works; "watched" needs the duration).
-    private func saveProgress(force: Bool) {
+    private func saveProgress() {
         guard let request, !request.isLive, let key = request.contentKey, let library, currentTime > 1 else { return }
         lastProgressSaveMs = nowMs()
         var seriesKey: String?

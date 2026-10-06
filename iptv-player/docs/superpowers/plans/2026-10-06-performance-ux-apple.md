@@ -27,6 +27,7 @@
 - `cd apple/IPTVKit && swift test` (and `cd apple/IPTVCore && swift test` if touched)
 - `cd apple && xcodegen generate && xcodebuild -project NovaPlayer.xcodeproj -scheme NovaPlayer-iOS -destination 'generic/platform=iOS Simulator' build -quiet` and the same with `NovaPlayer-tvOS` / `'generic/platform=tvOS Simulator'`
 - UI tests (tasks that touch UI): local media server first — `cd /private/tmp/claude-501/-Users-hguencavdi-hasi-share/1f2597b2-bac6-4b01-9cb5-597300a6fe3b/scratchpad/apple-www && python3 -m http.server 8765 --bind 127.0.0.1` (background, long timeout), then `TEST_RUNNER_SEED_M3U=http://localhost:8765/redesign/demo.m3u xcodebuild test -project NovaPlayer.xcodeproj -scheme NovaPlayer-iOS -destination 'platform=iOS Simulator,name=iPhone 17 Pro'` and `-scheme NovaPlayer-tvOS -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation)'`.
+- VLC/VOD media server (Range-capable, needed by the VLCKit and player-control UI tests: `vlc-live.m3u`, `vlc-movie.m3u` MKV, `vod-movie.m3u` MP4 → AVPlayer; those tests `XCTSkip` without it): `cd /private/tmp/claude-501/-Users-hguencavdi-hasi-share/1f2597b2-bac6-4b01-9cb5-597300a6fe3b/scratchpad/vlc-www && python3 ../range_server.py 8766` (background, long timeout; check `lsof -iTCP:8766 -sTCP:LISTEN`). Start it together with the 8765 server before any UI suite run.
 
 ---
 

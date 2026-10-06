@@ -15,7 +15,7 @@ final class PlayerProgressTests: XCTestCase {
     private let movie = Movie(sourceId: "s1", id: "m7", name: "Film", url: "http://h.example.com/film.mp4")
     private let mkvMovie = Movie(sourceId: "s1", id: "m8", name: "Film MKV", url: "http://h.example.com/film.mkv")
 
-    private func controller() throws -> PlayerController {
+    private func controller(policy: ReconnectPolicy = ReconnectPolicy()) throws -> PlayerController {
         let av = FakeEngine(kind: .avPlayer)
         let vlc = FakeEngine(kind: .vlcKit)
         self.av = av
@@ -23,7 +23,7 @@ final class PlayerProgressTests: XCTestCase {
         library = LibraryRepository(database: try AppDatabase.inMemory())
         let engines = PlaybackEngines(avPlayer: { av }, vlc: { vlc })
         let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, vlcAvailable: true),
-                                 library: library, engines: engines)
+                                 library: library, reconnectPolicy: policy, engines: engines)
         c.nowMs = { [unowned self] in self.clockMs }
         return c
     }
@@ -207,6 +207,44 @@ final class PlayerProgressTests: XCTestCase {
         XCTAssertEqual(c.currentTime, 40.5)
         engine.emit(.time(41.5))
         XCTAssertEqual(c.currentTime, 41.5)
+    }
+
+    /// The stale-tick window starts when the engine loads (a slow reconnect must not open it early).
+    func testSeekSettleWindowStartsAtEngineLoad() async throws {
+        let c = try controller(policy: ReconnectPolicy(delaysMs: [20, 20]))
+        let engine = try await open(c, movie)
+        engine.emit(.ready(duration: 600))
+        engine.emit(.time(20))
+        c.seek(by: 20)
+        engine.emit(.failed(.network(.timeout)))
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
+        clockMs += 4_000   // the reconnect took a while
+        let loads = engine.loads.count
+        for _ in 0..<200 where engine.loads.count == loads { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(engine.loads.last?.startMs, 40_000)
+        engine.emit(.time(0.5))   // new item before it reached the start position
+        XCTAssertEqual(c.currentTime, 40)
+    }
+
+    /// Pause while reconnecting = user intent: the pending attempt is cancelled; play resumes it.
+    func testPauseDuringReconnectCancelsRetryAndPlayResumes() async throws {
+        let c = try controller(policy: ReconnectPolicy(delaysMs: [80, 80]))
+        let engine = try await open(c, movie)
+        engine.emit(.ready(duration: 600))
+        engine.emit(.time(50))
+        engine.emit(.failed(.network(.timeout)))
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
+        let loads = engine.loads.count
+        c.togglePlayPause()
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertEqual(try saved(movie)?.data.positionMs, 50_000)
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(engine.loads.count, loads, "pending reconnect cancelled")
+        XCTAssertEqual(c.phase, .paused)
+        c.togglePlayPause()
+        XCTAssertEqual(engine.loads.count, loads + 1, "play reconnects")
+        XCTAssertEqual(engine.loads.last?.startMs, 50_000)
+        XCTAssertEqual(c.phase, .loading)
     }
 
     func testSeekToFraction() async throws {

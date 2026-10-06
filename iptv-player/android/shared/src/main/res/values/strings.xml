@@ -129,6 +129,9 @@
     <string name="player_seek_back_10" formatted="false">Back 10 seconds</string>
     <string name="player_seek_forward_10" formatted="false">Forward 10 seconds</string>
     <string name="player_seek_delta">%1$s s</string>
+    <string name="player_state_playing" formatted="false">Playing</string>
+    <string name="player_state_paused" formatted="false">Paused</string>
+    <string name="player_show_controls" formatted="false">Show controls</string>
     <string name="player_position" formatted="false">Playback position</string>
     <string name="player_locked" formatted="false">Your trial has ended. Purchase to keep watching.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
