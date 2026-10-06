@@ -45,7 +45,11 @@ struct AddSourceView: View {
                 Text(text(for: step)).font(Theme.headline).foregroundStyle(Theme.textPrimary)
                 Button(L10n.t("action_cancel")) { model.cancel() }.buttonStyle(SecondaryButtonStyle())
             }
-            .onAppear { router.onboarding = true }
+            // Only the first source is onboarding: keep the welcome flow on screen until "Continue"
+            // (the root would switch to home as soon as the source exists). With sources already
+            // present (Settings → add) the root must stay as it is – flipping it would replace the
+            // screen that presents the settings sheet.
+            .onAppear { if env.sources.isEmpty { router.onboarding = true } }
         case .success(let source):
             successView(source)
         case .failed(let error):

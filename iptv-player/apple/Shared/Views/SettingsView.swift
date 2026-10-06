@@ -21,8 +21,10 @@ struct SettingsView: View {
             Section(L10n.t("settings_sources")) {
                 ForEach(env.sources) { source in
                     NavigationLink(value: SettingsRoute.source(source.id)) { SourceSummaryRow(source: source) }
+                        .accessibilityIdentifier("settings_source_\(source.name)")
                 }
                 NavigationLink(value: SettingsRoute.add(.m3u)) { Label(L10n.t("add_source_m3u"), systemImage: "plus") }
+                    .accessibilityIdentifier("settings_add_m3u")
                 NavigationLink(value: SettingsRoute.add(.xtream)) { Label(L10n.t("add_source_xtream"), systemImage: "plus") }
                 #if os(tvOS)
                 NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
@@ -212,12 +214,14 @@ struct SourceDetailView: View {
                 }
                 Section {
                     Button(L10n.t("action_delete"), role: .destructive) { confirmDelete = true }
+                        .accessibilityIdentifier("source_delete")
                 }
                 .confirmationDialog(L10n.t("source_delete_confirm", source.name), isPresented: $confirmDelete, titleVisibility: .visible) {
                     Button(L10n.t("action_delete"), role: .destructive) {
                         env.deleteSource(id: sourceId)
                         dismiss()
                     }
+                    .accessibilityIdentifier("source_delete_confirm")
                     Button(L10n.t("action_cancel"), role: .cancel) {}
                 }
             }
