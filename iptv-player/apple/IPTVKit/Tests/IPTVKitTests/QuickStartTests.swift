@@ -64,8 +64,48 @@ final class LastSessionRecordingTests: XCTestCase {
         av.emit(.playing)
         c.open(PlaybackRequest(item: .url("http://a.example.com/x.m3u8", title: "x"), source: nil))
         XCTAssertEqual(events().count, 2)
-        if case .some(.some) = events().last { XCTFail("VOD playback must clear the last live session") }
-        XCTAssertNotNil(events().first ?? nil)
+        XCTAssertNotNil(events()[0], "first event: the live record")
+        XCTAssertNil(events()[1], "VOD playback clears the last live session")
+    }
+}
+
+extension LastSessionRecordingTests {
+    func testSeededStaleRecordIsClearedByVODOpen() {
+        let (c, _, events) = make()
+        c.restoreLastSession(LastSession(sourceId: "s1", channelId: "old", endedInPlayer: true))   // persisted by an earlier launch
+        c.open(PlaybackRequest(item: .url("http://a.example.com/x.m3u8", title: "x"), source: nil))
+        XCTAssertEqual(events().count, 1)
+        XCTAssertNil(events()[0])
+    }
+
+    func testClosingBeforeFirstFrameOfSeededSessionStillClears() {
+        let (c, _, events) = make()
+        c.restoreLastSession(LastSession(sourceId: "s1", channelId: "c1", endedInPlayer: true))
+        c.close()   // no live request open, record seeded
+        XCTAssertEqual(events(), [LastSession(sourceId: "s1", channelId: "c1", endedInPlayer: false)])
+    }
+}
+
+final class QuickStartFlagTests: XCTestCase {
+    let s = LastSession(sourceId: "s", channelId: "c", endedInPlayer: true)
+
+    func testFlagOnlyDiscardedWhenItCanNeverResume() {
+        XCTAssertFalse(QuickStart.shouldDiscard(enabled: true, last: s, channelExists: true), "playable: keep (also while canPlay is still unknown)")
+        XCTAssertTrue(QuickStart.shouldDiscard(enabled: false, last: s, channelExists: true))
+        XCTAssertTrue(QuickStart.shouldDiscard(enabled: true, last: s, channelExists: false))
+        XCTAssertFalse(QuickStart.shouldDiscard(enabled: true, last: nil, channelExists: false))
+        var left = s; left.endedInPlayer = false
+        XCTAssertFalse(QuickStart.shouldDiscard(enabled: false, last: left, channelExists: false), "nothing to consume")
+    }
+
+    @MainActor
+    func testWaitForEntitlementsTimesOutThenSucceedsOnceLoaded() async {
+        let store = StoreManager(productIDs: ProductIDs(lifetime: "l", trial: "t"), kv: InMemoryKeyValueStore())
+        let timedOut = await store.waitForEntitlements(timeout: .milliseconds(60))
+        XCTAssertFalse(timedOut)
+        Task { try? await Task.sleep(for: .milliseconds(40)); store.markEntitlementsLoaded() }
+        let loaded = await store.waitForEntitlements(timeout: .seconds(2))
+        XCTAssertTrue(loaded)
     }
 }
 

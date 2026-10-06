@@ -121,6 +121,7 @@ public final class AppEnvironment {
         player.onLibraryChange = { [weak self] in self?.libraryChanged() }
         player.aspect = settings.aspect
         player.largeBuffer = settings.largeBuffer
+        player.restoreLastSession(settings.lastSession)
         player.onLastSessionChange = { [weak self] in self?.settings.lastSession = $0 }
         player.onAspectChange = { [weak self] mode in self?.settings.aspect = mode }
         applyLanguagePreferences()
@@ -143,6 +144,24 @@ public final class AppEnvironment {
             libraryVersion += 1
         }
         await refreshDueSources()
+    }
+
+    /// QuickStart bookkeeping: the persisted session no longer counts as "ended in the player".
+    public func clearEndedInPlayer() {
+        guard var last = settings.lastSession, last.endedInPlayer else { return }
+        last.endedInPlayer = false
+        settings.lastSession = last
+        player.restoreLastSession(last)
+    }
+
+    /// Starts StoreKit (idempotent) and waits for the first entitlement snapshot, so `license.canPlay`
+    /// is real before QuickStart decides. Returns immediately when playback is already allowed.
+    public func awaitEntitlements(timeout: Duration) async {
+        license.evaluate()
+        if license.canPlay { return }
+        store.start()
+        _ = await store.waitForEntitlements(timeout: timeout)
+        license.evaluate()
     }
 
     /// Scene phase handling: release the player when not active (docs/ARCHITECTURE.md §3.2).

@@ -38,6 +38,29 @@ final class LicenseManagerTests: XCTestCase {
                               readClock: { clock.read() })
     }
 
+    /// QuickStart: at launch the StoreKit snapshot is still empty (canPlay false → no decision, flag kept);
+    /// once the entitlement snapshot arrives the very same session plays.
+    func testQuickStartFiresWhenEntitlementsArriveLate() throws {
+        let clock = TestClock(wallMs: t0)
+        let manager = try make(FakeLicenseBackend(), TestSigner(), clock)
+        let session = LastSession(sourceId: "s", channelId: "c", endedInPlayer: true)
+
+        manager.evaluate()   // launch: empty store snapshot
+        XCTAssertFalse(manager.canPlay)
+        XCTAssertEqual(QuickStart.decide(enabled: true, last: session, canPlay: manager.canPlay, channelExists: true), .none)
+        XCTAssertFalse(QuickStart.shouldDiscard(enabled: true, last: session, channelExists: true), "flag survives the not-yet-known entitlement")
+
+        manager.update(store: StoreSnapshot(trialStartMs: t0 - 2 * day, trialTransactionId: "tx"))   // first StoreKit snapshot
+        XCTAssertTrue(manager.canPlay)
+        XCTAssertEqual(QuickStart.decide(enabled: true, last: session, canPlay: manager.canPlay, channelExists: true),
+                       .play(sourceId: "s", channelId: "c"))
+
+        // Purchase variant.
+        let purchased = try make(FakeLicenseBackend(), TestSigner(), clock)
+        purchased.update(store: StoreSnapshot(lifetime: .purchased, transactionIds: ["1"]))
+        XCTAssertTrue(purchased.canPlay)
+    }
+
     func testTesterFullAccessUnlocksAndCanBeTurnedOff() throws {
         let clock = TestClock(wallMs: t0)
         let manager = try make(FakeLicenseBackend(), TestSigner(), clock)

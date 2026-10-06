@@ -186,13 +186,22 @@ enum AppBootstrap {
 
     /// QuickStart (docs/SCREENS.md §3.2): when the app was left while a live channel was playing, open that
     /// channel in the player right away – before any source refresh (`env.start()`). Call AFTER
-    /// `applyTesterAccess` (TestFlight full access decides `canPlay`). Without a decision to play, the
-    /// "ended in player" flag is consumed so a later launch does not resume a stale session.
-    static func quickStart(env: AppEnvironment, router: Router) {
-        guard !router.playerPresented, !router.onboarding, !env.sources.isEmpty else { return }
-        env.license.evaluate()
+    /// `applyTesterAccess`. `canPlay` is only trusted after the first StoreKit entitlement snapshot
+    /// (`awaitEntitlements`, ≤ 1.5 s, local read), otherwise trial/purchase users would never get quick start.
+    /// The "ended in player" flag is consumed only when it can never resume (feature off / channel gone),
+    /// never because of a transient `canPlay == false`.
+    static func quickStart(env: AppEnvironment, router: Router) async {
+        guard !router.playerPresented, !router.onboarding, !env.sources.isEmpty,
+              env.settings.lastSession?.endedInPlayer == true else { return }
+        let channelOf: (LastSession?) -> Channel? = { last in
+            last.flatMap { (try? env.catalog.channel(sourceId: $0.sourceId, id: $0.channelId)) ?? nil }
+        }
+        if env.settings.quickStart, channelOf(env.settings.lastSession) != nil {
+            await env.awaitEntitlements(timeout: QuickStart.entitlementTimeout)
+        }
+        guard !router.playerPresented else { return }   // e.g. the user was faster than the wait
         let last = env.settings.lastSession
-        let channel = last.flatMap { (try? env.catalog.channel(sourceId: $0.sourceId, id: $0.channelId)) ?? nil }
+        let channel = channelOf(last)
         switch QuickStart.decide(enabled: env.settings.quickStart, last: last, canPlay: env.license.canPlay, channelExists: channel != nil) {
         case .play:
             guard let channel else { return }
@@ -201,9 +210,8 @@ enum AppBootstrap {
             if !page.contains(where: { $0.id == channel.id }) { page.insert(channel, at: 0) }
             router.play(.channel(channel), channels: page)
         case .none:
-            if var last, last.endedInPlayer {
-                last.endedInPlayer = false
-                env.settings.lastSession = last
+            if QuickStart.shouldDiscard(enabled: env.settings.quickStart, last: last, channelExists: channel != nil) {
+                env.clearEndedInPlayer()
             }
         }
     }

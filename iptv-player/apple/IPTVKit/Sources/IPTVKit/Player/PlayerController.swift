@@ -465,6 +465,9 @@ public final class PlayerController {
         phase = .idle
     }
 
+    /// Seeds the cache with the persisted record (a VOD open then clears a stale one); no callback.
+    public func restoreLastSession(_ session: LastSession?) { lastSession = session }
+
     private func updateLastSession(_ new: LastSession?) {
         guard new != lastSession else { return }
         lastSession = new

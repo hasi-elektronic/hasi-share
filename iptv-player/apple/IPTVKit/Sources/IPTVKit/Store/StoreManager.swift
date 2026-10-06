@@ -57,6 +57,8 @@ public final class StoreManager {
     public private(set) var isLoadingProducts = false
     public private(set) var productsError: String?
     public private(set) var purchaseInProgress = false
+    /// true once the first entitlement read finished (the snapshot is then authoritative for the license).
+    public private(set) var entitlementsLoaded = false
 
     /// Called after every snapshot change.
     @ObservationIgnored public var onChange: (@MainActor (StoreSnapshot) -> Void)?
@@ -83,11 +85,25 @@ public final class StoreManager {
                 await self?.refreshEntitlements()
             }
         }
+        // Entitlements first (local, fast – QuickStart waits for them); products are only needed for the paywall.
         Task {
-            await loadProducts()
             await refreshEntitlements()
+            await loadProducts()
         }
     }
+
+    /// Waits until the first entitlement read finished (or `timeout`). Returns whether it did.
+    public func waitForEntitlements(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !entitlementsLoaded {
+            if ContinuousClock.now >= deadline { return false }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return true
+    }
+
+    /// Marks the first entitlement read as done (also used by tests).
+    func markEntitlementsLoaded() { entitlementsLoaded = true }
 
     /// Localized price of the lifetime unlock ("₺99,99"), nil until loaded.
     public var lifetimePrice: String? { lifetimeProduct?.displayPrice }
@@ -137,6 +153,7 @@ public final class StoreManager {
             next.trialTransactionId = String(t.originalID)
         }
         setSnapshot(next)
+        entitlementsLoaded = true
     }
 
     private func setSnapshot(_ value: StoreSnapshot) {
