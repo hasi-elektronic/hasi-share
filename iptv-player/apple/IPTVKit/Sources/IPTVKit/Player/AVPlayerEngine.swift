@@ -20,6 +20,9 @@ public final class AVPlayerEngine: PlaybackEngine {
     private var timeObserver: Any?
     private var mediaGroups: (audio: AVMediaSelectionGroup?, legible: AVMediaSelectionGroup?) = (nil, nil)
     private var optionsTask: Task<Void, Never>?
+    /// Live start tuning: relaxes the first-variant cap / stall waiting after the first frame.
+    private var relaxTasks: [Task<Void, Never>] = []
+    private var pendingRelax: (item: AVPlayerItem, tuning: LiveStartTuning)?
 
     public init() {
         player.automaticallyWaitsToMinimizeStalling = true
@@ -53,12 +56,18 @@ public final class AVPlayerEngine: PlaybackEngine {
         return d
     }
 
-    public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?) {
+    public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
+        cancelRelax()
         var options: [String: Any] = [:]
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
         let asset = AVURLAsset(url: stream.url, options: options)
         let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = isLive ? 2 : 0
+        item.preferredForwardBufferDuration = tuning.forwardBufferSeconds
+        player.automaticallyWaitsToMinimizeStalling = tuning.waitToMinimizeStallingAfter == 0
+        if let cap = tuning.initialPeakBitRate { item.preferredPeakBitRate = cap }
+        if tuning.initialPeakBitRate != nil || tuning.waitToMinimizeStallingAfter > 0 {
+            pendingRelax = (item, tuning)
+        }
         attach(item, container: stream.container)
         player.replaceCurrentItem(with: item)
         if let startMs, startMs > 0 {
@@ -108,11 +117,42 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     private func timeControlChanged() {
         switch player.timeControlStatus {
-        case .playing: onEvent?(.playing)
+        case .playing:
+            scheduleRelaxIfNeeded()
+            onEvent?(.playing)
         case .paused: onEvent?(.paused)
         case .waitingToPlayAtSpecifiedRate: onEvent?(.buffering)
         @unknown default: break
         }
+    }
+
+    /// On the first `.playing` of a tuned load: after the configured delays remove the bitrate cap
+    /// and re-enable stall minimizing (cancelled by the next `load` / `stop`).
+    private func scheduleRelaxIfNeeded() {
+        guard let (item, tuning) = pendingRelax else { return }
+        pendingRelax = nil
+        cancelRelax()
+        // Two independent timers, both measured from the first frame.
+        if tuning.initialPeakBitRate != nil {
+            relaxTasks.append(Task { [weak self, weak item] in
+                try? await Task.sleep(for: .seconds(tuning.peakBitRateReleaseAfter))
+                guard !Task.isCancelled, let self, let item, self.player.currentItem === item else { return }
+                item.preferredPeakBitRate = 0
+            })
+        }
+        if tuning.waitToMinimizeStallingAfter > 0 {
+            relaxTasks.append(Task { [weak self, weak item] in
+                try? await Task.sleep(for: .seconds(tuning.waitToMinimizeStallingAfter))
+                guard !Task.isCancelled, let self, let item, self.player.currentItem === item else { return }
+                self.player.automaticallyWaitsToMinimizeStalling = true
+            })
+        }
+    }
+
+    private func cancelRelax() {
+        relaxTasks.forEach { $0.cancel() }
+        relaxTasks.removeAll()
+        pendingRelax = nil
     }
 
     public func play() { player.play() }
@@ -179,6 +219,8 @@ public final class AVPlayerEngine: PlaybackEngine {
     public func setAspect(_ mode: AspectMode) { aspect = mode }
 
     public func stop() {
+        cancelRelax()
+        player.automaticallyWaitsToMinimizeStalling = true
         optionsTask?.cancel()
         player.pause()
         player.replaceCurrentItem(with: nil)

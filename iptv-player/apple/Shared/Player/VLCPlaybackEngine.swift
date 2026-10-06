@@ -62,7 +62,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
             resolution: size.width > 0 && size.height > 0 ? "\(Int(size.width))x\(Int(size.height))" : nil)
     }
 
-    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?) {
+    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         failureTask?.cancel()
         self.stream = stream
         self.isLive = isLive
@@ -77,8 +77,8 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         preferredSubtitle = preferredSubtitleLanguage
 
         let media = VLCMedia(url: stream.url)
-        // Live: small but safe cache for IPTV; VOD: a little more for HTTP seeks.
-        media.addOption(isLive ? ":network-caching=1500" : ":network-caching=2000")
+        // Live: small but safe cache for IPTV; VOD: a little more for HTTP seeks (LiveStartTuning).
+        media.addOption(":network-caching=\(tuning.vlcNetworkCachingMs)")
         if let ua = stream.headers["User-Agent"] { media.addOption(":http-user-agent=\(ua)") }
         if let referer = stream.headers["Referer"] { media.addOption(":http-referrer=\(referer)") }
         if let startMs, startMs > 0 { media.addOption(":start-time=\(Double(startMs) / 1000)") }

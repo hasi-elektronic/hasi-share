@@ -40,8 +40,8 @@ public struct EngineDiagnostics: Sendable, Equatable {
 public protocol PlaybackEngine: AnyObject {
     var kind: PlayerEngine { get }
     var onEvent: (@MainActor (EngineEvent) -> Void)? { get set }
-    /// Replaces the current item; `startMs` = resume position (VOD).
-    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?)
+    /// Replaces the current item; `startMs` = resume position (VOD); `tuning` = buffer/start values.
+    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning)
     func play()
     func pause()
     var isPlaying: Bool { get }

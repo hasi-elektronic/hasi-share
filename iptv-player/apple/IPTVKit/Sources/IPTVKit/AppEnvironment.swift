@@ -118,6 +118,7 @@ public final class AppEnvironment {
         player.nowMs = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
         player.onLibraryChange = { [weak self] in self?.libraryChanged() }
         player.aspect = settings.aspect
+        player.largeBuffer = settings.largeBuffer
         player.onAspectChange = { [weak self] mode in self?.settings.aspect = mode }
         applyLanguagePreferences()
     }

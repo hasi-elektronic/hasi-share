@@ -9,6 +9,7 @@ final class FakeEngine: PlaybackEngine {
     let kind: PlayerEngine
     var onEvent: (@MainActor (EngineEvent) -> Void)?
     private(set) var loads: [(url: URL, startMs: Int64?)] = []
+    private(set) var tunings: [LiveStartTuning] = []
     private(set) var stops = 0
     private(set) var aspect: AspectMode?
     private(set) var selectedAudio: Int?
@@ -19,8 +20,9 @@ final class FakeEngine: PlaybackEngine {
 
     init(kind: PlayerEngine) { self.kind = kind }
 
-    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?) {
+    func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         loads.append((stream.url, startMs))
+        tunings.append(tuning)
     }
     func play() { isPlaying = true }
     func pause() { isPlaying = false }
@@ -90,6 +92,16 @@ final class EngineSelectionTests: XCTestCase {
         try await open(c, "udp://@239.0.0.1:1234")
         for _ in 0..<50 where c.phase == .loading { try await Task.sleep(for: .milliseconds(5)) }
         XCTAssertEqual(c.phase, .failed(.unsupportedFormat(container: "udp")))
+    }
+
+    func testControllerPassesTuningToEngine() async throws {
+        let c = controller()
+        try await open(c, "http://h.example.com/film.mp4")
+        XCTAssertEqual(av.tunings.last, LiveStartTuning.make(isLive: false, largeBuffer: false))
+        c.largeBuffer = true
+        try await open(c, "http://h.example.com/film2.mkv")
+        XCTAssertEqual(vlc.tunings.last, LiveStartTuning.make(isLive: false, largeBuffer: true))
+        XCTAssertEqual(vlc.tunings.last?.vlcNetworkCachingMs, 4000)
     }
 
     func testSnifferRoutesUnknownURLToVLC() async throws {

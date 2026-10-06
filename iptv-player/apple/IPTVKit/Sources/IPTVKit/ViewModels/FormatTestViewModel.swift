@@ -145,7 +145,8 @@ public final class FormatTestViewModel {
             default: break
             }
         }
-        engine.load(stream, isLive: false, startMs: nil, preferredAudioLanguage: nil, preferredSubtitleLanguage: nil)
+        engine.load(stream, isLive: false, startMs: nil, preferredAudioLanguage: nil, preferredSubtitleLanguage: nil,
+                    tuning: LiveStartTuning.make(isLive: false, largeBuffer: false))
         engine.play()
         defer { engine.onEvent = nil; engine.stop() }
         for _ in 0..<60 {

@@ -116,6 +116,8 @@ public final class PlayerController {
     @ObservationIgnored public var nowMs: @MainActor () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     @ObservationIgnored public var onLibraryChange: (@MainActor () -> Void)?
     @ObservationIgnored public var onAspectChange: (@MainActor (AspectMode) -> Void)?
+    /// Settings → Playback → buffer size (large = no start tuning, bigger caches); set by `AppEnvironment`.
+    @ObservationIgnored public var largeBuffer = false
     @ObservationIgnored public var preferredAudioLanguage: String?
     @ObservationIgnored public var preferredSubtitleLanguage: String?
     /// Channel-switch debounce (ms).
@@ -223,8 +225,10 @@ public final class PlayerController {
         next.setAspect(aspect)
         if let startMs, startMs > 0 { resumedFromMs = startMs }
         SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
-        next.load(stream, isLive: request?.isLive == true, startMs: startMs,
-                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage)
+        let isLive = request?.isLive == true
+        next.load(stream, isLive: isLive, startMs: startMs,
+                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage,
+                  tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
     }
 
     // MARK: Engine events

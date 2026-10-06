@@ -90,6 +90,14 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   sınıflandırılır (403 → AccessDenied, 404 → StreamOffline, erişilemiyor → Network, erişilebilir
   ama hiç oynamadı → UnsupportedCodec). Xtream canlıda `m3u8` tercih edilir; hesap yalnızca `ts`
   izin veriyorsa `ts` + VLCKit.
+* **Canlı başlangıç ayarı** (`LiveStartTuning`, her `load`'a verilir; "Büyük tampon" ayarı `largeBuffer`):
+  | | AVPlayer | VLCKit `network-caching` |
+  |---|---|---|
+  | Canlı (varsayılan) | `preferredForwardBufferDuration` 1 sn; ilk karede `automaticallyWaitsToMinimizeStalling` kapalı → ilk kareden 3 sn sonra açılır; ilk varyant `preferredPeakBitRate` 2,5 Mbps ile sınırlı → ilk kareden 4 sn sonra sınır kalkar | 1000 ms |
+  | Canlı + büyük tampon | 6 sn, bekleme açık, sınır yok | 3000 ms |
+  | VOD | 0 (sistem varsayılanı), sınır yok | 2000 ms (büyük tampon: 4000 ms) |
+
+  Zamanlayıcılar (sınırı kaldırma / bekleme açma) yeni `load`'da ve `stop()`'ta iptal edilir.
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
 * Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /
@@ -199,7 +207,8 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
   ön yükleme sınırlı.
 * Ağ: tüm çağrılar iptal edilebilir, bağlantı 10 sn / okuma 30 sn / toplam 20–120 sn zaman
   aşımı (CONTRACT §2); ekran kapanınca coroutine/Task iptal edilir.
-* Oynatıcı: kanal değiştirmede örnek yeniden kullanımı, canlıda düşük başlangıç tamponu.
+* Oynatıcı: kanal değiştirmede örnek yeniden kullanımı, canlıda düşük başlangıç tamponu
+  (AVPlayer 1 sn ileri tampon + 2,5 Mbps ilk varyant sınırı, VLCKit 1000 ms; ayrıntı §3.2).
 
 ## 8. Güvenlik özeti
 Ayrıntı: `docs/SECURITY.md`. Kısaca: gizli bilgiler Keystore/Keychain'de; veritabanı ve

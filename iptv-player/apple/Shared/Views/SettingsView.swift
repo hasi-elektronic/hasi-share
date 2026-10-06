@@ -48,6 +48,7 @@ struct SettingsView: View {
                     Text(L10n.t("buffer_normal")).tag(false)
                     Text(L10n.t("buffer_large")).tag(true)
                 }
+                .onChange(of: settings.largeBuffer) { env.player.largeBuffer = settings.largeBuffer }
                 #if os(tvOS)
                 Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
                 #endif
