@@ -110,7 +110,7 @@
     <string name="favorites_channels" formatted="false">Kanallar</string>
     <string name="favorites_movies" formatted="false">Filmler</string>
     <string name="favorites_series" formatted="false">Diziler</string>
-    <string name="favorites_empty" formatted="false">Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü).</string>
+    <string name="favorites_empty" formatted="false">Henüz favori yok. Eklemek için kanal, film veya dizideki ☆ simgesine dokun.</string>
     <string name="last_synced">Son senkron: %1$s</string>
     <string name="player_audio" formatted="false">Ses</string>
     <string name="player_subtitles" formatted="false">Altyazı</string>
@@ -291,6 +291,15 @@
     <string name="licenses_apache_notice" formatted="false">Apache Lisansı 2.0 altında lisanslıdır.</string>
     <string name="format_test_engine">Motor: %1$s</string>
     <string name="format_test_expected">Beklenen: %1$s</string>
+    <string name="fav_added" formatted="false">Favorilere eklendi</string>
+    <string name="fav_removed" formatted="false">Favorilerden çıkarıldı</string>
+    <string name="action_undo" formatted="false">Geri al</string>
+    <string name="fav_move" formatted="false">Taşı</string>
+    <string name="fav_move_done" formatted="false">Bitti</string>
+    <string name="fav_move_hint" formatted="false">Bir öğe seç, ▲▼ ile taşı, bırakmak için tekrar seç.</string>
+    <string name="fav_category_add" formatted="false">Kategoriyi favorilere ekle</string>
+    <string name="fav_category_remove" formatted="false">Kategoriyi favorilerden çıkar</string>
+    <string name="live_all_channels" formatted="false">Tüm kanallar</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

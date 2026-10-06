@@ -328,17 +328,15 @@ struct BrowseView: View {
     private func posterRow(_ title: String, _ items: [CatalogItem], seeAll: BrowseRoute?, id: String, markNew: Bool = false) -> some View {
         Shelf(title: title, seeAll: seeAll, identifier: id) {
             ForEach(items) { item in
-                NavigationLink(value: item) {
+                FavoritePosterLink(value: item, target: env.favoriteTarget(item), identifier: "poster_\(item.id)") {
                     PosterCard(title: item.title, url: item.posterUrl, subtitle: item.year.map(String.init), isNew: markNew)
                 }
-                .buttonStyle(ArtworkButtonStyle())
-                .accessibilityIdentifier("poster_\(item.id)")
             }
         }
     }
 
     private func channelButton(_ row: ChannelRow, list: [Channel]) -> some View {
-        let isFav = env.isFavorite(sourceId: row.channel.sourceId, kind: .live, itemId: row.channel.id)
+        let isFav = env.favoriteTarget(row.channel).map { env.favorites.isFavorite($0.contentKey) } ?? false
         return Button { router.play(.channel(row.channel), channels: list) } label: {
             ChannelCard(row: row, isFavorite: isFav)
         }
@@ -354,12 +352,8 @@ struct ChannelMenuItems: View {
     let channel: Channel
 
     var body: some View {
-        let fav = env.isFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id)
-        Button {
-            env.toggleFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id, title: channel.name, posterUrl: channel.logoUrl)
-        } label: {
-            Label(L10n.t(fav ? "action_remove_favorite" : "action_add_favorite"), systemImage: fav ? "star.slash" : "star")
-        }
+        // First item: favorite (spec §2: long press / long OK → "Add to / Remove from favorites").
+        if let target = env.favoriteTarget(channel) { FavoriteMenuItem(target: target) }
         Button { HiddenStore.shared.hideChannel(channel.id, sourceId: channel.sourceId) } label: {
             Label(L10n.t("channel_hide"), systemImage: "eye.slash")
         }
@@ -391,13 +385,7 @@ private struct BrowseHero: View {
         return model.genreLine(item, durationSec: dur)
     }
 
-    private var favoriteTarget: (kind: ContentKind, id: String, sourceId: String, poster: String?)? {
-        switch item {
-        case .movie(let m)?: return (.movie, m.id, m.sourceId, m.posterUrl)
-        case .series(let s)?: return (.series, s.id, s.sourceId, s.posterUrl)
-        default: return nil
-        }
-    }
+    private var favoriteTarget: FavoriteTarget? { item.flatMap(env.favoriteTarget) }
 
     private var playTitle: String {
         let pos = ResumePolicy.startPositionMs(positionMs: entry?.progress.data.positionMs, durationMs: entry?.progress.data.durationMs) ?? 0
@@ -424,16 +412,6 @@ private struct BrowseHero: View {
         #endif
     }
 
-    private var isFavorite: Bool {
-        guard let t = favoriteTarget else { return false }
-        return env.isFavorite(sourceId: t.sourceId, kind: t.kind, itemId: t.id)
-    }
-
-    private func toggleFavorite() {
-        guard let t = favoriteTarget else { return }
-        env.toggleFavorite(sourceId: t.sourceId, kind: t.kind, itemId: t.id, title: title, posterUrl: t.poster)
-    }
-
     var body: some View {
         #if os(tvOS)
         ZStack(alignment: .bottomLeading) {
@@ -447,12 +425,9 @@ private struct BrowseHero: View {
                     Button(action: play) { Label(playTitle, systemImage: "play.fill") }
                         .buttonStyle(WhitePillButtonStyle())
                         .accessibilityIdentifier("hero_play")
-                    if favoriteTarget != nil {
-                        Button(action: toggleFavorite) {
-                            Label(L10n.t("action_favorite_short"), systemImage: isFavorite ? "star.fill" : "star")
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .accessibilityIdentifier("hero_favorite")
+                    if let favoriteTarget {
+                        FavoriteButton(target: favoriteTarget, style: .labeled)
+                            .buttonStyle(SecondaryButtonStyle())
                     }
                     if item != nil {
                         Button(action: openInfo) { Label(L10n.t("action_info"), systemImage: "info.circle") }
@@ -493,17 +468,23 @@ private struct BrowseHero: View {
                     Text(subtitle).font(.footnote.weight(.medium)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
                 HStack(alignment: .center) {
-                    labeledIcon(isFavorite ? "star.fill" : "star", L10n.t("action_favorite_short"), action: toggleFavorite)
-                        .opacity(favoriteTarget == nil ? 0 : 1)
-                        .accessibilityIdentifier("hero_favorite")
+                    // No tappable control kept at opacity 0 (iOS 26 hit testing): a plain spacer instead.
+                    if let favoriteTarget {
+                        FavoriteButton(target: favoriteTarget, style: .stacked).buttonStyle(.plain)
+                    } else {
+                        Color.clear.frame(width: 64, height: 44)
+                    }
                     Spacer()
                     Button(action: play) { Label(playTitle, systemImage: "play.fill").fixedSize().frame(minWidth: 110) }
                         .buttonStyle(WhitePillButtonStyle())
                         .accessibilityIdentifier("hero_play")
                     Spacer()
-                    labeledIcon("info.circle", L10n.t("action_info"), action: openInfo)
-                        .opacity(item == nil ? 0 : 1)
-                        .accessibilityIdentifier("hero_info")
+                    if item != nil {
+                        labeledIcon("info.circle", L10n.t("action_info"), action: openInfo)
+                            .accessibilityIdentifier("hero_info")
+                    } else {
+                        Color.clear.frame(width: 64, height: 44)
+                    }
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 4)
@@ -627,21 +608,17 @@ struct CatalogGridView: View {
             LazyVGrid(columns: columns, spacing: Theme.isTV ? 56 : 18) {
                 if let movies {
                     ForEach(movies.movies) { m in
-                        NavigationLink(value: CatalogItem.movie(m)) {
+                        FavoritePosterLink(value: CatalogItem.movie(m), target: env.favoriteTarget(m), identifier: "grid_\(m.id)") {
                             PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil)
                         }
-                        .buttonStyle(ArtworkButtonStyle())
-                        .accessibilityIdentifier("grid_\(m.id)")
                         .onAppear { movies.loadMoreIfNeeded(m) }
                     }
                 }
                 if let series {
                     ForEach(series.series) { s in
-                        NavigationLink(value: CatalogItem.series(s)) {
+                        FavoritePosterLink(value: CatalogItem.series(s), target: env.favoriteTarget(s), identifier: "grid_\(s.id)") {
                             PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil)
                         }
-                        .buttonStyle(ArtworkButtonStyle())
-                        .accessibilityIdentifier("grid_\(s.id)")
                         .onAppear { series.loadMoreIfNeeded(s) }
                     }
                 }

@@ -2,20 +2,35 @@ import IPTVCore
 import IPTVKit
 import SwiftUI
 
-/// Category menu entries shared by Live TV and the TV guide (Favorites first, hidden categories removed).
+/// Category menu entries shared by Live TV and the TV guide: All · Favorites · favorite categories
+/// (⭐) · the other categories; hidden categories removed.
 @MainActor
-private func channelFilters(_ model: LiveTVViewModel, sourceId: String?) -> [(id: ChannelFilter, title: String)] {
+private func channelFilters(_ model: LiveTVViewModel, env: AppEnvironment) -> [(id: ChannelFilter, title: String)] {
+    let sourceId = env.currentSource?.id
     let hidden = sourceId.map { HiddenStore.shared.hiddenCategories($0) } ?? []
+    let favorite = sourceId.map { env.favorites.favoriteCategoryIds(sourceId: $0) } ?? []
+    let visible = model.categories.filter { !hidden.contains($0.id) }
+    let ordered = visible.filter { favorite.contains($0.id) } + visible.filter { !favorite.contains($0.id) }
     return [(ChannelFilter.all, L10n.t("all")), (.favorites, L10n.t("nav_favorites"))]
-        + model.categories.filter { !hidden.contains($0.id) }.map { (ChannelFilter.category($0.id), $0.name) }
+        + ordered.map { (ChannelFilter.category($0.id), $0.name) }
+}
+
+/// ⭐ marker of the filter menu / chips: the Favorites entry and favorite categories.
+@MainActor
+private func isStarred(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
+    switch filter {
+    case .favorites: return true
+    case .category(let id): return env.currentSource.map { env.favorites.isFavoriteCategory(sourceId: $0.id, categoryId: id) } ?? false
+    case .all: return false
+    }
 }
 
 /// Rows without hidden channels / categories.
 @MainActor
-private func visibleRows(_ model: LiveTVViewModel, sourceId: String?) -> [ChannelRow] {
-    guard let sourceId else { return model.rows }
+private func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow] {
+    guard let sourceId else { return rows }
     let store = HiddenStore.shared
-    return model.rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
+    return rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
 }
 
 /// Floating category chip ("🇹🇷 Türkiye ⌄") with the category menu (SCREENS §3.3).
@@ -24,19 +39,30 @@ private struct CategoryChipMenu: View {
     @Bindable var model: LiveTVViewModel
 
     var body: some View {
-        let items = channelFilters(model, sourceId: env.currentSource?.id)
+        let items = channelFilters(model, env: env)
         let current = items.first { $0.id == model.filter }?.title ?? L10n.t("all")
         let hiddenCount = env.currentSource.map { HiddenStore.shared.count($0.id) } ?? 0
         Menu {
+            // ⭐ for the selected category (device-local, per source): favorite categories come
+            // right after "Favorites" here and as sections after the favorite channels in "All".
+            if case .category(let categoryId) = model.filter, let sid = env.currentSource?.id {
+                let on = env.favorites.isFavoriteCategory(sourceId: sid, categoryId: categoryId)
+                Button { env.favorites.toggleCategory(sourceId: sid, categoryId: categoryId) } label: {
+                    Label(L10n.t(on ? "fav_category_remove" : "fav_category_add"), systemImage: on ? "star.slash" : "star")
+                }
+                .accessibilityIdentifier("fav_category_toggle")
+                Divider()
+            }
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 Button {
                     model.filter = item.id
                 } label: {
                     let flag = CountryFlag.emoji(for: item.title).map { "\($0)  " } ?? ""
+                    let star = isStarred(item.id, env: env) && item.id != .favorites ? "⭐ " : ""
                     if model.filter == item.id {
-                        Label(flag + CountryFlag.strippedTitle(item.title), systemImage: "checkmark")
+                        Label(star + flag + CountryFlag.strippedTitle(item.title), systemImage: "checkmark")
                     } else {
-                        Text(flag + CountryFlag.strippedTitle(item.title))
+                        Text(star + flag + CountryFlag.strippedTitle(item.title))
                     }
                 }
             }
@@ -48,9 +74,10 @@ private struct CategoryChipMenu: View {
             }
         } label: {
             HStack(spacing: Theme.isTV ? 12 : 6) {
-                if model.filter == .favorites {
+                if isStarred(model.filter, env: env) {
                     Image(systemName: "star.fill").foregroundStyle(Theme.warning)
-                } else if let flag = CountryFlag.emoji(for: current) {
+                }
+                if model.filter != .favorites, let flag = CountryFlag.emoji(for: current) {
                     Text(flag)
                 }
                 Text(CountryFlag.strippedTitle(current)).lineLimit(1)
@@ -90,20 +117,54 @@ struct LiveTVView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let model {
-                let rows = visibleRows(model, sourceId: env.currentSource?.id)
+                let sid = env.currentSource?.id
+                let rows = visibleRows(model.rows, sourceId: sid)
+                let favorites = visibleRows(model.favoriteRows, sourceId: sid)
+                let categorySections = model.favoriteCategorySections
+                let hasSections = !favorites.isEmpty || !categorySections.isEmpty
                 ScrollView {
                     #if os(tvOS)
                     CategoryChipMenu(model: model).padding(.top, 20).padding(.bottom, 10)
                     #endif
-                    if rows.isEmpty {
+                    if rows.isEmpty && !hasSections {
                         EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
                                        text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
                             .frame(height: 400)
                     }
-                    LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
-                        ForEach(rows) { row in
-                            LiveChannelCard(row: row, zapList: model.channels, onArchive: { archiveChannel = row.channel })
-                                .onAppear { model.loadMoreIfNeeded(current: row) }
+                    // "All": favorite channels first (manual order), then favorite categories, then the rest.
+                    // Separate grids per section: a Section inserted above existing LazyVGrid content
+                    // was not rendered until the view was rebuilt.
+                    VStack(alignment: .leading, spacing: Theme.isTV ? 40 : 10) {
+                        if !favorites.isEmpty {
+                            sectionHeader(L10n.t("nav_favorites"), icon: "star.fill", id: "live_section_favorites")
+                            let zap = favorites.map(\.channel)
+                            LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
+                                ForEach(favorites) { row in
+                                    LiveChannelCard(row: row, zapList: zap, identifier: "live_favorite_\(row.channel.id)",
+                                                    onArchive: { archiveChannel = row.channel })
+                                }
+                            }
+                        }
+                        ForEach(categorySections) { section in
+                            let title = [CountryFlag.emoji(for: section.category.name), CountryFlag.strippedTitle(section.category.name)]
+                                .compactMap { $0 }.joined(separator: " ")
+                            sectionHeader(title, icon: "star", id: "live_section_category_\(section.category.id)",
+                                          seeAll: section.total > section.rows.count ? { model.filter = .category(section.category.id) } : nil)
+                            let sectionRows = visibleRows(section.rows, sourceId: sid)
+                            let zap = sectionRows.map(\.channel)
+                            LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
+                                ForEach(sectionRows) { row in
+                                    LiveChannelCard(row: row, zapList: zap, identifier: "live_category_channel_\(row.channel.id)",
+                                                    onArchive: { archiveChannel = row.channel })
+                                }
+                            }
+                        }
+                        if hasSections, !rows.isEmpty { sectionHeader(L10n.t("live_all_channels"), icon: nil, id: "live_section_all") }
+                        LazyVGrid(columns: columns, spacing: Theme.isTV ? 40 : 10) {
+                            ForEach(rows) { row in
+                                LiveChannelCard(row: row, zapList: model.channels, onArchive: { archiveChannel = row.channel })
+                                    .onAppear { model.loadMoreIfNeeded(current: row) }
+                            }
                         }
                     }
                     .padding(.horizontal, Theme.safeH)
@@ -126,12 +187,42 @@ struct LiveTVView: View {
         .onAppear {
             if model == nil {
                 let m = LiveTVViewModel(env: env)
+                m.showsFavoriteSections = true
                 model = m
                 m.reload()
             }
         }
         .onChange(of: env.catalogVersion) { model?.reload() }
-        .onChange(of: env.libraryVersion) { if model?.filter == .favorites { model?.reload() } }
+        .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+    }
+
+    /// Section title of the grid ("Favorites", favorite categories with "See all", "All channels").
+    private func sectionHeader(_ title: String, icon: String?, id: String, seeAll: (() -> Void)? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.isTV ? 12 : 6) {
+            if let icon { Image(systemName: icon).foregroundStyle(Theme.warning) }
+            Text(title).font(Theme.rowTitle).foregroundStyle(Theme.textPrimary).lineLimit(1)
+            Spacer(minLength: 12)
+            if let seeAll {
+                Button(action: seeAll) {
+                    LText("action_see_all").font(Theme.isTV ? Theme.caption.weight(.semibold) : .subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.primary)
+                        #if os(tvOS)
+                        .padding(.horizontal, 20).padding(.vertical, 8)
+                        #endif
+                }
+                #if os(tvOS)
+                .buttonStyle(CardButtonStyle(radius: 30, scale: 1.08))
+                #else
+                .buttonStyle(.plain)
+                #endif
+                .accessibilityIdentifier("\(id)_see_all")
+            }
+        }
+        .padding(.top, Theme.isTV ? 20 : 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier(id)
     }
 }
 
@@ -141,12 +232,15 @@ private struct LiveChannelCard: View {
     @Environment(Router.self) private var router
     let row: ChannelRow
     let zapList: [Channel]
+    /// Play button id; favorites / category sections use their own ids (same channel twice in the grid).
+    var identifier: String?
     let onArchive: () -> Void
 
     private var channel: Channel { row.channel }
 
     var body: some View {
-        let fav = env.isFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id)
+        let target = env.favoriteTarget(channel)
+        let fav = target.map { env.favorites.isFavorite($0.contentKey) } ?? false
         VStack(alignment: .leading, spacing: Theme.isTV ? 14 : 8) {
             Button { router.play(.channel(channel), channels: zapList) } label: { main }
                 .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
@@ -157,7 +251,7 @@ private struct LiveChannelCard: View {
                     }
                 }
                 .accessibilityLabel([channel.name, row.nowNext?.now?.title].compactMap { $0 }.joined(separator: ", "))
-                .accessibilityIdentifier("channel_\(channel.id)")
+                .accessibilityIdentifier(identifier ?? "channel_\(channel.id)")
             #if os(tvOS)
             // TV: one focus target per card (D-pad stays on the cards); the icons are indicators,
             // favorite / archive are in the long-press menu.
@@ -171,25 +265,27 @@ private struct LiveChannelCard: View {
             .padding(.bottom, 12)
             .accessibilityHidden(true)
             #else
-            HStack(spacing: 18) {
-                Button {
-                    env.toggleFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id, title: channel.name, posterUrl: channel.logoUrl)
-                } label: {
-                    Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? Theme.warning : Theme.textSecondary)
+            // One tap ⭐ (spec §2) and ⟲ archive: 44 pt targets.
+            HStack(spacing: 4) {
+                if let target {
+                    FavoriteButton(target: target, minTapSize: 44)
+                        .foregroundStyle(Theme.textSecondary)
                 }
-                .accessibilityLabel(L10n.t(fav ? "action_remove_favorite" : "action_add_favorite"))
-                .accessibilityIdentifier("live_fav_\(channel.id)")
                 if channel.catchup.isAvailable {
-                    Button(action: onArchive) { Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.textSecondary) }
-                        .accessibilityLabel(L10n.t("catchup_title"))
-                        .accessibilityIdentifier("live_archive_\(channel.id)")
+                    Button(action: onArchive) {
+                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.textSecondary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(L10n.t("catchup_title"))
+                    .accessibilityIdentifier("live_archive_\(channel.id)")
                 }
                 Spacer(minLength: 0)
             }
             .font(.subheadline)
             .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 0)
             #endif
         }
         .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
@@ -254,10 +350,10 @@ struct GuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let model {
-                let rows = visibleRows(model, sourceId: env.currentSource?.id)
-                ChipBar(items: channelFilters(model, sourceId: env.currentSource?.id),
+                let rows = visibleRows(model.rows, sourceId: env.currentSource?.id)
+                ChipBar(items: channelFilters(model, env: env),
                         selection: Binding(get: { model.filter }, set: { model.filter = $0 }),
-                        showFlags: true, leadingIcon: { $0 == .favorites ? "star.fill" : nil }, identifierPrefix: "guide_filter")
+                        showFlags: true, leadingIcon: { isStarred($0, env: env) ? "star.fill" : nil }, identifierPrefix: "guide_filter")
                     .padding(.bottom, Theme.isTV ? 4 : 8)
                 if rows.isEmpty {
                     EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
@@ -289,7 +385,7 @@ struct GuideView: View {
             }
         }
         .onChange(of: env.catalogVersion) { model?.reload() }
-        .onChange(of: env.libraryVersion) { if model?.filter == .favorites { model?.reload() } }
+        .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
     }
 }
 
@@ -659,7 +755,7 @@ private struct EpgRowView: View {
     private var channel: Channel { row.channel }
 
     var body: some View {
-        let isFavorite = env.isFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id)
+        let isFavorite = env.favoriteTarget(channel).map { env.favorites.isFavorite($0.contentKey) } ?? false
         ZStack(alignment: .topLeading) {
             blocks(isFavorite: isFavorite)
             tile(isFavorite: isFavorite)
@@ -707,15 +803,6 @@ private struct EpgRowView: View {
             .accessibilityIdentifier("channel_\(channel.id)")
             .contextMenu { ChannelMenuItems(channel: channel) }
         #endif
-    }
-
-    @ViewBuilder
-    private func favoriteButton(_ isFavorite: Bool) -> some View {
-        Button {
-            env.toggleFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id, title: channel.name, posterUrl: channel.logoUrl)
-        } label: {
-            Label(L10n.t(isFavorite ? "action_remove_favorite" : "action_add_favorite"), systemImage: isFavorite ? "star.slash" : "star")
-        }
     }
 
     @ViewBuilder

@@ -110,7 +110,7 @@
     <string name="favorites_channels" formatted="false">Sender</string>
     <string name="favorites_movies" formatted="false">Filme</string>
     <string name="favorites_series" formatted="false">Serien</string>
-    <string name="favorites_empty" formatted="false">Noch keine Favoriten. Zum Hinzufügen ein Element lange gedrückt halten (TV: Menü).</string>
+    <string name="favorites_empty" formatted="false">Noch keine Favoriten. Tippe bei einem Sender, Film oder einer Serie auf ☆.</string>
     <string name="last_synced">Zuletzt synchronisiert: %1$s</string>
     <string name="player_audio" formatted="false">Audio</string>
     <string name="player_subtitles" formatted="false">Untertitel</string>
@@ -291,6 +291,15 @@
     <string name="licenses_apache_notice" formatted="false">Lizenziert unter der Apache License 2.0.</string>
     <string name="format_test_engine">Engine: %1$s</string>
     <string name="format_test_expected">Erwartet: %1$s</string>
+    <string name="fav_added" formatted="false">Zu Favoriten hinzugefügt</string>
+    <string name="fav_removed" formatted="false">Aus Favoriten entfernt</string>
+    <string name="action_undo" formatted="false">Rückgängig</string>
+    <string name="fav_move" formatted="false">Sortieren</string>
+    <string name="fav_move_done" formatted="false">Fertig</string>
+    <string name="fav_move_hint" formatted="false">Element wählen, mit ▲▼ verschieben, zum Ablegen erneut wählen.</string>
+    <string name="fav_category_add" formatted="false">Kategorie zu Favoriten hinzufügen</string>
+    <string name="fav_category_remove" formatted="false">Kategorie aus Favoriten entfernen</string>
+    <string name="live_all_channels" formatted="false">Alle Sender</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

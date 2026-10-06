@@ -34,7 +34,9 @@ final class TVVLCPlaybackTests: XCTestCase {
         VLCTestSupport.assertNoErrorCard(app, "HLS")
         UITestSupport.snap("vlc-tvos-04-hls-avplayer", in: self)
 
-        remote.press(.up)       // back to VLCKit: engine switch in both directions
+        remote.press(.up)       // ▲ = channel info card (spec §2) …
+        sleep(1)
+        remote.press(.up)       // … ▲ again = CH− back to VLCKit: engine switch in both directions
         sleep(8)
         VLCTestSupport.assertNoErrorCard(app, "MPEG-TS again")
         UITestSupport.snap("vlc-tvos-05-ts-again", in: self)

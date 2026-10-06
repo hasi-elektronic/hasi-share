@@ -546,9 +546,9 @@
    "de": "Serien"
   },
   "favorites_empty": {
-   "en": "No favorites yet. Long-press (TV: Menu) an item to add it.",
-   "tr": "Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü).",
-   "de": "Noch keine Favoriten. Zum Hinzufügen ein Element lange gedrückt halten (TV: Menü)."
+   "en": "No favorites yet. Tap ☆ on a channel, movie or series to add it.",
+   "tr": "Henüz favori yok. Eklemek için kanal, film veya dizideki ☆ simgesine dokun.",
+   "de": "Noch keine Favoriten. Tippe bei einem Sender, Film oder einer Serie auf ☆."
   },
   "last_synced": {
    "en": "Last synced {0}",
@@ -1443,6 +1443,51 @@
    "en": "Expected: {0}",
    "tr": "Beklenen: {0}",
    "de": "Erwartet: {0}"
+  },
+  "fav_added": {
+   "en": "Added to favorites",
+   "tr": "Favorilere eklendi",
+   "de": "Zu Favoriten hinzugefügt"
+  },
+  "fav_removed": {
+   "en": "Removed from favorites",
+   "tr": "Favorilerden çıkarıldı",
+   "de": "Aus Favoriten entfernt"
+  },
+  "action_undo": {
+   "en": "Undo",
+   "tr": "Geri al",
+   "de": "Rückgängig"
+  },
+  "fav_move": {
+   "en": "Reorder",
+   "tr": "Taşı",
+   "de": "Sortieren"
+  },
+  "fav_move_done": {
+   "en": "Done",
+   "tr": "Bitti",
+   "de": "Fertig"
+  },
+  "fav_move_hint": {
+   "en": "Select an item, move it with ▲▼, select again to drop it.",
+   "tr": "Bir öğe seç, ▲▼ ile taşı, bırakmak için tekrar seç.",
+   "de": "Element wählen, mit ▲▼ verschieben, zum Ablegen erneut wählen."
+  },
+  "fav_category_add": {
+   "en": "Add category to favorites",
+   "tr": "Kategoriyi favorilere ekle",
+   "de": "Kategorie zu Favoriten hinzufügen"
+  },
+  "fav_category_remove": {
+   "en": "Remove category from favorites",
+   "tr": "Kategoriyi favorilerden çıkar",
+   "de": "Kategorie aus Favoriten entfernen"
+  },
+  "live_all_channels": {
+   "en": "All channels",
+   "tr": "Tüm kanallar",
+   "de": "Alle Sender"
   }
  }
 }

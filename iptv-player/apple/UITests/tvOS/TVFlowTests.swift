@@ -94,6 +94,47 @@ final class TVFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 5), "Home content shown")
     }
 
+    /// Live player: ▲ shows the channel info card with ⭐ focused; OK adds the favorite (no dialog,
+    /// undo toast); after Back the Live grid's first section has the channel (spec §2).
+    @MainActor
+    func testUpArrowInfoCardFavorite() throws {
+        let app = UITestSupport.launch(["-uiScreen", "player"])
+        let surface = app.otherElements["video_surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 30))
+        // The overlay hides 3 s after playback starts; ▲ with the overlay shown moves its focus.
+        if !app.buttons["player_play_pause"].waitForNonExistence(timeout: 20) {
+            remote.press(.menu)
+            sleep(1)
+        }
+        remote.press(.up)
+        XCTAssertTrue(app.otherElements["player_info_card"].waitForExistence(timeout: 3), "▲ = channel info")
+        let star = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'fav_'")).firstMatch
+        XCTAssertTrue(star.waitForExistence(timeout: 2))
+        sleep(1)
+        XCTAssertTrue(star.hasFocus, "⭐ has the focus")
+        XCTAssertEqual(star.label, "Add to favorites")
+        let channelId = try XCTUnwrap(star.identifier.components(separatedBy: ":live:").last)
+        UITestSupport.snap("fav-tvos-01-info-card", in: self)
+
+        remote.press(.select)
+        XCTAssertTrue(app.otherElements["undo_toast"].waitForExistence(timeout: 2), "undo toast")
+        XCTAssertEqual(star.label, "Remove from favorites")
+        UITestSupport.snap("fav-tvos-02-info-card-favorite", in: self)
+
+        remote.press(.menu)   // closes the card
+        sleep(1)
+        XCTAssertFalse(app.otherElements["player_info_card"].exists)
+        remote.press(.menu)   // leaves the player
+        XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
+        let header = app.descendants(matching: .any)["live_section_favorites"]
+        let favCard = app.buttons["live_favorite_\(channelId)"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5), "\"Favorites\" section")
+        XCTAssertTrue(favCard.exists, "channel in the first section")
+        XCTAssertLessThan(favCard.frame.minY, app.descendants(matching: .any)["live_section_all"].frame.minY)
+        sleep(1)
+        UITestSupport.snap("fav-tvos-03-live-favorites-first", in: self)
+    }
+
     @MainActor
     func testGuideFocusAndPanel() throws {
         let app = UITestSupport.launch(["-uiScreen", "guide"])

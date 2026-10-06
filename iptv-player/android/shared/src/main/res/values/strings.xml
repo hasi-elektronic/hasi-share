@@ -110,7 +110,7 @@
     <string name="favorites_channels" formatted="false">Channels</string>
     <string name="favorites_movies" formatted="false">Movies</string>
     <string name="favorites_series" formatted="false">Series</string>
-    <string name="favorites_empty" formatted="false">No favorites yet. Long-press (TV: Menu) an item to add it.</string>
+    <string name="favorites_empty" formatted="false">No favorites yet. Tap ☆ on a channel, movie or series to add it.</string>
     <string name="last_synced">Last synced %1$s</string>
     <string name="player_audio" formatted="false">Audio</string>
     <string name="player_subtitles" formatted="false">Subtitles</string>
@@ -291,6 +291,15 @@
     <string name="licenses_apache_notice" formatted="false">Licensed under the Apache License 2.0.</string>
     <string name="format_test_engine">Engine: %1$s</string>
     <string name="format_test_expected">Expected: %1$s</string>
+    <string name="fav_added" formatted="false">Added to favorites</string>
+    <string name="fav_removed" formatted="false">Removed from favorites</string>
+    <string name="action_undo" formatted="false">Undo</string>
+    <string name="fav_move" formatted="false">Reorder</string>
+    <string name="fav_move_done" formatted="false">Done</string>
+    <string name="fav_move_hint" formatted="false">Select an item, move it with ▲▼, select again to drop it.</string>
+    <string name="fav_category_add" formatted="false">Add category to favorites</string>
+    <string name="fav_category_remove" formatted="false">Remove category from favorites</string>
+    <string name="live_all_channels" formatted="false">All channels</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

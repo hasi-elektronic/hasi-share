@@ -234,6 +234,8 @@ enum AppBootstrap {
             _ = try? await env.addSource(name: argument("-seedName") ?? "Demo", secrets: .m3u(M3USecrets(url: m3u))) { _ in }
         }
         if arguments.contains("-uiSeedLibrary") { seedLibrary(env: env) }
+        // UI tests: a longer ⭐ undo window, so multi-step undo checks do not race the 4 s.
+        if let seconds = argument("-uiUndoSeconds").flatMap(Int.init) { env.favorites.undoWindow = .seconds(seconds) }
         router.debugScreen = argument("-uiScreen")
         if router.debugScreen == "paywall" { router.paywallPresented = true }
         if router.debugScreen == "player" {
@@ -263,10 +265,15 @@ enum AppBootstrap {
                                               durationMs: 2_400_000, posterUrl: episode.posterUrl ?? series.posterUrl,
                                               seriesKey: env.contentKey(sourceId: source.id, kind: .series, itemId: series.id), nowMs: nowMs - 5000)
         }
-        for channel in ((try? env.catalog.channels(sourceId: source.id, limit: 3)) ?? []).prefix(2)
-        where !env.isFavorite(sourceId: source.id, kind: .live, itemId: channel.id) {
-            env.toggleFavorite(sourceId: source.id, kind: .live, itemId: channel.id, title: channel.name, posterUrl: channel.logoUrl)
+        // Written directly (no ⭐ toggle): screenshots must not show the undo toast.
+        for (i, channel) in ((try? env.catalog.channels(sourceId: source.id, limit: 3)) ?? []).prefix(2).enumerated() {
+            if let key = env.contentKey(sourceId: source.id, kind: .live, itemId: channel.id) {
+                _ = try? env.library.setFavorite(true, contentKey: key, title: channel.name, kind: .live, posterUrl: channel.logoUrl,
+                                                 nowMs: nowMs - 10_000 + Int64(i))
+            }
         }
+        env.favorites.reload()
+        env.favorites.onLocalChange()   // views reload their rows (bumps libraryVersion, no sync push)
     }
     #endif
 }

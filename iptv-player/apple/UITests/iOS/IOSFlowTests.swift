@@ -95,6 +95,88 @@ final class IOSFlowTests: XCTestCase {
         UITestSupport.snap("ios-11-locked-paywall", in: self)
     }
 
+    /// ⭐ of a channel (`fav_<fingerprint>:live:<id>`).
+    @MainActor
+    static func favoriteButton(channelId: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'fav_' AND identifier ENDSWITH %@", ":live:\(channelId)")).firstMatch
+    }
+
+    /// One-tap ⭐ on a live card (spec §2): no dialog, undo toast, the Home favorites row shows the
+    /// channel; "Undo" removes it again.
+    @MainActor
+    func testOneTapFavoriteFromLiveCard() throws {
+        let app = UITestSupport.launch(["-uiScreen", "live", "-uiUndoSeconds", "20"])
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 30))
+        let channelId = String(card.identifier.dropFirst("channel_".count))
+        let star = Self.favoriteButton(channelId: channelId, in: app)
+        XCTAssertTrue(star.exists, "⭐ on the live card")
+        XCTAssertEqual(star.label, "Add to favorites")
+        XCTAssertFalse(app.descendants(matching: .any)["live_section_favorites"].exists, "no favorites section yet")
+
+        star.tap()
+        XCTAssertTrue(app.otherElements["undo_toast"].waitForExistence(timeout: 2), "undo toast")
+        XCTAssertFalse(app.alerts.firstMatch.exists, "no confirmation dialog")
+        XCTAssertEqual(star.label, "Remove from favorites", "state flips at once")
+        let header = app.descendants(matching: .any)["live_section_favorites"]
+        let favCard = app.buttons["live_favorite_\(channelId)"]
+        XCTAssertTrue(favCard.waitForExistence(timeout: 3), "first section of the live grid")
+        XCTAssertLessThan(header.frame.minY, favCard.frame.minY)
+        UITestSupport.snap("fav-ios-01-live-card-toast", in: self)
+
+        Self.openSection("home", in: app)
+        let favRow = app.buttons["see_all_favorite_channels"]
+        XCTAssertTrue(favRow.waitForExistence(timeout: 5), "Home favorite channels row")
+        let inRow = app.buttons.matching(identifier: "channel_card_\(channelId)").allElementsBoundByIndex
+            .contains { $0.frame.minY > favRow.frame.minY && $0.frame.minY < favRow.frame.minY + 300 }
+        XCTAssertTrue(inRow, "channel in the favorites row")
+        UITestSupport.snap("fav-ios-02-home-row", in: self)
+
+        let undo = app.buttons["action_undo"]
+        XCTAssertTrue(undo.exists, "toast still offered on Home")
+        undo.tap()
+        XCTAssertTrue(favRow.waitForNonExistence(timeout: 3), "undo removes the favorite")
+        XCTAssertTrue(app.otherElements["undo_toast"].waitForNonExistence(timeout: 2))
+    }
+
+    /// ⭐ in the player overlay (live): after closing, the Live grid's first section has the channel.
+    @MainActor
+    func testFavoriteFromPlayerOverlay() throws {
+        let app = UITestSupport.launch(["-uiScreen", "live"])
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 30))
+        let channelId = String(card.identifier.dropFirst("channel_".count))
+        card.tap()
+        let surface = app.otherElements["video_surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        let star = Self.favoriteButton(channelId: channelId, in: app)
+        // Let the overlay auto-hide once playing, then show it fresh (its 3 s count must not end mid-tap).
+        _ = app.buttons["player_play_pause"].waitForNonExistence(timeout: 15)
+        surface.tap()
+        XCTAssertTrue(star.waitForExistence(timeout: 3), "⭐ in the overlay tools")
+        XCTAssertEqual(star.label, "Add to favorites")
+        star.tap()
+        XCTAssertTrue(app.otherElements["undo_toast"].waitForExistence(timeout: 2), "undo toast in the player")
+        UITestSupport.snap("fav-ios-03-player-overlay", in: self)
+        XCTAssertEqual(Self.favoriteButton(channelId: channelId, in: app).label, "Remove from favorites")
+
+        let close = app.buttons["player_close"]
+        _ = close.waitForNonExistence(timeout: 6)   // overlay auto-hides; show it fresh for the tap
+        surface.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        close.tap()
+        XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
+        let header = app.descendants(matching: .any)["live_section_favorites"]
+        let favCard = app.buttons["live_favorite_\(channelId)"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5), "\"Favorites\" section")
+        XCTAssertTrue(favCard.exists, "channel in the favorites section")
+        XCTAssertLessThan(header.frame.minY, favCard.frame.minY)
+        let rest = app.descendants(matching: .any)["live_section_all"]
+        XCTAssertTrue(rest.exists, "the other channels follow")
+        XCTAssertLessThan(favCard.frame.minY, rest.frame.minY, "favorites are the first section")
+        UITestSupport.snap("fav-ios-04-live-favorites-first", in: self)
+    }
+
     /// Redesign walkthrough: hero + rows, movies/series tabs, detail screens, live grid, guide, favorites, search.
     @MainActor
     func testRedesignScreens() throws {

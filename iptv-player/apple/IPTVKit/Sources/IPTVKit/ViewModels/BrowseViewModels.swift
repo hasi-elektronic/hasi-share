@@ -20,13 +20,30 @@ public enum ChannelFilter: Hashable, Sendable {
     case category(String)
 }
 
+/// A favorite category's preview section in the live grid ("All" filter).
+public struct LiveCategorySection: Identifiable, Sendable {
+    public var category: IPTVCore.Category
+    public var rows: [ChannelRow]
+    /// All channels of the category (the section shows the first `LiveTVViewModel.categoryPreview`).
+    public var total: Int
+    public var id: String { category.id }
+}
+
 /// Live TV list (docs/SCREENS.md §3.3): category chips, paged channel rows, now/next EPG.
+/// With the "All" filter favorite channels come first, then favorite categories, then the rest.
 @MainActor
 @Observable
 public final class LiveTVViewModel {
     public private(set) var categories: [IPTVCore.Category] = []
     public var filter: ChannelFilter = .all { didSet { if filter != oldValue { reload() } } }
     public private(set) var rows: [ChannelRow] = []
+    /// "All" filter: favorite channels (manual order), shown as the first section.
+    public private(set) var favoriteRows: [ChannelRow] = []
+    /// "All" filter: one preview section per favorite category (after the favorites).
+    public private(set) var favoriteCategorySections: [LiveCategorySection] = []
+    public static let categoryPreview = 24
+    /// Live grid only: build the favorite sections (the guide shows plain rows).
+    @ObservationIgnored public var showsFavoriteSections = false
     public private(set) var totalCount = 0
     public private(set) var isLoading = false
     @ObservationIgnored private let env: AppEnvironment
@@ -39,27 +56,43 @@ public final class LiveTVViewModel {
 
     public func reload() {
         sourceId = env.currentSource?.id
-        guard let sourceId else {
-            categories = []
-            rows = []
-            totalCount = 0
-            return
-        }
-        categories = (try? env.catalog.categories(sourceId: sourceId, kind: .live)) ?? []
+        categories = sourceId.flatMap { try? env.catalog.categories(sourceId: $0, kind: .live) } ?? []
         rows = []
         totalCount = 0
-        switch filter {
-        case .favorites:
-            let fingerprint = env.fingerprint(sourceId: sourceId)
-            let ids = env.favorites.orderedKeys(kind: .live).compactMap { ContentKey.parse($0) }
-                .filter { fingerprint == $0.fingerprint }.map(\.itemId)
-            let channels = (try? env.catalog.channels(sourceId: sourceId, ids: ids)) ?? []
-            totalCount = channels.count
-            rows = attachEpg(channels)
-        case .all, .category:
+        if let sourceId, filter != .favorites {
             totalCount = (try? env.catalog.channelCount(sourceId: sourceId, categoryId: categoryId)) ?? 0
             loadMore()
         }
+        reloadFavorites()
+    }
+
+    /// Re-reads only what favorites change (after a ⭐ toggle): the favorite sections of "All" or
+    /// the rows of the Favorites filter; the paged rows of "All" stay as they are.
+    public func reloadFavorites() {
+        favoriteRows = []
+        favoriteCategorySections = []
+        guard let sourceId else { return }
+        if filter == .favorites {
+            rows = attachEpg(favoriteChannels(sourceId: sourceId))
+            totalCount = rows.count
+            return
+        }
+        guard filter == .all, showsFavoriteSections else { return }
+        favoriteRows = attachEpg(favoriteChannels(sourceId: sourceId))
+        let ids = env.favorites.favoriteCategoryIds(sourceId: sourceId)
+        favoriteCategorySections = categories.filter { ids.contains($0.id) }.map { category in
+            let channels = (try? env.catalog.channels(sourceId: sourceId, categoryId: category.id, offset: 0, limit: Self.categoryPreview)) ?? []
+            let total = (try? env.catalog.channelCount(sourceId: sourceId, categoryId: category.id)) ?? channels.count
+            return LiveCategorySection(category: category, rows: attachEpg(channels), total: total)
+        }
+    }
+
+    /// The current source's favorite channels in the user's order.
+    private func favoriteChannels(sourceId: String) -> [Channel] {
+        let fingerprint = env.fingerprint(sourceId: sourceId)
+        let ids = env.favorites.orderedKeys(kind: .live).compactMap { ContentKey.parse($0) }
+            .filter { fingerprint == $0.fingerprint }.map(\.itemId)
+        return (try? env.catalog.channels(sourceId: sourceId, ids: ids)) ?? []
     }
 
     private var categoryId: String? {
@@ -298,6 +331,8 @@ public final class FavoritesViewModel {
     public private(set) var channels: [Channel] = []
     public private(set) var movies: [Movie] = []
     public private(set) var series: [Series] = []
+    /// Content keys of the shown items (same order) – the subset `move` reorders.
+    @ObservationIgnored private var shownKeys: [ContentKind: [String]] = [:]
     @ObservationIgnored private let env: AppEnvironment
 
     public init(env: AppEnvironment) {
@@ -305,15 +340,45 @@ public final class FavoritesViewModel {
     }
 
     public func reload() {
-        guard let source = env.currentSource else { channels = []; movies = []; series = []; return }
-        let fingerprint = env.fingerprint(sourceId: source.id)
+        shownKeys = [:]
+        guard let source = env.currentSource, let fingerprint = env.fingerprint(sourceId: source.id) else {
+            channels = []; movies = []; series = []; return
+        }
         func ids(_ kind: ContentKind) -> [String] {
             env.favorites.orderedKeys(kind: kind).compactMap { ContentKey.parse($0) }
                 .filter { fingerprint == $0.fingerprint }.map(\.itemId)
         }
+        func key(_ kind: ContentKind, _ id: String) -> String { ContentKey.make(fingerprint: fingerprint, kind: kind, itemId: id) }
         channels = (try? env.catalog.channels(sourceId: source.id, ids: ids(.live))) ?? []
         movies = ids(.movie).compactMap { (try? env.catalog.movie(sourceId: source.id, id: $0)) ?? nil }
         series = ids(.series).compactMap { (try? env.catalog.seriesItem(sourceId: source.id, id: $0)) ?? nil }
+        shownKeys = [.live: channels.map { key(.live, $0.id) }, .movie: movies.map { key(.movie, $0.id) },
+                     .series: series.map { key(.series, $0.id) }]
+    }
+
+    /// Reorders the current tab (SwiftUI `onMove` offsets) and saves the device-local order.
+    public func move(from: IndexSet, to: Int) {
+        let kind = tab
+        guard let keys = shownKeys[kind] else { return }
+        switch kind {
+        case .live: channels.move(from: from, to: to)
+        case .movie: movies.move(from: from, to: to)
+        default: series.move(from: from, to: to)
+        }
+        var reordered = keys
+        reordered.move(from: from, to: to)
+        shownKeys[kind] = reordered
+        env.favorites.move(kind: kind, from: from, to: to, within: keys)
+    }
+}
+
+extension Array {
+    /// SwiftUI `move(fromOffsets:toOffset:)` semantics (IPTVKit does not import SwiftUI).
+    mutating func move(from offsets: IndexSet, to destination: Int) {
+        let moving = offsets.filter { indices.contains($0) }.map { self[$0] }
+        let removedBefore = offsets.filter { $0 < destination && indices.contains($0) }.count
+        for index in offsets.sorted(by: >) where indices.contains(index) { remove(at: index) }
+        insert(contentsOf: moving, at: Swift.min(Swift.max(destination - removedBefore, 0), count))
     }
 }
 

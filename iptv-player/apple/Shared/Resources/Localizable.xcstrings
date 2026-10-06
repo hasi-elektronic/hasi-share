@@ -2504,19 +2504,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No favorites yet. Long-press (TV: Menu) an item to add it."
+            "value": "No favorites yet. Tap ☆ on a channel, movie or series to add it."
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Henüz favori yok. Eklemek için öğeye uzun basın (TV: Menü)."
+            "value": "Henüz favori yok. Eklemek için kanal, film veya dizideki ☆ simgesine dokun."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Noch keine Favoriten. Zum Hinzufügen ein Element lange gedrückt halten (TV: Menü)."
+            "value": "Noch keine Favoriten. Tippe bei einem Sender, Film oder einer Serie auf ☆."
           }
         }
       }
@@ -6624,6 +6624,213 @@
           "stringUnit": {
             "state": "translated",
             "value": "Erwartet: %1$@"
+          }
+        }
+      }
+    },
+    "fav_added": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to favorites"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorilere eklendi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zu Favoriten hinzugefügt"
+          }
+        }
+      }
+    },
+    "fav_removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed from favorites"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorilerden çıkarıldı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus Favoriten entfernt"
+          }
+        }
+      }
+    },
+    "action_undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri al"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückgängig"
+          }
+        }
+      }
+    },
+    "fav_move": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reorder"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sortieren"
+          }
+        }
+      }
+    },
+    "fav_move_done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
+        }
+      }
+    },
+    "fav_move_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an item, move it with ▲▼, select again to drop it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir öğe seç, ▲▼ ile taşı, bırakmak için tekrar seç."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Element wählen, mit ▲▼ verschieben, zum Ablegen erneut wählen."
+          }
+        }
+      }
+    },
+    "fav_category_add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add category to favorites"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategoriyi favorilere ekle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategorie zu Favoriten hinzufügen"
+          }
+        }
+      }
+    },
+    "fav_category_remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove category from favorites"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategoriyi favorilerden çıkar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategorie aus Favoriten entfernen"
+          }
+        }
+      }
+    },
+    "live_all_channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All channels"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm kanallar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Sender"
           }
         }
       }

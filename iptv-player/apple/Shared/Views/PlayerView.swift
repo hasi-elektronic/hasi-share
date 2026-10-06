@@ -36,6 +36,10 @@ struct PlayerView: View {
     /// VOD: the top row (close + tools) takes focus only after ▲ from play/pause, so ◀▶ on the
     /// transport row seeks instead of moving the focus sideways into the tools.
     @State private var toolsActive = false
+    /// Live: ▲ shows the channel info card (logo, name, now/next) with ⭐ focused (spec §2).
+    @State private var infoCardVisible = false
+    @State private var infoCardTask: Task<Void, Never>?
+    @FocusState private var infoFavoriteFocused: Bool
     #endif
 
     private var player: PlayerController { env.player }
@@ -43,6 +47,15 @@ struct PlayerView: View {
     /// The play/pause control shows "play" (paused by the user or finished).
     private var showsPlayIcon: Bool { player.phase == .paused || player.phase == .ended || player.phase == .idle }
     private static let autoHideSeconds = 3
+
+    /// Undo toast sits above the bottom bar (and above the tvOS info card).
+    private var toastLift: CGFloat {
+        #if os(tvOS)
+        infoCardVisible ? 330 : 150
+        #else
+        96
+        #endif
+    }
 
     var body: some View {
         ZStack {
@@ -74,7 +87,14 @@ struct PlayerView: View {
                     .padding(Theme.isTV ? 48 : 16)
             }
             if let target = player.zapTarget { zapCard(target) }
+            #if os(tvOS)
+            if infoCardVisible, let channel = player.currentChannel { infoCard(channel) }
+            #endif
             if channelListVisible { channelList }
+            // Undo of a ⭐ toggle (4 s), above the bottom bar; independent of the overlay.
+            UndoToast()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, Theme.safeV + toastLift)
         }
         .animation(.easeInOut(duration: 0.18), value: overlayVisible)
         .animation(.easeInOut(duration: 0.2), value: resumeChipVisible)
@@ -86,6 +106,9 @@ struct PlayerView: View {
         .onDisappear {
             hideTask?.cancel()
             resumeChipTask?.cancel()
+            #if os(tvOS)
+            infoCardTask?.cancel()
+            #endif
         }
         .onChange(of: player.phase) { _, phase in
             // Never hide while paused/buffering; once playing (again) the 3 s count starts.
@@ -109,29 +132,39 @@ struct PlayerView: View {
                 }
             }
         }
-        .focusable(!overlayVisible && !channelListVisible)
+        .focusable(!overlayVisible && !channelListVisible && !infoCardVisible)
         .focused($surfaceFocused)
         .onMoveCommand { direction in
+            if infoCardVisible {
+                infoCardMove(direction)
+                return
+            }
             if isVOD, overlayVisible, !channelListVisible {
                 vodOverlayMove(direction)
                 return
             }
+            let live = player.request?.isLive == true
+            // Live overlay / channel list shown: ▲▼ move the focus there (no zapping underneath).
+            if live, overlayVisible || channelListVisible { return }
             switch direction {
-            case .up: player.request?.isLive == true ? player.zap(by: -1) : showOverlay()
-            case .down: player.request?.isLive == true ? player.zap(by: 1) : showOverlay()
+            case .up: live ? showInfoCard() : showOverlay()
+            case .down: live ? player.zap(by: 1) : showOverlay()
             case .left: tvSeek(-1)
             case .right: tvSeek(1)
             @unknown default: break
             }
         }
         .onPlayPauseCommand { togglePlayPause() }
+        // A ⭐ toggle on the info card keeps it open for another full period.
+        .onChange(of: env.favorites.pendingUndo) { if infoCardVisible { scheduleInfoCardHide() } }
         // Select on the picture (overlay hidden): VOD pauses/resumes like the TV app; live shows the info.
         .onTapGesture {
             if isVOD { togglePlayPause() } else { showOverlay() }
         }
         .onExitCommand {
             // Back rules (SCREENS §2): close panel/menu first, then leave the player.
-            if channelListVisible { channelListVisible = false }
+            if infoCardVisible { hideInfoCard() }
+            else if channelListVisible { channelListVisible = false }
             else if overlayVisible { hideOverlay() }
             else { router.closePlayer() }
         }
@@ -282,6 +315,90 @@ struct PlayerView: View {
         guard isVOD else { showOverlay(); return }
         player.seek(by: SeekAccelerator.step(direction: direction, heldMs: heldMs))
         showOverlay()
+    }
+
+    // MARK: Info card (tvOS live)
+
+    private static let infoCardSeconds = 6
+
+    private func showInfoCard() {
+        infoCardVisible = true
+        scheduleInfoCardHide()
+    }
+
+    private func hideInfoCard() {
+        infoCardTask?.cancel()
+        infoCardVisible = false
+        surfaceFocused = true
+    }
+
+    private func scheduleInfoCardHide() {
+        infoCardTask?.cancel()
+        infoCardTask = Task {
+            try? await Task.sleep(for: .seconds(Self.infoCardSeconds))
+            guard !Task.isCancelled, !voiceOverEnabled else { return }
+            hideInfoCard()
+        }
+    }
+
+    /// Card shown: ▲▼ zap (the card follows the channel), anything else keeps it open.
+    private func infoCardMove(_ direction: MoveCommandDirection) {
+        switch direction {
+        case .up: player.zap(by: -1)
+        case .down: player.zap(by: 1)
+        default: break
+        }
+        scheduleInfoCardHide()
+    }
+
+    /// Channel info (spec §2 "▲ = kanal bilgisi"): logo, number, name, now/next; ⭐ has the focus.
+    private func infoCard(_ channel: Channel) -> some View {
+        let nowNext = channel.epgId.flatMap { id in (try? env.epg.nowNext(sourceId: channel.sourceId, epgIds: [id], at: Date()))?[id.lowercased()] }
+        return VStack {
+            Spacer()
+            HStack(alignment: .center, spacing: 36) {
+                ChannelLogo(url: channel.logoUrl, width: 160)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 16) {
+                        if let n = channel.number { Text(String(n)).font(Theme.headline.monospacedDigit()).foregroundStyle(Theme.textSecondary) }
+                        Text(channel.name).font(Theme.title).foregroundStyle(.white).lineLimit(1)
+                    }
+                    if let now = nowNext?.now {
+                        HStack(spacing: 14) {
+                            LText("epg_now").font(Theme.caption.weight(.heavy)).foregroundStyle(Theme.live)
+                            Text(env.timeFormatter.range(start: now.start, end: now.end)).font(Theme.caption.monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                            Text(now.title).font(Theme.body.weight(.semibold)).foregroundStyle(.white).lineLimit(1)
+                        }
+                        ProgressBar(value: EpgSchedule.progress(of: now, at: Date()), color: Theme.live).frame(width: 520, height: 5)
+                    } else {
+                        LText("epg_no_info").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                    if let next = nowNext?.next {
+                        HStack(spacing: 14) {
+                            LText("epg_next").font(Theme.caption.weight(.heavy)).foregroundStyle(Theme.textSecondary)
+                            Text(env.timeFormatter.time(next.start)).font(Theme.caption.monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                            Text(next.title).font(Theme.body).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        }
+                    }
+                }
+                Spacer(minLength: 20)
+                if let target = env.favoriteTarget(channel) {
+                    FavoriteButton(target: target, style: .labeled)
+                        .buttonStyle(SecondaryButtonStyle())
+                        .focused($infoFavoriteFocused)
+                        .onAppear { infoFavoriteFocused = true }
+                }
+            }
+            .padding(36)
+            .background(RoundedRectangle(cornerRadius: Theme.cardRadius * 2, style: .continuous).fill(Theme.surfaceElevated.opacity(0.95)))
+            .padding(.horizontal, Theme.safeH)
+            .padding(.bottom, Theme.safeV + 20)
+        }
+        .focusSection()
+        .defaultFocus($infoFavoriteFocused, true)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("player_info_card")
     }
     #endif
 
@@ -513,6 +630,9 @@ struct PlayerView: View {
                     Button { env.player.aspect = mode; menuClosed() } label: { Label(L10n.t(mode.titleKey), systemImage: player.aspect == mode ? "checkmark" : "") }
                 }
             }
+            if let target = favoriteTarget {
+                FavoriteButton(target: target, minTapSize: Theme.isTV ? 0 : 36)
+            }
             if player.request?.isLive == true {
                 Button { channelListVisible = true } label: { toolIcon("list.bullet") }
                     .accessibilityLabel(L10n.t("action_channel_list"))
@@ -521,17 +641,24 @@ struct PlayerView: View {
                         .accessibilityLabel(L10n.t("player_previous_channel"))
                 }
             }
-            if let request = player.request, let channel = player.currentChannel {
-                let fav = env.isFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id)
-                Button {
-                    env.toggleFavorite(sourceId: channel.sourceId, kind: .live, itemId: channel.id, title: request.title, posterUrl: channel.logoUrl)
-                } label: { toolIcon(fav ? "star.fill" : "star") }
-                .accessibilityLabel(L10n.t(fav ? "action_remove_favorite" : "action_add_favorite"))
-            }
         }
         .font(Theme.headline)
         .foregroundStyle(.white)
         .buttonStyle(.borderless)
+    }
+
+    /// ⭐ of what is playing: the current channel, the movie, or the series of an episode.
+    private var favoriteTarget: FavoriteTarget? {
+        if let channel = player.currentChannel { return env.favoriteTarget(channel) }
+        switch player.request?.item {
+        case .movie(let m)?:
+            return env.favoriteTarget(m)
+        case .episode(let e, let seriesTitle)?:
+            if let series = (try? env.catalog.seriesItem(sourceId: e.sourceId, id: e.seriesId)) ?? nil { return env.favoriteTarget(series) }
+            return env.favoriteTarget(sourceId: e.sourceId, kind: .series, itemId: e.seriesId, title: seriesTitle, posterUrl: nil)
+        default:
+            return nil
+        }
     }
 
     /// Audio/subtitle/aspect menu. Its items appear while the menu is open: the overlay must not
@@ -646,12 +773,19 @@ struct PlayerView: View {
         .padding(.top, Theme.safeV + 20)
     }
 
+    /// Zap list with the favorite channels on top (spec §2: favorites always first).
+    private var channelListOrder: [Channel] {
+        let all = player.request?.channels ?? []
+        let isFavorite: (Channel) -> Bool = { c in env.favoriteTarget(c).map { env.favorites.isFavorite($0.contentKey) } ?? false }
+        return all.filter(isFavorite) + all.filter { !isFavorite($0) }
+    }
+
     private var channelList: some View {
         HStack {
             Spacer()
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    ForEach(player.request?.channels ?? []) { channel in
+                    ForEach(channelListOrder) { channel in
                         Button {
                             player.zap(to: channel)
                             channelListVisible = false

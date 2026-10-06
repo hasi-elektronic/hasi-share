@@ -44,7 +44,7 @@ final class TVPlayerControlsTests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 30))
         sleep(2)
         for _ in 0..<6 where !play.hasFocus {
-            remote.press(app.buttons["detail_favorite"].hasFocus ? .left : .down)
+            remote.press(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'fav_'")).firstMatch.hasFocus ? .left : .down)
             sleep(1)
         }
         XCTAssertTrue(play.hasFocus, "Play focused on the detail")

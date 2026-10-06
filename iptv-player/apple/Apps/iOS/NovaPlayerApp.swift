@@ -64,6 +64,10 @@ struct RootView: View {
                 .onChange(of: router.section) { router.headerSolid = false }
             }
         }
+        // ⭐ undo (4 s) over every screen; the player shows its own above the video.
+        .overlay(alignment: .bottom) {
+            if !router.playerPresented { UndoToast().padding(.bottom, 8) }
+        }
         .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
             PlayerView().environment(env).environment(router)
         }

@@ -223,7 +223,6 @@ struct MovieDetailView: View {
         // Same rule as the request the Play button builds (AppEnvironment.request → ResumePolicy).
         let resumeMs = ResumePolicy.startPositionMs(positionMs: progress?.data.positionMs, durationMs: progress?.data.durationMs) ?? 0
         let canResume = resumeMs > 0
-        let fav = env.isFavorite(sourceId: movie.sourceId, kind: .movie, itemId: movie.id)
         let duration = info?.durationSec ?? progress?.data.durationMs.map { Int($0 / 1000) }
         let clean = MediaTags.clean(movie.name)
         DetailScaffold(title: clean.title, imageURL: movie.posterUrl,
@@ -233,12 +232,9 @@ struct MovieDetailView: View {
             DetailActions(primaryTitle: canResume ? L10n.t("action_resume_at", L10n.clock(Double(resumeMs) / 1000)) : L10n.t("action_play"),
                           primaryAction: { router.play(.movie(movie)) },
                           format: MediaTags.format(container: movie.containerExt, name: movie.name)) {
-                Button {
-                    env.toggleFavorite(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, title: movie.name, posterUrl: movie.posterUrl)
-                } label: { Image(systemName: fav ? "star.fill" : "star") }
-                    .buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
-                    .accessibilityLabel(L10n.t(fav ? "action_remove_favorite" : "action_add_favorite"))
-                    .accessibilityIdentifier("detail_favorite")
+                if let target = env.favoriteTarget(movie) {
+                    FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
+                }
                 if canResume {
                     Button { router.play(.movie(movie), fromStart: true) } label: { Image(systemName: "arrow.counterclockwise") }
                         .buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
@@ -306,7 +302,6 @@ struct SeriesDetailView: View {
     @State private var model: SeriesDetailViewModel?
 
     var body: some View {
-        let fav = env.isFavorite(sourceId: series.sourceId, kind: .series, itemId: series.id)
         let next = model?.continueEpisode ?? model?.episodes.first
         let primaryTitle: String = {
             guard let next else { return L10n.t("action_play") }
@@ -322,12 +317,9 @@ struct SeriesDetailView: View {
                        plot: model?.plot ?? series.plot, onPlay: play) {
             DetailActions(primaryTitle: primaryTitle, primaryAction: play,
                           format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) {
-                Button {
-                    env.toggleFavorite(sourceId: series.sourceId, kind: .series, itemId: series.id, title: series.name, posterUrl: series.posterUrl)
-                } label: { Image(systemName: fav ? "star.fill" : "star") }
-                    .buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
-                    .accessibilityLabel(L10n.t(fav ? "action_remove_favorite" : "action_add_favorite"))
-                    .accessibilityIdentifier("detail_favorite")
+                if let target = env.favoriteTarget(series) {
+                    FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
+                }
             }
         } below: {
             if let model { episodes(model) }
@@ -426,25 +418,41 @@ struct SeriesDetailView: View {
 // MARK: - Favorites
 
 /// Favorites: segmented Channels · Movies · Series (SCREENS §3.6). Channels use the EPG list.
+/// "Reorder" switches the current segment to a list: drag handles on iOS (`onMove`), on tvOS
+/// select → ▲▼ → select. The order is device-local (spec §2).
 struct FavoritesView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @State private var model: FavoritesViewModel?
+    @State private var reordering = false
+    #if os(tvOS)
+    /// tvOS "move" mode: the picked row follows ▲▼ until select drops it.
+    @State private var picked: String?
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
             if let model {
-                Picker(L10n.t("nav_favorites"), selection: Binding(get: { model.tab }, set: { model.tab = $0 })) {
-                    LText("favorites_channels").tag(ContentKind.live)
-                    LText("favorites_movies").tag(ContentKind.movie)
-                    LText("favorites_series").tag(ContentKind.series)
+                HStack(spacing: Theme.isTV ? 30 : 12) {
+                    Picker(L10n.t("nav_favorites"), selection: Binding(get: { model.tab }, set: { model.tab = $0; reordering = false })) {
+                        LText("favorites_channels").tag(ContentKind.live)
+                        LText("favorites_movies").tag(ContentKind.movie)
+                        LText("favorites_series").tag(ContentKind.series)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("favorites_segment")
+                    #if os(tvOS)
+                    if items(model).count > 1 { reorderButton }
+                    #endif
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal, Theme.safeH)
                 .padding(.vertical, Theme.isTV ? 24 : 10)
-                .frame(maxWidth: Theme.isTV ? 900 : .infinity)
-                .accessibilityIdentifier("favorites_segment")
-                content(model)
+                .frame(maxWidth: Theme.isTV ? 1200 : .infinity)
+                #if os(tvOS)
+                .disabled(picked != nil)
+                .focusSection()
+                #endif
+                if reordering { reorderList(model) } else { content(model) }
                 if let synced = env.lastSyncedAt, env.account.isSignedIn {
                     LText("last_synced", L10n.date(synced, date: .omitted, time: .shortened)).font(Theme.caption).foregroundStyle(Theme.textSecondary).padding()
                 }
@@ -452,11 +460,113 @@ struct FavoritesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .screenBackground()
+        #if !os(tvOS)
+        .toolbar {
+            if let model, reordering || items(model).count > 1 {
+                ToolbarItem(placement: .topBarTrailing) { reorderButton }
+            }
+        }
+        #endif
         .onAppear {
             if model == nil { model = FavoritesViewModel(env: env) }
             model?.reload()
         }
         .onChange(of: env.libraryVersion) { model?.reload() }
+    }
+
+    private var reorderButton: some View {
+        Button {
+            reordering.toggle()
+            #if os(tvOS)
+            picked = nil
+            #endif
+        } label: {
+            Label(L10n.t(reordering ? "fav_move_done" : "fav_move"), systemImage: reordering ? "checkmark" : "arrow.up.arrow.down")
+        }
+        #if os(tvOS)
+        .buttonStyle(SecondaryButtonStyle())
+        #endif
+        .accessibilityIdentifier(reordering ? "fav_move_done" : "fav_move")
+    }
+
+    /// One row of the reorder list.
+    private struct Item: Identifiable {
+        let id: String
+        let title: String
+        let image: String?
+    }
+
+    private func items(_ model: FavoritesViewModel) -> [Item] {
+        switch model.tab {
+        case .live: return model.channels.map { Item(id: $0.id, title: $0.name, image: $0.logoUrl) }
+        case .movie: return model.movies.map { Item(id: $0.id, title: $0.name, image: $0.posterUrl) }
+        default: return model.series.map { Item(id: $0.id, title: $0.name, image: $0.posterUrl) }
+        }
+    }
+
+    private func reorderRow(_ item: Item, index: Int, active: Bool) -> some View {
+        HStack(spacing: Theme.isTV ? 24 : 12) {
+            Text(String(index + 1)).font((Theme.isTV ? Theme.caption : .footnote).monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                .frame(minWidth: Theme.isTV ? 50 : 24, alignment: .trailing)
+            RemoteImage(url: item.image, maxPixel: 200, placeholder: model?.tab == .live ? "tv" : "film")
+                .frame(width: Theme.isTV ? 96 : 44, height: Theme.isTV ? 64 : 30)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            Text(item.title).font(Theme.isTV ? Theme.body : .body).foregroundStyle(Theme.textPrimary).lineLimit(1)
+            Spacer(minLength: 0)
+            #if os(tvOS)
+            if active { Image(systemName: "arrow.up.arrow.down").foregroundStyle(Theme.primary) }
+            #endif
+        }
+        .padding(.vertical, Theme.isTV ? 10 : 2)
+        .padding(.horizontal, Theme.isTV ? 20 : 0)
+        #if os(tvOS)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(active ? Theme.primary.opacity(0.3) : Theme.surface))
+        #endif
+    }
+
+    @ViewBuilder
+    private func reorderList(_ model: FavoritesViewModel) -> some View {
+        let list = items(model)
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 16) {
+            LText("fav_move_hint").font(Theme.caption).foregroundStyle(Theme.textSecondary).padding(.horizontal, Theme.safeH)
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(Array(list.enumerated()), id: \.element.id) { index, item in
+                        Button { picked = picked == item.id ? nil : item.id } label: {
+                            reorderRow(item, index: index, active: picked == item.id)
+                        }
+                        .buttonStyle(CardButtonStyle(radius: 12, scale: 1.02))
+                        .disabled(picked != nil && picked != item.id)
+                        .onMoveCommand { direction in
+                            guard picked == item.id else { return }
+                            switch direction {
+                            case .up where index > 0: model.move(from: IndexSet(integer: index), to: index - 1)
+                            case .down where index < list.count - 1: model.move(from: IndexSet(integer: index), to: index + 2)
+                            default: break
+                            }
+                        }
+                        .accessibilityIdentifier("fav_move_row_\(index)")
+                    }
+                }
+                .padding(.horizontal, Theme.safeH)
+                .padding(.vertical, 20)
+            }
+            .scrollClipDisabled()
+        }
+        .frame(maxWidth: 1200)
+        #else
+        List {
+            ForEach(Array(list.enumerated()), id: \.element.id) { index, item in
+                reorderRow(item, index: index, active: false)
+                    .listRowBackground(Theme.surface)
+                    .accessibilityIdentifier("fav_move_row_\(index)")
+            }
+            .onMove { model.move(from: $0, to: $1) }
+        }
+        .environment(\.editMode, .constant(.active))
+        .hiddenListBackground()
+        #endif
     }
 
     @ViewBuilder
@@ -470,8 +580,9 @@ struct FavoritesView: View {
             if model.movies.isEmpty { EmptyStateView(icon: "star", text: L10n.t("favorites_empty")) } else {
                 grid {
                     ForEach(model.movies) { m in
-                        NavigationLink(value: m) { PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: gridPosterWidth) }
-                            .buttonStyle(ArtworkButtonStyle())
+                        FavoritePosterLink(value: m, target: env.favoriteTarget(m), identifier: "favorite_movie_\(m.id)") {
+                            PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: gridPosterWidth)
+                        }
                     }
                 }
             }
@@ -479,8 +590,9 @@ struct FavoritesView: View {
             if model.series.isEmpty { EmptyStateView(icon: "star", text: L10n.t("favorites_empty")) } else {
                 grid {
                     ForEach(model.series) { s in
-                        NavigationLink(value: s) { PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: gridPosterWidth) }
-                            .buttonStyle(ArtworkButtonStyle())
+                        FavoritePosterLink(value: s, target: env.favoriteTarget(s), identifier: "favorite_series_\(s.id)") {
+                            PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: gridPosterWidth)
+                        }
                     }
                 }
             }
@@ -523,27 +635,30 @@ struct SearchView: View {
                         if !channels.isEmpty {
                             Shelf(title: L10n.t("favorites_channels")) {
                                 ForEach(channels) { row in
-                                    Button { router.play(.channel(row.channel), channels: channels.map(\.channel)) } label: { ChannelCard(row: row) }
-                                        .buttonStyle(ArtworkButtonStyle())
-                                        .accessibilityIdentifier("search_channel_\(row.channel.id)")
+                                    Button { router.play(.channel(row.channel), channels: channels.map(\.channel)) } label: {
+                                        ChannelCard(row: row, isFavorite: env.favoriteTarget(row.channel).map { env.favorites.isFavorite($0.contentKey) } ?? false)
+                                    }
+                                    .buttonStyle(ArtworkButtonStyle())
+                                    .contextMenu { ChannelMenuItems(channel: row.channel) }
+                                    .accessibilityIdentifier("search_channel_\(row.channel.id)")
                                 }
                             }
                         }
                         if !movies.isEmpty {
                             Shelf(title: L10n.t("favorites_movies")) {
                                 ForEach(movies) { m in
-                                    NavigationLink(value: m) { PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init)) }
-                                        .buttonStyle(ArtworkButtonStyle())
-                                        .accessibilityIdentifier("search_movie_\(m.id)")
+                                    FavoritePosterLink(value: m, target: env.favoriteTarget(m), identifier: "search_movie_\(m.id)") {
+                                        PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init))
+                                    }
                                 }
                             }
                         }
                         if !series.isEmpty {
                             Shelf(title: L10n.t("favorites_series")) {
                                 ForEach(series) { s in
-                                    NavigationLink(value: s) { PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init)) }
-                                        .buttonStyle(ArtworkButtonStyle())
-                                        .accessibilityIdentifier("search_series_\(s.id)")
+                                    FavoritePosterLink(value: s, target: env.favoriteTarget(s), identifier: "search_series_\(s.id)") {
+                                        PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init))
+                                    }
                                 }
                             }
                         }

@@ -21,12 +21,19 @@ public final class FavoritesController {
     @ObservationIgnored private let kv: any KeyValueStore
     /// Clock (epoch ms); the environment swaps in the license clock.
     @ObservationIgnored public var now: @MainActor () -> Int64
-    @ObservationIgnored private let undoWindow: Duration
+    /// How long `pendingUndo` stays offered (spec: 4 s; UI tests may stretch it).
+    @ObservationIgnored public var undoWindow: Duration
     @ObservationIgnored private var undoTask: Task<Void, Never>?
-    /// Called after every local change (the environment bumps `libraryVersion` and schedules a sync push).
+    /// Called after every synced change (the environment bumps `libraryVersion` and schedules a sync push).
     @ObservationIgnored public var onChange: @MainActor () -> Void
+    /// Called after device-local changes (order, favorite categories): UI refresh only, no sync push.
+    @ObservationIgnored public var onLocalChange: @MainActor () -> Void = {}
     private var keys: Set<String>
+    /// The last toggle, offered for undo until `undoWindow` passes.
     public private(set) var pendingUndo: FavoriteTarget?
+    /// Favorite state of `pendingUndo` before the toggle (undo restores it).
+    @ObservationIgnored private var undoPriorState = false
+    /// Source-scoped category ids (`"<sourceId>|<categoryId>"`), per device.
     public private(set) var favoriteCategoryIds: Set<String>
 
     public init(library: LibraryRepository, kv: any KeyValueStore, now: @escaping @MainActor () -> Int64,
@@ -45,11 +52,14 @@ public final class FavoritesController {
 
     public func isFavorite(_ contentKey: String) -> Bool { keys.contains(contentKey) }
 
+    /// Flips the favorite state immediately and offers undo. Returns the resulting state (unchanged
+    /// when the database write failed).
     @discardableResult
     public func toggle(_ t: FavoriteTarget) -> Bool {
-        let on = !keys.contains(t.contentKey)
-        apply(on, t)
+        let prior = keys.contains(t.contentKey)
+        guard apply(!prior, t) else { return prior }
         pendingUndo = t
+        undoPriorState = prior
         undoTask?.cancel()
         let window = undoWindow
         undoTask = Task { [weak self] in
@@ -57,24 +67,44 @@ public final class FavoritesController {
             guard !Task.isCancelled else { return }
             self?.pendingUndo = nil
         }
-        return on
+        return !prior
     }
 
+    /// Restores the state before the last toggle.
     public func undo() {
         guard let t = pendingUndo else { return }
         undoTask?.cancel()
-        apply(!keys.contains(t.contentKey), t)
         pendingUndo = nil
+        if keys.contains(t.contentKey) != undoPriorState { apply(undoPriorState, t) }
     }
 
-    private func apply(_ on: Bool, _ t: FavoriteTarget) {
+    /// Optimistic write: cache first, database second; a failed write restores the cache.
+    @discardableResult
+    private func apply(_ on: Bool, _ t: FavoriteTarget) -> Bool {
+        let was = keys.contains(t.contentKey)
         if on { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
-        _ = try? library.setFavorite(on, contentKey: t.contentKey, title: t.title, kind: t.kind,
-                                     posterUrl: t.posterUrl, nowMs: now())
+        do {
+            try library.setFavorite(on, contentKey: t.contentKey, title: t.title, kind: t.kind,
+                                    posterUrl: t.posterUrl, nowMs: now())
+        } catch {
+            if was { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
+            return false
+        }
+        if !on { pruneOrder(kind: t.kind, key: t.contentKey) }
         onChange()
+        return true
     }
+
+    // MARK: Order (device-local)
 
     private func orderKey(_ kind: ContentKind) -> String { "fav.order.\(kind.rawValue)" }
+
+    /// A removed favorite leaves the saved order; re-adding it counts as new (newest-first part).
+    private func pruneOrder(kind: ContentKind, key: String) {
+        guard var saved = kv.value([String].self, forKey: orderKey(kind)), saved.contains(key) else { return }
+        saved.removeAll { $0 == key }
+        kv.setValue(saved, forKey: orderKey(kind))
+    }
 
     /// Manually ordered keys first, then every other favorite newest-first.
     public func orderedKeys(kind: ContentKind) -> [String] {
@@ -85,21 +115,45 @@ public final class FavoritesController {
         return saved + newestFirst.filter { !savedSet.contains($0) }
     }
 
-    public func move(kind: ContentKind, from: IndexSet, to: Int) {
-        var list = orderedKeys(kind: kind)
-        // SwiftUI `move(fromOffsets:toOffset:)` semantics without importing SwiftUI.
-        let moving = from.filter { list.indices.contains($0) }.map { list[$0] }
-        let removedBefore = from.filter { $0 < to }.count
-        for index in from.sorted(by: >) where list.indices.contains(index) { list.remove(at: index) }
-        let target = min(max(to - removedBefore, 0), list.count)
-        list.insert(contentsOf: moving, at: target)
-        kv.setValue(list, forKey: orderKey(kind))
-        onChange()
+    /// Moves favorites (SwiftUI `onMove` offsets). With `within`, the offsets refer to that subset
+    /// of `orderedKeys(kind:)` (e.g. the current source's favorites); other keys keep their slots.
+    public func move(kind: ContentKind, from: IndexSet, to: Int, within subset: [String]? = nil) {
+        let full = orderedKeys(kind: kind)
+        let visible = subset.map { s in let present = Set(full); return s.filter { present.contains($0) } } ?? full
+        var moved = visible
+        moved.move(from: from, to: to)
+        var result = full
+        if subset != nil {
+            let visibleSet = Set(visible)
+            var next = moved.makeIterator()
+            for index in result.indices where visibleSet.contains(result[index]) {
+                if let key = next.next() { result[index] = key }
+            }
+        } else {
+            result = moved
+        }
+        kv.setValue(result, forKey: orderKey(kind))
+        onLocalChange()
     }
 
-    public func toggleCategory(_ id: String) {
+    // MARK: Favorite categories (device-local, source-scoped)
+
+    public static func categoryKey(sourceId: String, categoryId: String) -> String { "\(sourceId)|\(categoryId)" }
+
+    public func isFavoriteCategory(sourceId: String, categoryId: String) -> Bool {
+        favoriteCategoryIds.contains(Self.categoryKey(sourceId: sourceId, categoryId: categoryId))
+    }
+
+    /// Favorite category ids of one source (unscoped provider ids).
+    public func favoriteCategoryIds(sourceId: String) -> Set<String> {
+        let prefix = sourceId + "|"
+        return Set(favoriteCategoryIds.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) })
+    }
+
+    public func toggleCategory(sourceId: String, categoryId: String) {
+        let id = Self.categoryKey(sourceId: sourceId, categoryId: categoryId)
         if favoriteCategoryIds.contains(id) { favoriteCategoryIds.remove(id) } else { favoriteCategoryIds.insert(id) }
         kv.setValue(favoriteCategoryIds, forKey: Self.categoriesKey)
-        onChange()
+        onLocalChange()
     }
 }

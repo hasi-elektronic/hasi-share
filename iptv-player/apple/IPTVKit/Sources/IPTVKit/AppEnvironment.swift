@@ -63,6 +63,9 @@ public final class AppEnvironment {
     public private(set) var lastSyncedAt: Date?
     /// Source ids with a refresh in flight.
     public private(set) var refreshing: Set<String> = []
+    /// sourceId → fingerprint: content keys are built per card/row; the secrets live in the
+    /// Keychain, so they are read once per source (cleared whenever the sources change).
+    @ObservationIgnored private var fingerprintCache: [String: String] = [:]
 
     public init(config: AppConfig, database: AppDatabase, secureStore: any SecureStore, kv: any KeyValueStore,
                 settings: AppSettings = AppSettings(), transport: any HTTPTransport = URLSessionTransport.shared,
@@ -108,6 +111,7 @@ public final class AppEnvironment {
         }
         favorites.now = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
         favorites.onChange = { [weak self] in self?.libraryChanged() }
+        favorites.onLocalChange = { [weak self] in self?.libraryVersion += 1 }   // order/categories: device-local, no sync push
         license.sessionToken = { [weak self] in self?.account.sessionToken }
         account.onSessionChange = { [weak self] signedIn in
             guard let self else { return }
@@ -193,6 +197,7 @@ public final class AppEnvironment {
     // MARK: Sources
 
     public func reloadSources() {
+        fingerprintCache = [:]
         sources = (try? sourceRepository.all()) ?? []
         if let current = settings.currentSourceId, sources.contains(where: { $0.id == current }) { return }
         settings.currentSourceId = sources.first?.id
@@ -283,7 +288,10 @@ public final class AppEnvironment {
 
     /// Fingerprint of a source (content keys).
     public func fingerprint(sourceId: String) -> String? {
-        secrets(for: sourceId).flatMap(SourceFingerprint.of)
+        if let cached = fingerprintCache[sourceId] { return cached }
+        let value = secrets(for: sourceId).flatMap(SourceFingerprint.of)
+        if let value { fingerprintCache[sourceId] = value }
+        return value
     }
 
     // MARK: Library
@@ -300,6 +308,11 @@ public final class AppEnvironment {
     public func isFavorite(sourceId: String, kind: ContentKind, itemId: String) -> Bool {
         guard let key = contentKey(sourceId: sourceId, kind: kind, itemId: itemId) else { return false }
         return favorites.isFavorite(key)
+    }
+
+    /// The ⭐ target of a catalog item (nil when the source has no fingerprint).
+    public func favoriteTarget(sourceId: String, kind: ContentKind, itemId: String, title: String, posterUrl: String?) -> FavoriteTarget? {
+        contentKey(sourceId: sourceId, kind: kind, itemId: itemId).map { FavoriteTarget(contentKey: $0, title: title, kind: kind, posterUrl: posterUrl) }
     }
 
     @discardableResult

@@ -51,6 +51,19 @@ hep siyah). Ara → genel arama ekranı (kanal + film + dizi). Ayarlar **sheet**
 Favoriler ayrı sekme değildir: Ana Sayfa'da "Favoriler" satırı (+ "Tümünü gör" → Favoriler ekranı:
 Kanallar · Filmler · Diziler segmenti), Filmler/Diziler'de "Favoriler" satırı, Canlı TV ve TV Rehberi'nde
 kategori seçicinin ilk öğesi "Favoriler".
+**Favori: her yerde tek dokunuş, onaysız, 4 sn geri al.**
+1. ☆/★ düğmesi kanal kartında, film/dizi posterinin köşesinde (iOS), detay sayfasında, hero'da ve
+   oynatıcı katmanında; tek dokunuş durumu **anında** değiştirir (iyimser güncelleme, onay diyaloğu yok).
+2. Her değişiklikten sonra altta 4 sn "Favorilere eklendi / Favorilerden çıkarıldı · **Geri al**" kapsülü
+   (VoiceOver duyurur); Geri al önceki durumu geri yükler. Kapsül oynatıcının üstünde de görünür.
+3. Uzun bas (iOS bağlam menüsü / TV uzun OK) menüsünün **ilk öğesi** her zaman "Favorilere ekle/çıkar".
+4. TV kartlarında ⭐ ikinci bir odak hedefi değildir (gösterge); TV'de favori: uzun OK menüsü, detay ⭐,
+   oynatıcıda ▲ bilgi kartı.
+5. Favoriler her listede **önce** gelir (Canlı TV "Tümü" ilk bölüm, oynatıcı kanal listesi). Favori
+   **kategoriler** (kaynak başına, cihazda) kategori menüsünde ⭐ ile işaretlenir.
+6. Favori sırası **yalnızca cihazda** (Favoriler ekranı → "Taşı"); senkronize olan yalnızca favori
+   durumudur (CONTRACT §8 değişmez); yeni cihazda en yeni üstte.
+
 Kaynak yoksa Karşılama ekranı. Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; boş durum gösterir.
 Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster min. 104 pt).
 
@@ -98,6 +111,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   öğesi, yoksa en yeni film / dizi. Görsel `fill` (poster bulanık uzantı + net poster), alta doğru
   siyaha gradyan; büyük kalın başlık; "tür · yıl · süre" satırı; üç eylem: **☆ Favori** (ikon + etiket)
   · **beyaz pill "▶ Oynat"** (devam ediyorsa "Devam et (01:12:30)") ★ · **ⓘ Bilgi** (detay).
+* **Posterler** (satırlar, "Tümünü gör" grid'i, arama, Favoriler): iOS'ta sağ üst köşede küçük yuvarlak ☆/★
+  (tek dokunuş, 44 pt hedef); uzun bas menüsünün ilk öğesi Favorilere ekle/çıkar (TV: uzun OK).
 * **Ana Sayfa satırları:** İzlemeye devam et (16:9 kart, ortada oynat ikonu, başlık kartın altında
   görsel üstünde, kartın altında `primary` ilerleme çubuğu; kural CONTRACT §8: %5 < konum < %95,
   süre bilinmiyorsa konum ≥ 10 sn ve çubuk gizli; en son `updatedAt` önce) · Favoriler (posterler) · Favori kanallar ·
@@ -124,10 +139,15 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 ### 3.3 Canlı TV
 * **Kanal kartı grid'i:** iPhone dikeyde 2 sütun, iPad 3–4, TV 4. Kart: renkli logo karosu + kanal
   adı + kalite rozeti (adındaki HD/FHD/4K/UHD/SD etiketinden), şimdiki programın saat aralığı + başlığı,
-  ince `primary` ilerleme çubuğu, alt satırda küçük eylem ikonları: ☆ favori, ⟲ geçmiş yayın (yalnız
-  kanal destekliyorsa → arşiv sheet'i §3.4). EPG yoksa "Program bilgisi yok".
-* Üstte ortada **yüzen kategori çipi** ("🇹🇷 Türkiye ⌄") → menü: Tümü · Favoriler · kategoriler (bayraklı)
-  · "Gizlenenleri göster (n)".
+  ince `primary` ilerleme çubuğu, alt satırda küçük eylem ikonları (44 pt): ☆ favori (tek dokunuş, §2),
+  ⟲ geçmiş yayın (yalnız kanal destekliyorsa → arşiv sheet'i §3.4). EPG yoksa "Program bilgisi yok".
+  TV'de ikonlar yalnızca göstergedir (kart başına tek odak).
+* **Favoriler önce:** "Tümü" seçiliyken grid bölümlüdür: **★ Favoriler** (favori kanallar, cihazdaki sıra) →
+  her favori kategori için bir bölüm (ilk 24 kanal + "Tümünü gör" → o kategori) → **Tüm kanallar**
+  (sayfalı). ⭐ değişince yalnızca favori bölümleri yeniden yüklenir.
+* Üstte ortada **yüzen kategori çipi** ("🇹🇷 Türkiye ⌄") → menü: Tümü · Favoriler · favori kategoriler (⭐)
+  · diğer kategoriler (bayraklı) · "Gizlenenleri göster (n)". Bir kategori seçiliyken menünün başında
+  "⭐ Kategoriyi favorilere ekle / favorilerden çıkar" (kaynak başına, yalnız bu cihazda).
 * Dokun / OK → oynatıcı. **Uzun bas** (iOS bağlam menüsü / TV uzun OK) → Favorilere ekle/çıkar ·
   **Kanalı gizle** · **Kategoriyi gizle**. Gizlenen kanal/kategori listeleri kaynak başına **yerel**
   saklanır (UserDefaults, senkronize edilmez); "Gizlenenleri göster" hepsini geri getirir.
@@ -152,7 +172,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 ### 3.5 Film ve dizi detayı
 * Tam genişlikte hero görsel (iPhone ~%50 yükseklik, TV tam ekran arka plan), ortada büyük **yuvarlak
   ▶ oynat** butonu, sağ üstte **✕ kapat**. Altında büyük başlık; "★ 7.8 · 2024 · 1 sa 52 dk" (dizide
-  sezon sayısı); kısa açıklama; "Tür: …" satırı; küçük eylem satırı: ☆ favori · ⟲ baştan oynat
+  sezon sayısı); kısa açıklama; "Tür: …" satırı; küçük eylem satırı: ☆ favori (tek dokunuş, §2) · ⟲ baştan oynat
   (devam varsa) · format pill ("MKV · HD"). Birincil eylem metni: "Oynat" / "Devam et (01:12:30)" /
   "Devam et S02E05".
 * **Dizi:** sezonlar yatay **metin sekmeleri** ("Sezon 1 · Sezon 2 …", seçili `primary` alt çizgi);
@@ -162,16 +182,24 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 
 ### 3.6 Favoriler ve arama
 * Favoriler ekranı (Ana Sayfa "Favoriler" satırı → "Tümünü gör"): segment Kanallar · Filmler ·
-  Diziler; kanallar TV Rehberi satırlarıyla, filmler/diziler poster grid'i. Kaldırma: uzun bas menüsü.
-  Hesap varsa senkronize edilir (son senkron saati gösterilir).
+  Diziler; kanallar TV Rehberi satırlarıyla, filmler/diziler poster grid'i. Kaldırma: posterdeki ★ (iOS) veya
+  uzun bas menüsü (geri alınabilir, §2). Hesap varsa favori durumu senkronize edilir (son senkron saati gösterilir).
+* **Sıralama ("Taşı"):** sağ üstte (TV: segmentin yanında) "Taşı" → seçili segment liste olur. iOS: tutamaçla
+  sürükle-bırak; TV: öğeyi seç → ▲▼ ile taşı → tekrar seç bırakır (taşınırken diğer satırlar odak almaz).
+  "Bitti" çıkar. Sıra cihazda saklanır, diğer kaynakların favorileri yerinde kalır.
 * Arama: tek alan, sonuçlar satır olarak (Kanallar kartları · Filmler · Diziler posterleri).
 
 ### 3.7 Oynatıcı
 * Tam ekran, sistem çubukları gizli, ekran açık kalır.
 * Katman (3 sn sonra kaybolur): üstte kanal/başlık, solda kanal numarası; altta zaman çizgisi
   (VOD) veya program ilerlemesi (canlı), "CANLI" rozeti; sağda araçlar: Ses · Altyazı ·
-  Görüntü oranı · (canlı) Kanal listesi · Favori.
-* **Kanal değiştirme (canlı):** mobil yukarı/aşağı kaydır, TV D-pad ▲▼ / CH+/CH−. Basıldığı
+  Görüntü oranı · **⭐ Favori** (kanal / film / bölümün dizisi; tek dokunuş, 4 sn geri al kapsülü alt çubuğun
+  üstünde) · (canlı) Kanal listesi. Kanal listesinde favori kanallar en üstte.
+* **TV canlı – ▲ = kanal bilgisi:** katman kapalıyken ▲ altta bilgi kartını açar (logo, numara, ad, Şimdi +
+  saat + ilerleme, Sonra), **⭐ odakta** (OK = favori ekle/çıkar). Kart açıkken ▲/▼ kanal değiştirir (kart yeni
+  kanalı gösterir), Geri kartı kapatır; 6 sn dokunulmazsa kaybolur (⭐ değişince süre yeniden başlar).
+  Katman kapalıyken ▼ = sonraki kanal. Katman veya kanal listesi açıkken ▲▼ yalnızca odağı taşır.
+* **Kanal değiştirme (canlı):** mobil yukarı/aşağı kaydır, TV D-pad ▼ (▲ önce bilgi kartı, kart açıkken ▲▼) / CH+/CH−. Basıldığı
   anda (< 100 ms) üstte büyük bilgi kartı: numara, logo, ad, şimdiki program; yükleme
   göstergesi kartın içinde. Ard arda basışlar 400 ms içinde birleştirilir (yalnızca son kanal
   açılır). TV'de rakam tuşları: 1,5 sn içinde girilen numaraya geçer. "Önceki kanal" (TV: geri

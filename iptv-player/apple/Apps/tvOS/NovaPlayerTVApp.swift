@@ -81,6 +81,10 @@ struct TVRootView: View {
                 }
             }
         }
+        // ⭐ undo (4 s) over every screen; the player shows its own above the video.
+        .overlay(alignment: .bottom) {
+            if !router.playerPresented { UndoToast().padding(.bottom, Theme.safeV) }
+        }
         .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
             PlayerView().environment(env).environment(router)
         }
