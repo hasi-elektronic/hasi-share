@@ -170,4 +170,41 @@ final class PlaybackRobustnessTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(250))
         XCTAssertEqual(c.phase, .paused, "user pause")
     }
+
+    // MARK: 4c review fixes
+
+    /// The 8 s not-ready watchdog probes VOD only: a second connection to a live panel could be refused itself.
+    func testNotReadyWatchdogDoesNotProbeLive() async throws {
+        let c = controller(probeStatus: 403)
+        c.notReadyProbeDelay = .milliseconds(30)
+        let channel = Channel(sourceId: "s1", id: "c1", name: "Live", url: "http://h.example.com/live.m3u8")
+        c.open(PlaybackRequest(item: .channel(channel), source: nil))
+        try await eventually { !av.loads.isEmpty }
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(probes.isEmpty)
+        XCTAssertEqual(c.phase, .loading)
+    }
+
+    /// An unreachable host (probe transport error, no HTTP status) ends the not-ready wait with its specific
+    /// network reason (reconnect policy) instead of an endless spinner.
+    func testProbeTransportErrorEndsNotReadyWait() async throws {
+        let c = controller(probeStatus: nil)
+        c.notReadyProbeDelay = .milliseconds(30)
+        c.probe = { _, _ in VLCFailureClassifier.Probe(httpStatus: nil, transportError: .network(.dns)) }
+        try await open(c, "http://h.example.com/a.mp4")
+        try await eventually { c.phase != .loading }
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
+    }
+
+    /// The end of an item cancels a pending stall timer (no reconnect of a finished VOD).
+    func testEndCancelsStallTimer() async throws {
+        let c = controller(probeStatus: nil)
+        c.stallTimeout = .milliseconds(80)
+        try await open(c, "http://h.example.com/a.mp4")
+        av.emit(.playing)
+        av.emit(.stalled)
+        av.emit(.ended)
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(c.phase, .ended)
+    }
 }

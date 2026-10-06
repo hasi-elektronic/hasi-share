@@ -93,6 +93,8 @@ enum AppBootstrap {
 
     /// UserDefaults of this launch (separate suite in UI-test mode) – used by local UI state (hidden channels).
     static var defaults: UserDefaults = .standard
+    /// Lives for the whole app run (interruption / route-change → player).
+    private static let audioObserver = AudioSessionObserver()
 
     static func argument(_ name: String) -> String? {
         guard let i = arguments.firstIndex(of: name), i + 1 < arguments.count else { return nil }
@@ -136,8 +138,12 @@ enum AppBootstrap {
         let settings = AppSettings(defaults: suite)
         L10n.setLanguage(settings.appLanguage)
         do {
-            return try AppEnvironment(config: config, database: database, secureStore: secure, kv: kv,
-                                      settings: settings, engines: .app)
+            let env = try AppEnvironment(config: config, database: database, secureStore: secure, kv: kv,
+                                         settings: settings, engines: .app)
+            AudioSessionConfigurator.configure()
+            env.player.audioSession = AudioSessionConfigurator.hooks
+            audioObserver.start(player: env.player)
+            return env
         } catch {
             fatalError("Invalid build configuration (license keys): \(error)")
         }

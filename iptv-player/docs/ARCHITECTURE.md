@@ -113,6 +113,19 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   süreyi uzatmaz) → `Network(timeout)` → yeniden bağlanma politikası. Gerçek duraklatma (kullanıcı,
   motorun `.paused`'ı) zamanlayıcıyı iptal eder. Kulaklık/Bluetooth çıkışının kaybolması
   (`oldDeviceUnavailable`) ve ses kesintisi başlangıcı kullanıcı duraklatması sayılır.
+* **Ses oturumu:** uygulama açılışında `AVAudioSession` kategorisi `.playback` / modu `.moviePlayback`
+  (iPhone sessiz anahtarı videonun sesini kesmez); oturum her oynatma başlangıcında/devamında
+  etkinleştirilir, oynatıcı release/kapatılınca `.notifyOthersOnDeactivation` ile kapatılır (müzik uygulamaları
+  devam eder). Arka planda ses yok (V10; `UIBackgroundModes` eklenmez). Kesinti ve çıkış rotası
+  değişiklikleri **tek yerde** işlenir: `AudioSessionObserver` → `PlayerController.handleAudioInterruption`
+  (kesinti başladı / `oldDeviceUnavailable` → kullanıcı-duraklatması yolu: `engine.pause()`, ilerleme kaydı;
+  yükleme/yeniden bağlanma sırasında da `.paused`; kesinti `shouldResume` ile biterse yalnızca kesintinin
+  duraklattığı oynatma devam eder, kulaklık çıkarılınca otomatik devam yok; `appWasSuspended` kesintisi yok
+  sayılır). AVPlayer'ın kendi duraklaması `rateDidChangeReason` (`audioSessionInterrupted`/`appBackgrounded`)
+  ve AirPlay (`isExternalPlaybackActive`) ile sınıflanır: sistem duraklaması takılma sayılmaz ve devam
+  ettirilmez; kalan her duraklama takılmadır ve ilk otomatik `play()` 300 ms gecikmeli çalışır (oturum
+  bildirimleri önce gelsin). VLCKit kendi ses çıkışında kategoriyi `.playback`/`.moviePlayback` olarak bırakır
+  (simülatörde doğrulandı); `activate()` kategoriyi yine de yeniden uygular.
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
 * Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /

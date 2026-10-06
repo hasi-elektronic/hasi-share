@@ -65,6 +65,28 @@ public enum PlayerPhase: Equatable, Sendable {
     case ended
 }
 
+/// System audio events that pause playback (docs/ARCHITECTURE.md §3.2), translated from
+/// `AVAudioSession` notifications by the app (`AudioSessionObserver`).
+public enum AudioSessionEvent: Equatable, Sendable {
+    /// Another app / a call took the audio session.
+    case began
+    /// The interruption is over; `shouldResume` = the system recommends resuming.
+    case ended(shouldResume: Bool)
+    /// The output route was lost (headphones / Bluetooth unplugged).
+    case routeLost
+}
+
+/// Activates / deactivates the platform audio session (`AVAudioSession` on iOS/tvOS, set by the app).
+public struct AudioSessionHooks {
+    public var activate: @MainActor () -> Void
+    public var deactivate: @MainActor () -> Void
+
+    public init(activate: @escaping @MainActor () -> Void, deactivate: @escaping @MainActor () -> Void) {
+        self.activate = activate
+        self.deactivate = deactivate
+    }
+}
+
 /// Playback controller shared by iOS and tvOS (docs/ARCHITECTURE.md §3.2). Two engines behind
 /// `PlaybackEngine`: AVPlayer for HLS/MP4/MOV, VLCKit for MKV/TS/AVI/FLV/DASH/RTSP/RTMP…
 /// (`ApplePlayback.engine(for:)`, CONTRACT §6.1), each a single instance reused across channel
@@ -117,6 +139,14 @@ public final class PlayerController {
     @ObservationIgnored private var pausedDuringReconnect = false
     /// Engine forced for the current stream after a fallback (survives reconnects).
     @ObservationIgnored private var fallbackEngine: PlayerEngine?
+    /// The interruption paused this playback and it may resume when the interruption ends.
+    @ObservationIgnored private var pausedByInterruption = false
+    /// The user (not the system) paused: a `.paused` phase that an interruption must leave alone.
+    @ObservationIgnored private var userPaused = false
+    /// Paused while the stream was still opening: play opens the request again.
+    @ObservationIgnored private var pausedWhileLoading = false
+    /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
+    @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
     @ObservationIgnored public var nowMs: @MainActor () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     @ObservationIgnored public var onLibraryChange: (@MainActor () -> Void)?
@@ -132,7 +162,7 @@ public final class PlayerController {
     @ObservationIgnored private var lastSession: LastSession?
     /// HTTP probe of the stream (1 KiB range request) that classifies AVPlayer failures without a
     /// usable reason (docs/SCREENS.md §4); injectable for tests.
-    @ObservationIgnored public var probe: @MainActor (URL, [String: String]) async -> VLCFailureClassifier.Probe? = { url, headers in
+    @ObservationIgnored var probe: @MainActor (URL, [String: String]) async -> VLCFailureClassifier.Probe? = { url, headers in
         await VLCFailureClassifier.probe(url, headers: headers)
     }
     /// AVPlayer still not ready after this long → probe the stream (internal for tests).
@@ -180,6 +210,9 @@ public final class PlayerController {
         retryTask?.cancel()
         probeTask?.cancel()
         reconnectState = ReconnectState()
+        pausedByInterruption = false
+        userPaused = false
+        pausedWhileLoading = false
         fallbackEngine = nil
         lastProgressSaveMs = nil
         pendingSeek = nil
@@ -277,6 +310,7 @@ public final class PlayerController {
             pendingSeek = (Double(startMs) / 1000, nowMs())
         }
         SafeLog.info("load \(stream.container.rawValue) via \(next.kind.rawValue)")
+        audioSession.activate()
         let isLive = request?.isLive == true
         loadReady = false
         probeTask?.cancel()
@@ -284,7 +318,8 @@ public final class PlayerController {
         next.load(stream, isLive: isLive, startMs: startMs,
                   preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage,
                   tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
-        if next.kind == .avPlayer { watchNotReady(stream) }
+        // VOD only: a second connection to a live panel (often one connection per account) could itself be refused.
+        if next.kind == .avPlayer, !isLive { watchNotReady(stream) }
     }
 
     // MARK: AVPlayer failure classification
@@ -298,7 +333,7 @@ public final class PlayerController {
             guard !Task.isCancelled, let self, !self.loadReady else { return }
             let probe = await self.probe(stream.url, stream.headers)
             guard !Task.isCancelled, !self.loadReady, self.stream == stream,
-                  let status = probe?.httpStatus, let error = ErrorClassifier.playbackError(httpStatus: status) else { return }
+                  let error = probe?.httpStatus.flatMap(ErrorClassifier.playbackError(httpStatus:)) ?? probe?.transportError else { return }
             SafeLog.warning("avplayer not ready after \(delay) – probe \(error)")
             self.handle(error)
         }
@@ -312,7 +347,7 @@ public final class PlayerController {
         probeTask = Task { [weak self] in
             let probe = await self?.probe(stream.url, stream.headers)
             guard !Task.isCancelled, let self, self.stream == stream else { return }
-            let mapped = probe?.httpStatus.flatMap(ErrorClassifier.playbackError(httpStatus:)) ?? error
+            let mapped = probe?.httpStatus.flatMap(ErrorClassifier.playbackError(httpStatus:)) ?? probe?.transportError ?? error
             SafeLog.warning("avplayer failed before ready: \(error) – probe \(mapped)")
             self.handle(mapped)
         }
@@ -443,7 +478,11 @@ public final class PlayerController {
 
     private func handleEnded() {
         // End of file = fully watched (the last tick can be a second or more before the end).
-        if request?.isLive == false, duration > 0 { currentTime = duration }
+        cancelStallTimer()
+        if request?.isLive == false {
+            // Unknown duration: the end position is the length, so the item is "watched" and leaves Continue watching.
+            if duration > 0 { currentTime = duration } else if currentTime > 0 { duration = currentTime }
+        }
         saveProgress()
         phase = .ended
     }
@@ -494,6 +533,12 @@ public final class PlayerController {
     // MARK: Transport
 
     public func togglePlayPause() {
+        pausedByInterruption = false   // the user decides from here on
+        if pausedWhileLoading, phase == .paused {
+            userPaused = false
+            resumePausedPlayback()
+            return
+        }
         guard let engine else { return }
         if case .reconnecting = phase {
             // Pause = user intent: no further attempts until play.
@@ -502,10 +547,11 @@ public final class PlayerController {
             engine.pause()
             phase = .paused
             pausedDuringReconnect = true
+            userPaused = true
             saveProgress()
-        } else if pausedDuringReconnect, phase == .paused, let stream {
-            phase = .loading
-            load(stream, startMs: request?.isLive == true ? nil : Int64(currentTime * 1000))
+        } else if pausedDuringReconnect, phase == .paused, stream != nil {
+            userPaused = false
+            resumePausedPlayback()
         } else if phase == .ended {
             // Play again from the start after the end of a VOD.
             seek(to: 0)
@@ -516,9 +562,79 @@ public final class PlayerController {
             cancelStallTimer()
             engine.pause()
             phase = .paused
+            userPaused = true
             saveProgress()
         } else {
+            userPaused = false
             engine.play()
+        }
+    }
+
+    /// Plays again after a pause that left no live item: reopens a request paused while loading, reloads a
+    /// stream paused during a reconnect, otherwise just `play()`.
+    private func resumePausedPlayback() {
+        if pausedWhileLoading, var request {
+            pausedWhileLoading = false
+            if !request.isLive, currentTime > 0 { request.startPositionMs = Int64(currentTime * 1000) }
+            open(request)
+        } else if pausedDuringReconnect, let stream {
+            phase = .loading
+            load(stream, startMs: request?.isLive == true ? nil : Int64(currentTime * 1000))
+        } else {
+            engine?.play()
+        }
+    }
+
+    /// Audio interruption / lost output route (called by `AudioSessionObserver`; the only place that reacts to
+    /// them). Every pause goes through the user-intent path (`engine.pause()`), so the engine does not treat
+    /// it as a stall and resume it. An interruption that ends with `shouldResume` resumes only playback that
+    /// it paused itself; a lost route (headphones unplugged) never resumes automatically. Also pauses
+    /// while still loading or reconnecting (no endless spinner behind a phone call).
+    public func handleAudioInterruption(_ event: AudioSessionEvent) {
+        switch event {
+        case .began, .routeLost:
+            let paused = pauseForSystem()
+            pausedByInterruption = event == .began && paused
+        case .ended(let shouldResume):
+            guard shouldResume, pausedByInterruption, phase == .paused else { return }
+            pausedByInterruption = false
+            audioSession.activate()   // the interruption deactivated the session
+            resumePausedPlayback()
+        }
+    }
+
+    /// Pauses for a system event; true when playback is (now) paused by the system rather than the user.
+    private func pauseForSystem() -> Bool {
+        switch phase {
+        case .playing, .buffering:
+            guard let engine else { return false }
+            cancelStallTimer()
+            engine.pause()
+            phase = .paused
+            saveProgress()
+            return true
+        case .reconnecting:
+            retryTask?.cancel()
+            cancelStallTimer()
+            engine?.pause()
+            phase = .paused
+            pausedDuringReconnect = true
+            saveProgress()
+            return true
+        case .loading:
+            guard request != nil else { return false }
+            // Nothing playing yet: drop the pending open (and a half-loaded item); play opens it again.
+            openTask?.cancel()
+            stopPlayback()
+            phase = .paused
+            pausedWhileLoading = true
+            return true
+        case .paused:
+            // The engine may already have reported the system's own pause (rate change reason): ours to resume
+            // unless the user paused.
+            return !userPaused && request != nil
+        default:
+            return false
         }
     }
 
@@ -569,6 +685,7 @@ public final class PlayerController {
         openTask?.cancel()
         zapTask?.cancel()
         stopPlayback()
+        audioSession.deactivate()   // lets other apps' audio resume
         if phase != .locked, !isFailed { phase = .idle }
     }
 
@@ -611,6 +728,9 @@ public final class PlayerController {
     }
 
     private func stopPlayback() {
+        pausedByInterruption = false
+        userPaused = false
+        pausedWhileLoading = false
         prefetcher?.cancelAll()
         prefetchedFor = nil
         retryTask?.cancel()

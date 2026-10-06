@@ -54,7 +54,7 @@ final class AVPlayerEnginePausedStatusTests: XCTestCase {
     }
     /// Unexpected pauses are resumed at most once per second (the controller's stall timeout bounds the rest).
     func testResumeThrottle() {
-        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: nil), 0)
+        XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: nil), 300, "first resume waits for audio-session notifications")
         XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 1_500), 0)
         XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 300), 700)
         XCTAssertEqual(AVPlayerEngine.resumeDelayMs(sinceLastResumeMs: 0), 1_000)

@@ -267,4 +267,17 @@ final class PlayerProgressTests: XCTestCase {
         XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 0), -10)
         XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 1_300), -30)
     }
+
+    /// End of a VOD whose length was never known: saved as watched, so it leaves "Continue watching".
+    func testEndWithUnknownDurationMarksWatched() async throws {
+        let c = try controller()
+        let engine = try await open(c, movie)
+        engine.emit(.ready(duration: 0))
+        engine.emit(.time(300))
+        engine.emit(.ended)
+        let item = try XCTUnwrap(try saved(movie))
+        XCTAssertEqual(item.data.positionMs, 300_000)
+        XCTAssertTrue(WatchHistory.isCompleted(positionMs: item.data.positionMs ?? 0, durationMs: item.data.durationMs ?? 0))
+        XCTAssertTrue(WatchHistory.continueWatching([item]).isEmpty)
+    }
 }
