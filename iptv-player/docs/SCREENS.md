@@ -35,9 +35,17 @@ buradan üretilir – eksik çeviri üretimi durdurur).
 ## 2. Navigasyon
 
 ### Mobil (iPhone / iPad)
-**Alt sekme çubuğu ve başlık açılır menüsü yok.** Üstte tek başlık şeridi: solda uygulama işareti,
-ortada yatay kaydırılabilir **metin sekmeleri** **Ana Sayfa · Filmler · Diziler · Canlı TV · TV Rehberi**
+**Alt sekme çubuğu ve başlık açılır menüsü yok.** Üstte başlık şeridi: solda uygulama işareti,
+**metin sekmeleri** **Ana Sayfa · Filmler · Diziler · Canlı TV · TV Rehberi**
 (seçili = beyaz metin + `primary` alt çizgi, diğerleri gri), sağda 🔍 Ara ve ⚙️ Ayarlar ikonları.
+**Beş sekme her zaman görünür, yatay kaydırma yok** (TestFlight build 6: kaydırmalı şerit iPhone'da
+"Canlı TV"/"TV Rehberi"ni gizliyordu, otomatik ortalama "Ana Sayfa"yı uygulama işaretinin altına
+itiyordu). Her şey tek satıra sığarsa (yatay, iPad) tek satır; sığmazsa (dikey iPhone) **iki satır**:
+üstte uygulama işareti · 🔍 · ⚙️, altında sekmeler tüm genişliğe eşit dağılmış. Sığmadığında yazı
+önce küçülür (subheadline → footnote → caption, sonra ölçeklenir), hiçbir sekme kesilmez. Her
+dokunma hedefi ≥ 44 pt yüksek. Başlık üst güvenli alan eki (`safeAreaInset`) olarak durur: hero'suz
+ekranlar her yükseklikte (Dynamic Type, bir/iki satır) başlığın **altında** başlar; dinamik yazı
+boyutu başlıkta `accessibility2` ile sınırlıdır.
 Şerit hero üzerinde **şeffaf** durur, içerik kaydırılınca **siyaha** döner (hero'suz ekranlarda
 hep siyah). Ara → genel arama ekranı (kanal + film + dizi). Ayarlar **sheet** olarak açılır (§3.9).
 Favoriler ayrı sekme değildir: Ana Sayfa'da "Favoriler" satırı (+ "Tümünü gör" → Favoriler ekranı:

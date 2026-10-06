@@ -669,62 +669,39 @@ struct CatalogGridView: View {
 #if !os(tvOS)
 /// iPhone/iPad header (SCREENS §2): app mark · text tabs with accent underline · search · settings.
 /// Transparent over heroes, solid black once scrolled (or on screens without hero).
+///
+/// All five tabs are always visible – no horizontal scrolling (TestFlight build 6: on iPhone the
+/// scrolling strip hid "Live TV"/"TV Guide", and its auto-centering parked "Home" under the app
+/// mark). One row when everything fits (landscape, iPad); otherwise two rows: app mark · search ·
+/// settings on top, the tabs spread over the full width below. Tab font steps down (subheadline →
+/// footnote → caption, then scales) before anything is clipped. Every target is ≥ 44 pt high.
 struct MobileTopBar: View {
     @Environment(Router.self) private var router
     var solid: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "play.tv.fill").font(.title3.weight(.bold)).foregroundStyle(Theme.premiumGradient)
-                .accessibilityHidden(true)
-            ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 18) {
-                    ForEach(AppSection.mobile, id: \.self) { section in
-                        let selected = router.section == section
-                        Button {
-                            router.section = section
-                            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(section, anchor: .center) }
-                        } label: {
-                            VStack(spacing: 5) {
-                                Text(L10n.t(section.titleKey))
-                                    .font(.subheadline.weight(selected ? .bold : .semibold))
-                                    .foregroundStyle(selected ? Color.white : Color.white.opacity(0.6))
-                                    .lineLimit(1)
-                                Capsule().fill(selected ? Theme.primary : .clear).frame(height: 3)
-                            }
-                            .fixedSize(horizontal: true, vertical: false)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("tab_\(section.rawValue)")
-                        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-                        .id(section)
-                    }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                appMark
+                tabRow(.subheadline, spacing: 22)
+                Spacer(minLength: 0)
+                actions
+            }
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    appMark
+                    Spacer(minLength: 0)
+                    actions
                 }
-                .padding(.vertical, 6)
-                .padding(.trailing, 20)
+                ViewThatFits(in: .horizontal) {
+                    tabRow(.subheadline, fill: true)
+                    tabRow(.footnote, fill: true)
+                    tabRow(.caption, fill: true, shrink: true)
+                }
             }
-            // Soft fade at the edges so a clipped tab ("Live T…") reads as "more to scroll",
-            // not as a broken label.
-            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.85),
-                                         .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
-            .onAppear { proxy.scrollTo(router.section, anchor: .center) }
-            .onChange(of: router.section) { _, s in withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(s, anchor: .center) } }
-            }
-            Button { router.path.append(BrowseRoute.search) } label: {
-                Image(systemName: "magnifyingglass").font(.body.weight(.semibold)).foregroundStyle(.white).frame(width: 36, height: 36)
-            }
-            .accessibilityLabel(L10n.t("action_search"))
-            .accessibilityIdentifier("open_search")
-            Button { router.settingsPresented = true } label: {
-                Image(systemName: "gearshape.fill").font(.body.weight(.semibold)).foregroundStyle(.white).frame(width: 36, height: 36)
-            }
-            .accessibilityLabel(L10n.t("action_settings"))
-            .accessibilityIdentifier("open_settings")
         }
         .padding(.horizontal, Theme.safeH)
-        .padding(.top, 2)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .background {
             ZStack {
                 LinearGradient(colors: [.black.opacity(0.7), .clear], startPoint: .top, endPoint: .bottom)
@@ -732,6 +709,58 @@ struct MobileTopBar: View {
             }
             .ignoresSafeArea(edges: .top)
             .animation(.easeOut(duration: 0.2), value: solid)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("mobile_header")
+    }
+
+    private var appMark: some View {
+        Image(systemName: "play.tv.fill").font(.title3.weight(.bold)).foregroundStyle(Theme.premiumGradient)
+            .accessibilityHidden(true)
+    }
+
+    /// Text tabs. `fill`: spread over the full width (each tab's slot is tappable); `shrink`: last
+    /// resort, labels scale down instead of being clipped.
+    private func tabRow(_ font: Font, spacing: CGFloat = 0, fill: Bool = false, shrink: Bool = false) -> some View {
+        HStack(spacing: spacing) {
+            ForEach(AppSection.mobile, id: \.self) { section in
+                let selected = router.section == section
+                Button { router.section = section } label: {
+                    VStack(spacing: 5) {
+                        Text(L10n.t(section.titleKey))
+                            .font(font.weight(selected ? .bold : .semibold))
+                            .foregroundStyle(selected ? Color.white : Color.white.opacity(0.6))
+                            .lineLimit(1)
+                            .minimumScaleFactor(shrink ? 0.5 : 1)
+                            .fixedSize(horizontal: !shrink, vertical: false)
+                        Capsule().fill(selected ? Theme.primary : .clear).frame(height: 3)
+                    }
+                    .fixedSize(horizontal: !shrink, vertical: false)
+                    .padding(.horizontal, fill ? 2 : 0)
+                    .frame(maxWidth: fill ? .infinity : nil, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tab_\(section.rawValue)")
+                .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+            }
+        }
+    }
+
+    private var actions: some View {
+        HStack(spacing: 4) {
+            Button { router.path.append(BrowseRoute.search) } label: {
+                Image(systemName: "magnifyingglass").font(.body.weight(.semibold)).foregroundStyle(.white)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel(L10n.t("action_search"))
+            .accessibilityIdentifier("open_search")
+            Button { router.settingsPresented = true } label: {
+                Image(systemName: "gearshape.fill").font(.body.weight(.semibold)).foregroundStyle(.white)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel(L10n.t("action_settings"))
+            .accessibilityIdentifier("open_settings")
         }
     }
 }

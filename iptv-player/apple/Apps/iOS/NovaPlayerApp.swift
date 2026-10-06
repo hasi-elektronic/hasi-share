@@ -49,14 +49,16 @@ struct RootView: View {
                 WelcomeView()
             } else {
                 NavigationStack(path: $router.path) {
-                    ZStack(alignment: .top) {
-                        // Hero sections run under the (transparent) header; the others start below it.
-                        sectionContent
-                            .safeAreaPadding(.top, hasHero ? 0 : 50)
-                        MobileTopBar(solid: router.headerSolid || !hasHero)
-                    }
-                    .toolbar(.hidden, for: .navigationBar)
-                    .catalogDestinations()
+                    // The header is a top safe-area inset: screens without hero start right below
+                    // it whatever its height (Dynamic Type, one/two rows); hero screens ignore the
+                    // top safe area and run under the transparent header. The inset is layered
+                    // above the content, so it always receives the taps in its area.
+                    sectionContent
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            MobileTopBar(solid: router.headerSolid || !hasHero)
+                        }
+                        .toolbar(.hidden, for: .navigationBar)
+                        .catalogDestinations()
                 }
                 .onAppear(perform: applyDebugScreen)
                 .onChange(of: router.section) { router.headerSolid = false }
