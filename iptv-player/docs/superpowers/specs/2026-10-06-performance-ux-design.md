@@ -34,8 +34,9 @@ Bileşenler:
 - **Liste/görsel**: görseller hedef boyuta küçültülerek (`CGImageSourceCreateThumbnailAtIndex`)
   çözülür, bellek + disk önbelleği; kaydırmada iptal. Şimdi/sonraki için
   `(sourceId, channelEpgId, start)` indeksli tek sorgu ve 60 sn önbellek.
-- **Artımlı yenileme**: liste yenilemede değişmeyen satırlar yeniden yazılmaz
-  (içerik karması karşılaştırması), yenileme UI'yi kilitlemez.
+- **Engelsiz yenileme**: liste yenilemesi (atomik geçici tablo + değişim) ana iş
+  parçacığı dışında çalışır, yenileme sırasında listeler kaydırılabilir kalır. (Satır bazlı
+  artımlı yazım v1'de yok — atomik değişimle çelişir, ölçümle gerek görülmedi.)
 - **`PerfTrace` + gizli performans katmanı**: imleçler (uygulama açılış, oynatma isteği,
   ilk kare, zap). Ayarlar → Tanılama → "Performans katmanı" açılınca oynatıcıda: motor,
   zap süresi, tampon, bitrate, çözünürlük, düşen kare. Log'a yalnızca süreler yazılır
