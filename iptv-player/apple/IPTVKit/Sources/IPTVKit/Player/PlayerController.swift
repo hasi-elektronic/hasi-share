@@ -176,13 +176,13 @@ public final class PlayerController {
         phase = .loading
         PerfTrace.shared.mark(.playRequested)
         prefetchedFor = nil
-        // A neighbour warmed up while the previous channel played: skip the resolver.
+        // A neighbour warmed up while the previous channel played: skip the resolver. Anything else
+        // (not warmed, VOD) cancels the old prefetch right away so it does not compete with this start.
         var cached: ResolvedStream?
         if case .channel(let channel) = request.item {
             cached = prefetcher?.takeResolved(channelId: channel.id)
-        } else {
-            prefetcher?.cancelAll()
         }
+        if cached == nil { prefetcher?.cancelAll() }
         openTask = Task { [weak self] in
             guard let self else { return }
             do {

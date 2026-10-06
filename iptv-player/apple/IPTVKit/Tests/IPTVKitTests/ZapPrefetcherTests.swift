@@ -15,7 +15,80 @@ private struct Net: NetworkConditions { var isExpensiveOrConstrained: Bool }
 
 @MainActor
 final class ZapPrefetcherTests: XCTestCase {
-    func channels(_ n: Int) -> [Channel] { (0..<n).map { TestData.channel(id: "c\($0)") } }
+    func channels(_ n: Int) -> [Channel] { (0..<n).map { TestData.channel(id: "c\($0)", url: "http://live.example.com/c\($0)") } }
+
+    private func hlsResolver(_ container: StreamContainer = .hls) -> @MainActor (PlaybackRequest) async throws -> ResolvedStream {
+        { req in
+            guard case .channel(let c) = req.item else { throw CancellationError() }
+            return ResolvedStream(url: URL(string: "http://h/\(c.id).m3u8")!, container: container, headers: [:])
+        }
+    }
+
+    private func xtreamSource(maxConnections: Int?) -> Source {
+        var s = Source.make(name: "P", secrets: .xtream(XtreamSecrets(serverUrl: "http://panel.example.com", username: "u", password: "p")), id: "s1")
+        s.xtreamAccount = XtreamAccountInfo(status: "Active", expiresAt: nil, maxConnections: maxConnections, activeConnections: 0,
+                                            allowedOutputFormats: [], serverTimezone: "UTC")
+        return s
+    }
+
+    /// Prefetches around c1 of 3 with `source`; returns (#fetches, resolved neighbour present).
+    private func run(container: StreamContainer = .hls, source: Source?, channels list: [Channel]) async throws -> (Int, Bool) {
+        let fetcher = CountingFetcher()
+        let p = ZapPrefetcher(resolver: hlsResolver(container), fetcher: fetcher, network: Net(isExpensiveOrConstrained: false))
+        p.prefetch(around: list[1], request: PlaybackRequest(item: .channel(list[1]), source: source, channels: list))
+        try await Task.sleep(for: .milliseconds(100))
+        return (fetcher.urls.count, p.takeResolved(channelId: "c2") != nil)
+    }
+
+    func testByteReadOnlyForHLS() async throws {
+        let (hls, _) = try await run(source: nil, channels: channels(3))
+        XCTAssertEqual(hls, 2)
+        for container in [StreamContainer.mpegts, .mp4, .mkv, .unknown] {
+            let (fetches, resolved) = try await run(container: container, source: nil, channels: channels(3))
+            XCTAssertEqual(fetches, 0, "\(container): resolve-only")
+            XCTAssertTrue(resolved, "\(container): still resolved")
+        }
+    }
+
+    func testXtreamByteReadNeedsMoreThanOneConnection() async throws {
+        let xt = (0..<3).map { TestData.channel(id: "c\($0)") }   // Xtream channels have no URL of their own
+        for (max, want) in [(nil, 0), (0, 0), (1, 0), (2, 2), (5, 2)] as [(Int?, Int)] {
+            let (fetches, resolved) = try await run(source: xtreamSource(maxConnections: max), channels: xt)
+            XCTAssertEqual(fetches, want, "max_connections=\(String(describing: max))")
+            XCTAssertTrue(resolved)
+        }
+        // Source unknown + channel without URL = Xtream with unknown account → no read.
+        let (unknown, _) = try await run(source: nil, channels: xt)
+        XCTAssertEqual(unknown, 0)
+        // A neighbour from another source is not described by the request's source: Xtream channel → no read.
+        let other = (0..<3).map { Channel(sourceId: "s2", id: "c\($0)", name: "X") }
+        let (foreign, _) = try await run(source: xtreamSource(maxConnections: 5), channels: other)
+        XCTAssertEqual(foreign, 0)
+        // M3U source is not gated.
+        let m3u = Source.make(name: "M", secrets: .m3u(M3USecrets(url: "http://x.example.com/l.m3u")), id: "s1")
+        let (m3uFetches, _) = try await run(source: m3u, channels: channels(3))
+        XCTAssertEqual(m3uFetches, 2)
+    }
+
+    private final class Clock: @unchecked Sendable {
+        private let lock = NSLock(); private var t = Date(timeIntervalSince1970: 1_000)
+        var date: Date { lock.withLock { t } }
+        func advance(_ s: TimeInterval) { lock.withLock { t += s } }
+    }
+
+    func testCachedResolutionExpiresAfterTTL() async throws {
+        let list = channels(3); let clock = Clock()
+        let p = ZapPrefetcher(resolver: hlsResolver(), fetcher: CountingFetcher(), network: Net(isExpensiveOrConstrained: false),
+                              now: { clock.date })
+        let request = PlaybackRequest(item: .channel(list[1]), source: nil, channels: list)
+        p.prefetch(around: list[1], request: request)
+        try await Task.sleep(for: .milliseconds(80))
+        clock.advance(89)
+        XCTAssertNotNil(p.takeResolved(channelId: "c0"), "still fresh at 89 s")
+        clock.advance(2)
+        XCTAssertNil(p.takeResolved(channelId: "c2"), "stale after 90 s → resolve again")
+        XCTAssertNil(p.takeResolved(channelId: "c2"))
+    }
 
     func testNeighboursWrapAround() {
         let list = channels(3)
@@ -116,6 +189,18 @@ final class PlayerControllerPrefetchTests: XCTestCase {
         try await settle(av.loads.count == 3)
         XCTAssertEqual(sniffed.count, 2)
         XCTAssertEqual(av.loads.last?.url.absoluteString, "http://live.example.com/play?id=3")
+    }
+
+    func testOpeningUncachedChannelCancelsOldPrefetchImmediately() async throws {
+        let (c, av, fetcher) = make(CallCounter())
+        let channels = list()
+        c.open(PlaybackRequest(item: .channel(channels[1]), source: nil, channels: channels))
+        try await settle(av.loads.count == 1)
+        av.emit(.playing)
+        try await settle(fetcher.urls.count == 2)
+        c.open(PlaybackRequest(item: .channel(channels[3]), source: nil, channels: channels))   // not warmed
+        XCTAssertNil(c.prefetcher?.takeResolved(channelId: "c0"), "old prefetch dropped at open, before the new stream loads")
+        XCTAssertNil(c.prefetcher?.takeResolved(channelId: "c2"))
     }
 
     func testNoPrefetchBeforeFirstFrameOrOnExpensiveNetwork() async throws {

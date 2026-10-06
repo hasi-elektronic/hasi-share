@@ -210,11 +210,16 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
 * Oynatıcı: kanal değiştirmede örnek yeniden kullanımı, canlıda düşük başlangıç tamponu
   (AVPlayer 1 sn ileri tampon + 2,5 Mbps ilk varyant sınırı, VLCKit 1000 ms; ayrıntı §3.2).
 * Komşu kanal ön ısıtma (`ZapPrefetcher`, yalnızca Apple): canlı kanalın ilk karesinden sonra
-  önceki/sonraki kanalın akış URL'si çözülür ve en çok **256 KB** (manifest / ilk baytlar,
-  Range GET) okunur; **en çok 2 eşzamanlı**, **hücresel / Düşük Veri Modu'nda kapalı**
-  (`NWPath.isExpensive/isConstrained`). Çözümlenmiş akış bir kez tüketilir: komşuya geçişte
-  `StreamResolver` tekrar çağrılmaz. Kanal değişince, ekran/oynatıcı kapanınca ve uygulama
-  `.active` dışına çıkınca (`release()`) iptal edilir; URL'ler loglanmaz.
+  önceki/sonraki kanalın akış URL'si çözülür (**en çok 2 eşzamanlı**, **hücresel / Düşük Veri
+  Modu'nda kapalı** – `NWPath.isExpensive/isConstrained`, yol bilinmeyene kadar kapalı). Çözümlenmiş
+  akış bir kez tüketilir ve **90 sn** sonra düşer (tokenlı URL'ler eskir); komşuya geçişte
+  `StreamResolver` tekrar çağrılmaz. **Bayt ön okuması** (en çok **256 KB**, Range GET) ek bağlantı
+  açar ve `max_connections = 1` olan Xtream hesaplarında oynayan yayını düşürebilir; bu yüzden
+  yalnızca **HLS** (`.m3u8`) için ve yalnızca kaynak Xtream değilse ya da kayıtlı
+  `xtreamAccount.maxConnections > 1` ise yapılır (Xtream + bilgi yok/1 ya da komşu farklı kaynaktan → yalnızca URL çözümü;
+  bedel: tek bağlantılı hesaplarda daha az ısınma). Başka bir kanal açılınca (önbellekte yoksa),
+  ekran/oynatıcı kapanınca ve uygulama `.active` dışına çıkınca (`release()`) iptal edilir;
+  URL'ler loglanmaz.
 
 ## 8. Güvenlik özeti
 Ayrıntı: `docs/SECURITY.md`. Kısaca: gizli bilgiler Keystore/Keychain'de; veritabanı ve

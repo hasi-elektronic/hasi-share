@@ -23,10 +23,15 @@ Bileşenler:
 - **Anında başlatma (`QuickStart`)**: açılışta, kaynak yenilemesini beklemeden son izlenen
   canlı kanal (ayar: Açık/Kapalı, varsayılan Açık — yalnızca son oturum canlı kanalda
   bittiyse) oynatıcıda açılır. Yenileme arka planda (atomik) sürer.
-- **Komşu kanal ön ısıtma (`ZapPrefetcher`)**: canlı oynatırken önceki/sonraki kanal için
-  DNS + TCP/TLS bağlantısı ve HLS ana/çeşit listesi önceden alınır (HEAD/GET, bayt sınırı
-  256 KB, eşzamanlı en fazla 2). Kanal değişince hazır URL/manifest kullanılır. VLC/TS
-  akışlarında yalnızca bağlantı ısıtılır. Hücresel ağda ve "Düşük veri modu"nda kapalı.
+- **Komşu kanal ön ısıtma (`ZapPrefetcher`)**: canlı oynatırken, ilk kareden sonra önceki/sonraki
+  kanalın akış URL'si çözülür (en fazla 2 eşzamanlı) ve kanal değişince bu çözüm kullanılır
+  (çözüm 90 sn sonra geçersiz sayılır: tokenlı URL'ler eskir). **Bayt ön okuması** (HLS ana
+  listesi, en fazla 256 KB) sağlayıcıya ek bir bağlantı açar; birçok Xtream hesabında
+  `max_connections = 1` olduğundan ikinci bağlantı oynayan yayını düşürebilir. Bu yüzden ön okuma
+  **yalnızca HLS** için ve yalnızca kaynak Xtream değilse ya da kayıtlı hesap bilgisi
+  `max_connections > 1` diyorsa yapılır; Xtream'de hesap bilgisi yoksa/1 ise yalnızca URL çözümü
+  yapılır (bedel: tek bağlantılı hesaplarda daha az ısınma). VLC/TS/MP4 akışlarında bayt okunmaz.
+  Hücresel ağda ve "Düşük veri modu"nda kapalı (ağ durumu bilinmeyene kadar da kapalı).
 - **Canlı başlangıç ayarı**: AVPlayer canlıda `preferredForwardBufferDuration = 1`,
   `automaticallyWaitsToMinimizeStalling = false` ilk 3 sn, ardından `true`;
   ilk çeşit için `preferredPeakBitRate` sınırı (≈ 2,5 Mbps) ilk 4 sn, sonra kaldırılır.
