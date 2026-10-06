@@ -45,6 +45,8 @@ public final class AppEnvironment {
     @ObservationIgnored public let refresher: SourceRefresher
     @ObservationIgnored public let backend: BackendClient
     @ObservationIgnored public let syncManager: SyncManager
+    /// One-tap favorites: cached set, undo, device-local order, favorite categories.
+    public let favorites: FavoritesController
     @ObservationIgnored public let secureStore: any SecureStore
     public let settings: AppSettings
     public let store: StoreManager
@@ -73,6 +75,7 @@ public final class AppEnvironment {
         catalog = CatalogRepository(database: database)
         epg = EpgRepository(database: database)
         library = LibraryRepository(database: database)
+        favorites = FavoritesController(library: library, kv: kv, now: { Int64(Date().timeIntervalSince1970 * 1000) })
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
@@ -103,12 +106,15 @@ public final class AppEnvironment {
             license.update(store: snapshot)
             Task { await self.license.sync() }
         }
+        favorites.now = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
+        favorites.onChange = { [weak self] in self?.libraryChanged() }
         license.sessionToken = { [weak self] in self?.account.sessionToken }
         account.onSessionChange = { [weak self] signedIn in
             guard let self else { return }
             Task {
                 if signedIn {
                     await self.syncManager.syncNow()
+                    self.favorites.reload()
                     self.libraryVersion += 1
                 } else {
                     await self.syncManager.reset()
@@ -141,6 +147,7 @@ public final class AppEnvironment {
         if account.isSignedIn {
             await syncManager.syncNow()
             lastSyncedAt = await syncManager.lastSyncedAt
+            favorites.reload()
             libraryVersion += 1
         }
         await refreshDueSources()
@@ -173,6 +180,7 @@ public final class AppEnvironment {
                 if account.isSignedIn {
                     await syncManager.syncNow()
                     lastSyncedAt = await syncManager.lastSyncedAt
+                    self.favorites.reload()
                     libraryVersion += 1
                 }
             }
@@ -291,14 +299,13 @@ public final class AppEnvironment {
 
     public func isFavorite(sourceId: String, kind: ContentKind, itemId: String) -> Bool {
         guard let key = contentKey(sourceId: sourceId, kind: kind, itemId: itemId) else { return false }
-        return (try? library.isFavorite(contentKey: key)) ?? false
+        return favorites.isFavorite(key)
     }
 
-    public func toggleFavorite(sourceId: String, kind: ContentKind, itemId: String, title: String, posterUrl: String?) {
-        guard let key = contentKey(sourceId: sourceId, kind: kind, itemId: itemId) else { return }
-        let on = !((try? library.isFavorite(contentKey: key)) ?? false)
-        _ = try? library.setFavorite(on, contentKey: key, title: title, kind: kind, posterUrl: posterUrl, nowMs: license.nowMs())
-        libraryChanged()
+    @discardableResult
+    public func toggleFavorite(sourceId: String, kind: ContentKind, itemId: String, title: String, posterUrl: String?) -> Bool {
+        guard let key = contentKey(sourceId: sourceId, kind: kind, itemId: itemId) else { return false }
+        return favorites.toggle(FavoriteTarget(contentKey: key, title: title, kind: kind, posterUrl: posterUrl))
     }
 
     // MARK: Playback

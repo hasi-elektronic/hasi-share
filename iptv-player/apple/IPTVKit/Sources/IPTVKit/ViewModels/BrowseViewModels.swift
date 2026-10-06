@@ -50,8 +50,9 @@ public final class LiveTVViewModel {
         totalCount = 0
         switch filter {
         case .favorites:
-            let favs = (try? env.library.favorites(kind: .live)) ?? []
-            let ids = favs.compactMap { ContentKey.parse($0.contentKey) }.map(\.itemId)
+            let fingerprint = env.fingerprint(sourceId: sourceId)
+            let ids = env.favorites.orderedKeys(kind: .live).compactMap { ContentKey.parse($0) }
+                .filter { fingerprint == $0.fingerprint }.map(\.itemId)
             let channels = (try? env.catalog.channels(sourceId: sourceId, ids: ids)) ?? []
             totalCount = channels.count
             rows = attachEpg(channels)
@@ -258,8 +259,8 @@ public final class HomeViewModel {
         let mine = progress.filter { $0.contentKey.hasPrefix(fingerprint + ":") }
         continueWatching = WatchHistory.continueWatching(mine, limit: 20)
         let recentIds = WatchHistory.recentlyWatched(mine, kind: .live, limit: 20).compactMap { ContentKey.parse($0.contentKey)?.itemId }
-        let favIds = ((try? env.library.favorites(kind: .live)) ?? []).filter { $0.contentKey.hasPrefix(fingerprint + ":") }
-            .compactMap { ContentKey.parse($0.contentKey)?.itemId }
+        let favIds = env.favorites.orderedKeys(kind: .live).filter { $0.hasPrefix(fingerprint + ":") }
+            .compactMap { ContentKey.parse($0)?.itemId }
         recentChannels = rows((try? env.catalog.channels(sourceId: source.id, ids: recentIds)) ?? [], sourceId: source.id)
         favoriteChannels = rows((try? env.catalog.channels(sourceId: source.id, ids: favIds)) ?? [], sourceId: source.id)
         newMovies = (try? env.catalog.movies(sourceId: source.id, sort: .added, limit: 20)) ?? []
@@ -305,9 +306,10 @@ public final class FavoritesViewModel {
 
     public func reload() {
         guard let source = env.currentSource else { channels = []; movies = []; series = []; return }
+        let fingerprint = env.fingerprint(sourceId: source.id)
         func ids(_ kind: ContentKind) -> [String] {
-            ((try? env.library.favorites(kind: kind)) ?? []).compactMap { ContentKey.parse($0.contentKey) }
-                .filter { env.fingerprint(sourceId: source.id) == $0.fingerprint }.map(\.itemId)
+            env.favorites.orderedKeys(kind: kind).compactMap { ContentKey.parse($0) }
+                .filter { fingerprint == $0.fingerprint }.map(\.itemId)
         }
         channels = (try? env.catalog.channels(sourceId: source.id, ids: ids(.live))) ?? []
         movies = ids(.movie).compactMap { (try? env.catalog.movie(sourceId: source.id, id: $0)) ?? nil }
