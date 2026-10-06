@@ -1045,9 +1045,9 @@
    "de": "Audio-Sync"
   },
   "audio_sync_hint": {
-   "en": "Sound too early? Use +. Sound too late? Use −. Saved for this channel or title.",
-   "tr": "Ses görüntüden önce mi? + kullan. Sonra mı? − kullan. Bu kanal/içerik için kaydedilir.",
-   "de": "Ton zu früh? + wählen. Ton zu spät? − wählen. Wird für diesen Sender bzw. Titel gespeichert."
+   "en": "Sound before the picture? Use +. Sound after the picture? Use −.",
+   "tr": "Ses görüntüden önce mi geliyor? + kullan. Sonra mı geliyor? − kullan.",
+   "de": "Ton vor dem Bild? + wählen. Ton nach dem Bild? − wählen."
   },
   "audio_sync_fix": {
    "en": "Fix sync",
@@ -1059,10 +1059,30 @@
    "tr": "Gecikme ayarlanınca bu kanal VLC motoruyla oynatılır",
    "de": "Mit Verzögerung läuft dieser Stream über die VLC-Engine"
   },
+  "audio_sync_content": {
+   "en": "This channel/title",
+   "tr": "Bu kanal/içerik",
+   "de": "Dieser Sender/Titel"
+  },
+  "audio_delay_later": {
+   "en": "{0} · audio later",
+   "tr": "{0} · ses daha geç",
+   "de": "{0} · Ton später"
+  },
+  "audio_delay_earlier": {
+   "en": "{0} · audio earlier",
+   "tr": "{0} · ses daha erken",
+   "de": "{0} · Ton früher"
+  },
+  "audio_sync_unavailable": {
+   "en": "Sync can't be applied to this stream",
+   "tr": "Senkron bu yayında uygulanamadı",
+   "de": "Sync ist bei diesem Stream nicht möglich"
+  },
   "settings_device_audio_delay": {
-   "en": "Device/soundbar delay",
-   "tr": "Cihaz/soundbar gecikmesi",
-   "de": "Geräte-/Soundbar-Verzögerung"
+   "en": "Audio delay (TV/soundbar)",
+   "tr": "Ses gecikmesi (TV/soundbar)",
+   "de": "Audioverzögerung (TV/Soundbar)"
   },
   "about_version": {
    "en": "Version {0}",

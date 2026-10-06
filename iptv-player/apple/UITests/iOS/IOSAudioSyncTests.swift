@@ -58,13 +58,33 @@ final class IOSAudioSyncTests: XCTestCase {
         let plus = app.buttons["player_audio_sync_delay_plus"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5), "sync panel")
         XCTAssertTrue(app.staticTexts["audio_sync_vlc_note"].exists, "AVPlayer note")
-        UITestSupport.snap("audio-sync-01-panel", in: self)
+        XCTAssertTrue(app.buttons["player_device_audio_delay_plus"].exists, "device (TV/soundbar) row in the panel")
+        XCTAssertTrue(app.otherElements["video_surface"].exists, "non-modal: the picture stays")
         for _ in 0..<4 { plus.tap() }
-        XCTAssertEqual(app.staticTexts["player_audio_sync_delay_value"].label, "+200 ms")
+        XCTAssertEqual(app.staticTexts["player_audio_sync_delay_value"].label, "+200 ms · audio later")
         XCTAssertTrue(waitPerf(app, contains: ["VLCKit"], timeout: 5), "switched to VLCKit within 5 s: \(perf(app))")
         XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Buffer: ok", "Audio delay: +200 ms"], timeout: 30),
                       "VLCKit plays with the delay applied: \(perf(app))")
-        UITestSupport.snap("audio-sync-02-vlc", in: self)
+        // Device delay from the same panel adds live: 200 + (−100) applied by libVLC.
+        app.buttons["player_device_audio_delay_minus"].tap()
+        app.buttons["player_device_audio_delay_minus"].tap()
+        XCTAssertEqual(app.staticTexts["player_device_audio_delay_value"].label, "-100 ms · audio earlier")
+        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: +100 ms"], timeout: 5), "content + device: \(perf(app))")
+        UITestSupport.snap("ios-portrait-sync-panel", in: self)
+
+        // iPhone landscape: the panel stays low – most of the picture remains visible.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(2)
+        let panel = app.otherElements["audio_sync_panel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 3))
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, window.height, "landscape")
+        XCTAssertLessThan(panel.frame.height, window.height * 0.6, "panel covers \(panel.frame.height) of \(window.height) pt")
+        UITestSupport.snap("ios-landscape-sync-panel", in: self)
+        XCUIDevice.shared.orientation = .portrait
+        sleep(2)
+        app.buttons["player_device_audio_delay_plus"].tap()
+        app.buttons["player_device_audio_delay_plus"].tap()   // device delay back to 0 for the next checks
         app.buttons["audio_sync_close"].tap()
         XCTAssertTrue(plus.waitForNonExistence(timeout: 3), "panel closed")
 

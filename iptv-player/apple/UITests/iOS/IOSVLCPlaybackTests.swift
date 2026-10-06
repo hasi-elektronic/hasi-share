@@ -43,12 +43,17 @@ final class IOSVLCPlaybackTests: XCTestCase {
         showOverlay(app)
         UITestSupport.snap("vlc-ios-02-mkv-overlay", in: self)
 
-        // The Subtitles tool only appears when the engine reported tracks: VLCKit found the two SRT
-        // subtitle tracks of the MKV (Audio is always shown – it holds the Sync row). (Menu
-        // contents/language names: EngineTests + TrackNamingTests.)
-        XCTAssertTrue(app.buttons["Audio"].waitForExistence(timeout: 3), "audio menu")
-        XCTAssertTrue(app.buttons["Subtitles"].exists, "VLCKit subtitle tracks")
+        // VLCKit reported the MKV's tracks: the two audio tracks (tur/eng) are rows of the Audio menu
+        // (which always exists – it holds the Sync row) and the Subtitles tool appears for the two SRT
+        // tracks. (Language naming: EngineTests + TrackNamingTests.)
+        XCTAssertTrue(app.buttons["Subtitles"].waitForExistence(timeout: 3), "VLCKit subtitle tracks")
         XCTAssertTrue(app.buttons["Aspect ratio"].exists)
+        app.buttons["Audio"].tap()
+        let turkish = app.buttons["Turkish"]
+        XCTAssertTrue(turkish.waitForExistence(timeout: 3), "VLCKit audio track rows in the Audio menu")
+        XCTAssertTrue(app.buttons["English"].exists, "second VLCKit audio track")
+        UITestSupport.snap("vlc-ios-03-audio-tracks", in: self)
+        turkish.tap()   // closes the menu (selects the track that already plays)
 
         // Zap (swipe up) → progressive MPEG-TS (MPEG-2 video + MP2 audio) via VLCKit.
         surface.swipeUp()

@@ -193,9 +193,9 @@ final class AudioDelayPlayerTests: XCTestCase {
         XCTAssertEqual(av.loads.count, 1, "no reload from the error card (Retry does that)")
     }
 
-    /// The reconnect itself reopens the stream at the live edge; on its first frame the delay is applied
-    /// once more (no second reload).
-    func testReconnectSuccessReappliesSyncOnce() async throws {
+    /// The reconnect itself reopens the stream at the live edge (that is the resync) and starts the new
+    /// item with the delay; its first frame triggers no second reload.
+    func testReconnectReopensAtLiveEdgeWithTheDelay() async throws {
         let c = controller(policy: ReconnectPolicy(delaysMs: [10, 10]))
         let r = request(.channel(channel("1", "http://h.example.com/live/1.ts")))
         store.setContentDelay(200, for: try key(r))
@@ -208,15 +208,111 @@ final class AudioDelayPlayerTests: XCTestCase {
         for _ in 0..<200 where vlc.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
         XCTAssertEqual(vlc.loads.count, 2)
         XCTAssertNil(vlc.loads.last?.startMs, "live edge")
-        let appliedAtLoad = vlc.audioDelays.count
-        XCTAssertEqual(appliedAtLoad, appliedBefore + 1)
-        vlc.emit(.playing)
-        XCTAssertEqual(c.phase, .playing)
-        XCTAssertEqual(vlc.audioDelays.count, appliedAtLoad + 1, "resync applied once after the reconnect")
+        XCTAssertEqual(vlc.audioDelays.count, appliedBefore + 1, "the reconnect load starts with the delay")
         XCTAssertEqual(vlc.audioDelays.last, 200)
         vlc.emit(.playing)
-        XCTAssertEqual(vlc.audioDelays.count, appliedAtLoad + 1, "only once")
-        XCTAssertEqual(vlc.loads.count, 2, "no extra reload")
+        vlc.emit(.playing)
+        XCTAssertEqual(c.phase, .playing)
+        XCTAssertEqual(vlc.loads.count, 2, "no extra reload after the reconnect")
+    }
+
+    /// While the next request resolves, `stream` still is the previous channel: sync actions must not
+    /// reopen it (single-connection Xtream accounts would refuse the new channel).
+    func testSyncActionsWhileResolvingDoNotReopenThePreviousStream() async throws {
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        self.av = av
+        self.vlc = vlc
+        store = AudioDelayStore(kv: InMemoryKeyValueStore())
+        var makeVLC: (@MainActor () -> any PlaybackEngine)?
+        makeVLC = { vlc }
+        // Unknown container → the (slow) sniffer runs while the request resolves.
+        let sniffer: StreamResolver.Sniffer = { _, _ in
+            try? await Task.sleep(for: .milliseconds(300))
+            return ("application/vnd.apple.mpegurl", Data("#EXTM3U\n".utf8), 200)
+        }
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: sniffer, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: makeVLC))
+        c.audioDelayStore = store
+        try await open(c, request(.channel(channel("1", "http://h.example.com/live/1.m3u8"))))
+        av.emit(.playing)
+        c.open(request(.channel(channel("2", "http://h.example.com/play?id=2"))))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(c.phase, .loading)
+        c.resync()
+        c.setAudioDelay(200)
+        XCTAssertEqual(av.loads.count, 1, "previous channel not reopened")
+        XCTAssertTrue(vlc.loads.isEmpty, "previous channel not reopened in VLCKit")
+        for _ in 0..<200 where vlc.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(vlc.loads.map(\.url.absoluteString), ["http://h.example.com/play?id=2"], "only the new channel, with its delay")
+        XCTAssertEqual(vlc.audioDelays.last, 200)
+    }
+
+    /// Delay routed an AVPlayer stream to VLCKit and VLCKit cannot play it: back to AVPlayer without
+    /// the delay (+ notice), once; the stored delay is kept.
+    func testVLCFailureOfDelayRoutedStreamFallsBackToAVPlayer() async throws {
+        let c = controller()
+        let movie = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mp4")
+        let r = request(.movie(movie))
+        store.setContentDelay(200, for: try key(r))
+        try await open(c, r)
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        XCTAssertFalse(c.audioSyncUnavailable)
+        vlc.emit(.time(30))
+        vlc.emit(.failed(.unsupportedCodec(codec: nil)))
+        XCTAssertEqual(c.engineKind, .avPlayer)
+        XCTAssertEqual(av.loads.count, 1)
+        XCTAssertEqual(av.loads.last?.startMs, 30_000)
+        XCTAssertTrue(c.audioSyncUnavailable, "notice")
+        XCTAssertNotEqual(c.phase, .failed(.unsupportedCodec(codec: nil)))
+        XCTAssertEqual(store.contentDelay(try key(r)), 200, "stored delay kept")
+        // Further changes do not bounce back to VLCKit for this opened stream.
+        c.setAudioDelay(300)
+        XCTAssertEqual(c.engineKind, .avPlayer)
+        XCTAssertEqual(vlc.loads.count, 1)
+        // AVPlayer failing too is final (no ping-pong).
+        av.emit(.failed(.unsupportedCodec(codec: nil)))
+        XCTAssertEqual(c.phase, .failed(.unsupportedCodec(codec: nil)))
+        // The next open tries the delay (VLCKit) again.
+        try await open(c, r)
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        XCTAssertFalse(c.audioSyncUnavailable)
+    }
+
+    /// Same after switching live from AVPlayer to VLCKit with the Sync control.
+    func testVLCFailureAfterLiveDelaySwitchFallsBackToAVPlayer() async throws {
+        let c = controller()
+        try await open(c, request(.channel(channel("1", "http://h.example.com/live/1.m3u8"))))
+        av.emit(.playing)
+        c.setAudioDelay(150)
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        vlc.emit(.failed(.unsupportedFormat(container: "hls")))
+        XCTAssertEqual(c.engineKind, .avPlayer)
+        XCTAssertEqual(av.loads.count, 2)
+        XCTAssertNil(av.loads.last?.startMs)
+        XCTAssertTrue(c.audioSyncUnavailable)
+    }
+
+    /// A stream that only VLCKit plays (MKV) keeps the normal rule: a VLCKit failure is final.
+    func testVLCFailureOfVLCOnlyStreamStaysFinal() async throws {
+        let c = controller()
+        let movie = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mkv")
+        let r = request(.movie(movie))
+        store.setContentDelay(200, for: try key(r))
+        try await open(c, r)
+        vlc.emit(.failed(.unsupportedCodec(codec: nil)))
+        XCTAssertEqual(c.phase, .failed(.unsupportedCodec(codec: nil)))
+        XCTAssertTrue(av.loads.isEmpty)
+    }
+
+    /// tvOS stepper: held/repeated ◀▶ accelerate 50 → 100 → 250 ms.
+    func testStepperAcceleration() {
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 0), 50)
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 3), 50)
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 4), 100)
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 9), 100)
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 10), 250)
+        XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 100), 250)
     }
 
     func testRawURLDelayIsKeptForTheSessionOnly() async throws {

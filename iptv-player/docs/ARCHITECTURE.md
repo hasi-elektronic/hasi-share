@@ -146,9 +146,12 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   hesabına katar (`ca_SetDeviceLatency`, en fazla 1 sn). Bu yüzden uygulama gecikmeyi ikinci kez
   eklemez; yalnızca 1 sn'nin üstündeki kısmı (AirPlay ≈ 2 sn) negatif gecikme olarak ekler
   (`VLCLatencyCompensation`). "Senkronu düzelt" (`resync()`): canlıyı canlı uçtan, VOD'u mevcut
-  konumdan yeniden açar. Yeniden bağlanma zaten yayını yeniden açtığı için (canlı: canlı uç) başarılı
-  yeniden bağlanmanın ilk `playing`'inde yalnızca gecikme bir kez yeniden uygulanır (ikinci yükleme
-  yok). Performans katmanı motoru, `outputLatency`'yi (ms) ve libVLC'den geri okunan uygulanan
+  konumdan yeniden açar; yeni istek henüz çözümlenirken (`resolving`) senkron eylemleri hiçbir şey
+  yapmaz (önceki kanal yeniden açılmaz). Yeniden bağlanma zaten yayını yeniden açar (canlı: canlı uç) ve
+  yeni öğe gecikmeyle başlar; ayrıca ikinci bir yükleme yapılmaz. Yalnızca gecikme yüzünden VLCKit'e
+  giden (AVPlayer'ın oynatabildiği) yayın VLCKit'te biçim/kodek hatası verirse bir kez gecikmesiz
+  AVPlayer ile açılır ve "Senkron bu yayında uygulanamadı" notu görünür (kayıtlı gecikme korunur).
+  Performans katmanı motoru, `outputLatency`'yi (ms) ve libVLC'den geri okunan uygulanan
   gecikmeyi gösterir.
 * **M3U canlı TS → HLS tercihi:** M3U'daki Xtream biçimli canlı `.ts` URL'si için önce aynı URL'nin
   `.m3u8` hâli 1,5 sn'lik GET ile yoklanır (200 + `#EXTM3U` → HLS/AVPlayer; aksi hâlde `.ts`/VLCKit;

@@ -62,7 +62,10 @@ struct SettingsView: View {
             } header: {
                 Text(L10n.t("settings_playback"))
             } footer: {
-                Text(L10n.t("settings_quick_start_hint"))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.t("settings_quick_start_hint"))
+                    Text(L10n.t("audio_sync_hint"))   // direction of the device delay row
+                }
             }
             Section(L10n.t("settings_appearance")) {
                 // Switching re-renders the whole app in the new language (root views are keyed by it).

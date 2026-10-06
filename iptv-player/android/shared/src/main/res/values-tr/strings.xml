@@ -211,10 +211,14 @@
     <string name="perf_output_latency" formatted="false">Çıkış gecikmesi</string>
     <string name="perf_audio_delay" formatted="false">Ses gecikmesi</string>
     <string name="audio_sync" formatted="false">Senkron</string>
-    <string name="audio_sync_hint" formatted="false">Ses görüntüden önce mi? + kullan. Sonra mı? − kullan. Bu kanal/içerik için kaydedilir.</string>
+    <string name="audio_sync_hint" formatted="false">Ses görüntüden önce mi geliyor? + kullan. Sonra mı geliyor? − kullan.</string>
     <string name="audio_sync_fix" formatted="false">Senkronu düzelt</string>
     <string name="audio_sync_vlc_note" formatted="false">Gecikme ayarlanınca bu kanal VLC motoruyla oynatılır</string>
-    <string name="settings_device_audio_delay" formatted="false">Cihaz/soundbar gecikmesi</string>
+    <string name="audio_sync_content" formatted="false">Bu kanal/içerik</string>
+    <string name="audio_delay_later">%1$s · ses daha geç</string>
+    <string name="audio_delay_earlier">%1$s · ses daha erken</string>
+    <string name="audio_sync_unavailable" formatted="false">Senkron bu yayında uygulanamadı</string>
+    <string name="settings_device_audio_delay" formatted="false">Ses gecikmesi (TV/soundbar)</string>
     <string name="about_version">Sürüm %1$s</string>
     <string name="about_licenses" formatted="false">Açık kaynak lisansları</string>
     <string name="format_test_result_ok" formatted="false">Oynatılıyor ✓</string>

@@ -21,8 +21,11 @@ struct PlayerView: View {
     /// "Play from start" chip after an automatic resume (5 s, independent of the overlay).
     @State private var resumeChipVisible = false
     @State private var resumeChipTask: Task<Void, Never>?
-    /// Audio → Sync panel (SCREENS §3.7).
+    /// Audio → Sync panel (SCREENS §3.7): non-modal, at the bottom, the picture stays visible.
     @State private var syncPanelVisible = false
+    /// "Sync can't be applied to this stream" (VLCKit failed, AVPlayer without the delay) – 4 s.
+    @State private var syncNoticeVisible = false
+    @State private var syncNoticeTask: Task<Void, Never>?
     #if os(iOS)
     /// Scrubber position while the finger is down (nil = follow playback).
     @State private var scrubFraction: Double?
@@ -104,6 +107,12 @@ struct PlayerView: View {
             if infoCardVisible, let channel = player.currentChannel { infoCard(channel) }
             #endif
             if channelListVisible { channelList }
+            if syncPanelVisible {
+                AudioSyncPanel(player: player) { closeSyncPanel() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            if syncNoticeVisible { syncNotice }
             // Undo of a ⭐ toggle (4 s), above the bottom bar; independent of the overlay.
             UndoToast(undoFocus: undoFocusBinding)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toastAlignment)
@@ -115,6 +124,10 @@ struct PlayerView: View {
         .onAppear {
             showOverlay()
             if player.resumedFromMs != nil { showResumeChip() }
+            #if DEBUG
+            // UI tests: the tvOS top row cannot be walked with arrow presses in XCUITest.
+            if AppBootstrap.arguments.contains("-uiSyncPanel") { openSyncPanel() }
+            #endif
         }
         .onDisappear {
             hideTask?.cancel()
@@ -130,10 +143,19 @@ struct PlayerView: View {
         .onChange(of: player.resumedFromMs) { _, ms in
             if ms != nil { showResumeChip() } else { resumeChipVisible = false }
         }
+        .animation(.easeInOut(duration: 0.2), value: syncPanelVisible)
+        .onChange(of: player.audioSyncUnavailable) { _, unavailable in
+            guard unavailable else { return }
+            syncNoticeVisible = true
+            syncNoticeTask?.cancel()
+            syncNoticeTask = Task {
+                try? await Task.sleep(for: .seconds(4))
+                if !Task.isCancelled { syncNoticeVisible = false }
+            }
+        }
         .task(id: player.request?.id) { loadEpisodeSeries() }
         .onChange(of: channelListVisible) { _, visible in if visible { refreshChannelListOrder() } }
         .onChange(of: env.libraryVersion) { if channelListVisible { refreshChannelListOrder() } }
-        .sheet(isPresented: $syncPanelVisible) { AudioSyncPanel(player: player) }
         #if os(iOS)
         .statusBarHidden()
         .gesture(DragGesture(minimumDistance: 40).onEnded { value in
@@ -145,13 +167,14 @@ struct PlayerView: View {
         .background {
             if isVOD {
                 TVHoldSeek { direction, heldMs in
-                    if !channelListVisible, !(overlayVisible && toolsActive) { tvSeek(direction, heldMs: heldMs) }
+                    if !channelListVisible, !syncPanelVisible, !(overlayVisible && toolsActive) { tvSeek(direction, heldMs: heldMs) }
                 }
             }
         }
-        .focusable(!overlayVisible && !channelListVisible && !infoCardVisible)
+        .focusable(!overlayVisible && !channelListVisible && !infoCardVisible && !syncPanelVisible)
         .focused($surfaceFocused)
         .onMoveCommand { direction in
+            if syncPanelVisible { return }   // its rows handle ◀▶ themselves
             if infoCardVisible {
                 infoCardMove(direction)
                 return
@@ -184,11 +207,13 @@ struct PlayerView: View {
         }
         // Select on the picture (overlay hidden): VOD pauses/resumes like the TV app; live shows the info.
         .onTapGesture {
+            guard !syncPanelVisible else { return }
             if isVOD { togglePlayPause() } else { showOverlay() }
         }
         .onExitCommand {
             // Back rules (SCREENS §2): close panel/menu first, then leave the player.
-            if infoCardVisible { hideInfoCard() }
+            if syncPanelVisible { closeSyncPanel() }
+            else if infoCardVisible { hideInfoCard() }
             else if channelListVisible { channelListVisible = false }
             else if overlayVisible { hideOverlay() }
             else { router.closePlayer() }
@@ -255,6 +280,40 @@ struct PlayerView: View {
             }
         }
         .padding(Theme.safeH)
+    }
+
+    // MARK: Audio sync panel
+
+    /// Opens the Sync panel and hides the overlay, so only the panel covers the picture's bottom.
+    private func openSyncPanel() {
+        hideTask?.cancel()
+        syncPanelVisible = true
+        overlayVisible = false
+        #if os(iOS)
+        menuOpen = false
+        #else
+        toolsActive = false
+        #endif
+    }
+
+    private func closeSyncPanel() {
+        syncPanelVisible = false
+        #if os(tvOS)
+        surfaceFocused = true
+        #endif
+    }
+
+    private var syncNotice: some View {
+        Text(L10n.t("audio_sync_unavailable"))
+            .font(Theme.caption)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Capsule().fill(Color.black.opacity(0.75)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, Theme.safeV + (Theme.isTV ? 40 : 56))
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("audio_sync_unavailable_notice")
     }
 
     // MARK: Overlay visibility
@@ -642,8 +701,8 @@ struct PlayerView: View {
                         Label(option.name ?? L10n.t("unknown_track", String(option.id + 1)), systemImage: player.selectedAudio == option.id ? "checkmark" : "")
                     }
                 }
-                Button { menuClosed(); syncPanelVisible = true } label: {
-                    Label("\(L10n.t("audio_sync")) (\(AudioDelayControl.label(player.contentAudioDelay)))", systemImage: "waveform")
+                Button { menuClosed(); openSyncPanel() } label: {
+                    Label("\(L10n.t("audio_sync")) (\(AudioDelayControl.shortLabel(player.contentAudioDelay)))", systemImage: "waveform")
                 }
                 .accessibilityIdentifier("player_audio_sync")
             }
@@ -967,8 +1026,8 @@ private struct PlayerScrubber: View {
 /// Press-and-hold ◀▶ on the Siri Remote: SwiftUI's `onMoveCommand` fires once per press (no
 /// repeat while held), so long-press recognizers for the arrow presses on the window repeat the
 /// step every 0.3 s while the button stays down (10 s, 30 s once held for 1 s). A short press
-/// fails them and reaches `onMoveCommand` as usual.
-private struct TVHoldSeek: UIViewRepresentable {
+/// fails them and reaches `onMoveCommand` as usual. Also used by the audio delay stepper.
+struct TVHoldSeek: UIViewRepresentable {
     /// (direction, ms since the button went down)
     let onStep: @MainActor (Int, Int64) -> Void
 

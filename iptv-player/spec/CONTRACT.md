@@ -325,7 +325,11 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
 
 Changing the delay while AVPlayer plays reopens the same stream in VLCKit (VOD at the current
 position, live at the live edge) and keeps VLCKit for that opened stream; back to 0 does not
-switch back until the next open. VLCKit applies the delay in libVLC's sign (positive = audio
+switch back until the next open. If VLCKit then fails with `UnsupportedFormat`/`UnsupportedCodec`
+on a stream AVPlayer can play (it was routed to VLCKit only because of the delay), the stream is
+reopened once in AVPlayer **without** the delay (VOD at the position) and the player shows "Sync can't
+be applied to this stream"; the stored delay is kept and tried again at the next open. Sync actions
+(`resync`, delay changes) do nothing while a new request is still resolving. VLCKit applies the delay in libVLC's sign (positive = audio
 later; `currentAudioPlaybackDelay` in µs, reset by libVLC with every media → set at each start).
 Automatic latency term: libVLC 3 already compensates `AVAudioSession.outputLatency` up to 1 s
 itself; only the part above 1 s is added (negative = audio earlier). AVPlayer syncs to the output

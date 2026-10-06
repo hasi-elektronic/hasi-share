@@ -142,6 +142,8 @@ public final class PlayerController {
     public private(set) var contentAudioDelay = 0
     /// Device/soundbar delay (Settings → Playback), added to every content.
     public private(set) var deviceAudioDelay = 0
+    /// The delay could not be applied to this opened stream (VLCKit failed, playing on AVPlayer without it).
+    public private(set) var audioSyncUnavailable = false
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -177,8 +179,11 @@ public final class PlayerController {
     @ObservationIgnored public var audioDelayStore: AudioDelayStore? { didSet { refreshAudioDelay() } }
     /// Content delay of a request without content key (raw URL): this session only.
     @ObservationIgnored private var unkeyedContentDelay = 0
-    /// A reconnect reload is in flight: its first `.playing` re-applies the sync once.
-    @ObservationIgnored private var resyncAfterReconnect = false
+    /// The open's resolve is in flight: `stream` still belongs to the previous request.
+    @ObservationIgnored private var resolving = false
+    /// VLCKit plays this stream only because of the audio delay (AVPlayer could play it): a VLCKit
+    /// format/codec failure falls back to AVPlayer without the delay (CONTRACT §6.1).
+    @ObservationIgnored private var delayRoutedToVLC = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
     @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -252,7 +257,8 @@ public final class PlayerController {
         lastProgressSaveMs = nil
         pendingSeek = nil
         pausedDuringReconnect = false
-        resyncAfterReconnect = false
+        delayRoutedToVLC = false
+        audioSyncUnavailable = false
         if self.request?.id != request.id { unkeyedContentDelay = 0 }   // retry / resume keep a raw URL's delay
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
@@ -288,17 +294,20 @@ public final class PlayerController {
             cached = prefetcher?.takeResolved(channelId: channel.id)
         }
         if cached == nil { prefetcher?.cancelAll() }
+        resolving = true
         openTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let stream: ResolvedStream
                 if let cached { stream = cached } else { stream = try await resolver.resolve(request) }
                 guard !Task.isCancelled else { return }
+                self.resolving = false
                 self.stream = stream
                 load(stream, startMs: request.startPositionMs)
                 recordLiveWatch()
             } catch {
                 guard !Task.isCancelled else { return }
+                self.resolving = false
                 let mapped = (error as? PlaybackError) ?? ErrorClassifier.playbackError(from: error) ?? .unknown(message: "\(error)")
                 SafeLog.warning("open failed: \(mapped)")
                 stopPlayback()
@@ -341,7 +350,12 @@ public final class PlayerController {
     }
 
     private func load(_ stream: ResolvedStream, startMs: Int64?) {
-        let next = engineInstance(engineKind(for: stream))
+        let kind = engineKind(for: stream)
+        if kind == .vlcKit, currentAudioDelay != 0, fallbackEngine == nil || delayRoutedToVLC,
+           ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable) == .avPlayer {
+            delayRoutedToVLC = true
+        }
+        let next = engineInstance(kind)
         if let current = engine, current !== next { current.stop() }
         engine = next
         next.setAspect(aspect)
@@ -418,11 +432,6 @@ public final class PlayerController {
             cancelStallTimer()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
             systemPauseUnclaimed = false
-            if resyncAfterReconnect {
-                // The reconnect reopened the stream (live: at the live edge); re-apply the sync once.
-                resyncAfterReconnect = false
-                engine?.setAudioDelay(ms: currentAudioDelay)
-            }
             if phase != .playing { phase = .playing }
         case .paused, .pausedBySystem:
             cancelStallTimer()   // a real pause ends any stall recovery
@@ -469,6 +478,16 @@ public final class PlayerController {
     /// Applies the fallback and reconnect policy to a playback error (internal for tests).
     func handle(_ error: PlaybackError) {
         if case .failed = phase { return }
+        if delayRoutedToVLC, let stream, engine?.kind == .vlcKit,
+           ApplePlayback.fallbackEngine(after: error, on: .avPlayer, vlcAvailable: true) != nil {
+            // VLCKit cannot play what AVPlayer can: play it there without the delay (once, with a notice).
+            SafeLog.info("vlckit failed (\(error)) for a delay-routed stream – avplayer without audio delay")
+            delayRoutedToVLC = false
+            fallbackEngine = .avPlayer
+            audioSyncUnavailable = true
+            load(stream, startMs: request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs))
+            return
+        }
         if let stream, let current = engine?.kind, fallbackEngine == nil,
            let next = ApplePlayback.fallbackEngine(after: error, on: current, vlcAvailable: engines.vlcAvailable) {
             SafeLog.info("\(current.rawValue) failed (\(error)) – retrying with \(next.rawValue)")
@@ -492,7 +511,6 @@ public final class PlayerController {
             retryTask = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(delayMs))
                 guard !Task.isCancelled, let self, let stream = self.stream else { return }
-                self.resyncAfterReconnect = true
                 self.load(stream, startMs: resumeMs)
             }
         case .giveUp:
@@ -781,6 +799,7 @@ public final class PlayerController {
         } else if currentAudioDelay != 0, engineKind(for: stream) == .vlcKit {
             SafeLog.info("audio delay \(currentAudioDelay) ms – reloading in vlckit")
             fallbackEngine = .vlcKit
+            delayRoutedToVLC = true
             reload(stream)
         }
     }
@@ -806,7 +825,7 @@ public final class PlayerController {
     /// A stream is loaded or playing (not idle / failed / locked / ended / paused without an item).
     private var hasActiveItem: Bool {
         switch phase {
-        case .playing, .paused, .buffering, .loading, .reconnecting: return request != nil && !reloadOnPlay
+        case .playing, .paused, .buffering, .loading, .reconnecting: return request != nil && !reloadOnPlay && !resolving
         case .idle, .failed, .locked, .ended: return false
         }
     }
