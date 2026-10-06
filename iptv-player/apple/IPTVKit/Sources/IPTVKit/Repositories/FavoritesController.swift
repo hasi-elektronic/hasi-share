@@ -33,6 +33,8 @@ public final class FavoritesController {
     public private(set) var pendingUndo: FavoriteTarget?
     /// Favorite state of `pendingUndo` before the toggle (undo restores it).
     @ObservationIgnored private var undoPriorState = false
+    /// Saved manual order of that kind before the toggle (a removal prunes it; undo restores it).
+    @ObservationIgnored private var undoPriorOrder: [String]?
     /// Source-scoped category ids (`"<sourceId>|<categoryId>"`), per device.
     public private(set) var favoriteCategoryIds: Set<String>
 
@@ -57,9 +59,11 @@ public final class FavoritesController {
     @discardableResult
     public func toggle(_ t: FavoriteTarget) -> Bool {
         let prior = keys.contains(t.contentKey)
+        let priorOrder = kv.value([String].self, forKey: orderKey(t.kind))
         guard apply(!prior, t) else { return prior }
         pendingUndo = t
         undoPriorState = prior
+        undoPriorOrder = priorOrder
         undoTask?.cancel()
         let window = undoWindow
         undoTask = Task { [weak self] in
@@ -76,6 +80,9 @@ public final class FavoritesController {
         undoTask?.cancel()
         pendingUndo = nil
         if keys.contains(t.contentKey) != undoPriorState { apply(undoPriorState, t) }
+        // Back into its manual slot (keys removed meanwhile drop out in `orderedKeys`).
+        if let order = undoPriorOrder { kv.setValue(order, forKey: orderKey(t.kind)) }
+        undoPriorOrder = nil
     }
 
     /// Optimistic write: cache first, database second; a failed write restores the cache.
@@ -119,9 +126,12 @@ public final class FavoritesController {
     /// of `orderedKeys(kind:)` (e.g. the current source's favorites); other keys keep their slots.
     public func move(kind: ContentKind, from: IndexSet, to: Int, within subset: [String]? = nil) {
         let full = orderedKeys(kind: kind)
-        let visible = subset.map { s in let present = Set(full); return s.filter { present.contains($0) } } ?? full
-        var moved = visible
+        let present = Set(full)
+        // Offsets refer to `subset` exactly as passed: move first, then drop keys that are no favorite.
+        var moved = subset ?? full
         moved.move(from: from, to: to)
+        moved = moved.filter { present.contains($0) }
+        let visible = moved
         var result = full
         if subset != nil {
             let visibleSet = Set(visible)

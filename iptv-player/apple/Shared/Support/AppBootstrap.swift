@@ -54,6 +54,13 @@ final class Router {
     var headerSolid = false
     /// TV: detail to push onto the current tab's stack (hero "Info" without a NavigationLink).
     var tvPushRequest: CatalogItem?
+    /// Live "Show in TV guide": the guide opens on this channel (its category, scrolled to, in the panel).
+    var guideFocus: Channel?
+
+    func showInGuide(_ channel: Channel) {
+        guideFocus = channel
+        section = .guide
+    }
     /// Keeps the onboarding flow (welcome → add source → summary) on screen until "Continue".
     var onboarding = false
     /// Screen opened by a debug launch argument (`-uiScreen paywall`…), UI tests & screenshots.

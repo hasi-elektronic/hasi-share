@@ -33,16 +33,26 @@ private func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow
     return rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
 }
 
+/// Channel shown in the Live info panel. Its own observable, read only by the panel (and by iPad rows
+/// for the selection mark), so a tvOS focus move does not re-render the whole list.
+@MainActor
+@Observable
+final class LiveSelection {
+    var channel: Channel?
+}
+
 /// Live TV (SCREENS §3.3): a channel LIST (more channels on screen than the old card grid).
 /// iPhone portrait: sticky category chips + list. Wide (iPad, iPhone landscape): list + info panel.
 /// Apple TV: category column | list | info panel (focus drives the panel, 150 ms debounce).
 struct LiveTVView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
+    #if !os(tvOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     @State private var model: LiveTVViewModel?
     @State private var archiveChannel: Channel?
-    /// Row shown in the info panel (wide layouts / tvOS focus).
-    @State private var selected: Channel?
+    @State private var selection = LiveSelection()
     @State private var selectTask: Task<Void, Never>?
 
     var body: some View {
@@ -66,7 +76,7 @@ struct LiveTVView: View {
         }
         .onChange(of: env.catalogVersion) { model?.reload() }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
-        .onChange(of: model?.filter) { selected = nil }
+        .onChange(of: model?.filter) { selection.channel = nil }
     }
 
     @ViewBuilder
@@ -74,8 +84,8 @@ struct LiveTVView: View {
         #if os(tvOS)
         HStack(alignment: .top, spacing: 30) {
             LiveCategoryColumn(model: model).frame(width: 360)
-            list(model, wide: true)
-            panel(model).frame(width: 500)
+            list(model, selectFirst: false)
+            LivePanel(selection: selection, model: model, onArchive: { archiveChannel = $0 }).frame(width: 500)
         }
         .padding(.leading, Theme.safeH)
         .padding(.trailing, Theme.safeH)
@@ -84,29 +94,30 @@ struct LiveTVView: View {
             LiveCategoryChips(model: model)
             GeometryReader { geo in
                 let wide = geo.size.width >= 700
+                // Select-first only on iPad (regular width); iPhone landscape plays on the first tap.
+                let selectFirst = wide && sizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad
                 HStack(alignment: .top, spacing: 16) {
-                    list(model, wide: wide)
+                    list(model, selectFirst: selectFirst)
                         .frame(width: wide ? geo.size.width * 0.55 : geo.size.width)
-                    if wide { panel(model).padding(.trailing, Theme.safeH).padding(.vertical, 8) }
+                    if wide {
+                        LivePanel(selection: selection, model: model, onArchive: { archiveChannel = $0 })
+                            .padding(.trailing, Theme.safeH).padding(.vertical, 8)
+                    }
                 }
             }
         }
         #endif
     }
 
-    private func panel(_ model: LiveTVViewModel) -> some View {
-        let sid = env.currentSource?.id
-        let shown = selected ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel ?? visibleRows(model.rows, sourceId: sid).first?.channel
-        return GuidePanel(channel: shown, zapList: model.channels, onArchive: { archiveChannel = $0 },
-                          liveActions: true, identifier: "live_info_panel")
-    }
-
-    /// Wide layouts: a tap selects (panel), a tap on the selected row plays. Compact: a tap plays.
-    private func list(_ model: LiveTVViewModel, wide: Bool) -> some View {
+    /// iPad: a tap selects (panel), a tap on the selected row plays. Elsewhere a tap plays.
+    private func list(_ model: LiveTVViewModel, selectFirst: Bool) -> some View {
         let sid = env.currentSource?.id
         let rows = visibleRows(model.rows, sourceId: sid)
         let favorites = model.filter == .all ? visibleRows(model.favoriteRows, sourceId: sid) : []
-        let playing = env.player.currentChannel?.id
+        // "● Watching": the channel playing now, else the last one played from this source (the
+        // player is closed while the list is visible on iPhone).
+        let last = env.settings.lastSession
+        let playing = env.player.currentChannel?.id ?? (last?.sourceId == sid ? last?.channelId : nil)
         let zapAll = model.channels   // once per update, not per row
         return ScrollView {
             if rows.isEmpty && favorites.isEmpty {
@@ -121,13 +132,13 @@ struct LiveTVView: View {
                     sectionHeader(L10n.t("nav_favorites"), icon: "star.fill", id: "live_section_favorites")
                     let zap = favorites.map(\.channel)
                     ForEach(favorites) { row in
-                        rowView(row, zap: zap, wide: wide, playing: playing, id: "live_favorite_\(row.channel.id)")
+                        rowView(row, zap: zap, selectFirst: selectFirst, playing: playing, id: "live_favorite_\(row.channel.id)")
                     }
                     if !rows.isEmpty { sectionHeader(L10n.t("live_all_channels"), icon: nil, id: "live_section_all") }
                 }
                 LazyVStack(alignment: .leading, spacing: Theme.isTV ? 12 : 0) {
                     ForEach(rows) { row in
-                        rowView(row, zap: zapAll, wide: wide, playing: playing, id: "channel_\(row.channel.id)")
+                        rowView(row, zap: zapAll, selectFirst: selectFirst, playing: playing, id: "channel_\(row.channel.id)")
                             .onAppear { model.loadMoreIfNeeded(current: row) }
                     }
                 }
@@ -141,24 +152,26 @@ struct LiveTVView: View {
         .accessibilityIdentifier("live_list")
     }
 
-    private func rowView(_ row: ChannelRow, zap: [Channel], wide: Bool, playing: String?, id: String) -> some View {
+    private func rowView(_ row: ChannelRow, zap: [Channel], selectFirst: Bool, playing: String?, id: String) -> some View {
         let channel = row.channel
-        return LiveChannelRow(row: row, isPlaying: playing == channel.id, isSelected: wide && selected?.id == channel.id,
+        let selection = selection
+        return LiveChannelRow(row: row, isPlaying: playing == channel.id, selection: selectFirst ? selection : nil,
                               identifier: id,
                               onTap: {
-                                  if wide && !Theme.isTV && selected?.id != channel.id { selected = channel } else { router.play(.channel(channel), channels: zap) }
+                                  if selectFirst && selection.channel?.id != channel.id { selection.channel = channel } else { router.play(.channel(channel), channels: zap) }
                               },
                               onFocus: { focusSelect(channel) },
                               onArchive: { archiveChannel = channel },
-                              onGuide: { router.section = .guide })
+                              onGuide: { router.showInGuide(channel) })
     }
 
     /// tvOS: the panel follows the focus after 150 ms (fast D-pad runs do not reload it per row).
     private func focusSelect(_ channel: Channel) {
         selectTask?.cancel()
+        let selection = selection
         selectTask = Task {
             try? await Task.sleep(for: .milliseconds(150))
-            if !Task.isCancelled { selected = channel }
+            if !Task.isCancelled { selection.channel = channel }
         }
     }
 
@@ -180,13 +193,29 @@ struct LiveTVView: View {
     }
 }
 
+/// Info panel of the Live list: the selected / focused channel, else the first row.
+private struct LivePanel: View {
+    @Environment(AppEnvironment.self) private var env
+    let selection: LiveSelection
+    let model: LiveTVViewModel
+    let onArchive: (Channel) -> Void
+
+    var body: some View {
+        let sid = env.currentSource?.id
+        let shown = selection.channel ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel
+            ?? visibleRows(model.rows, sourceId: sid).first?.channel
+        GuidePanel(channel: shown, zapList: model.channels, onArchive: onArchive, liveActions: true, identifier: "live_info_panel")
+    }
+}
+
 /// One channel row (~76 pt iOS): number · logo tile · name + quality + ⟲ · NOW (time, title, progress)
 /// · NEXT line · ⭐ (iOS; tvOS: one focus target per row, favorite via long OK / player ▲ card).
 private struct LiveChannelRow: View {
     @Environment(AppEnvironment.self) private var env
     let row: ChannelRow
     let isPlaying: Bool
-    let isSelected: Bool
+    /// iPad select-first: the row reads the selection itself (only then); tvOS rows never do.
+    let selection: LiveSelection?
     let identifier: String
     let onTap: () -> Void
     let onFocus: () -> Void
@@ -194,6 +223,7 @@ private struct LiveChannelRow: View {
     let onGuide: () -> Void
 
     private var channel: Channel { row.channel }
+    private var isSelected: Bool { selection?.channel?.id == channel.id }
 
     var body: some View {
         let target = env.favoriteTarget(channel)
@@ -387,6 +417,7 @@ private struct LiveCategoryColumn: View {
 
     var body: some View {
         let items = chipItems(model, env: env)
+        let hiddenCount = env.currentSource.map { HiddenStore.shared.count($0.id) } ?? 0
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
@@ -406,6 +437,17 @@ private struct LiveCategoryColumn: View {
                     .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
                     .accessibilityAddTraits(selected ? .isSelected : [])
                     .accessibilityIdentifier("live_chip_\(index)")
+                }
+                // Last row: bring hidden channels / categories back (long OK on a row hides them).
+                if hiddenCount > 0, let sid = env.currentSource?.id {
+                    Button { HiddenStore.shared.showAll(sourceId: sid); model.reload() } label: {
+                        Label(L10n.t("hidden_show_all", String(hiddenCount)), systemImage: "eye")
+                            .font(Theme.caption.weight(.medium)).foregroundStyle(Theme.textSecondary)
+                            .padding(.horizontal, 20).padding(.vertical, 14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+                    .accessibilityIdentifier("live_show_hidden")
                 }
             }
             .padding(.vertical, 20)
@@ -462,6 +504,8 @@ struct GuideView: View {
     @State private var model: LiveTVViewModel?
     @State private var selected: Channel?
     @State private var archiveChannel: Channel?
+    /// Row the EPG list scrolls to ("Show in TV guide").
+    @State private var scrollTarget: String?
 
     private var showsPanel: Bool {
         #if os(tvOS)
@@ -485,7 +529,7 @@ struct GuideView: View {
                 } else {
                     HStack(alignment: .top, spacing: Theme.isTV ? 30 : 16) {
                         EpgListView(rows: rows, zapList: model.channels,
-                                    onSelect: showsPanel ? { selected = $0 } : nil) { model.loadMoreIfNeeded(current: $0) }
+                                    onSelect: showsPanel ? { selected = $0 } : nil, scrollTarget: scrollTarget) { model.loadMoreIfNeeded(current: $0) }
                         if showsPanel {
                             GuidePanel(channel: selected ?? rows.first?.channel, zapList: model.channels,
                                        onArchive: { archiveChannel = $0 })
@@ -507,9 +551,26 @@ struct GuideView: View {
                 model = m
                 m.reload()
             }
+            applyFocusRequest()
         }
+        .onChange(of: router.guideFocus?.id) { applyFocusRequest() }
         .onChange(of: env.catalogVersion) { model?.reload() }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+    }
+
+    /// Live → "Show in TV guide": the channel's category (or All), its row loaded, scrolled to and in the panel.
+    private func applyFocusRequest() {
+        guard let channel = router.guideFocus, let model else { return }
+        router.guideFocus = nil
+        let filter = channel.categoryId.map(ChannelFilter.category) ?? .all
+        if model.filter != filter { model.filter = filter }
+        if !model.reveal(channelId: channel.id), filter != .all {
+            model.filter = .all
+            model.reveal(channelId: channel.id)
+        }
+        selected = channel
+        scrollTarget = nil
+        Task { @MainActor in scrollTarget = channel.id }   // after the rows are laid out
     }
 }
 
@@ -786,6 +847,8 @@ struct EpgListView: View {
     let zapList: [Channel]
     /// iPad: tile tap selects the channel for the side panel; tvOS: called on focus.
     var onSelect: ((Channel) -> Void)? = nil
+    /// Channel id to scroll to (set → scrolls once).
+    var scrollTarget: String? = nil
     var onRowAppear: (ChannelRow) -> Void = { _ in }
     @State private var scrollX: CGFloat = 0
     @State private var now = Date()
@@ -795,15 +858,20 @@ struct EpgListView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 timeAxis
-                ScrollView(.vertical, showsIndicators: !Theme.isTV) {
-                    LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
-                        ForEach(rows) { row in
-                            EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now, onSelect: onSelect)
-                                .onAppear { onRowAppear(row) }
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: !Theme.isTV) {
+                        LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
+                            ForEach(rows) { row in
+                                EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now, onSelect: onSelect)
+                                    .id(row.id)
+                                    .onAppear { onRowAppear(row) }
+                            }
                         }
+                        .padding(.top, 4)
+                        .padding(.bottom, Theme.isTV ? 60 : 24)
                     }
-                    .padding(.top, 4)
-                    .padding(.bottom, Theme.isTV ? 60 : 24)
+                    .onChange(of: scrollTarget) { _, id in if let id { proxy.scrollTo(id, anchor: .center) } }
+                    .onAppear { if let scrollTarget { proxy.scrollTo(scrollTarget, anchor: .center) } }
                 }
                 .frame(width: timeline.width)
                 .overlay(alignment: .topLeading) { nowLine }

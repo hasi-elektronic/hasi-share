@@ -150,4 +150,24 @@ final class FavoritesControllerTests: XCTestCase {
         XCTAssertNil(f.pendingUndo)
         XCTAssertTrue(f.isFavorite("ch:a"))
     }
+
+    /// Undo of a removal puts the favorite back into its manual order slot.
+    func testUndoOfRemovalRestoresManualOrderSlot() throws {
+        let f = try make()
+        f.toggle(a); f.toggle(b); f.toggle(c)                           // c b a
+        f.move(kind: .live, from: IndexSet(integer: 0), to: 3)          // b a c (saved)
+        f.toggle(a)                                                    // remove a
+        XCTAssertEqual(f.orderedKeys(kind: .live), ["ch:b", "ch:c"])
+        f.undo()
+        XCTAssertEqual(f.orderedKeys(kind: .live), ["ch:b", "ch:a", "ch:c"], "back in its slot")
+    }
+
+    /// `within` offsets refer to the subset as passed, even if it holds keys that are no favorite (any more).
+    func testMoveWithinMapsOffsetsThroughSubset() throws {
+        let f = try make()
+        let x = FavoriteTarget(contentKey: "ch:x", title: "X", kind: .live, posterUrl: nil)
+        f.toggle(a); f.toggle(x); f.toggle(b)                           // b x a
+        f.move(kind: .live, from: IndexSet(integer: 2), to: 0, within: ["ch:b", "ch:gone", "ch:a"])
+        XCTAssertEqual(f.orderedKeys(kind: .live), ["ch:a", "ch:x", "ch:b"])
+    }
 }

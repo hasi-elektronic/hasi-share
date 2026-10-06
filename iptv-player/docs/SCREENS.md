@@ -142,7 +142,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   · ad (yarı kalın, tek satır) + kalite rozeti (adındaki HD/FHD/4K/UHD/SD) + ⟲ (geçmiş yayın varsa) ·
   **Şimdi:** saat aralığı + program başlığı (tek satır) + ince `primary` ilerleme çubuğu · **Sonra:**
   "Sonra 21:00 · Başlık" (ikincil, tek satır) · sağda **☆/★** (tek dokunuş, §2; yalnız iOS). EPG yoksa
-  "Program bilgisi yok". Oynatılan kanalın satırı: solda `primary` çubuk + "● İzleniyor".
+  "Program bilgisi yok". Oynatılan kanalın — oynatıcı kapalıyken bu kaynakta **en son oynatılan** kanalın (LastSession) — satırı:
+  solda `primary` çubuk + "● İzleniyor".
 * **Kategori çipleri** (iOS: başlığın altında sabit, yatay kaydırılır): **★ Favoriler (n)** · **Tümü (n)** ·
   favori kategoriler (⭐) · diğer kategoriler; bayrak emojisi kategori adından (TR/Türkiye → 🇹🇷, DE → 🇩🇪 …),
   yanında kanal sayısı (çoklu kategori üyeliği dahil, tek sorgu). Seçili çip dolu beyaz. Kategori çipine
@@ -151,13 +152,16 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Favoriler önce:** "Tümü" seçiliyken önce **★ Favoriler** bölümü (cihazdaki sıra), sonra **Tüm kanallar**
   (sayfalı). ⭐ değişince yalnızca favori bölümü ve sayılar yeniden yüklenir.
 * Dokun → oynatıcı. **Uzun bas** (iOS bağlam menüsü / TV uzun OK) → Favorilere ekle/çıkar (ilk öğe) ·
-  **Kanalı gizle** · **Kategoriyi gizle** · ⟲ Arşiv (varsa) · **Rehberde göster**. Gizlenen kanal/kategori
+  **Kanalı gizle** · **Kategoriyi gizle** · ⟲ Arşiv (varsa) · **Rehberde göster** (TV Rehberi kanalın
+  kategorisiyle açılır — kategorisi yoksa Tümü —, satır yüklenip ortaya kaydırılır, iPad/TV'de panelde o kanal). Gizlenen kanal/kategori
   listeleri kaynak başına **yerel** saklanır (UserDefaults, senkronize edilmez).
 * **Geniş ekran** (iPad, iPhone yatay; genişlik ≥ 700 pt): solda liste (~%55), sağda **bilgi paneli**: logo + ad,
   **ŞİMDİ YAYINDA** başlık + saat + ilerleme + açıklama, ▶ Oynat · ☆ · 📅 Rehber · ⟲ Arşiv, **BUGÜN** sıradaki
-  programlar (saat · başlık · süre). İlk dokunuş satırı seçer (panel), seçili satıra dokunmak oynatır.
+  programlar (saat · başlık · süre). **Yalnız iPad'de** (geniş boyut sınıfı) ilk dokunuş satırı seçer (panel),
+  seçili satıra dokunmak oynatır; iPhone yatayda panel ilk satırı gösterir, dokunuş hemen oynatır.
   Otomatik video önizlemesi yok.
-* **Apple TV:** solda kategori sütunu (dikey, sayılı; OK seçer) | kanal listesi | bilgi paneli (butonsuz).
+* **Apple TV:** solda kategori sütunu (dikey, sayılı; OK seçer; gizlenen varsa en altta "Gizlenenleri göster (n)")
+  | kanal listesi | bilgi paneli (butonsuz).
   Satır başına **tek odak hedefi** (⭐ gösterge; favori: uzun OK menüsü veya oynatıcıda ▲ bilgi kartı).
   D-pad ▲▼ satırlar arasında akıcı; panel odağı 150 ms gecikmeyle izler; OK oynatır.
 * Performans: lazy liste, sabit id'ler, sayfa başına (120) tek now/next sorgusu (§ bütçe ≤ 20 ms), logolar
@@ -208,7 +212,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   üstünde) · (canlı) Kanal listesi. Kanal listesinde favori kanallar en üstte.
 * **TV canlı – ▲ = kanal bilgisi:** katman kapalıyken ▲ altta bilgi kartını açar (logo, numara, ad, Şimdi +
   saat + ilerleme, Sonra), **⭐ odakta** (OK = favori ekle/çıkar). Kart açıkken ▲/▼ kanal değiştirir (kart yeni
-  kanalı gösterir), Geri kartı kapatır; 6 sn dokunulmazsa kaybolur (⭐ değişince süre yeniden başlar).
+  kanalı gösterir), Geri kartı kapatır; ⭐ sonrası "Geri al" kapsülü kartın **altında** (⭐'ın hizasında) durur:
+  teklif sürerken ▼ "Geri al"a, ▲ ⭐'a gider (kanal değişmez); 6 sn dokunulmazsa kaybolur (⭐ değişince süre yeniden başlar).
   Katman kapalıyken ▼ = sonraki kanal. Katman veya kanal listesi açıkken ▲▼ yalnızca odağı taşır.
 * **Kanal değiştirme (canlı):** mobil yukarı/aşağı kaydır, TV D-pad ▼ (▲ önce bilgi kartı, kart açıkken ▲▼) / CH+/CH−. Basıldığı
   anda (< 100 ms) üstte büyük bilgi kartı: numara, logo, ad, şimdiki program; yükleme

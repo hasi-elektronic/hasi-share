@@ -125,6 +125,21 @@ final class TVFlowTests: XCTestCase {
         XCTAssertEqual(star.label, "Remove from favorites")
         UITestSupport.snap("fav-tvos-02-info-card-favorite", in: self)
 
+        // ▼ reaches "Undo" (no zap while it is offered); OK undoes; ▲ … back on ⭐.
+        let undo = app.buttons["action_undo"]
+        remote.press(.down)
+        sleep(1)
+        XCTAssertTrue(undo.hasFocus, "▼ from ⭐ focuses Undo")
+        XCTAssertTrue(star.identifier.hasSuffix(":live:\(channelId)"), "no zap")
+        UITestSupport.snap("fav-tvos-02b-undo-focused", in: self)
+        remote.press(.select)
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 2))
+        XCTAssertEqual(star.label, "Add to favorites", "undone")
+        sleep(1)
+        XCTAssertTrue(star.hasFocus, "focus back on ⭐")
+        remote.press(.select)   // favorite again for the Live check below
+        XCTAssertEqual(star.label, "Remove from favorites")
+
         remote.press(.menu)   // closes the card
         sleep(1)
         XCTAssertFalse(app.otherElements["player_info_card"].exists)

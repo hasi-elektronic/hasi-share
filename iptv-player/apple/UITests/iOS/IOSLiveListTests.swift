@@ -68,24 +68,64 @@ final class IOSLiveListTests: XCTestCase {
         XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 10), "tap plays")
     }
 
+    /// iPhone landscape: list + info panel, but a tap plays at once (select-first is iPad only).
     @MainActor
-    func testLandscapeShowsInfoPanel() throws {
+    func testIPhoneLandscapePanelAndTapPlays() throws {
         let app = UITestSupport.launch(["-uiScreen", "live"])
         XCTAssertTrue(firstRow(app).waitForExistence(timeout: 30))
         XCUIDevice.shared.orientation = .landscapeLeft
         let panel = app.descendants(matching: .any)["live_info_panel"]
         XCTAssertTrue(panel.waitForExistence(timeout: 5), "wide layout: info panel")
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'"))
-        let second = rows.element(boundBy: 1)
-        let name = second.label.components(separatedBy: ",").first ?? ""
-        second.tap()   // first tap selects
-        XCTAssertTrue(second.isSelected, "row selected")
-        XCTAssertTrue(panel.staticTexts[name].waitForExistence(timeout: 3), "panel shows \(name)")
-        XCTAssertFalse(app.otherElements["video_surface"].exists, "first tap does not play")
-        XCTAssertTrue(app.buttons["live_panel_play"].exists)
         sleep(1)
         UITestSupport.snap("live-list/ios-05-landscape-panel", in: self)
-        second.tap()   // second tap plays
-        XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 10), "tap on the selected row plays")
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).element(boundBy: 1).tap()
+        XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 10), "iPhone landscape: the first tap plays")
+    }
+
+    /// The last played channel is marked "● Watching" after the player is closed.
+    @MainActor
+    func testLastPlayedChannelMarkedWatching() throws {
+        let app = UITestSupport.launch(["-uiScreen", "live"])
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 30))
+        let row = rows.element(boundBy: 2)
+        let id = row.identifier
+        XCTAssertFalse(row.label.contains("Watching"))
+        row.tap()
+        let surface = app.otherElements["video_surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        let close = app.buttons["player_close"]
+        _ = close.waitForNonExistence(timeout: 8)
+        surface.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        close.tap()
+        XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons[id].label.contains("Watching"), "last played row: \(app.buttons[id].label)")
+        UITestSupport.snap("live-list/ios-06-watching", in: self)
+    }
+
+    /// Long press → "Show in TV guide": guide on the channel's category, the row on screen.
+    @MainActor
+    func testShowInGuideFocusesTheChannel() throws {
+        let app = UITestSupport.launch(["-uiScreen", "live"])
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 30))
+        app.swipeUp()
+        sleep(1)
+        let row = rows.allElementsBoundByIndex.last { $0.isHittable }!
+        let id = row.identifier
+        let name = row.label.components(separatedBy: ",").first ?? ""
+        row.press(forDuration: 1.2)
+        let guide = app.buttons["Show in TV guide"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 3))
+        guide.tap()
+        XCTAssertTrue(app.buttons["tab_guide"].waitForExistence(timeout: 5))
+        let epgRow = app.buttons[id]
+        XCTAssertTrue(epgRow.waitForExistence(timeout: 5), "guide row of \(name)")
+        XCTAssertTrue(epgRow.isHittable, "scrolled into view")
+        let selectedChip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'guide_filter_' AND selected == true")).firstMatch
+        XCTAssertTrue(selectedChip.exists)
+        XCTAssertFalse(selectedChip.identifier == "guide_filter_0", "the channel's category, not All (\(selectedChip.label))")
+        UITestSupport.snap("live-list/ios-07-show-in-guide", in: self)
     }
 }

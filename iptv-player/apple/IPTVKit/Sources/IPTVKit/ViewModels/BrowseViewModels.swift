@@ -105,6 +105,19 @@ public final class LiveTVViewModel {
         rows += attachEpg(page)
     }
 
+    /// Loads pages until the channel is among the rows ("Show in TV guide"); stops after `maxRows`.
+    /// Returns whether it is loaded.
+    @discardableResult
+    public func reveal(channelId: String, maxRows: Int = 3_000) -> Bool {
+        while !rows.contains(where: { $0.channel.id == channelId }) {
+            let before = rows.count
+            guard before < maxRows else { return false }
+            loadMore()
+            if rows.count == before { return false }
+        }
+        return true
+    }
+
     public func loadMoreIfNeeded(current row: ChannelRow) {
         if let index = rows.firstIndex(of: row), index >= rows.count - 20 { loadMore() }
     }

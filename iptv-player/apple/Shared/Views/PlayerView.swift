@@ -42,6 +42,10 @@ struct PlayerView: View {
     @State private var infoCardVisible = false
     @State private var infoCardTask: Task<Void, Never>?
     @FocusState private var infoFavoriteFocused: Bool
+    /// Undo button of the toast (below the info card: ▼ from ⭐ reaches it, no zap while offered).
+    @FocusState private var undoFocused: Bool
+    /// Now/next of the info card's channel (loaded per channel, not per render).
+    @State private var infoNowNext: NowNext?
     #endif
 
     private var player: PlayerController { env.player }
@@ -49,11 +53,16 @@ struct PlayerView: View {
     /// The play/pause control shows "play" (paused by the user or finished).
     private var showsPlayIcon: Bool { player.phase == .paused || player.phase == .ended || player.phase == .idle }
     private static let autoHideSeconds = 3
+    /// Per request / per opening, not per render: the series of an episode (⭐) and the zap list
+    /// with favorites on top.
+    @State private var episodeSeries: Series?
+    @State private var channelListCache: [Channel] = []
 
-    /// Undo toast sits above the bottom bar (and above the tvOS info card).
+    /// Undo toast sits above the bottom bar; tvOS with the info card: below the card, at the right
+    /// under ⭐, so ▼ moves the focus to "Undo".
     private var toastLift: CGFloat {
         #if os(tvOS)
-        infoCardVisible ? 330 : 150
+        infoCardVisible ? 0 : 150
         #else
         96
         #endif
@@ -96,8 +105,8 @@ struct PlayerView: View {
             #endif
             if channelListVisible { channelList }
             // Undo of a ⭐ toggle (4 s), above the bottom bar; independent of the overlay.
-            UndoToast()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            UndoToast(undoFocus: undoFocusBinding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toastAlignment)
                 .padding(.bottom, Theme.safeV + toastLift)
         }
         .animation(.easeInOut(duration: 0.18), value: overlayVisible)
@@ -121,6 +130,9 @@ struct PlayerView: View {
         .onChange(of: player.resumedFromMs) { _, ms in
             if ms != nil { showResumeChip() } else { resumeChipVisible = false }
         }
+        .task(id: player.request?.id) { loadEpisodeSeries() }
+        .onChange(of: channelListVisible) { _, visible in if visible { refreshChannelListOrder() } }
+        .onChange(of: env.libraryVersion) { if channelListVisible { refreshChannelListOrder() } }
         .sheet(isPresented: $syncPanelVisible) { AudioSyncPanel(player: player) }
         #if os(iOS)
         .statusBarHidden()
@@ -161,7 +173,15 @@ struct PlayerView: View {
         }
         .onPlayPauseCommand { togglePlayPause() }
         // A ⭐ toggle on the info card keeps it open for another full period.
-        .onChange(of: env.favorites.pendingUndo) { if infoCardVisible { scheduleInfoCardHide() } }
+        .onChange(of: env.favorites.pendingUndo) { _, pending in
+            guard infoCardVisible else { return }
+            scheduleInfoCardHide()
+            if pending == nil { infoFavoriteFocused = true }   // the toast (and its focused Undo) is gone
+        }
+        .task(id: infoCardVisible ? player.currentChannel?.id : nil) {
+            guard infoCardVisible, let channel = player.currentChannel, let id = channel.epgId else { infoNowNext = nil; return }
+            infoNowNext = (try? env.epg.nowNext(sourceId: channel.sourceId, epgIds: [id], at: Date()))?[id.lowercased()]
+        }
         // Select on the picture (overlay hidden): VOD pauses/resumes like the TV app; live shows the info.
         .onTapGesture {
             if isVOD { togglePlayPause() } else { showOverlay() }
@@ -346,9 +366,13 @@ struct PlayerView: View {
         }
     }
 
-    /// Card shown: ▲▼ zap (the card follows the channel), anything else keeps it open.
+    /// Card shown: ▲▼ zap (the card follows the channel), anything else keeps it open. While the undo
+    /// toast is offered, ▼ goes to "Undo" and ▲ back to ⭐ instead of zapping.
     private func infoCardMove(_ direction: MoveCommandDirection) {
+        let undoOffered = env.favorites.pendingUndo != nil
         switch direction {
+        case .up where undoOffered: infoFavoriteFocused = true
+        case .down where undoOffered: undoFocused = true
         case .up: player.zap(by: -1)
         case .down: player.zap(by: 1)
         default: break
@@ -358,7 +382,7 @@ struct PlayerView: View {
 
     /// Channel info (spec §2 "▲ = kanal bilgisi"): logo, number, name, now/next; ⭐ has the focus.
     private func infoCard(_ channel: Channel) -> some View {
-        let nowNext = channel.epgId.flatMap { id in (try? env.epg.nowNext(sourceId: channel.sourceId, epgIds: [id], at: Date()))?[id.lowercased()] }
+        let nowNext = infoNowNext
         return VStack {
             Spacer()
             HStack(alignment: .center, spacing: 36) {
@@ -397,7 +421,7 @@ struct PlayerView: View {
             .padding(36)
             .background(RoundedRectangle(cornerRadius: Theme.cardRadius * 2, style: .continuous).fill(Theme.surfaceElevated.opacity(0.95)))
             .padding(.horizontal, Theme.safeH)
-            .padding(.bottom, Theme.safeV + 20)
+            .padding(.bottom, Theme.safeV + 20 + (env.favorites.pendingUndo != nil ? 120 : 0))   // room for the toast below
         }
         .focusSection()
         .defaultFocus($infoFavoriteFocused, true)
@@ -666,7 +690,7 @@ struct PlayerView: View {
         case .movie(let m)?:
             return env.favoriteTarget(m)
         case .episode(let e, let seriesTitle)?:
-            if let series = (try? env.catalog.seriesItem(sourceId: e.sourceId, id: e.seriesId)) ?? nil { return env.favoriteTarget(series) }
+            if let series = episodeSeries, series.id == e.seriesId { return env.favoriteTarget(series) }
             return env.favoriteTarget(sourceId: e.sourceId, kind: .series, itemId: e.seriesId, title: seriesTitle, posterUrl: nil)
         default:
             return nil
@@ -785,11 +809,36 @@ struct PlayerView: View {
         .padding(.top, Theme.safeV + 20)
     }
 
-    /// Zap list with the favorite channels on top (spec §2: favorites always first).
-    private var channelListOrder: [Channel] {
+    /// Zap list with the favorite channels on top (spec §2: favorites always first) – computed when
+    /// the list opens / favorites change, not on every render.
+    private func refreshChannelListOrder() {
         let all = player.request?.channels ?? []
         let isFavorite: (Channel) -> Bool = { c in env.favoriteTarget(c).map { env.favorites.isFavorite($0.contentKey) } ?? false }
-        return all.filter(isFavorite) + all.filter { !isFavorite($0) }
+        channelListCache = all.filter(isFavorite) + all.filter { !isFavorite($0) }
+    }
+
+    private var channelListOrder: [Channel] { channelListCache.isEmpty ? (player.request?.channels ?? []) : channelListCache }
+
+    /// The series of a playing episode (its poster/name for ⭐), once per request.
+    private func loadEpisodeSeries() {
+        guard case .episode(let e, _)? = player.request?.item else { episodeSeries = nil; return }
+        episodeSeries = (try? env.catalog.seriesItem(sourceId: e.sourceId, id: e.seriesId)) ?? nil
+    }
+
+    private var toastAlignment: Alignment {
+        #if os(tvOS)
+        infoCardVisible ? .bottomTrailing : .bottom
+        #else
+        .bottom
+        #endif
+    }
+
+    private var undoFocusBinding: FocusState<Bool>.Binding? {
+        #if os(tvOS)
+        $undoFocused
+        #else
+        nil
+        #endif
     }
 
     private var channelList: some View {

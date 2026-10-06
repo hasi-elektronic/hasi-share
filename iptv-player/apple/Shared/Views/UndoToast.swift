@@ -6,6 +6,8 @@ import SwiftUI
 /// (iOS 26 hit testing, see PlayerView).
 struct UndoToast: View {
     @Environment(AppEnvironment.self) private var env
+    /// tvOS player: lets the info card move the focus to "Undo" (▼ from ⭐).
+    var undoFocus: FocusState<Bool>.Binding?
 
     var body: some View {
         ZStack {
@@ -32,6 +34,7 @@ struct UndoToast: View {
             Button(L10n.t("action_undo")) { env.favorites.undo() }
                 #if os(tvOS)
                 .buttonStyle(SecondaryButtonStyle())
+                .modifier(OptionalFocus(binding: undoFocus))
                 #else
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(Theme.primary)
@@ -57,5 +60,14 @@ struct UndoToast: View {
 
     private func announce(_ on: Bool) {
         AccessibilityNotification.Announcement(L10n.t(on ? "fav_added" : "fav_removed")).post()
+    }
+}
+
+/// `.focused(binding)` when a binding is given.
+private struct OptionalFocus: ViewModifier {
+    let binding: FocusState<Bool>.Binding?
+
+    func body(content: Content) -> some View {
+        if let binding { content.focused(binding) } else { content }
     }
 }

@@ -66,4 +66,13 @@ final class FavoritesViewModelTests: XCTestCase {
         fresh.reload()
         XCTAssertEqual(fresh.channels.map(\.id), expected, "persisted")
     }
+
+    func testRevealLoadsPagesUntilTheChannelIsThere() async throws {
+        let env = try await makeEnvironment()
+        let model = LiveTVViewModel(env: env)
+        model.reload()
+        let last = try XCTUnwrap(model.rows.last?.channel)
+        XCTAssertTrue(model.reveal(channelId: last.id))
+        XCTAssertFalse(model.reveal(channelId: "no-such-channel"), "stops when the list is exhausted")
+    }
 }
