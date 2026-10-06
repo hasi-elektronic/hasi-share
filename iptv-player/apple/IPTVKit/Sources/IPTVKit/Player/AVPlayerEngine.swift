@@ -22,6 +22,9 @@ public final class AVPlayerEngine: PlaybackEngine {
     private var optionsTask: Task<Void, Never>?
     /// Live start tuning: relaxes the first-variant cap / stall waiting after the first frame.
     private var relaxTasks: [Task<Void, Never>] = []
+    /// User intent: true after `load`/`play()`, false after `pause()`/`stop()`. A `.paused`
+    /// status while this is true and stall-waiting is off is a stall, not a user pause.
+    private var wantsToPlay = false
     private var pendingRelax: (item: AVPlayerItem, tuning: LiveStartTuning)?
 
     public init() {
@@ -58,6 +61,7 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         cancelRelax()
+        wantsToPlay = true
         var options: [String: Any] = [:]
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
         let asset = AVURLAsset(url: stream.url, options: options)
@@ -111,6 +115,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         case .readyToPlay:
             let d = item.duration.seconds
             onEvent?(.ready(duration: d.isFinite ? d : 0))
+            if player.timeControlStatus == .playing { scheduleRelaxIfNeeded() }
         default: break
         }
     }
@@ -120,7 +125,17 @@ public final class AVPlayerEngine: PlaybackEngine {
         case .playing:
             scheduleRelaxIfNeeded()
             onEvent?(.playing)
-        case .paused: onEvent?(.paused)
+        case .paused:
+            let event = Self.eventForPausedStatus(wantsToPlay: wantsToPlay,
+                                                  stallWaitEnabled: player.automaticallyWaitsToMinimizeStalling)
+            if event == .buffering {
+                // Tuned live start: with stall-waiting off a stall drops the rate to 0. Recover
+                // with the safe settings and let AVPlayer resume once it has buffered.
+                cancelRelax()
+                player.automaticallyWaitsToMinimizeStalling = true
+                player.play()
+            }
+            onEvent?(event)
         case .waitingToPlayAtSpecifiedRate: onEvent?(.buffering)
         @unknown default: break
         }
@@ -129,7 +144,9 @@ public final class AVPlayerEngine: PlaybackEngine {
     /// On the first `.playing` of a tuned load: after the configured delays remove the bitrate cap
     /// and re-enable stall minimizing (cancelled by the next `load` / `stop`).
     private func scheduleRelaxIfNeeded() {
-        guard let (item, tuning) = pendingRelax else { return }
+        // Only a real playing state counts as "first frame": with stall-waiting off AVPlayer
+        // reports `.playing` right at `play()`, before the item is ready.
+        guard let (item, tuning) = pendingRelax, item.status == .readyToPlay else { return }
         pendingRelax = nil
         cancelRelax()
         // Two independent timers, both measured from the first frame.
@@ -155,8 +172,15 @@ public final class AVPlayerEngine: PlaybackEngine {
         pendingRelax = nil
     }
 
-    public func play() { player.play() }
-    public func pause() { player.pause() }
+    /// True when `.paused` was not requested by the user: the engine wants to play but
+    /// stall-waiting is off, so AVPlayer stopped (rate 0) instead of waiting for data.
+    /// Event for `timeControlStatus == .paused`: `.buffering` for a stall (see above), else `.paused`.
+    nonisolated static func eventForPausedStatus(wantsToPlay: Bool, stallWaitEnabled: Bool) -> EngineEvent {
+        wantsToPlay && !stallWaitEnabled ? .buffering : .paused
+    }
+
+    public func play() { wantsToPlay = true; player.play() }
+    public func pause() { wantsToPlay = false; player.pause() }
 
     public func seek(to seconds: Double) {
         player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600))
@@ -219,6 +243,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     public func setAspect(_ mode: AspectMode) { aspect = mode }
 
     public func stop() {
+        wantsToPlay = false
         cancelRelax()
         player.automaticallyWaitsToMinimizeStalling = true
         optionsTask?.cancel()

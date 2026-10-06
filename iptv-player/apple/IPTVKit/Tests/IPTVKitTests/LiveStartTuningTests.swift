@@ -17,5 +17,26 @@ final class LiveStartTuningTests: XCTestCase {
         XCTAssertEqual(vod.forwardBufferSeconds, 0)
         XCTAssertNil(vod.initialPeakBitRate)
         XCTAssertEqual(vod.vlcNetworkCachingMs, 2000)
+        let live = LiveStartTuning.make(isLive: true, largeBuffer: true)
+        XCTAssertEqual(live.forwardBufferSeconds, 6)
+        XCTAssertEqual(live.waitToMinimizeStallingAfter, 0)
+        XCTAssertEqual(live.peakBitRateReleaseAfter, 0)
+        XCTAssertEqual(LiveStartTuning.make(isLive: false, largeBuffer: true).vlcNetworkCachingMs, 4000)
     }
 }
+
+#if canImport(AVFoundation)
+/// A `.paused` AVPlayer status is a user pause only when stall-waiting is on or the user did not ask to play.
+final class AVPlayerEnginePausedStatusTests: XCTestCase {
+    func testStallWithWaitingDisabledBecomesBuffering() {
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, stallWaitEnabled: false), .buffering)
+    }
+    func testUserPauseStaysPaused() {
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, stallWaitEnabled: false), .paused)
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: false, stallWaitEnabled: true), .paused)
+    }
+    func testPauseWithWaitingEnabledStaysPaused() {
+        XCTAssertEqual(AVPlayerEngine.eventForPausedStatus(wantsToPlay: true, stallWaitEnabled: true), .paused)
+    }
+}
+#endif

@@ -104,6 +104,15 @@ final class EngineSelectionTests: XCTestCase {
         XCTAssertEqual(vlc.tunings.last?.vlcNetworkCachingMs, 4000)
     }
 
+    func testLiveChannelPassesLiveTuning() async throws {
+        let channel = Channel(sourceId: "s", id: "7", name: "C7", url: "http://h.example.com/live/7.m3u8")
+        let c = controller()
+        c.open(PlaybackRequest(item: .channel(channel), source: nil, channels: [channel]))
+        for _ in 0..<200 where av.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(av.tunings.last, LiveStartTuning.make(isLive: true, largeBuffer: false))
+        XCTAssertEqual(av.tunings.last?.initialPeakBitRate, 2_500_000)
+    }
+
     func testSnifferRoutesUnknownURLToVLC() async throws {
         let tsBytes: Data = { var d = Data(count: 400); d[0] = 0x47; d[188] = 0x47; d[376] = 0x47; return d }()
         let c = controller(sniffer: { _, _ in ("application/octet-stream", tsBytes, 200) })

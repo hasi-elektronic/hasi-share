@@ -93,7 +93,7 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 * **Canlı başlangıç ayarı** (`LiveStartTuning`, her `load`'a verilir; "Büyük tampon" ayarı `largeBuffer`):
   | | AVPlayer | VLCKit `network-caching` |
   |---|---|---|
-  | Canlı (varsayılan) | `preferredForwardBufferDuration` 1 sn; ilk karede `automaticallyWaitsToMinimizeStalling` kapalı → ilk kareden 3 sn sonra açılır; ilk varyant `preferredPeakBitRate` 2,5 Mbps ile sınırlı → ilk kareden 4 sn sonra sınır kalkar | 1000 ms |
+  | Canlı (varsayılan) | `preferredForwardBufferDuration` 1 sn; `automaticallyWaitsToMinimizeStalling` `load()`'dan ilk kareden 3 sn sonrasına kadar kapalı (bu sürede takılma olursa hemen açılır ve oynatma yeniden başlatılır; zamanlayıcılar yalnızca gerçek `playing` + `readyToPlay` durumunda başlar); ilk varyant `preferredPeakBitRate` 2,5 Mbps ile sınırlı → ilk kareden 4 sn sonra sınır kalkar | 1000 ms |
   | Canlı + büyük tampon | 6 sn, bekleme açık, sınır yok | 3000 ms |
   | VOD | 0 (sistem varsayılanı), sınır yok | 2000 ms (büyük tampon: 4000 ms) |
 
