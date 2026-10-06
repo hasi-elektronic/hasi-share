@@ -1,0 +1,18 @@
+{
+  "live": [
+    { "id": "1001", "categoryId": "1", "categoryIds": ["1", "7"] },
+    { "id": "1002", "categoryId": "7", "categoryIds": ["7"] }
+  ],
+  "vod": [
+    { "id": "5001", "categoryId": "31", "categoryIds": ["31", "32"] },
+    { "id": "5002", "categoryId": "32", "categoryIds": ["32"] }
+  ],
+  "series": [
+    { "id": "9001", "categoryId": "215", "categoryIds": ["215", "216"] },
+    { "id": "9002", "categoryId": "216", "categoryIds": ["216"] },
+    { "id": "9003", "categoryId": "102", "categoryIds": ["102", "101"] },
+    { "id": "9004", "categoryId": "215", "categoryIds": ["215"] },
+    { "id": "9005", "categoryId": "102", "categoryIds": ["102"] },
+    { "id": "9006", "categoryId": null, "categoryIds": [] }
+  ]
+}

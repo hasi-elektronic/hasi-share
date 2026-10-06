@@ -94,7 +94,8 @@ public object XtreamMapper {
             name = XtreamJson.string(item["name"]) ?: "",
             number = XtreamJson.int(item["num"]),
             logoUrl = XtreamJson.trimmed(item["stream_icon"]),
-            categoryId = id(item["category_id"]),
+            categoryId = categoryIds(item).firstOrNull(),
+            categoryIds = categoryIds(item),
             epgId = XtreamJson.trimmed(item["epg_channel_id"]),
             catchup = catchup,
             sort = sort,
@@ -113,7 +114,8 @@ public object XtreamMapper {
             id = id,
             name = XtreamJson.string(item["name"]) ?: "",
             posterUrl = XtreamJson.trimmed(item["stream_icon"]),
-            categoryId = id(item["category_id"]),
+            categoryId = categoryIds(item).firstOrNull(),
+            categoryIds = categoryIds(item),
             rating = XtreamJson.double(item["rating"]),
             year = XtreamJson.int(item["year"])?.takeIf { it > 0 },
             plot = XtreamJson.string(item["plot"]),
@@ -135,7 +137,8 @@ public object XtreamMapper {
             id = id,
             name = XtreamJson.string(item["name"]) ?: "",
             posterUrl = XtreamJson.trimmed(item["cover"]),
-            categoryId = id(item["category_id"]),
+            categoryId = categoryIds(item).firstOrNull(),
+            categoryIds = categoryIds(item),
             plot = XtreamJson.string(item["plot"]),
             rating = XtreamJson.double(item["rating"]),
             year = year(item),
@@ -147,6 +150,18 @@ public object XtreamMapper {
     /** `get_series` → series. */
     public fun series(json: JsonElement?, sourceId: String): List<Series> =
         mapItems(json) { item, sort -> seriesItem(item, sourceId, sort) }
+
+    /**
+     * All categories of a list item (CONTRACT §4.3): `category_id` first, then the entries of
+     * `category_ids` (XUI.one / newer panels: ints or strings; `category_id` may be null, `""` or
+     * only the first of them). Empty/null entries are skipped, duplicates removed, order kept.
+     */
+    public fun categoryIds(item: JsonElement?): List<String> {
+        val out = LinkedHashSet<String>()
+        id(item["category_id"])?.let(out::add)
+        XtreamJson.array(item["category_ids"])?.forEach { e -> id(e)?.let(out::add) }
+        return out.toList()
+    }
 
     /** `year` field, else the first 4 digits of `releaseDate` / `release_date`. */
     public fun year(item: JsonElement?): Int? {

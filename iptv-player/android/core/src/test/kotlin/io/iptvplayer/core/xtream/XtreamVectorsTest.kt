@@ -52,7 +52,8 @@ class XtreamVectorsTest {
             "auth_user_info_array.json", "live_categories.expected.json", "live_categories.json", "live_streams.expected.json",
             "live_streams.json", "series.expected.json", "series.json", "series_info.expected.json", "series_info.json",
             "series_info_list_variant.json", "short_epg.expected.json", "short_epg.json", "url-vectors.json",
-            "vod_streams.expected.json", "vod_streams.json",
+            "vod_streams.expected.json", "vod_streams.json", "series_categories.json", "series_categories.expected.json",
+            "category_ids.json", "category_ids.expected.json",
         )
         val present = Vectors.file("xtream/auth_ok.json").parentFile.listFiles()!!.map { it.name }.toSet()
         assertEquals(present, used, "new xtream vector files must get a test")
@@ -65,6 +66,34 @@ class XtreamVectorsTest {
         assertJsonEquals(json("live_categories.expected.json"), actual)
         assertEquals(listOf(0, 1), cats.map { it.sort })
         assertTrue(cats.all { it.kind == ContentKind.LIVE && it.sourceId == src })
+    }
+
+    /** `get_series_categories` with numeric/string ids, `parent_id` and Turkish names: nothing valid is dropped. */
+    @Test
+    fun seriesCategories() {
+        val cats = XtreamMapper.categories(json("series_categories.json"), src, ContentKind.SERIES)
+        val actual = JsonArray(cats.map { buildJsonObject { put("id", it.id); put("name", it.name) } })
+        assertJsonEquals(json("series_categories.expected.json"), actual)
+        assertEquals(cats.indices.toList(), cats.map { it.sort }, "provider order")
+    }
+
+    private fun categoryRow(id: String, categoryId: String?, categoryIds: List<String>) = buildJsonObject {
+        put("id", id)
+        put("categoryId", str(categoryId))
+        put("categoryIds", JsonArray(categoryIds.map(::JsonPrimitive)))
+    }
+
+    /** XUI.one / newer panels: `category_ids` arrays (ints or strings), `category_id` null/""/only the first. */
+    @Test
+    fun categoryIds() {
+        val input = json("category_ids.json").jsonObject
+        val expected = json("category_ids.expected.json").jsonObject
+        assertJsonEquals(expected.getValue("live"),
+            JsonArray(XtreamMapper.channels(input["live"], src).map { categoryRow(it.id, it.categoryId, it.categoryIds) }))
+        assertJsonEquals(expected.getValue("vod"),
+            JsonArray(XtreamMapper.movies(input["vod"], src).map { categoryRow(it.id, it.categoryId, it.categoryIds) }))
+        assertJsonEquals(expected.getValue("series"),
+            JsonArray(XtreamMapper.series(input["series"], src).map { categoryRow(it.id, it.categoryId, it.categoryIds) }))
     }
 
     private fun channelJson(c: Channel) = buildJsonObject {

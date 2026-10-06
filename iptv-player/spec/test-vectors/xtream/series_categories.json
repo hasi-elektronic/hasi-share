@@ -1,0 +1,31 @@
+[
+  {
+    "category_id": "101",
+    "category_name": "EN | NETFLIX SERIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": 102,
+    "category_name": "DE | SERIEN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "215",
+    "category_name": "TR | DİZİLER",
+    "parent_id": 0
+  },
+  {
+    "category_id": 216,
+    "category_name": "Türk Dizileri",
+    "parent_id": "215"
+  },
+  {
+    "category_id": "217",
+    "category_name": "",
+    "parent_id": null
+  },
+  {
+    "category_id": "",
+    "category_name": "Broken"
+  }
+]

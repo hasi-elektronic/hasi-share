@@ -39,7 +39,7 @@ final class DatabaseMigrationTests: XCTestCase {
 
         // Reopen with the current code.
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 2)
+        XCTAssertEqual(db.db.userVersion, 3)
         XCTAssertEqual(db.value(forKey: "k"), "kept")
         XCTAssertEqual(try CatalogRepository(database: db).channelCount(sourceId: "s"), 1)
         let epg = EpgRepository(database: db)
@@ -62,6 +62,31 @@ final class DatabaseMigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         _ = try AppDatabase(db: SQLiteDatabase(path: path))
         let again = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(again.db.userVersion, 2)
+        XCTAssertEqual(again.db.userVersion, 3)
+    }
+
+    /// A v2 database (no `item_categories`) keeps its category lists: v3 backfills memberships from `category_id`.
+    func testSchemaV2DatabaseBackfillsCategoryMemberships() throws {
+        let path = tempPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        do {
+            let db = try AppDatabase(db: SQLiteDatabase(path: path))
+            let catalog = CatalogRepository(database: db)
+            let session = try catalog.beginRefresh(sourceId: "s")
+            try session.write(channels: [TestData.channel(id: "c1", sourceId: "s", categoryId: "tr", sort: 0),
+                                         TestData.channel(id: "c2", sourceId: "s", categoryId: "de", sort: 1)],
+                              movies: [Movie(sourceId: "s", id: "m1", name: "Ayla", categoryId: "tr-film")],
+                              series: [Series(sourceId: "s", id: "d1", name: "Kuruluş Osman", categoryId: "tr-dizi")])
+            try session.commit()
+            try db.db.execute("DROP TABLE item_categories")
+            db.db.userVersion = 2
+        }
+        let db = try AppDatabase(db: SQLiteDatabase(path: path))
+        XCTAssertEqual(db.db.userVersion, 3)
+        let catalog = CatalogRepository(database: db)
+        XCTAssertEqual(try catalog.channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
+        XCTAssertEqual(try catalog.channelCount(sourceId: "s", categoryId: "de"), 1)
+        XCTAssertEqual(try catalog.movies(sourceId: "s", categoryId: "tr-film").map(\.id), ["m1"])
+        XCTAssertEqual(try catalog.series(sourceId: "s", categoryId: "tr-dizi").map(\.id), ["d1"])
     }
 }

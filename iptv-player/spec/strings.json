@@ -1359,6 +1359,11 @@
    "tr": "Top 10",
    "de": "Top 10"
   },
+  "row_categories": {
+   "en": "Categories",
+   "tr": "Kategoriler",
+   "de": "Kategorien"
+  },
   "catchup_title": {
    "en": "TV archive · Catch-up",
    "tr": "TV arşivi · Geçmiş yayınlar",

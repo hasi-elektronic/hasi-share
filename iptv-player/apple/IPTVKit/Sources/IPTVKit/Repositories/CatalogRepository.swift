@@ -44,7 +44,7 @@ public final class CatalogRepository: Sendable {
     /// Removes all content of a source.
     public func deleteContent(sourceId: String) throws {
         try db.transaction {
-            for table in ["categories", "channels", "movies", "series", "episodes", "epg"] {
+            for table in ["categories", "item_categories", "channels", "movies", "series", "episodes", "epg"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ? OR source_id = ?",
                            [.text(sourceId), .text(sourceId + AppDatabase.stagingSuffix)])
             }
@@ -71,7 +71,25 @@ public final class CatalogRepository: Sendable {
         }
     }
 
+    /// Categories that contain at least one item (via `item_categories`, so multi-category Xtream items
+    /// count everywhere), in provider order – the full list the Movies/Series category chips offer.
+    public func categoriesWithContent(sourceId: String, kind: CategoryKind) throws -> [IPTVCore.Category] {
+        try db.query("""
+            SELECT id, name, sort FROM categories c WHERE c.source_id = ? AND c.kind = ? AND EXISTS (
+              SELECT 1 FROM item_categories ic WHERE ic.source_id = c.source_id AND ic.kind = c.kind AND ic.category_id = c.id)
+            ORDER BY sort
+            """, [.text(sourceId), .text(kind.rawValue)]) {
+            IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: $0.string(1), sort: $0.int(2))
+        }
+    }
+
+    /// `id IN (…)` filter: items of one category (all memberships, not just the primary `category_id`).
+    static func memberFilter(_ kind: CategoryKind) -> String {
+        "id IN (SELECT item_id FROM item_categories WHERE source_id = ? AND kind = '\(kind.rawValue)' AND category_id = ?)"
+    }
+
     static let channelColumns = "source_id, id, name, number, logo_url, category_id, epg_id, catchup_type, catchup_days, catchup_source, url, user_agent, referrer, drm, sort"
+    static let qualifiedChannelColumns = channelColumns.components(separatedBy: ", ").map { "c.\($0)" }.joined(separator: ", ")
 
     static func channel(_ r: SQLiteRow) -> Channel {
         Channel(sourceId: r.string(0), id: r.string(1), name: r.string(2), number: r.optInt(3), logoUrl: r.optString(4),
@@ -83,8 +101,12 @@ public final class CatalogRepository: Sendable {
     /// A page of channels; `categoryId == nil` → all.
     public func channels(sourceId: String, categoryId: String? = nil, offset: Int = 0, limit: Int = 100) throws -> [Channel] {
         if let categoryId {
-            return try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND category_id = ? ORDER BY sort LIMIT ? OFFSET ?",
-                                [.text(sourceId), .text(categoryId), .int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
+            // Walks the membership index in list order (no sort step) and joins the channel rows.
+            return try db.query("""
+                SELECT \(Self.qualifiedChannelColumns) FROM item_categories ic
+                JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
+                WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ? ORDER BY ic.sort LIMIT ? OFFSET ?
+                """, [.text(sourceId), .text(categoryId), .int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
         }
         return try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? ORDER BY sort LIMIT ? OFFSET ?",
                             [.text(sourceId), .int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
@@ -92,7 +114,8 @@ public final class CatalogRepository: Sendable {
 
     public func channelCount(sourceId: String, categoryId: String? = nil) throws -> Int {
         if let categoryId {
-            return try db.scalar("SELECT COUNT(*) FROM channels WHERE source_id = ? AND category_id = ?", [.text(sourceId), .text(categoryId)])
+            return try db.scalar("SELECT COUNT(*) FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ?",
+                                 [.text(sourceId), .text(categoryId)])
         }
         return try db.scalar("SELECT COUNT(*) FROM channels WHERE source_id = ?", [.text(sourceId)])
     }
@@ -132,7 +155,7 @@ public final class CatalogRepository: Sendable {
                        offset: Int = 0, limit: Int = 60) throws -> [Movie] {
         var sql = "SELECT \(Self.movieColumns) FROM movies WHERE source_id = ?"
         var args: [SQLiteValue] = [.text(sourceId)]
-        if let categoryId { sql += " AND category_id = ?"; args.append(.text(categoryId)) }
+        if let categoryId { sql += " AND " + Self.memberFilter(.movie); args += [.text(sourceId), .text(categoryId)] }
         sql += " ORDER BY \(Self.order(sort)) LIMIT ? OFFSET ?"
         args += [.int(Int64(limit)), .int(Int64(offset))]
         return try db.query(sql, args, map: Self.movie)
@@ -153,7 +176,7 @@ public final class CatalogRepository: Sendable {
                        offset: Int = 0, limit: Int = 60) throws -> [Series] {
         var sql = "SELECT \(Self.seriesColumns) FROM series WHERE source_id = ?"
         var args: [SQLiteValue] = [.text(sourceId)]
-        if let categoryId { sql += " AND category_id = ?"; args.append(.text(categoryId)) }
+        if let categoryId { sql += " AND " + Self.memberFilter(.series); args += [.text(sourceId), .text(categoryId)] }
         let order = sort == .added ? "sort DESC" : Self.order(sort)
         sql += " ORDER BY \(order) LIMIT ? OFFSET ?"
         args += [.int(Int64(limit)), .int(Int64(offset))]
@@ -250,7 +273,7 @@ public final class CatalogRefreshSession: @unchecked Sendable {
 
     private func clearStaging() throws {
         try db.transaction {
-            for table in ["categories", "channels", "movies", "series", "episodes"] {
+            for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(stagingId)])
             }
             if db.hasFTS5 { try db.run("DELETE FROM search_index WHERE source_id = ?", [.text(stagingId)]) }
@@ -278,18 +301,21 @@ public final class CatalogRefreshSession: @unchecked Sendable {
                             .from(c.epgId), .text(c.catchup.type.rawValue), .from(c.catchup.days), .from(c.catchup.source),
                             .from(c.url), .from(c.userAgent), .from(c.referrer), .from(c.drm), .from(c.sort)])
                 try index(title: c.name, kind: .live, itemId: c.id)
+                try member(kind: .live, itemId: c.id, categoryIds: c.categoryIds, sort: c.sort)
             }
             for m in movies {
                 try db.run("INSERT OR REPLACE INTO movies (\(CatalogRepository.movieColumns)) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                            [.text(sid), .text(m.id), .text(m.name), .from(m.posterUrl), .from(m.categoryId), .from(m.rating),
                             .from(m.year), .from(m.plot), .from(m.containerExt), .from(m.url), .from(m.addedAt), .from(m.sort)])
                 try index(title: m.name, kind: .movie, itemId: m.id)
+                try member(kind: .movie, itemId: m.id, categoryIds: m.categoryIds, sort: m.sort)
             }
             for s in series {
                 try db.run("INSERT OR REPLACE INTO series (\(CatalogRepository.seriesColumns)) VALUES (?,?,?,?,?,?,?,?,?)",
                            [.text(sid), .text(s.id), .text(s.name), .from(s.posterUrl), .from(s.categoryId), .from(s.plot),
                             .from(s.rating), .from(s.year), .from(s.sort)])
                 try index(title: s.name, kind: .series, itemId: s.id)
+                try member(kind: .series, itemId: s.id, categoryIds: s.categoryIds, sort: s.sort)
             }
             for e in episodes { try Self.insert(episode: e, sourceId: sid, db: db) }
         }
@@ -303,6 +329,14 @@ public final class CatalogRefreshSession: @unchecked Sendable {
                   .from(e.containerExt), .from(e.durationSec), .from(e.plot), .from(e.posterUrl), .from(e.url)])
     }
 
+    /// One `item_categories` row per category of the item (all Xtream `category_ids`, M3U: its group).
+    private func member(kind: CategoryKind, itemId: String, categoryIds: [String], sort: Int) throws {
+        for categoryId in categoryIds {
+            try db.run("INSERT OR REPLACE INTO item_categories (source_id, kind, category_id, item_id, sort) VALUES (?,?,?,?,?)",
+                       [.text(stagingId), .text(kind.rawValue), .text(categoryId), .text(itemId), .from(sort)])
+        }
+    }
+
     private func index(title: String, kind: ContentKind, itemId: String) throws {
         guard db.hasFTS5 else { return }
         try db.run("INSERT INTO search_index (title, source_id, kind, item_id) VALUES (?,?,?,?)",
@@ -314,7 +348,7 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         guard !finished else { return }
         finished = true
         try db.transaction {
-            for table in ["categories", "channels", "movies", "series", "episodes"] {
+            for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(sourceId)])
                 try db.run("UPDATE \(table) SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
             }

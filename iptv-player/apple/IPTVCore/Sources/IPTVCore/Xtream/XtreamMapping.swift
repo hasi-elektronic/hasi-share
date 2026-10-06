@@ -95,8 +95,8 @@ public enum XtreamMapper {
                 : CatchupInfo.none
             out.append(Channel(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
                                number: item["num"]?.intValue, logoUrl: item["stream_icon"]?.stringValue,
-                               categoryId: item["category_id"]?.stringValue, epgId: item["epg_channel_id"]?.stringValue,
-                               catchup: catchup, sort: out.count))
+                               categoryId: categoryIds(item).first, epgId: item["epg_channel_id"]?.stringValue,
+                               catchup: catchup, sort: out.count, categoryIds: categoryIds(item)))
         }
         return out
     }
@@ -106,10 +106,10 @@ public enum XtreamMapper {
         for item in listItems(json) {
             guard let id = item["stream_id"]?.stringValue else { continue }
             out.append(Movie(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
-                             posterUrl: item["stream_icon"]?.stringValue, categoryId: item["category_id"]?.stringValue,
+                             posterUrl: item["stream_icon"]?.stringValue, categoryId: categoryIds(item).first,
                              rating: item["rating"]?.doubleValue, year: item["year"]?.intValue,
                              plot: item["plot"]?.stringValue, containerExt: item["container_extension"]?.stringValue,
-                             addedAt: epochDate(item["added"]), sort: out.count))
+                             addedAt: epochDate(item["added"]), sort: out.count, categoryIds: categoryIds(item)))
         }
         return out
     }
@@ -119,10 +119,20 @@ public enum XtreamMapper {
         for item in listItems(json) {
             guard let id = item["series_id"]?.stringValue else { continue }
             out.append(Series(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
-                              posterUrl: item["cover"]?.stringValue, categoryId: item["category_id"]?.stringValue,
+                              posterUrl: item["cover"]?.stringValue, categoryId: categoryIds(item).first,
                               plot: item["plot"]?.stringValue, rating: item["rating"]?.doubleValue,
-                              year: year(item), sort: out.count))
+                              year: year(item), sort: out.count, categoryIds: categoryIds(item)))
         }
+        return out
+    }
+
+    /// All categories of a list item (CONTRACT §4.3): `category_id` first, then the entries of
+    /// `category_ids` (XUI.one / newer panels: ints or strings; `category_id` may be null, `""` or only
+    /// the first of them). Empty/null entries are skipped, duplicates removed, order kept.
+    static func categoryIds(_ item: JSONValue) -> [String] {
+        var out: [String] = []
+        let candidates = [item["category_id"]] + (item["category_ids"]?.arrayValue ?? []).map(Optional.some)
+        for case let id? in candidates.map({ $0?.stringValue }) where !out.contains(id) { out.append(id) }
         return out
     }
 

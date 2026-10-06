@@ -62,7 +62,8 @@ enum BrowseKind {
 }
 
 /// Rows of a browse screen. Rules (SCREENS §3.2): "new" = 20 newest by `added`; Top 10 = rating
-/// descending, or the 10 newest when the source has no ratings; one row per category (first 12).
+/// descending, or the 10 newest when the source has no ratings; one row per category (first 12 non-empty);
+/// every non-empty category as a chip (`allCategories`) – a provider may have hundreds.
 @MainActor
 @Observable
 final class BrowseModel {
@@ -80,6 +81,8 @@ final class BrowseModel {
     private(set) var newSeries: [CatalogItem] = []
     private(set) var top10: [CatalogItem] = []
     private(set) var categoryRows: [CategoryRow] = []
+    /// Movies/Series: every category with content, provider order (category chips).
+    private(set) var allCategories: [IPTVCore.Category] = []
     private(set) var liveRows: [ChannelRow] = []
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private let home: HomeViewModel
@@ -126,19 +129,22 @@ final class BrowseModel {
         if kind != .movies { newSeries = ((try? env.catalog.series(sourceId: sid, sort: .added, limit: 20)) ?? []).map(CatalogItem.series) }
         top10 = []
         categoryRows = []
+        allCategories = []
         liveRows = []
         switch kind {
         case .movies:
             let rated = (try? env.catalog.movies(sourceId: sid, sort: .rating, limit: 10)) ?? []
             top10 = rated.contains { ($0.rating ?? 0) > 0 } ? rated.map(CatalogItem.movie) : Array(newMovies.prefix(10))
-            categoryRows = ((try? env.catalog.categories(sourceId: sid, kind: .movie)) ?? []).prefix(12).compactMap { c in
+            allCategories = (try? env.catalog.categoriesWithContent(sourceId: sid, kind: .movie)) ?? []
+            categoryRows = allCategories.prefix(12).compactMap { c in
                 let items = ((try? env.catalog.movies(sourceId: sid, categoryId: c.id, sort: .added, limit: 20)) ?? []).map(CatalogItem.movie)
                 return items.isEmpty ? nil : CategoryRow(category: c, items: items)
             }
         case .series:
             let rated = (try? env.catalog.series(sourceId: sid, sort: .rating, limit: 10)) ?? []
             top10 = rated.contains { ($0.rating ?? 0) > 0 } ? rated.map(CatalogItem.series) : Array(newSeries.prefix(10))
-            categoryRows = ((try? env.catalog.categories(sourceId: sid, kind: .series)) ?? []).prefix(12).compactMap { c in
+            allCategories = (try? env.catalog.categoriesWithContent(sourceId: sid, kind: .series)) ?? []
+            categoryRows = allCategories.prefix(12).compactMap { c in
                 let items = ((try? env.catalog.series(sourceId: sid, categoryId: c.id, sort: .added, limit: 20)) ?? []).map(CatalogItem.series)
                 return items.isEmpty ? nil : CategoryRow(category: c, items: items)
             }
@@ -282,6 +288,24 @@ struct BrowseView: View {
         case .movies, .series:
             let ck: ContentKind = kind == .movies ? .movie : .series
             let newTitle = L10n.t(kind == .movies ? "home_new_movies" : "home_new_series")
+            if !model.allCategories.isEmpty {
+                // Every category is reachable here; the rows below preview only the first 12.
+                Shelf(title: L10n.t("row_categories"), spacing: Theme.isTV ? 16 : 8, identifier: "categories") {
+                    ForEach(model.allCategories) { category in
+                        let title = [CountryFlag.emoji(for: category.name), CountryFlag.strippedTitle(category.name)].compactMap { $0 }.joined(separator: " ")
+                        NavigationLink(value: BrowseRoute.grid(kind: ck, categoryId: category.id, title: title, sort: .added)) {
+                            Text(title).lineLimit(1)
+                                .font(Theme.isTV ? Theme.caption.weight(.medium) : .subheadline.weight(.medium))
+                                .foregroundStyle(Theme.textPrimary)
+                                .padding(.horizontal, Theme.isTV ? 26 : 14).padding(.vertical, Theme.isTV ? 12 : 8)
+                                .background(Capsule().fill(Theme.surface))
+                                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                        }
+                        .buttonStyle(CardButtonStyle(radius: 40, scale: 1.1))
+                        .accessibilityIdentifier("category_chip_\(category.id)")
+                    }
+                }
+            }
             if !model.newItems.isEmpty {
                 posterRow(newTitle, model.newItems, seeAll: .grid(kind: ck, categoryId: nil, title: newTitle, sort: .added), id: "new", markNew: true)
             }

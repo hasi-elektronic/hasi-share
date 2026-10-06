@@ -83,6 +83,10 @@ public struct Channel: Codable, Sendable, Hashable, Identifiable {
     public var number: Int?
     public var logoUrl: String?
     public var categoryId: String?
+    /// Every category the item belongs to, primary (`categoryId`) first (CONTRACT §1/§4.3: Xtream
+    /// `category_ids`). Defaults to `[categoryId]`; the Apple catalog stores memberships separately
+    /// (`item_categories`), so items read back from the database carry only the primary.
+    public var categoryIds: [String]
     public var epgId: String?
     public var catchup: CatchupInfo
     public var url: String?
@@ -94,13 +98,14 @@ public struct Channel: Codable, Sendable, Hashable, Identifiable {
     public init(sourceId: String, id: String, name: String, number: Int? = nil, logoUrl: String? = nil,
                 categoryId: String? = nil, epgId: String? = nil, catchup: CatchupInfo = .none,
                 url: String? = nil, userAgent: String? = nil, referrer: String? = nil,
-                drm: Bool = false, sort: Int = 0) {
+                drm: Bool = false, sort: Int = 0, categoryIds: [String]? = nil) {
         self.sourceId = sourceId
         self.id = id
         self.name = name
         self.number = number
         self.logoUrl = logoUrl
         self.categoryId = categoryId
+        self.categoryIds = categoryIds ?? categoryId.map { [$0] } ?? []
         self.epgId = epgId
         self.catchup = catchup
         self.url = url
@@ -118,6 +123,10 @@ public struct Movie: Codable, Sendable, Hashable, Identifiable {
     public var name: String
     public var posterUrl: String?
     public var categoryId: String?
+    /// Every category the item belongs to, primary (`categoryId`) first (CONTRACT §1/§4.3: Xtream
+    /// `category_ids`). Defaults to `[categoryId]`; the Apple catalog stores memberships separately
+    /// (`item_categories`), so items read back from the database carry only the primary.
+    public var categoryIds: [String]
     public var rating: Double?
     public var year: Int?
     public var plot: String?
@@ -130,12 +139,13 @@ public struct Movie: Codable, Sendable, Hashable, Identifiable {
     public init(sourceId: String, id: String, name: String, posterUrl: String? = nil,
                 categoryId: String? = nil, rating: Double? = nil, year: Int? = nil,
                 plot: String? = nil, containerExt: String? = nil, url: String? = nil,
-                addedAt: Date? = nil, sort: Int = 0) {
+                addedAt: Date? = nil, sort: Int = 0, categoryIds: [String]? = nil) {
         self.sourceId = sourceId
         self.id = id
         self.name = name
         self.posterUrl = posterUrl
         self.categoryId = categoryId
+        self.categoryIds = categoryIds ?? categoryId.map { [$0] } ?? []
         self.rating = rating
         self.year = year
         self.plot = plot
@@ -153,6 +163,10 @@ public struct Series: Codable, Sendable, Hashable, Identifiable {
     public var name: String
     public var posterUrl: String?
     public var categoryId: String?
+    /// Every category the item belongs to, primary (`categoryId`) first (CONTRACT §1/§4.3: Xtream
+    /// `category_ids`). Defaults to `[categoryId]`; the Apple catalog stores memberships separately
+    /// (`item_categories`), so items read back from the database carry only the primary.
+    public var categoryIds: [String]
     public var plot: String?
     public var rating: Double?
     public var year: Int?
@@ -160,12 +174,13 @@ public struct Series: Codable, Sendable, Hashable, Identifiable {
 
     public init(sourceId: String, id: String, name: String, posterUrl: String? = nil,
                 categoryId: String? = nil, plot: String? = nil, rating: Double? = nil,
-                year: Int? = nil, sort: Int = 0) {
+                year: Int? = nil, sort: Int = 0, categoryIds: [String]? = nil) {
         self.sourceId = sourceId
         self.id = id
         self.name = name
         self.posterUrl = posterUrl
         self.categoryId = categoryId
+        self.categoryIds = categoryIds ?? categoryId.map { [$0] } ?? []
         self.plot = plot
         self.rating = rating
         self.year = year

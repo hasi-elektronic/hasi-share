@@ -255,6 +255,8 @@ public data class Channel(
     val sort: Int = 0,
     /** M3U `tvg-shift` (hours) – per-channel EPG correction, added to the source shift. */
     val tvgShiftHours: Double? = null,
+    /** Every category of the item, primary ([categoryId]) first (CONTRACT §4.3: Xtream `category_ids`). */
+    val categoryIds: List<String> = listOfNotNull(categoryId),
 )
 
 /** A VOD movie (CONTRACT §1). */
@@ -272,6 +274,8 @@ public data class Movie(
     val url: String? = null,
     val addedAtMs: Long? = null,
     val sort: Int = 0,
+    /** Every category of the item, primary ([categoryId]) first (CONTRACT §4.3: Xtream `category_ids`). */
+    val categoryIds: List<String> = listOfNotNull(categoryId),
 )
 
 /** A series (CONTRACT §1). */
@@ -288,6 +292,8 @@ public data class Series(
     val sort: Int = 0,
     /** Xtream `last_modified` (used for "recently added series"). */
     val lastModifiedMs: Long? = null,
+    /** Every category of the item, primary ([categoryId]) first (CONTRACT §4.3: Xtream `category_ids`). */
+    val categoryIds: List<String> = listOfNotNull(categoryId),
 )
 
 /** An episode of a series (CONTRACT §1). */

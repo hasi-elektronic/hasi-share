@@ -101,6 +101,27 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 2
         }
+        if db.userVersion < 3 {
+            // Xtream panels (XUI.one …) put one item into several categories (`category_ids`); `category_id` is
+            // only the first one or null. Category lists therefore read this membership table (one row per item
+            // and category, `sort` = the item's list position). v3 backfills it from the v1/v2 `category_id`
+            // columns so existing catalogs keep working until their next refresh.
+            try db.transaction {
+                try db.execute("""
+                CREATE TABLE IF NOT EXISTS item_categories (
+                  source_id TEXT NOT NULL, kind TEXT NOT NULL, category_id TEXT NOT NULL, item_id TEXT NOT NULL,
+                  sort INTEGER NOT NULL, PRIMARY KEY (source_id, kind, category_id, item_id));
+                CREATE INDEX IF NOT EXISTS item_categories_sort ON item_categories (source_id, kind, category_id, sort);
+                INSERT OR IGNORE INTO item_categories (source_id, kind, category_id, item_id, sort)
+                  SELECT source_id, 'live', category_id, id, sort FROM channels WHERE category_id IS NOT NULL;
+                INSERT OR IGNORE INTO item_categories (source_id, kind, category_id, item_id, sort)
+                  SELECT source_id, 'movie', category_id, id, sort FROM movies WHERE category_id IS NOT NULL;
+                INSERT OR IGNORE INTO item_categories (source_id, kind, category_id, item_id, sort)
+                  SELECT source_id, 'series', category_id, id, sort FROM series WHERE category_id IS NOT NULL;
+                """)
+            }
+            db.userVersion = 3
+        }
     }
 
     // MARK: Key/value (small app state such as sync cursor)

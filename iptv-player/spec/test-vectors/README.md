@@ -51,6 +51,10 @@ Error files: `{"error": "InvalidFormat" | "Empty"}`.
 * Episode: `number` ← `episode_num`; `season` ← `season` (fallback: object key, or
   array index + 1); `durationSec` ← `info.duration_secs`; `plot` ← `info.plot`;
   `posterUrl` ← `info.movie_image`.
+* Categories of channels/movies/series (`category_ids.json`, CONTRACT §4.3): `categoryIds` ←
+  `category_id` then `category_ids` (ints or strings; null/`""` skipped, de-duplicated, order kept);
+  `categoryId` ← first of `categoryIds`. `series_categories.json`: numeric/string ids, `parent_id`
+  ignored, empty name → `""`, provider order kept.
 * Account: `serverTimezone` ← `server_info.timezone`, default `"UTC"`.
 * Short EPG: base64-decode `title`/`description` (if decoding fails, use the raw string);
   empty → null; entries with unparsable timestamps are skipped; `hasArchive` ← `has_archive`.

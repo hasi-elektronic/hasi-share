@@ -105,7 +105,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Filmler / Diziler satırları:** İzlemeye devam et (yalnız o tür) · Favoriler · **Yeni eklenenler**
   (2:3 poster, altta küçük `primary` "YENİ" rozeti) · **Top 10** (posterin arkasında büyük, içi boş
   çerçeveli sıra numarası 1–10) · ardından kaynaktaki **her kategori için bir satır** (kategori adı,
-  ülke adı/kodu içeriyorsa bayrak emojisi; ilk 12 kategori, satır başına 20 öğe).
+  ülke adı/kodu içeriyorsa bayrak emojisi; içeriği olan ilk 12 kategori, satır başına 20 öğe).
+  "Yeni eklenenler"in üstünde **Kategoriler** çip satırı: içeriği olan **tüm** kategoriler (sağlayıcı
+  sırası, bayraklı; yatay kaydırılır) → dokununca o kategorinin poster grid'i. Bir öğe birden fazla
+  kategorideyse (Xtream `category_ids`, CONTRACT §4.3) her birinde görünür.
 * **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
   gönderilmez – sıralama tamamen yereldir.)

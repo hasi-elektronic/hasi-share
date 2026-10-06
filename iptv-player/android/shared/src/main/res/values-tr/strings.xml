@@ -274,6 +274,7 @@
     <string name="seasons_value">Sezon: %1$s</string>
     <string name="badge_new" formatted="false">YENİ</string>
     <string name="row_top10" formatted="false">Top 10</string>
+    <string name="row_categories" formatted="false">Kategoriler</string>
     <string name="catchup_title" formatted="false">TV arşivi · Geçmiş yayınlar</string>
     <string name="catchup_replay" formatted="false">Tekrar izle</string>
     <string name="catchup_on_air" formatted="false">Yayında</string>

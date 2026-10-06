@@ -14,7 +14,8 @@ final class XtreamVectorTests: XCTestCase {
             "auth.expected.json", "live_categories.json", "live_categories.expected.json",
             "live_streams.json", "live_streams.expected.json", "vod_streams.json", "vod_streams.expected.json",
             "series.json", "series.expected.json", "series_info.expected.json", "short_epg.json",
-            "short_epg.expected.json", "url-vectors.json",
+            "short_epg.expected.json", "url-vectors.json", "series_categories.json", "series_categories.expected.json",
+            "category_ids.json", "category_ids.expected.json",
         ]
         var referenced = covered
         for c in try XCTUnwrap(Vectors.object("xtream/auth.expected.json").arr("cases")) { referenced.insert(c.str("file") ?? "") }
@@ -86,6 +87,29 @@ final class XtreamVectorTests: XCTestCase {
         let cats = XtreamMapper.categories(try json("live_categories.json"), sourceId: "s", kind: .live)
         assertJSONEqual(try Vectors.json("xtream/live_categories.expected.json"),
                         cats.map { ["id": $0.id, "name": $0.name] as [String: Any] })
+    }
+
+    /// `get_series_categories` with numeric/string ids, `parent_id` and Turkish names: nothing valid is dropped.
+    func testSeriesCategories() throws {
+        let cats = XtreamMapper.categories(try json("series_categories.json"), sourceId: "s", kind: .series)
+        assertJSONEqual(try Vectors.json("xtream/series_categories.expected.json"),
+                        cats.map { ["id": $0.id, "name": $0.name] as [String: Any] })
+        XCTAssertEqual(cats.map(\.sort), Array(0..<cats.count), "provider order")
+    }
+
+    /// XUI.one / newer panels: `category_ids` arrays (ints or strings), `category_id` null/""/only the first.
+    func testCategoryIds() throws {
+        let input = try json("category_ids.json")
+        let expected = try Vectors.object("xtream/category_ids.expected.json")
+        func row(_ id: String, _ categoryId: String?, _ categoryIds: [String]) -> [String: Any] {
+            ["id": id, "categoryId": j(categoryId), "categoryIds": categoryIds]
+        }
+        assertJSONEqual(try XCTUnwrap(expected["live"]),
+                        XtreamMapper.channels(try XCTUnwrap(input["live"]), sourceId: "s").map { row($0.id, $0.categoryId, $0.categoryIds) }, "live")
+        assertJSONEqual(try XCTUnwrap(expected["vod"]),
+                        XtreamMapper.movies(try XCTUnwrap(input["vod"]), sourceId: "s").map { row($0.id, $0.categoryId, $0.categoryIds) }, "vod")
+        assertJSONEqual(try XCTUnwrap(expected["series"]),
+                        XtreamMapper.series(try XCTUnwrap(input["series"]), sourceId: "s").map { row($0.id, $0.categoryId, $0.categoryIds) }, "series")
     }
 
     func testLiveStreams() throws {
@@ -256,6 +280,24 @@ final class XtreamVectorTests: XCTestCase {
         XCTAssertEqual(catalog.series.count, 2)
         XCTAssertEqual(catalog.status.liveCount, 3)
         XCTAssertEqual(client.fingerprint, "d11e55fa87364ff0")
+
+        // A failing list (here `get_series`, e.g. a huge list hitting the 20 s limit) fails the whole refresh –
+        // never a silently partial catalog with 0 series.
+        let seriesDown = FakeTransport { request in
+            let action = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "action" })?.value ?? ""
+            if action == "get_series" { throw URLError(.timedOut) }
+            guard let file = files[action] else { return HTTPResponse(statusCode: 404) }
+            return HTTPResponse(statusCode: 200, body: try Vectors.data("xtream/\(file)"))
+        }
+        let seriesDownClient = try XCTUnwrap(XtreamClient(sourceId: "s", secrets: XtreamSecrets(serverUrl: "h", username: "u", password: "p"),
+                                                          transport: seriesDown, sleeper: .immediate))
+        do {
+            _ = try await seriesDownClient.fetchCatalog(now: Date(timeIntervalSince1970: 1_759_570_000))
+            XCTFail("expected a network error")
+        } catch {
+            XCTAssertEqual(error as? SourceError, .network(.timeout))
+        }
 
         // Empty lists → SourceError.empty.
         let empty = FakeTransport { request in

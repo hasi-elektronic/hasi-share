@@ -60,16 +60,19 @@ SourceSecrets   (ONLY in Keychain / Android-Keystore-encrypted storage, keyed by
   XTREAM: { serverUrl, username, password, epgUrl? }
 
 Category  { sourceId, id, kind(live|movie|series), name, sort }
-Channel   { sourceId, id, name, number?, logoUrl?, categoryId?, epgId?,
+Channel   { sourceId, id, name, number?, logoUrl?, categoryId?, categoryIds, epgId?,
             catchup: {type: none|xtream|default|append|shift|flussonic, days, source?},
             url? (M3U only), userAgent?, referrer?, drm: bool, sort }
-Movie     { sourceId, id, name, posterUrl?, categoryId?, rating?, year?, plot?,
+Movie     { sourceId, id, name, posterUrl?, categoryId?, categoryIds, rating?, year?, plot?,
             containerExt?, url? (M3U only), addedAt? }
-Series    { sourceId, id, name, posterUrl?, categoryId?, plot?, rating?, year? }
+Series    { sourceId, id, name, posterUrl?, categoryId?, categoryIds, plot?, rating?, year? }
 Episode   { sourceId, id, seriesId, season, number, title, containerExt?, durationSec?,
             plot?, posterUrl?, url? (M3U only) }
 EpgProgram{ sourceId, channelEpgId, start, end, title, description?, category? }
 ```
+
+`categoryIds` = every category of the item, primary `categoryId` first (default `[categoryId]`;
+M3U: the group). An item is listed in **each** of its categories (§4.3 `category_ids`).
 
 Xtream stream URLs are **never persisted** (they contain credentials); they are
 built at play time from `SourceSecrets` (§4.5). M3U URLs are content and are
@@ -203,6 +206,11 @@ Expected-output schema: see `test-vectors/m3u/README.md`.
 * Short EPG `title`/`description` are **base64** (UTF-8). Prefer
   `start_timestamp`/`stop_timestamp` (epoch seconds, UTC) over `start`/`end` strings.
 * Unknown fields are ignored; a single malformed item is skipped, not fatal.
+* Categories of a list item (`get_live_streams`, `get_vod_streams`, `get_series`): newer panels
+  (XUI.one, Xtream UI R22+) send `category_ids: [215, 216]` (ints or strings) and `category_id` is
+  `null`, `""` or only the first of them. `categoryIds` = `category_id` (if non-empty) followed by
+  the `category_ids` entries, `null`/`""` skipped, duplicates removed, order kept;
+  `categoryId` = first of `categoryIds` (null if none). Vectors: `category_ids.json`.
 
 ### 4.4 Account classification (from `player_api.php` without action)
 | Condition (first match) | Result |
