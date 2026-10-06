@@ -124,11 +124,158 @@ final class AudioSessionTests: XCTestCase {
         let c = controller()
         try await startPlaying(c)
         av.isPlaying = false
-        av.emit(.paused)
+        av.emit(.pausedBySystem)
         XCTAssertEqual(c.phase, .paused)
         c.handleAudioInterruption(.began)
         c.handleAudioInterruption(.ended(shouldResume: true))
         XCTAssertTrue(av.isPlaying)
+    }
+
+    // MARK: Sticky pauses (only the user resumes them)
+
+    func testRouteLostThenInterruptionNeverResumes() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.handleAudioInterruption(.routeLost)
+        c.handleAudioInterruption(.began)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        XCTAssertEqual(c.phase, .paused, "no audio burst on the speaker after the headphones were unplugged")
+        XCTAssertFalse(av.isPlaying)
+    }
+
+    func testExternalPausePlainPausedThenInterruptionNeverResumes() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        av.isPlaying = false
+        av.emit(.paused)                         // AirPlay receiver pause (engine: plain .paused)
+        c.handleAudioInterruption(.began)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertFalse(av.isPlaying)
+    }
+
+    func testInterruptionEndedWithoutShouldResumeIsStickyForLaterInterruptions() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.handleAudioInterruption(.began)
+        c.handleAudioInterruption(.ended(shouldResume: false))
+        c.handleAudioInterruption(.began)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertFalse(av.isPlaying)
+    }
+
+    func testUnclaimedEngineSystemPauseIsClearedByPlaying() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        av.emit(.pausedBySystem)
+        av.emit(.playing)                        // playing again (e.g. the system resumed it)
+        c.togglePlayPause()                      // user pause
+        c.handleAudioInterruption(.began)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        XCTAssertFalse(av.isPlaying)
+    }
+
+    // MARK: Audio session on play
+
+    func testUserPlayActivatesTheSession() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.togglePlayPause()
+        c.togglePlayPause()
+        XCTAssertEqual(activations, 2, "load + play after pause (VLC needs the session back)")
+        XCTAssertTrue(av.isPlaying)
+    }
+
+    // MARK: Non-pausable input
+
+    func testPausingNonPausableInputStopsAndPlayReopens() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        av.canPause = false
+        c.togglePlayPause()
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertEqual(av.stops, 1, "a no-op pause would keep playing: stopped instead")
+        c.togglePlayPause()
+        for _ in 0..<200 where av.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(av.loads.count, 2, "play reopens (live edge)")
+    }
+
+    func testInterruptionOnNonPausableInputStopsAndResumeReopens() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        av.canPause = false
+        c.handleAudioInterruption(.began)
+        XCTAssertEqual(av.stops, 1)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        for _ in 0..<200 where av.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(av.loads.count, 2)
+    }
+
+    // MARK: Scene cycle keeps pauses
+
+    func testSceneCycleKeepsAUserPause() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.togglePlayPause()
+        c.release()
+        XCTAssertEqual(c.phase, .idle)
+        c.resumeAfterRelease()
+        XCTAssertEqual(c.phase, .paused, "Control Center pull-down must not undo the pause")
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(av.loads.count, 1, "nothing was reopened")
+        c.togglePlayPause()
+        for _ in 0..<200 where av.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(av.loads.count, 2, "the user's play reopens")
+    }
+
+    func testSceneCycleAfterPlayingStillResumesPlayback() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.release()
+        c.resumeAfterRelease()
+        for _ in 0..<200 where av.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(av.loads.count, 2)
+        XCTAssertEqual(c.phase, .loading)
+    }
+
+    func testSceneCycleDoesNotMakeASystemPauseResumable() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.handleAudioInterruption(.began)
+        c.release()
+        c.resumeAfterRelease()
+        XCTAssertEqual(c.phase, .paused)
+        c.handleAudioInterruption(.ended(shouldResume: true))
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertEqual(av.loads.count, 1)
+    }
+
+    func testSceneCyclePauseDoesNotSurviveClose() async throws {
+        let c = controller()
+        try await startPlaying(c)
+        c.togglePlayPause()
+        c.release()
+        c.close()
+        c.open(PlaybackRequest(item: .url("http://h.example.com/b.m3u8", title: "x"), source: nil))
+        c.release()
+        c.resumeAfterRelease()
+        XCTAssertNotEqual(c.phase, .paused, "a new item starts playing")
+    }
+
+    // MARK: Notification payloads
+
+    func testNotificationParsing() {
+        XCTAssertEqual(AudioSessionEvent.interruption(typeRaw: 1, optionsRaw: nil, reasonRaw: nil), .began)
+        XCTAssertNil(AudioSessionEvent.interruption(typeRaw: 1, optionsRaw: nil, reasonRaw: 1), "appWasSuspended")
+        XCTAssertEqual(AudioSessionEvent.interruption(typeRaw: 1, optionsRaw: nil, reasonRaw: 2), .began)
+        XCTAssertEqual(AudioSessionEvent.interruption(typeRaw: 0, optionsRaw: 1, reasonRaw: nil), .ended(shouldResume: true))
+        XCTAssertEqual(AudioSessionEvent.interruption(typeRaw: 0, optionsRaw: 0, reasonRaw: nil), .ended(shouldResume: false))
+        XCTAssertEqual(AudioSessionEvent.interruption(typeRaw: 0, optionsRaw: nil, reasonRaw: nil), .ended(shouldResume: false))
+        XCTAssertNil(AudioSessionEvent.interruption(typeRaw: nil, optionsRaw: 1, reasonRaw: nil))
+        XCTAssertEqual(AudioSessionEvent.routeChange(reasonRaw: 2), .routeLost)
+        XCTAssertNil(AudioSessionEvent.routeChange(reasonRaw: 3))
+        XCTAssertNil(AudioSessionEvent.routeChange(reasonRaw: nil))
     }
 
     // MARK: Loading / reconnecting
@@ -245,6 +392,23 @@ final class AudioSessionTests: XCTestCase {
     /// `PlayerController.handleAudioInterruption(.began)` calls `engine.pause()`; for the real engine
     /// that clears the playback intent, which is what makes AVPlayer's own interruption pause a
     /// real pause (`.paused`) instead of a stall (`.buffering` + automatic resume).
+    /// A finished item is never resumed, but replaying (seek / play) after the end clears that.
+    func testDidPlayToEndIsClearedByReplay() async throws {
+        let engine = AVPlayerEngine()
+        let stream = ResolvedStream(url: URL(string: "http://h.example.com/a.mp4")!, container: .mp4, headers: [:])
+        engine.load(stream, isLive: false, startMs: nil, preferredAudioLanguage: nil, preferredSubtitleLanguage: nil,
+                    tuning: LiveStartTuning.make(isLive: false, largeBuffer: false))
+        NotificationCenter.default.post(name: AVPlayerItem.didPlayToEndTimeNotification, object: engine.player.currentItem)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(engine.didPlayToEnd)
+        engine.seek(to: 0)
+        XCTAssertFalse(engine.didPlayToEnd)
+        NotificationCenter.default.post(name: AVPlayerItem.didPlayToEndTimeNotification, object: engine.player.currentItem)
+        try await Task.sleep(for: .milliseconds(50))
+        engine.play()
+        XCTAssertFalse(engine.didPlayToEnd)
+    }
+
     func testAVPlayerEnginePauseClearsPlaybackIntent() {
         let engine = AVPlayerEngine()
         engine.play()

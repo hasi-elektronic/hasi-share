@@ -76,6 +76,23 @@ public enum AudioSessionEvent: Equatable, Sendable {
     case routeLost
 }
 
+extension AudioSessionEvent {
+    /// `AVAudioSessionInterruptionNotification` payload (raw values: type began 1 / ended 0, option shouldResume 1,
+    /// reason appWasSuspended 1 – the app was in the background, nothing was playing for the user).
+    public static func interruption(typeRaw: UInt?, optionsRaw: UInt?, reasonRaw: UInt?) -> AudioSessionEvent? {
+        switch typeRaw {
+        case 1: return reasonRaw == 1 ? nil : .began
+        case 0: return .ended(shouldResume: (optionsRaw ?? 0) & 1 != 0)
+        default: return nil
+        }
+    }
+
+    /// `AVAudioSessionRouteChangeNotification` payload (reason oldDeviceUnavailable = 2).
+    public static func routeChange(reasonRaw: UInt?) -> AudioSessionEvent? {
+        reasonRaw == 2 ? .routeLost : nil
+    }
+}
+
 /// Activates / deactivates the platform audio session (`AVAudioSession` on iOS/tvOS, set by the app).
 public struct AudioSessionHooks {
     public var activate: @MainActor () -> Void
@@ -141,10 +158,15 @@ public final class PlayerController {
     @ObservationIgnored private var fallbackEngine: PlayerEngine?
     /// The interruption paused this playback and it may resume when the interruption ends.
     @ObservationIgnored private var pausedByInterruption = false
-    /// The user (not the system) paused: a `.paused` phase that an interruption must leave alone.
-    @ObservationIgnored private var userPaused = false
-    /// Paused while the stream was still opening: play opens the request again.
-    @ObservationIgnored private var pausedWhileLoading = false
+    /// The engine reported an interruption pause (`.pausedBySystem`) that its notification has not claimed yet.
+    /// Every other `.paused` phase (user, headphones, AirPlay, interruption that ended without
+    /// `shouldResume`) is sticky: only the user resumes it.
+    @ObservationIgnored private var systemPauseUnclaimed = false
+    /// No live item behind the paused state (paused while opening, stopped non-pausable input, scene cycle):
+    /// play opens the request again (VOD at the saved position, live at the live edge).
+    @ObservationIgnored private var reloadOnPlay = false
+    /// Paused when the scene released the player: `resumeAfterRelease` restores the paused state, it does not play.
+    @ObservationIgnored private var pausedAtRelease = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
     @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -211,8 +233,9 @@ public final class PlayerController {
         probeTask?.cancel()
         reconnectState = ReconnectState()
         pausedByInterruption = false
-        userPaused = false
-        pausedWhileLoading = false
+        systemPauseUnclaimed = false
+        reloadOnPlay = false
+        pausedAtRelease = false
         fallbackEngine = nil
         lastProgressSaveMs = nil
         pendingSeek = nil
@@ -374,11 +397,13 @@ public final class PlayerController {
             prefetchNeighboursIfNeeded()
             cancelStallTimer()
             reconnectState = reconnectPolicy.playing(reconnectState, nowMs: SystemClock.monotonicMs())
+            systemPauseUnclaimed = false
             if phase != .playing { phase = .playing }
-        case .paused:
+        case .paused, .pausedBySystem:
             cancelStallTimer()   // a real pause ends any stall recovery
             if phase == .playing || phase == .buffering {
                 phase = .paused
+                systemPauseUnclaimed = event == .pausedBySystem
                 saveProgress()
             }
         case .buffering:
@@ -534,8 +559,8 @@ public final class PlayerController {
 
     public func togglePlayPause() {
         pausedByInterruption = false   // the user decides from here on
-        if pausedWhileLoading, phase == .paused {
-            userPaused = false
+        systemPauseUnclaimed = false
+        if reloadOnPlay, phase == .paused {
             resumePausedPlayback()
             return
         }
@@ -544,43 +569,53 @@ public final class PlayerController {
             // Pause = user intent: no further attempts until play.
             retryTask?.cancel()
             cancelStallTimer()
-            engine.pause()
+            pauseEngine(engine)
             phase = .paused
             pausedDuringReconnect = true
-            userPaused = true
             saveProgress()
         } else if pausedDuringReconnect, phase == .paused, stream != nil {
-            userPaused = false
             resumePausedPlayback()
         } else if phase == .ended {
             // Play again from the start after the end of a VOD.
+            audioSession.activate()
             seek(to: 0)
             engine.play()
         } else if engine.isPlaying || phase == .playing || phase == .buffering {
             // Intent, not only `isPlaying`: a pause during buffering must pause too (and must not
             // be "recovered" by the stall timer).
             cancelStallTimer()
-            engine.pause()
+            pauseEngine(engine)
             phase = .paused
-            userPaused = true
             saveProgress()
         } else {
-            userPaused = false
+            audioSession.activate()
             engine.play()
         }
     }
 
-    /// Plays again after a pause that left no live item: reopens a request paused while loading, reloads a
-    /// stream paused during a reconnect, otherwise just `play()`.
+    /// Pauses the engine (user-intent path). Input that cannot pause (live MPEG-TS in libVLC) is stopped
+    /// instead – a no-op pause would keep playing – and play opens the request again.
+    private func pauseEngine(_ engine: any PlaybackEngine) {
+        if engine.canPause {
+            engine.pause()
+        } else {
+            engine.stop()
+            reloadOnPlay = true
+        }
+    }
+
+    /// Plays again after a pause that left no live item: reopens the request (paused while opening, stopped
+    /// non-pausable input, scene cycle), reloads a stream paused during a reconnect, otherwise `play()`.
     private func resumePausedPlayback() {
-        if pausedWhileLoading, var request {
-            pausedWhileLoading = false
+        if reloadOnPlay, var request {
+            reloadOnPlay = false
             if !request.isLive, currentTime > 0 { request.startPositionMs = Int64(currentTime * 1000) }
-            open(request)
+            open(request)   // load() activates the audio session
         } else if pausedDuringReconnect, let stream {
             phase = .loading
             load(stream, startMs: request?.isLive == true ? nil : Int64(currentTime * 1000))
         } else {
+            audioSession.activate()   // the session may have been deactivated (interruption, release)
             engine?.play()
         }
     }
@@ -593,30 +628,33 @@ public final class PlayerController {
     public func handleAudioInterruption(_ event: AudioSessionEvent) {
         switch event {
         case .began, .routeLost:
-            let paused = pauseForSystem()
-            pausedByInterruption = event == .began && paused
+            let resumable = pauseForSystem()
+            pausedByInterruption = event == .began && resumable
+            systemPauseUnclaimed = false
         case .ended(let shouldResume):
-            guard shouldResume, pausedByInterruption, phase == .paused else { return }
+            // Anything the interruption did not pause itself (user, headphones, AirPlay) stays paused.
+            let resume = shouldResume && pausedByInterruption && phase == .paused
             pausedByInterruption = false
-            audioSession.activate()   // the interruption deactivated the session
-            resumePausedPlayback()
+            if resume { resumePausedPlayback() }
         }
     }
 
-    /// Pauses for a system event; true when playback is (now) paused by the system rather than the user.
+    /// Pauses for a system event; true when the playback was playing (or opening) and is now paused by the
+    /// system, i.e. an interruption's end may resume it. A pause that already stood (user, headphones,
+    /// AirPlay) is sticky – except an interruption pause the engine reported just before this notification.
     private func pauseForSystem() -> Bool {
         switch phase {
         case .playing, .buffering:
             guard let engine else { return false }
             cancelStallTimer()
-            engine.pause()
+            pauseEngine(engine)
             phase = .paused
             saveProgress()
             return true
         case .reconnecting:
             retryTask?.cancel()
             cancelStallTimer()
-            engine?.pause()
+            if let engine { pauseEngine(engine) }
             phase = .paused
             pausedDuringReconnect = true
             saveProgress()
@@ -627,12 +665,10 @@ public final class PlayerController {
             openTask?.cancel()
             stopPlayback()
             phase = .paused
-            pausedWhileLoading = true
+            reloadOnPlay = true
             return true
         case .paused:
-            // The engine may already have reported the system's own pause (rate change reason): ours to resume
-            // unless the user paused.
-            return !userPaused && request != nil
+            return systemPauseUnclaimed && request != nil
         default:
             return false
         }
@@ -684,14 +720,24 @@ public final class PlayerController {
         saveProgress()
         openTask?.cancel()
         zapTask?.cancel()
+        let wasPaused = phase == .paused
         stopPlayback()
         audioSession.deactivate()   // lets other apps' audio resume
+        if wasPaused { pausedAtRelease = true }   // (a second release while idle keeps it)
         if phase != .locked, !isFailed { phase = .idle }
     }
 
     /// Re-opens the last request after `release()` (scene active again), resuming VOD.
     public func resumeAfterRelease() {
         guard var request, phase == .idle else { return }
+        if pausedAtRelease {
+            // Control Center, a call, Siri: the scene cycle must not undo a pause. Show the paused state;
+            // play reopens at the saved position.
+            pausedAtRelease = false
+            reloadOnPlay = true
+            phase = .paused
+            return
+        }
         if !request.isLive, currentTime > 0 { request.startPositionMs = Int64(currentTime * 1000) }
         open(request)
     }
@@ -707,6 +753,7 @@ public final class PlayerController {
             updateLastSession(last)
         }
         release()
+        pausedAtRelease = false
         request = nil
         stream = nil
         zapTarget = nil
@@ -729,8 +776,8 @@ public final class PlayerController {
 
     private func stopPlayback() {
         pausedByInterruption = false
-        userPaused = false
-        pausedWhileLoading = false
+        systemPauseUnclaimed = false
+        reloadOnPlay = false
         prefetcher?.cancelAll()
         prefetchedFor = nil
         retryTask?.cancel()

@@ -5,6 +5,9 @@ import IPTVCore
 public enum EngineEvent: Equatable, Sendable {
     case playing
     case paused
+    /// The system paused (audio interruption reported by AVPlayer): like `.paused`, but a following
+    /// interruption `.ended(shouldResume:)` may resume it.
+    case pausedBySystem
     case buffering
     /// Item is ready; `duration` 0 = live/unknown.
     case ready(duration: Double)
@@ -44,6 +47,8 @@ public protocol PlaybackEngine: AnyObject {
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning)
     func play()
     func pause()
+    /// False when a `pause()` would be a no-op (libVLC on non-seekable live input): the controller stops instead.
+    var canPause: Bool { get }
     var isPlaying: Bool { get }
     /// Current statistics (polled by the performance overlay only).
     var diagnostics: EngineDiagnostics { get }
@@ -54,6 +59,10 @@ public protocol PlaybackEngine: AnyObject {
     func setAspect(_ mode: AspectMode)
     /// Stops and frees the current item (the engine instance stays reusable).
     func stop()
+}
+
+public extension PlaybackEngine {
+    var canPause: Bool { true }
 }
 
 /// Engine factories handed to `PlayerController`. `vlc` is nil for builds without VLCKit

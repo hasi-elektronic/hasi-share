@@ -39,6 +39,10 @@ final class AudioSessionObserver {
     private var tokens: [NSObjectProtocol] = []
 
     func start(player: PlayerController) {
+        // `AudioSessionEvent` parses raw values (IPTVKit is unit-tested on macOS); they must match the SDK's.
+        assert(AVAudioSession.InterruptionType.began.rawValue == 1 && AVAudioSession.InterruptionType.ended.rawValue == 0
+               && AVAudioSession.InterruptionOptions.shouldResume.rawValue == 1
+               && AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue == 2)
         let center = NotificationCenter.default
         tokens.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { note in
             guard let event = Self.event(for: note) else { return }
@@ -51,25 +55,18 @@ final class AudioSessionObserver {
     }
 
     nonisolated static func event(for note: Notification) -> AudioSessionEvent? {
-        let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+        let info = note.userInfo
         switch note.name {
         case AVAudioSession.interruptionNotification:
-            switch raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) {
-            case .began?:
-                // "App was suspended" (raw 1; the named constant is deprecated) = the system took audio from a
-                // backgrounded app – nothing was playing for the user.
-                #if os(iOS)
-                if (note.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt) == 1 { return nil }
-                #endif
-                return .began
-            case .ended?:
-                let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt).map(AVAudioSession.InterruptionOptions.init(rawValue:))
-                return .ended(shouldResume: options?.contains(.shouldResume) == true)
-            default: return nil
-            }
+            #if os(iOS)
+            let reason = info?[AVAudioSessionInterruptionReasonKey] as? UInt
+            #else
+            let reason: UInt? = nil   // key unavailable on tvOS
+            #endif
+            return .interruption(typeRaw: info?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                                 optionsRaw: info?[AVAudioSessionInterruptionOptionKey] as? UInt, reasonRaw: reason)
         case AVAudioSession.routeChangeNotification:
-            let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt).flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
-            return reason == .oldDeviceUnavailable ? .routeLost : nil
+            return .routeChange(reasonRaw: info?[AVAudioSessionRouteChangeReasonKey] as? UInt)
         default: return nil
         }
     }

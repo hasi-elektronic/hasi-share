@@ -35,7 +35,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     private var resumeTask: Task<Void, Never>?
     private var lastResumeMs: Int64?
     /// The current item played to its end (set by `didPlayToEndTime`; a finished item is never resumed).
-    private var didPlayToEnd = false
+    private(set) var didPlayToEnd = false
 
     public init() {
         player.automaticallyWaitsToMinimizeStalling = true
@@ -203,7 +203,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         SafeLog.debug("avplayer system pause (\(reason?.rawValue ?? "-"))")
         wantsToPlay = false
         cancelResume()
-        onEvent?(.paused)
+        onEvent?(reason == .audioSessionInterrupted ? .pausedBySystem : .paused)
     }
 
     /// The current item failed or played to its end (nothing to resume).
@@ -327,7 +327,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         return max(0, resumeIntervalMs - since)
     }
 
-    public func play() { wantsToPlay = true; player.play() }
+    public func play() { wantsToPlay = true; didPlayToEnd = false; player.play() }
     public func pause() {
         wantsToPlay = false
         cancelResume()
@@ -342,6 +342,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     /// ±1 s tolerance: the default (keyframe) seek can land several seconds before the target,
     /// so "+10 s" would only move +5 s on a file with sparse keyframes.
     public func seek(to seconds: Double) {
+        didPlayToEnd = false   // replay after the end
         let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance)
     }

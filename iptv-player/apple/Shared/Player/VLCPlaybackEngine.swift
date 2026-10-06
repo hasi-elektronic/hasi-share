@@ -49,6 +49,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     }
 
     var isPlaying: Bool { player.isPlaying }
+    var canPause: Bool { player.canPause }
 
     /// `VLCMedia.statistics`: `demuxBitrate` is bytes per microsecond (libVLC) → ×1 000 000 B/s
     /// × 8 = bit/s; `lostPictures` is the session total. 0 bitrate = empty buffer → unknown.

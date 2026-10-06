@@ -280,4 +280,21 @@ final class PlayerProgressTests: XCTestCase {
         XCTAssertTrue(WatchHistory.isCompleted(positionMs: item.data.positionMs ?? 0, durationMs: item.data.durationMs ?? 0))
         XCTAssertTrue(WatchHistory.continueWatching([item]).isEmpty)
     }
+
+    /// Scene cycle (Control Center, a call): a paused VOD stays paused, play resumes at the saved position.
+    func testSceneCycleKeepsPausedVODAtItsPosition() async throws {
+        let c = try controller()
+        let engine = try await open(c, movie)
+        engine.emit(.ready(duration: 600))
+        engine.emit(.time(200))
+        c.togglePlayPause()
+        c.release()
+        c.resumeAfterRelease()
+        XCTAssertEqual(c.phase, .paused)
+        XCTAssertEqual(c.currentTime, 200, accuracy: 0.5)
+        XCTAssertEqual(engine.loads.count, 1)
+        c.togglePlayPause()
+        for _ in 0..<200 where engine.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(engine.loads.last?.startMs, 200_000)
+    }
 }
