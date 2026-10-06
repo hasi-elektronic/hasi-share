@@ -305,6 +305,37 @@ final class AudioDelayPlayerTests: XCTestCase {
         XCTAssertTrue(av.loads.isEmpty)
     }
 
+    /// Delay back to 0 on a delay-routed VLCKit stream: a later VLCKit failure still falls back to AVPlayer
+    /// (it can play it) but without the "sync unavailable" notice – no sync is wanted any more.
+    func testDelayBackToZeroThenVLCFailureShowsNoSyncNotice() async throws {
+        let c = controller()
+        try await open(c, request(.channel(channel("1", "http://h.example.com/live/1.m3u8"))))
+        av.emit(.playing)
+        c.setAudioDelay(150)
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        c.setAudioDelay(0)
+        XCTAssertEqual(c.engineKind, .vlcKit, "no ping-pong back to AVPlayer")
+        vlc.emit(.failed(.unsupportedFormat(container: "hls")))
+        XCTAssertEqual(c.engineKind, .avPlayer, "AVPlayer can play it")
+        XCTAssertFalse(c.audioSyncUnavailable, "no false notice")
+    }
+
+    /// During the 400 ms zap debounce `stream` is still the old channel: sync actions must not reopen it.
+    func testSyncActionsDuringZapDebounceDoNotReopenTheOldChannel() async throws {
+        let c = controller()
+        let channels = [channel("1", "http://h.example.com/live/1.m3u8"), channel("2", "http://h.example.com/live/2.m3u8")]
+        try await open(c, request(.channel(channels[0]), channels: channels))
+        av.emit(.playing)
+        c.zap(by: 1)
+        c.resync()
+        c.setAudioDelay(200)
+        XCTAssertEqual(av.loads.count, 1, "old channel not reopened in AVPlayer")
+        XCTAssertTrue(vlc.loads.isEmpty, "old channel not reopened in VLCKit")
+        try await Task.sleep(for: .milliseconds(PlayerController.zapDebounceMs + 250))
+        XCTAssertEqual(c.currentChannel?.id, "2")
+        XCTAssertEqual((av.loads + vlc.loads).map(\.url.lastPathComponent), ["1.m3u8", "2.m3u8"], "only the zap target opens")
+    }
+
     /// tvOS stepper: held/repeated ◀▶ accelerate 50 → 100 → 250 ms.
     func testStepperAcceleration() {
         XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 0), 50)

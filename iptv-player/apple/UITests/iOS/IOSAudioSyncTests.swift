@@ -80,13 +80,19 @@ final class IOSAudioSyncTests: XCTestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertGreaterThan(window.width, window.height, "landscape")
         XCTAssertLessThan(panel.frame.height, window.height * 0.6, "panel covers \(panel.frame.height) of \(window.height) pt")
-        UITestSupport.snap("ios-landscape-sync-panel", in: self)
+        let slider = app.sliders["player_audio_sync_delay"]
+        XCTAssertGreaterThanOrEqual(slider.frame.width, 120, "slider stays usable (\(slider.frame.width) pt)")
+        let phone = Int(max(window.width, window.height))
+        UITestSupport.snap(phone <= 700 ? "ios-landscape-sync-panel-\(phone)pt" : "ios-landscape-sync-panel", in: self)
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
         app.buttons["player_device_audio_delay_plus"].tap()
         app.buttons["player_device_audio_delay_plus"].tap()   // device delay back to 0 for the next checks
-        app.buttons["audio_sync_close"].tap()
-        XCTAssertTrue(plus.waitForNonExistence(timeout: 3), "panel closed")
+        XCTAssertTrue(app.buttons["audio_sync_close"].exists, "close button")
+        // A tap on the picture closes the panel and does not put the overlay over it.
+        app.otherElements["video_surface"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        XCTAssertTrue(plus.waitForNonExistence(timeout: 3), "panel closed by a tap on the picture")
+        XCTAssertFalse(app.buttons["player_close"].exists, "no overlay after that tap")
 
         showOverlay(app)
         app.buttons["action_resync"].tap()

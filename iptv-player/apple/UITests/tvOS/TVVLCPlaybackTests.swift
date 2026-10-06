@@ -19,8 +19,19 @@ final class TVVLCPlaybackTests: XCTestCase {
         remote.press(.select)   // overlay with the audio/subtitle/aspect tools
         sleep(1)
         UITestSupport.snap("vlc-tvos-02-mkv-overlay", in: self)
-        XCTAssertTrue(app.buttons["Audio"].exists, "audio menu (always shown: Sync row)")
         XCTAssertTrue(app.buttons["Subtitles"].exists, "VLCKit subtitle tracks listed")
+        // ▲ into the top row (close), ▶ Audio, OK: VLCKit's two audio tracks are rows of the menu.
+        remote.press(.up)
+        usleep(400_000)
+        remote.press(.right)
+        usleep(400_000)
+        remote.press(.select)
+        let turkish = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Turkish'")).firstMatch
+        XCTAssertTrue(turkish.waitForExistence(timeout: 5), "VLCKit audio track rows in the Audio menu")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == 'English'")).firstMatch.exists)
+        UITestSupport.snap("vlc-tvos-02b-audio-tracks", in: self)
+        remote.press(.menu)     // close the menu
+        sleep(1)
         remote.press(.menu)     // close overlay (back rule)
         sleep(4)
 

@@ -147,7 +147,7 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   eklemez; yalnızca 1 sn'nin üstündeki kısmı (AirPlay ≈ 2 sn) negatif gecikme olarak ekler
   (`VLCLatencyCompensation`). "Senkronu düzelt" (`resync()`): canlıyı canlı uçtan, VOD'u mevcut
   konumdan yeniden açar; yeni istek henüz çözümlenirken (`resolving`) senkron eylemleri hiçbir şey
-  yapmaz (önceki kanal yeniden açılmaz). Yeniden bağlanma zaten yayını yeniden açar (canlı: canlı uç) ve
+  yapmaz; kanal değişiminin 400 ms debounce'u beklerken de öyle (önceki kanal yeniden açılmaz). Yeniden bağlanma zaten yayını yeniden açar (canlı: canlı uç) ve
   yeni öğe gecikmeyle başlar; ayrıca ikinci bir yükleme yapılmaz. Yalnızca gecikme yüzünden VLCKit'e
   giden (AVPlayer'ın oynatabildiği) yayın VLCKit'te biçim/kodek hatası verirse bir kez gecikmesiz
   AVPlayer ile açılır ve "Senkron bu yayında uygulanamadı" notu görünür (kayıtlı gecikme korunur).

@@ -181,6 +181,8 @@ public final class PlayerController {
     @ObservationIgnored private var unkeyedContentDelay = 0
     /// The open's resolve is in flight: `stream` still belongs to the previous request.
     @ObservationIgnored private var resolving = false
+    /// A channel switch waits for its 400 ms debounce: `stream` still is the channel being left.
+    @ObservationIgnored private var zapPending = false
     /// VLCKit plays this stream only because of the audio delay (AVPlayer could play it): a VLCKit
     /// format/codec failure falls back to AVPlayer without the delay (CONTRACT §6.1).
     @ObservationIgnored private var delayRoutedToVLC = false
@@ -484,7 +486,7 @@ public final class PlayerController {
             SafeLog.info("vlckit failed (\(error)) for a delay-routed stream – avplayer without audio delay")
             delayRoutedToVLC = false
             fallbackEngine = .avPlayer
-            audioSyncUnavailable = true
+            audioSyncUnavailable = currentAudioDelay != 0   // delay back to 0: nothing to report
             load(stream, startMs: request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs))
             return
         }
@@ -578,9 +580,12 @@ public final class PlayerController {
     public func zap(to channel: Channel) {
         zapTarget = channel
         zapTask?.cancel()
+        zapPending = true
         zapTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(Self.zapDebounceMs))
-            guard !Task.isCancelled, let self, var request = self.request else { return }
+            guard !Task.isCancelled, let self else { return }
+            self.zapPending = false
+            guard var request = self.request else { return }
             request.item = .channel(channel)
             request.startPositionMs = nil
             self.open(request)
@@ -707,6 +712,7 @@ public final class PlayerController {
             guard request != nil else { return false }
             // Nothing playing yet: drop the pending open (and a half-loaded item); play opens it again.
             openTask?.cancel()
+            resolving = false
             stopPlayback()
             phase = .paused
             reloadOnPlay = true
@@ -825,7 +831,7 @@ public final class PlayerController {
     /// A stream is loaded or playing (not idle / failed / locked / ended / paused without an item).
     private var hasActiveItem: Bool {
         switch phase {
-        case .playing, .paused, .buffering, .loading, .reconnecting: return request != nil && !reloadOnPlay && !resolving
+        case .playing, .paused, .buffering, .loading, .reconnecting: return request != nil && !reloadOnPlay && !resolving && !zapPending
         case .idle, .failed, .locked, .ended: return false
         }
     }
@@ -837,6 +843,8 @@ public final class PlayerController {
         saveProgress()
         openTask?.cancel()
         zapTask?.cancel()
+        zapPending = false
+        resolving = false   // the cancelled open's resolve never finishes
         let wasPaused = phase == .paused
         stopPlayback()
         audioSession.deactivate()   // lets other apps' audio resume

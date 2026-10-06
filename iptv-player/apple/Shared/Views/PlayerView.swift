@@ -26,18 +26,21 @@ struct PlayerView: View {
     /// "Sync can't be applied to this stream" (VLCKit failed, AVPlayer without the delay) – 4 s.
     @State private var syncNoticeVisible = false
     @State private var syncNoticeTask: Task<Void, Never>?
+    /// An audio/subtitle/aspect menu is open: removing its source view would close it.
+    @State private var menuOpen = false
     #if os(iOS)
     /// Scrubber position while the finger is down (nil = follow playback).
     @State private var scrubFraction: Double?
-    /// An audio/subtitle/aspect menu is open: removing its source view would close it.
-    @State private var menuOpen = false
     @State private var ripple: SeekRipple?
     @State private var rippleTask: Task<Void, Never>?
     #endif
     #if os(tvOS)
     @FocusState private var surfaceFocused: Bool
     @FocusState private var playPauseFocused: Bool
-    @FocusState private var closeFocused: Bool
+    /// Top row (close + tools). The root `onMoveCommand` swallows every move the focused control does
+    /// not handle, so ◀▶ walk the row explicitly (`topRowMove`) and ▼ returns to play/pause.
+    enum TopItem: Hashable { case close, audio, subtitles, aspect, resync, favorite, channelList, previous }
+    @FocusState private var topFocus: TopItem?
     /// VOD: the top row (close + tools) takes focus only after ▲ from play/pause, so ◀▶ on the
     /// transport row seeks instead of moving the focus sideways into the tools.
     @State private var toolsActive = false
@@ -124,10 +127,6 @@ struct PlayerView: View {
         .onAppear {
             showOverlay()
             if player.resumedFromMs != nil { showResumeChip() }
-            #if DEBUG
-            // UI tests: the tvOS top row cannot be walked with arrow presses in XCUITest.
-            if AppBootstrap.arguments.contains("-uiSyncPanel") { openSyncPanel() }
-            #endif
         }
         .onDisappear {
             hideTask?.cancel()
@@ -179,12 +178,22 @@ struct PlayerView: View {
                 infoCardMove(direction)
                 return
             }
+            if overlayVisible, !channelListVisible, let item = topFocus {
+                topRowMove(direction, from: item)
+                return
+            }
             if isVOD, overlayVisible, !channelListVisible {
                 vodOverlayMove(direction)
                 return
             }
             let live = player.request?.isLive == true
-            // Live overlay / channel list shown: ▲▼ move the focus there (no zapping underneath).
+            if live, overlayVisible, !channelListVisible, direction == .up {
+                // Live overlay: ▲ from play/pause into the top row (close + tools).
+                toolsActive = true
+                topFocus = .close
+                return
+            }
+            // Live overlay / channel list shown: no zapping underneath.
             if live, overlayVisible || channelListVisible { return }
             switch direction {
             case .up: live ? showInfoCard() : showOverlay()
@@ -242,7 +251,10 @@ struct PlayerView: View {
                     .gesture(
                         SpatialTapGesture(count: 2)
                             .onEnded { value in doubleTap(at: value.location.x, width: geo.size.width) }
-                            .exclusively(before: TapGesture(count: 1).onEnded { overlayVisible ? hideOverlay() : showOverlay() })
+                            .exclusively(before: TapGesture(count: 1).onEnded {
+                                // Sync panel open: a tap on the picture closes it (no overlay on top of it).
+                                if syncPanelVisible { closeSyncPanel() } else if overlayVisible { hideOverlay() } else { showOverlay() }
+                            })
                     )
                 #endif
             }
@@ -289,9 +301,8 @@ struct PlayerView: View {
         hideTask?.cancel()
         syncPanelVisible = true
         overlayVisible = false
-        #if os(iOS)
         menuOpen = false
-        #else
+        #if os(tvOS)
         toolsActive = false
         #endif
     }
@@ -326,8 +337,8 @@ struct PlayerView: View {
     private func hideOverlay() {
         hideTask?.cancel()
         overlayVisible = false
-        #if os(iOS)
         menuOpen = false   // a menu dismissed without a choice
+        #if os(iOS)
         scrubFraction = nil   // a drag cut off by the hide never ends
         #else
         toolsActive = false
@@ -350,6 +361,10 @@ struct PlayerView: View {
         guard player.phase == .playing, !channelListVisible, !voiceOverEnabled else { return false }
         #if os(iOS)
         if scrubFraction != nil || menuOpen { return false }
+        #else
+        // tvOS: the top row (and the menus opened from it) is in use; ▼ to play/pause re-arms the hide.
+        // (Menu items' onAppear is not a reliable "menu open" signal on tvOS.)
+        if toolsActive { return false }
         #endif
         return true
     }
@@ -382,7 +397,7 @@ struct PlayerView: View {
         switch direction {
         case .up where !toolsActive:
             toolsActive = true
-            Task { @MainActor in closeFocused = true }   // after the row became focusable
+            Task { @MainActor in topFocus = .close }   // after the row became focusable
             scheduleHide()
         case .down where toolsActive:
             toolsActive = false
@@ -392,6 +407,38 @@ struct PlayerView: View {
         case .right where !toolsActive: tvSeek(1)
         default: scheduleHide()
         }
+    }
+
+    /// Controls of the top row, left to right (as shown by `topBar` / `tools`).
+    private var topItems: [TopItem] {
+        var items: [TopItem] = [.close, .audio]
+        if !player.subtitleOptions.isEmpty { items.append(.subtitles) }
+        items += [.aspect, .resync]
+        if favoriteTarget != nil { items.append(.favorite) }
+        if player.request?.isLive == true {
+            items.append(.channelList)
+            if player.previousChannel != nil { items.append(.previous) }
+        }
+        return items
+    }
+
+    /// Focus in the top row: ◀▶ move along it (stopping at the ends), ▼ back to play/pause (VOD: ◀▶ seek again).
+    private func topRowMove(_ direction: MoveCommandDirection, from item: TopItem) {
+        let items = topItems
+        switch direction {
+        case .left, .right:
+            if let index = items.firstIndex(of: item) {
+                let next = index + (direction == .left ? -1 : 1)
+                if items.indices.contains(next) { topFocus = items[next] }
+            }
+        case .down:
+            toolsActive = false
+            topFocus = nil
+            playPauseFocused = true
+        default:
+            break
+        }
+        scheduleHide()
     }
 
     /// ◀▶: 10 s; held (`TVHoldSeek` repeats every 0.3 s) 30 s steps once held for 1 s.
@@ -573,7 +620,7 @@ struct PlayerView: View {
             .accessibilityLabel(L10n.t("action_close"))
             .accessibilityIdentifier("player_close")
             #if os(tvOS)
-            .focused($closeFocused)
+            .focused($topFocus, equals: .close)
             #endif
             if let number = player.currentChannel?.number {
                 Text(String(number)).font(Theme.headline.monospacedDigit()).foregroundStyle(Theme.textSecondary)
@@ -591,7 +638,7 @@ struct PlayerView: View {
         // VOD: not focusable until ▲ from play/pause (◀▶ there seeks); entering the row lands on close.
         .disabled(isVOD && !toolsActive)
         .focusSection()
-        .defaultFocus($closeFocused, true, priority: .userInitiated)
+        .defaultFocus($topFocus, .close, priority: .userInitiated)
         #endif
     }
 
@@ -706,6 +753,9 @@ struct PlayerView: View {
                 }
                 .accessibilityIdentifier("player_audio_sync")
             }
+            #if os(tvOS)
+            .focused($topFocus, equals: .audio)
+            #endif
             if !player.subtitleOptions.isEmpty {
                 trackedMenu("captions.bubble", label: "player_subtitles") {
                     Button { player.selectSubtitle(nil); menuClosed() } label: { Label(L10n.t("off"), systemImage: player.selectedSubtitle == nil ? "checkmark" : "") }
@@ -715,25 +765,43 @@ struct PlayerView: View {
                         }
                     }
                 }
+                #if os(tvOS)
+                .focused($topFocus, equals: .subtitles)
+                #endif
             }
             trackedMenu("aspectratio", label: "player_aspect") {
                 ForEach(AspectMode.allCases, id: \.self) { mode in
                     Button { env.player.aspect = mode; menuClosed() } label: { Label(L10n.t(mode.titleKey), systemImage: player.aspect == mode ? "checkmark" : "") }
                 }
             }
+            #if os(tvOS)
+            .focused($topFocus, equals: .aspect)
+            #endif
             // "Fix sync": reopen the stream (live edge / current position).
             Button { player.resync(); showOverlay() } label: { toolIcon("arrow.triangle.2.circlepath") }
                 .accessibilityLabel(L10n.t("audio_sync_fix"))
                 .accessibilityIdentifier("action_resync")
+                #if os(tvOS)
+                .focused($topFocus, equals: .resync)
+                #endif
             if let target = favoriteTarget {
                 FavoriteButton(target: target, minTapSize: Theme.isTV ? 0 : 36)
+                    #if os(tvOS)
+                    .focused($topFocus, equals: .favorite)
+                    #endif
             }
             if player.request?.isLive == true {
                 Button { channelListVisible = true } label: { toolIcon("list.bullet") }
                     .accessibilityLabel(L10n.t("action_channel_list"))
+                    #if os(tvOS)
+                    .focused($topFocus, equals: .channelList)
+                    #endif
                 if player.previousChannel != nil {
                     Button { player.switchToPreviousChannel() } label: { toolIcon("arrow.uturn.backward") }
                         .accessibilityLabel(L10n.t("player_previous_channel"))
+                        #if os(tvOS)
+                        .focused($topFocus, equals: .previous)
+                        #endif
                 }
             }
         }
@@ -786,9 +854,7 @@ struct PlayerView: View {
 
     /// A menu item was chosen: the menu is gone, the overlay's 3 s count restarts.
     private func menuClosed() {
-        #if os(iOS)
         menuOpen = false
-        #endif
         showOverlay()
     }
 

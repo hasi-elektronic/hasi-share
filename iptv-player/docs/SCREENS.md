@@ -232,7 +232,11 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     gösterir (sürükleme yok), süre "--:--".
   * **TV (tvOS):** ◀▶ 10 sn; basılı tutunca 0,3 sn'de bir tekrar, 1 sn sonra 30 sn adım. Katman
     görünürken odak oynat/duraklat'tadır: OK oynat/duraklat, ◀▶ atlar (odak yana kaymaz);
-    ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Katman kapalıyken OK
+    ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Üst satırda ◀▶ araçlar
+    arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · ⭐ · canlıda Kanal listesi ·
+    Önceki kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
+    kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
+    satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
     duraklatır/sürdürür ve katmanı açar (canlıda yalnızca katmanı açar). Siri Remote dokunmatik
     yüzeyinde kaydırarak sarma v1'de yok (SwiftUI odak modeliyle güvenilir değil); basılı tutma
     aynı ihtiyacı karşılar.

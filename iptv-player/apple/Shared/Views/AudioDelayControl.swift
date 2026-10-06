@@ -43,31 +43,41 @@ struct AudioDelayControl: View {
                             onVerticalMove: onVerticalMove, step: set)
         #else
         if verticalSizeClass == .compact {
-            // Landscape iPhone: one line per control, so the panel stays low over the picture.
-            HStack(spacing: 6) {
-                Text(title).lineLimit(1).minimumScaleFactor(0.75).frame(width: 200, alignment: .leading)
-                stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
-                slider
-                stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
-                valueText.minimumScaleFactor(0.75).frame(width: 190, alignment: .trailing)
+            // Landscape iPhone: one line per control when it fits (the slider keeps ≥ 140 pt),
+            // else the two-line layout – e.g. 667 pt wide phones.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    Text(title).lineLimit(1).minimumScaleFactor(0.8).frame(minWidth: 130, maxWidth: 200, alignment: .leading)
+                    stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
+                    slider.frame(minWidth: 140)
+                    stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
+                    valueText.minimumScaleFactor(0.8).frame(minWidth: 150, maxWidth: 190, alignment: .trailing)
+                }
+                twoLines
             }
             .font(.subheadline)
         } else {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(title)
-                    Spacer()
-                    valueText
-                }
-                HStack(spacing: 12) {
-                    stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
-                    slider
-                    stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
-                }
-            }
+            twoLines
         }
         #endif
     }
+
+    #if os(iOS)
+    private var twoLines: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer()
+                valueText
+            }
+            HStack(spacing: 12) {
+                stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
+                slider
+                stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
+            }
+        }
+    }
+    #endif
 
     #if os(iOS)
     private var valueText: some View {
