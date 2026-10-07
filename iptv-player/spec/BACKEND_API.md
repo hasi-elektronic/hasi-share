@@ -17,8 +17,8 @@ as end-to-end-encrypted pairing ciphertext it cannot decrypt (§Pairing).
   "minVersion": {"android": 1, "apple": 1},
   "products": {
     "google": "lifetime_access",
-    "appleLifetime": "de.hasielektronik.novaplayer.lifetime",
-    "appleTrial": "de.hasielektronik.novaplayer.trial"
+    "appleLifetime": "com.hasielektronic.novaplayer.lifetime",
+    "appleTrial": "com.hasielektronic.novaplayer.trial"
   },
   "features": {"accounts": true, "pairing": true, "sync": true},
   "serverTime": 1759570000123

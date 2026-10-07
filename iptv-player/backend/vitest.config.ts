@@ -17,6 +17,11 @@ export default defineConfig(async () => {
             DEV_MODE: "true",
             PUBLIC_BASE_URL: "https://tv.example.test",
             LICENSE_KID: "test-1",
+            // Fixtures use one app id for both stores.
+            APP_IDS: "de.hasielektronik.novaplayer",
+            APPLE_BUNDLE_ID: "de.hasielektronik.novaplayer",
+            APPLE_PRODUCT_ID: "de.hasielektronik.novaplayer.lifetime",
+            APPLE_TRIAL_PRODUCT_ID: "de.hasielektronik.novaplayer.trial",
           },
         },
       }),

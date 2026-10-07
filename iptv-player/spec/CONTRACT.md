@@ -14,10 +14,13 @@ Language: technical contract in English (identifiers), user docs in Turkish.
 |---|---|---|
 | Display name | `NovaPlayer` | Android `android/gradle.properties` → `APP_NAME`; Apple `apple/Config/Shared.xcconfig` → `APP_DISPLAY_NAME`; backend `wrangler.toml` → `APP_NAME` |
 | Android applicationId | `de.hasielektronik.novaplayer` | `android/gradle.properties` → `APP_ID` |
-| Apple bundle id (iOS **and** tvOS, same id → Universal Purchase) | `de.hasielektronik.novaplayer` | `apple/Config/Shared.xcconfig` → `APP_BUNDLE_ID` |
+| Apple bundle id (iOS **and** tvOS, same id → Universal Purchase) | `com.hasielektronic.novaplayer` (registered in App Store Connect) | `apple/Config/Shared.xcconfig` → `APP_BUNDLE_ID` |
 | Google one-time product (non-consumed INAPP) | `lifetime_access` | `gradle.properties` → `PRODUCT_LIFETIME` + backend `GOOGLE_PRODUCT_ID` |
-| Apple non-consumable (full unlock) | `de.hasielektronik.novaplayer.lifetime` | xcconfig `PRODUCT_LIFETIME` + backend `APPLE_PRODUCT_ID` |
-| Apple non-consumable, price tier 0 (trial marker, name "7-day Trial") | `de.hasielektronik.novaplayer.trial` | xcconfig `PRODUCT_TRIAL` + backend `APPLE_TRIAL_PRODUCT_ID` |
+| Apple non-consumable (full unlock) | `com.hasielektronic.novaplayer.lifetime` | xcconfig `PRODUCT_LIFETIME` + backend `APPLE_PRODUCT_ID` |
+| Apple non-consumable, price tier 0 (trial marker, name "7-day Trial") | `com.hasielektronic.novaplayer.trial` | xcconfig `PRODUCT_TRIAL` + backend `APPLE_TRIAL_PRODUCT_ID` |
+
+Backend `APP_IDS` lists every allowed `appId` (comma list), so Android and Apple ids may differ.
+Test vectors and backend test fixtures keep `de.hasielektronik.novaplayer` as a neutral sample id.
 
 Code packages/modules are **name-neutral** (`io.iptvplayer.*`, `IPTVCore`, `IPTVKit`),
 so renaming the product never touches source code.
