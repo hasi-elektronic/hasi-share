@@ -1,5 +1,7 @@
 # Devir Notu (bulut oturumu → Mac)
 
+> **Tamamlandı (2026-10-07):** A–F bitti. Güncel durum, test sonuçları ve açık adımlar: [`docs/STATUS.md`](docs/STATUS.md). Aşağısı tarihsel kayıttır.
+
 Bulut oturumu Linux konteynerde çalıştı: Xcode yoktu ve Google Maven (`dl.google.com`)
 engelliydi. Bu yüzden iş, burada **test edilebilen** parçalarla sınırlı kaldı. Çalışma Mac'te
 tam araç zinciriyle devam edecek. Branch: `claude/iptv-player`, PR: hasi-elektronic/hasi-share#3.
