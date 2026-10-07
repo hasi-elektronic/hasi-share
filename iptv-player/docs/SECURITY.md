@@ -12,11 +12,14 @@
 | Oturum token'ı (hesap) | Keystore-şifreli | Keychain | Yalnızca SHA-256 özeti |
 | Cihaz kimliği | Gönderilmez; yalnızca `sha256(prefix|appId|ANDROID_ID)` | `sha256(prefix|bundleId|IDFV)` | `deviceKey` |
 | E-posta (opsiyonel hesap) | – | – | D1, hesap silinince silinir |
+| Dayanıklı ayna (Apple, Build 14): kaynak tanımları (ad, tür, host, ayarlar – **gizli bilgi yok**), seçili kaynak, favoriler/ilerleme (başlık, poster URL'si, içerik anahtarı), son aramalar, senkron imleçleri | – | `UserDefaults` (`durable.sources.v1`, `durable.userState.v1`, toplam ≤ 200 KB) – tvOS katalog veritabanını silebildiği için (ARCHITECTURE §3.3). iOS'ta UserDefaults cihaz yedeğine dahildir | Hiç |
 
 **Yedekleme:** Android `dataExtractionRules` / `fullBackupContent` veritabanını, şifreli
 kayıtları ve DataStore'u buluta yedeklemeden ve cihaz aktarımından hariç tutar (Keystore
 anahtarı zaten taşınamaz). iOS'ta veritabanı dosyası `isExcludedFromBackup`, Keychain öğesi
-`ThisDeviceOnly`.
+`ThisDeviceOnly`. **İstisna (Build 14):** dayanıklı ayna `UserDefaults`'ta durduğu için iOS cihaz yedeğine
+girer; içinde gizli bilgi yoktur (M3U/Xtream URL'si, kullanıcı adı, şifre yalnızca Keychain'de), ancak kaynak
+adları/hostları, favori/izleme başlıkları ve son 10 arama yer alır. Apple TV uygulama verisini iCloud'a yedeklemez.
 
 ## 2. Loglar
 * Tüm log çağrıları `SafeLog` → `Redactor` (CONTRACT §10) üzerinden geçer: kayıtlı gizli

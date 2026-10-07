@@ -73,6 +73,9 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if !router.playerPresented { UndoToast().padding(.bottom, 8) }
         }
+        .overlay(alignment: .bottom) {
+            if !router.playerPresented && !router.onboarding { CatalogRestoreNotice().padding(.bottom, 64) }
+        }
         .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
             PlayerView().environment(env).environment(router)
         }

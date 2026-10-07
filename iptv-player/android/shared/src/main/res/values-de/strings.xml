@@ -171,6 +171,7 @@
     <string name="settings_purchase" formatted="false">Kauf</string>
     <string name="settings_advanced" formatted="false">Erweitert &amp; Diagnose</string>
     <string name="source_last_refresh">Zuletzt aktualisiert: %1$s</string>
+    <string name="catalog_restoring" formatted="false">Katalog wird neu geladen…</string>
     <string name="source_never_refreshed" formatted="false">Noch nie aktualisiert</string>
     <string name="source_epg_shift" formatted="false">EPG-Zeitversatz</string>
     <string name="source_auto_refresh" formatted="false">Automatisch aktualisieren</string>

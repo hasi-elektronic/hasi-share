@@ -844,6 +844,11 @@
    "tr": "Son yenileme {0}",
    "de": "Zuletzt aktualisiert: {0}"
   },
+  "catalog_restoring": {
+   "en": "Reloading catalog…",
+   "tr": "Katalog yeniden yükleniyor…",
+   "de": "Katalog wird neu geladen…"
+  },
   "source_never_refreshed": {
    "en": "Never refreshed",
    "tr": "Hiç yenilenmedi",

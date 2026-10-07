@@ -4,13 +4,16 @@ import Observation
 
 /// Last searches of a source, newest first, at most 10 (device-local, SCREENS §3.6). Kept in the catalog
 /// database's `kv` table – excluded from iCloud/device backups like the rest of the catalog (queries can be
-/// personal) – and removed with the source. Changes are cached in memory and written without blocking the
+/// personal) – and removed with the source; a copy rides in the durable mirror (`DurableStateMirror`, tvOS purges the
+/// database). Changes are cached in memory and written without blocking the
 /// main actor (`DeferredWrites`: at once if the writer is free, else queued behind a running commit).
 public final class RecentSearchStore: @unchecked Sendable {
     public static let limit = 10
     private let database: AppDatabase
     private let lock = NSLock()
     private var cache: [String: [String]] = [:]
+    /// Called after every change (the durable mirror schedules a write). Set once at start.
+    public var onChange: (@Sendable () -> Void)?
 
     public init(database: AppDatabase) {
         self.database = database
@@ -34,6 +37,7 @@ public final class RecentSearchStore: @unchecked Sendable {
         let json = list.isEmpty ? nil : (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) }
         let database = database, key = Self.key(sourceId)
         database.deferredWrites.perform(database.db, { try? database.db.transaction { database.setValue(json, forKey: key) } })
+        onChange?()
     }
 
     /// Adds `query` on top (case/diacritics-insensitive duplicates removed). Blank queries are ignored.

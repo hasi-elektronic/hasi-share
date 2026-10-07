@@ -23,17 +23,90 @@ public final class AppDatabase: Sendable {
 
     /// Database in Application Support, excluded from iCloud/device backups (docs/SECURITY.md §1).
     public static func onDisk(fileName: String = "catalog.sqlite") throws -> AppDatabase {
-        let fm = FileManager.default
-        var dir = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try onDisk(directory: applicationSupportDirectory(), fileName: fileName)
+    }
+
+    /// Database file `fileName` in `directory` (created), directory and file excluded from backups.
+    public static func onDisk(directory: URL, fileName: String) throws -> AppDatabase {
+        var dir = directory
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try? dir.setResourceValues(values)
-        let url = dir.appendingPathComponent(fileName)
-        let db = try AppDatabase(db: SQLiteDatabase(path: url.path))
-        var fileURL = url
+        var fileURL = dir.appendingPathComponent(fileName)
+        let db = try AppDatabase(db: SQLiteDatabase(path: fileURL.path))
         try? fileURL.setResourceValues(values)
         return db
+    }
+
+    public static func applicationSupportDirectory() throws -> URL {
+        try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    }
+
+    public static func cachesDirectory() throws -> URL {
+        try FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    }
+
+    /// Where `open` ended up.
+    public enum Location: String, Sendable, Equatable {
+        case applicationSupport, caches, memory
+    }
+
+    /// Result of `open`.
+    public struct Opened: Sendable {
+        public let database: AppDatabase
+        public let location: Location
+        /// The primary file was unreadable (corrupt / not a database) and was deleted and recreated.
+        public let recreatedCorruptFile: Bool
+    }
+
+    /// True for "the file is not a usable database" (SQLITE_CORRUPT / SQLITE_NOTADB, extended codes included).
+    public static func isCorruption(_ error: Error) -> Bool {
+        guard let error = error as? SQLiteError else { return false }
+        return [11, 26].contains(error.code & 0xFF)
+    }
+
+    /// Removes a database file with its WAL/SHM/journal companions.
+    public static func deleteFiles(at url: URL) {
+        for suffix in ["", "-wal", "-shm", "-journal"] {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+        }
+    }
+
+    /// Opens the app database without ever failing: the primary directory (Application Support); if the file is
+    /// corrupt, once more after deleting it; then the Caches directory; only then in memory (lost at exit – the
+    /// durable mirror still restores the sources on the next launch). Logs carry no paths.
+    public static func open(fileName: String = "catalog.sqlite", primary: URL? = nil, caches: URL? = nil) -> Opened {
+        var recreated = false
+        let primaryDir = primary ?? (try? applicationSupportDirectory())
+        if let dir = primaryDir {
+            do {
+                return Opened(database: try onDisk(directory: dir, fileName: fileName), location: .applicationSupport, recreatedCorruptFile: false)
+            } catch where isCorruption(error) {
+                SafeLog.error("database corrupt (\((error as? SQLiteError)?.code ?? -1)): recreating")
+                deleteFiles(at: dir.appendingPathComponent(fileName))
+                recreated = true
+                do {
+                    return Opened(database: try onDisk(directory: dir, fileName: fileName), location: .applicationSupport, recreatedCorruptFile: true)
+                } catch {
+                    SafeLog.error("database reopen failed (\((error as? SQLiteError)?.code ?? -1))")
+                }
+            } catch {
+                SafeLog.error("database open failed (\((error as? SQLiteError)?.code ?? -1))")
+            }
+        }
+        if let dir = caches ?? (try? cachesDirectory()) {
+            do {
+                let db = try onDisk(directory: dir, fileName: fileName)
+                SafeLog.warning("database opened in caches")
+                return Opened(database: db, location: .caches, recreatedCorruptFile: recreated)
+            } catch {
+                SafeLog.error("database open in caches failed (\((error as? SQLiteError)?.code ?? -1))")
+            }
+        }
+        SafeLog.error("database in memory for this launch")
+        // An in-memory database with the schema cannot fail short of memory exhaustion.
+        return Opened(database: try! inMemory(), location: .memory, recreatedCorruptFile: recreated)
     }
 
     private func migrate() throws {

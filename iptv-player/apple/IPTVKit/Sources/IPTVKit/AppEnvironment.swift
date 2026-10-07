@@ -55,6 +55,8 @@ public final class AppEnvironment {
     /// Last searches per source (device-local, SCREENS §3.6).
     @ObservationIgnored public let recentSearches: RecentSearchStore
     @ObservationIgnored public let secureStore: any SecureStore
+    /// Persistent copy of sources + favorites/progress/recent searches (tvOS purges the database, ARCHITECTURE §3.3).
+    @ObservationIgnored public let mirror: DurableStateMirror
     public let settings: AppSettings
     public let store: StoreManager
     public let license: LicenseManager
@@ -70,6 +72,14 @@ public final class AppEnvironment {
     public private(set) var lastSyncedAt: Date?
     /// Source ids with a refresh in flight.
     public private(set) var refreshing: Set<String> = []
+    /// Sources put back from the mirror at launch whose catalog is still being reloaded ("Reloading catalog…").
+    public private(set) var restoringSourceIds: Set<String> = []
+    /// True while restored sources reload (non-blocking notice).
+    public var isRestoringCatalog: Bool { !restoringSourceIds.isEmpty }
+    /// What the launch restored from the mirror (nothing when the database still had its sources).
+    @ObservationIgnored public private(set) var restore = DurableStateMirror.Restore()
+    /// The background reload of the restored sources (tests await it).
+    @ObservationIgnored public private(set) var restoreRefresh: Task<Void, Never>?
     /// sourceId → fingerprint: content keys are built per card/row; the secrets live in the
     /// Keychain, so they are read once per source (cleared whenever the sources change).
     @ObservationIgnored private var fingerprintCache: [String: String] = [:]
@@ -81,7 +91,8 @@ public final class AppEnvironment {
         self.database = database
         self.secureStore = secureStore
         self.settings = settings
-        sourceRepository = SourceRepository(database: database, secureStore: secureStore)
+        mirror = DurableStateMirror(store: kv)
+        sourceRepository = SourceRepository(database: database, secureStore: secureStore, mirror: mirror)
         catalog = CatalogRepository(database: database)
         epg = EpgRepository(database: database)
         library = LibraryRepository(database: database)
@@ -109,8 +120,20 @@ public final class AppEnvironment {
         player.prefetcher = ZapPrefetcher(resolver: { try await streamResolver.resolve($0) },
                                           fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()
+        // A database without sources (tvOS purged it, corrupt file, new file in Caches/memory): put the mirrored
+        // sources and user state back BEFORE anything reads or mirrors the empty state.
+        restore = mirror.restoreIfNeeded(sources: sourceRepository, library: library, database: database)
+        if let selected = restore.selectedSourceId { settings.currentSourceId = selected }
         sourceRepository.registerSecretsForRedaction()
         reloadSources()
+        // First launch of a build with the mirror: seed it from the database (never with an empty list here – a
+        // failed restore must not wipe the copy it could be retried from).
+        if !sources.isEmpty { sourceRepository.updateMirror() }
+        installUserStateMirror()
+        if restore.didRestore {
+            favorites.reload()
+            reloadRestoredSources(restore.refreshIds)
+        }
         // Build 11 kept recent searches in UserDefaults (backed up): moved once into the catalog database.
         recentSearches.migrateLegacy(from: kv, sourceIds: sources.map(\.id))
         // Search index v6/v7: older catalogs are (re-)indexed in the background, never at launch; EPG stored
@@ -123,6 +146,49 @@ public final class AppEnvironment {
         }
     }
 
+    /// The mirror reads favorites/progress (pending writes included), recent searches and the sync cursors; it writes
+    /// at most once per few seconds and when the app goes to the background. Nothing is written without sources
+    /// (an empty database must never replace a mirror it could still be restored from).
+    private func installUserStateMirror() {
+        let library = library, recent = recentSearches, repo = sourceRepository, database = database
+        mirror.userStateProvider = {
+            guard let sources = try? repo.all(), !sources.isEmpty,
+                  let favorites = try? library.favorites(),
+                  let progress = try? library.progressItems(limit: DurableStateMirror.maxProgress) else { return nil }
+            var searches: [String: [String]] = [:]
+            for source in sources {
+                let list = recent.recent(sourceId: source.id)
+                if !list.isEmpty { searches[source.id] = list }
+            }
+            return DurableStateMirror.UserState(favorites: favorites, progress: progress, recentSearches: searches,
+                                                syncCursor: database.value(forKey: SyncManager.cursorKey),
+                                                syncLastPush: database.value(forKey: SyncManager.lastPushKey))
+        }
+        let mirror = mirror
+        recentSearches.onChange = { mirror.noteUserStateChanged() }
+        mirror.noteUserStateChanged()
+    }
+
+    /// Restored sources reload one after another in the background through the normal refresh pipeline (never
+    /// blocking launch or QuickStart); `refreshDueSources` leaves them alone in this launch.
+    private func reloadRestoredSources(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        restoringSourceIds = Set(ids)
+        restoreRefresh = Task { [weak self] in
+            for id in ids {
+                guard let self else { return }
+                await self.refreshSource(id: id)
+                self.restoringSourceIds.remove(id)
+            }
+        }
+    }
+
+    /// Favorites/progress changed: views reload; the durable mirror schedules a write.
+    private func libraryDidChange() {
+        libraryVersion += 1
+        mirror.noteUserStateChanged()
+    }
+
     private func wire() {
         store.onChange = { [weak self] snapshot in
             guard let self else { return }
@@ -131,7 +197,7 @@ public final class AppEnvironment {
         }
         favorites.now = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
         favorites.onChange = { [weak self] in self?.libraryChanged() }
-        favorites.onLocalChange = { [weak self] in self?.libraryVersion += 1 }   // order/categories: device-local, no sync push
+        favorites.onLocalChange = { [weak self] in self?.libraryDidChange() }   // order/categories: device-local, no sync push
         license.sessionToken = { [weak self] in self?.account.sessionToken }
         account.onSessionChange = { [weak self] signedIn in
             guard let self else { return }
@@ -139,7 +205,7 @@ public final class AppEnvironment {
                 if signedIn {
                     await self.syncManager.syncNow()
                     self.favorites.reload()
-                    self.libraryVersion += 1
+                    self.libraryDidChange()
                 } else {
                     await self.syncManager.reset()
                 }
@@ -172,7 +238,7 @@ public final class AppEnvironment {
             await syncManager.syncNow()
             lastSyncedAt = await syncManager.lastSyncedAt
             favorites.reload()
-            libraryVersion += 1
+            libraryDidChange()
         }
         await refreshDueSources()
     }
@@ -205,7 +271,7 @@ public final class AppEnvironment {
                     await syncManager.syncNow()
                     lastSyncedAt = await syncManager.lastSyncedAt
                     self.favorites.reload()
-                    libraryVersion += 1
+                    libraryDidChange()
                 }
             }
             player.resumeAfterRelease()
@@ -216,19 +282,23 @@ public final class AppEnvironment {
     }
 
     /// Going to the background: writes still waiting for the database (the position `release()` just saved while
-    /// a refresh held the writer, favorites, recent searches) are finished before the app may be suspended/killed.
+    /// a refresh held the writer, favorites, recent searches) are finished before the app may be suspended/killed,
+    /// then the durable mirror gets the final user state.
     private func flushDeferredWrites() {
-        let writes = database.deferredWrites
-        guard !writes.isIdle else { return }
+        let writes = database.deferredWrites, mirror = mirror
+        let work: @Sendable () -> Void = {
+            if !writes.isIdle { writes.drain(timeout: 20) }
+            mirror.flushUserState()
+        }
         #if canImport(UIKit) && !os(watchOS)
         let task = BackgroundTaskBox()
         task.id = UIApplication.shared.beginBackgroundTask(withName: "db-flush") { task.end() }
         DispatchQueue.global(qos: .userInitiated).async {
-            writes.drain(timeout: 20)
+            work()
             Task { @MainActor in task.end() }
         }
         #else
-        DispatchQueue.global(qos: .userInitiated).async { writes.drain(timeout: 20) }
+        DispatchQueue.global(qos: .userInitiated).async { work() }
         #endif
     }
 
@@ -237,8 +307,12 @@ public final class AppEnvironment {
     public func reloadSources() {
         fingerprintCache = [:]
         sources = (try? sourceRepository.all()) ?? []
-        if let current = settings.currentSourceId, sources.contains(where: { $0.id == current }) { return }
+        if let current = settings.currentSourceId, sources.contains(where: { $0.id == current }) {
+            mirror.recordSelectedSource(current)
+            return
+        }
         settings.currentSourceId = sources.first?.id
+        mirror.recordSelectedSource(settings.currentSourceId)
     }
 
     public var currentSource: Source? {
@@ -247,6 +321,7 @@ public final class AppEnvironment {
 
     public func selectSource(_ id: String) {
         settings.currentSourceId = id
+        mirror.recordSelectedSource(id)
         catalogVersion += 1
     }
 
@@ -312,7 +387,7 @@ public final class AppEnvironment {
     /// one is retried on the next launch.
     public func refreshDueSources() async {
         let now = Date()
-        for source in sources where !refreshing.contains(source.id)
+        for source in sources where !refreshing.contains(source.id) && !restore.sources.contains(where: { $0.id == source.id })
             && (source.isRefreshDue(now: now) || refresher.needsFormatRefresh(sourceId: source.id)) {
             await refreshSource(id: source.id)
         }
@@ -345,7 +420,7 @@ public final class AppEnvironment {
     // MARK: Library
 
     private func libraryChanged() {
-        libraryVersion += 1
+        libraryDidChange()
         Task { await syncManager.noteLocalChange() }
     }
 

@@ -5,11 +5,20 @@ import IPTVCore
 public final class SourceRepository: Sendable {
     private let database: AppDatabase
     private let secureStore: any SecureStore
+    /// Persistent copy of the source list (survives a purged database, `DurableStateMirror`).
+    private let mirror: DurableStateMirror?
     private var db: SQLiteDatabase { database.db }
 
-    public init(database: AppDatabase, secureStore: any SecureStore) {
+    public init(database: AppDatabase, secureStore: any SecureStore, mirror: DurableStateMirror? = nil) {
         self.database = database
         self.secureStore = secureStore
+        self.mirror = mirror
+    }
+
+    /// Writes the current list into the mirror (after every change; a failed read leaves the mirror as it is).
+    public func updateMirror() {
+        guard let mirror, let list = try? all() else { return }
+        mirror.recordSources(list)
     }
 
     private static func secretsKey(_ id: String) -> String { "source.secrets.\(id)" }
@@ -50,6 +59,30 @@ public final class SourceRepository: Sendable {
             ?? (try db.scalar("SELECT COALESCE(MAX(sort), -1) + 1 FROM sources"))
         try db.run("INSERT INTO sources (id, sort, json) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET json = excluded.json",
                    [.text(source.id), .from(sort), .text(json)])
+        updateMirror()
+    }
+
+    /// New order of the sources (ids not listed keep their place after the listed ones).
+    public func reorder(_ ids: [String]) throws {
+        try db.transaction {
+            let rest = try all().map(\.id).filter { !ids.contains($0) }
+            for (index, id) in (ids + rest).enumerated() {
+                try db.run("UPDATE sources SET sort = ? WHERE id = ?", [.from(index), .text(id)])
+            }
+        }
+        updateMirror()
+    }
+
+    /// Re-inserts mirrored sources (same ids, order = list order) without touching their secrets.
+    func restore(_ sources: [Source]) throws {
+        try db.transaction {
+            for (index, source) in sources.enumerated() {
+                let json = String(decoding: try Self.encoder.encode(source), as: UTF8.self)
+                try db.run("INSERT OR IGNORE INTO sources (id, sort, json) VALUES (?,?,?)",
+                           [.text(source.id), .from(index), .text(json)])
+            }
+        }
+        updateMirror()
     }
 
     public func secrets(id: String) -> SourceSecrets? {
@@ -60,6 +93,7 @@ public final class SourceRepository: Sendable {
         if let secrets = secrets(id: id) { Redactor.shared.unregister(secrets.redactableValues) }
         try secureStore.set(nil, forKey: Self.secretsKey(id))
         try db.run("DELETE FROM sources WHERE id = ?", [.text(id)])
+        updateMirror()
     }
 
     /// Registers all stored secrets with the redactor (app start).

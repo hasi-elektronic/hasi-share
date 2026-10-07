@@ -25,9 +25,12 @@ public actor SyncManager {
     public private(set) var pushCalls = 0
 
     private enum Keys {
-        static let cursor = "sync.cursor"
-        static let lastPush = "sync.lastPushMs"
+        static let cursor = SyncManager.cursorKey
+        static let lastPush = SyncManager.lastPushKey
     }
+    /// Database kv keys of the pull cursor / last pushed `updatedAt` (also mirrored, `DurableStateMirror`).
+    static let cursorKey = "sync.cursor"
+    static let lastPushKey = "sync.lastPushMs"
 
     public init(backend: any SyncBackend, library: LibraryRepository, database: AppDatabase,
                 debounce: Duration = .seconds(5), sessionToken: @escaping @Sendable () -> String?) {

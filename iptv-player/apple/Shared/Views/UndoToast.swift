@@ -71,3 +71,34 @@ private struct OptionalFocus: ViewModifier {
         if let binding { content.focused(binding) } else { content }
     }
 }
+
+/// "Reloading catalog…" capsule while sources restored from the durable mirror reload after the system deleted
+/// the catalog database (tvOS purgeable storage, ARCHITECTURE §3.3). Informational only: nothing focusable or
+/// tappable, inserted/removed (never at opacity 0).
+struct CatalogRestoreNotice: View {
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        ZStack {
+            if env.isRestoringCatalog {
+                HStack(spacing: Theme.isTV ? 20 : 10) {
+                    ProgressView()
+                    Text(L10n.t("catalog_restoring"))
+                        .font((Theme.isTV ? Theme.caption : .subheadline).weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
+                .padding(.horizontal, Theme.isTV ? 32 : 18)
+                .padding(.vertical, Theme.isTV ? 16 : 10)
+                .background(Capsule().fill(Theme.surfaceElevated.opacity(0.97)))
+                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+                .padding(.horizontal, Theme.safeH)
+                .allowsHitTesting(false)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("catalog_restoring")
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: env.isRestoringCatalog)
+    }
+}

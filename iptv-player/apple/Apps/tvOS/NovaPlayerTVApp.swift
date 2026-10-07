@@ -93,6 +93,9 @@ struct TVRootView: View {
         .overlay(alignment: .bottom) {
             if !router.playerPresented { UndoToast().padding(.bottom, Theme.safeV) }
         }
+        .overlay(alignment: .bottom) {
+            if !router.playerPresented && !router.onboarding { CatalogRestoreNotice().padding(.bottom, 120) }
+        }
         .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
             PlayerView().environment(env).environment(router)
         }

@@ -195,6 +195,25 @@ public final class LibraryRepository: Sendable {
                      [.int(ms), .int(Int64(limit))], map: Self.item)
     }
 
+    /// Puts mirrored rows back into an empty library (`DurableStateMirror`): original `updatedAt`, existing rows
+    /// win, and **no** push markers – these versions were already pushed (or are newer than the restored push cursor
+    /// and go out the normal way). Returns the number of rows written.
+    @discardableResult
+    func restore(_ items: [SyncItem]) throws -> Int {
+        try db.transaction {
+            var count = 0
+            for item in items {
+                count += try db.run("""
+                    INSERT OR IGNORE INTO library (key, kind, content_key, title, content_kind, poster_url, position_ms,
+                      duration_ms, series_key, updated_at, deleted) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    """, [.text(item.key), .text(item.kind.rawValue), .text(item.contentKey), .text(item.data.title),
+                          .text(item.data.contentKind.rawValue), .from(item.data.posterUrl), .from(item.data.positionMs),
+                          .from(item.data.durationMs), .from(item.data.seriesKey), .int(item.updatedAt), .from(item.deleted)])
+            }
+            return count
+        }
+    }
+
     public func all() throws -> [SyncItem] {
         try db.query("SELECT \(Self.columns) FROM library", map: Self.item)
     }

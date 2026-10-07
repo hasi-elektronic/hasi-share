@@ -264,6 +264,43 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 * Yaşam döngüsü: ekran kapanınca / arka plana geçince oynatıcı **release** edilir
   (Android `ON_STOP`, iOS `scenePhase != .active`), pozisyon kaydedilir.
 
+### 3.3 Kalıcı depolama: tvOS silinebilir alan ve dayanıklı ayna (Build 14)
+tvOS uygulamalarının yalnızca ~500 KB'lık **kalıcı** yerel alanı vardır (NSUserDefaults); Application Support ve
+Caches dahil konteynerin geri kalanı sistem yer gerektiğinde **silinebilir**. Sahibin kataloğu büyük (≈4k canlı,
+35k film, 9k dizi, ~500k EPG satırı + FTS dizinleri), bu yüzden `catalog.sqlite` TestFlight güncellemelerinden sonra
+silinebiliyordu – kaynak listesi yalnızca veritabanında olduğu için "Apple TV Xtream kodunu siliyor" görünüyordu.
+Gizli bilgiler Keychain'de (`ThisDeviceOnly`) ve silinmez.
+
+* **`DurableStateMirror` (IPTVKit)**: kalıcı anahtar/değer deposunda (uygulamada `UserDefaults`, testlerde bellek
+  içi) küçük bir kopya.
+  * `durable.sources.v1`: kaynak tanımları (**gizli bilgi yok** – `Source` yalnızca ad/tür/host/ayarlar/son durum
+    içerir) + seçili kaynak kimliği, sürümlü JSON. Her ekleme / düzenleme / sıralama / silmede
+    (`SourceRepository.save/reorder/delete`) hemen yazılır; ilk açılışta veritabanından tohumlanır.
+  * `durable.userState.v1`: tüm favoriler (en çok 2000), en yeni 300 ilerleme kaydı, kaynak başına son 10 arama
+    (en çok 20 kaynak), senkron imleçleri (`sync.cursor`, `sync.lastPushMs`) – konumsal dizilerle sıkı JSON,
+    zlib ile sıkıştırılmış. Değişiklikte en çok **3 sn'de bir** (ilk değişiklik hemen, aradakiler birleştirilir)
+    ve uygulama arka plana geçerken (`DeferredWrites` boşaltıldıktan sonra) yazılır. Kaynak yokken (boş/silinmiş
+    veritabanı) hiç yazılmaz: boş durum, geri yüklenebilecek aynayı ezemez.
+  * Favori sırası, favori kategoriler, kategori tercihleri ve gizli kanallar zaten `UserDefaults`'tadır (ayna gerekmez).
+  * **Bütçe**: aynanın toplamı ≤ **200 KB** (kullanıcı durumu payı 170 KB). Aşılırsa önce en eski ilerleme, sonra
+    en eski favoriler çeyrek çeyrek atılır. Ölçüm (`DurableStateMirrorTests.testSizeBudgetForALargeLibrary`):
+    5 kaynak ≈ 2,7 KB; 500 favori + 300 ilerleme + 50 arama ≈ 22 KB (sıkıştırılmış); toplam ≈ 25 KB.
+* **Geri yükleme** (`AppEnvironment` başlatılırken, her şeyden önce): veritabanında kaynak yok ama aynada var →
+  kaynaklar **aynı kimlik ve sırayla** eklenir, seçili kaynak geri gelir; Keychain'de gizli bilgisi olmayan kaynak
+  atılmaz, "geçersiz kimlik bilgileri" durumuyla kalır. Kütüphane boşsa favoriler/ilerleme **orijinal
+  `updatedAt`** ile yazılır (var olan daha yeni satır kazanır) ve **push işareti (`library_push`) oluşturulmaz**;
+  senkron imleçleri de geri geldiği için senkron bu satırları yeniden göndermez. Gizli bilgisi olan her kaynak
+  arka planda, sırayla, normal yenileme hattından **bir kez** yenilenir (`refreshDueSources` bu açılışta onları
+  atlar; açılışı ve QuickStart'ı bekletmez). Yenileme sürerken alt kenarda odaklanamayan, dokunulamayan
+  "Katalog yeniden yükleniyor…" (`catalog_restoring`) bildirimi görünür.
+* **Veritabanı açma** (`AppDatabase.open`, asla başarısız olmaz): Application Support → dosya bozuksa
+  (`SQLITE_CORRUPT`/`SQLITE_NOTADB`) silinip bir kez daha → Caches → bellek içi (yalnızca bu açılış; ayna bir sonraki
+  açılışta yine geri yükler). Loglar yol içermez (`SafeLog`, yalnızca hata kodu ve konum).
+* iOS'ta Application Support nadiren silinir; aynı kod yolu bozuk dosyayı da kapsar.
+* **Test**: `DurableStateMirrorTests` (ayna güncelleme, geri yükleme, eksik gizli bilgi, gidiş-dönüş, bütçe,
+  açma sırası) ve UI testleri `IOSCatalogRestoreTests` / `TVCatalogRestoreTests`: DEBUG `-uiSandbox <ad>` (gerçek
+  SQLite + Keychain + UserDefaults, test adlarıyla) ve `-debugDeleteCatalogDB` (silinmeyi taklit eder) ile.
+
 ## 4. Lisans, deneme ve satın alma
 
 ### 4.1 Durum makinesi (her iki platformda aynı saf fonksiyon – CONTRACT §7.4)

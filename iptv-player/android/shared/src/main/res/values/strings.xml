@@ -171,6 +171,7 @@
     <string name="settings_purchase" formatted="false">Purchase</string>
     <string name="settings_advanced" formatted="false">Advanced &amp; diagnostics</string>
     <string name="source_last_refresh">Last refresh %1$s</string>
+    <string name="catalog_restoring" formatted="false">Reloading catalog…</string>
     <string name="source_never_refreshed" formatted="false">Never refreshed</string>
     <string name="source_epg_shift" formatted="false">EPG time shift</string>
     <string name="source_auto_refresh" formatted="false">Auto refresh</string>

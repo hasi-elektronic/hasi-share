@@ -3868,6 +3868,29 @@
         }
       }
     },
+    "catalog_restoring": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reloading catalog…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Katalog yeniden yükleniyor…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Katalog wird neu geladen…"
+          }
+        }
+      }
+    },
     "source_never_refreshed": {
       "extractionState": "manual",
       "localizations": {

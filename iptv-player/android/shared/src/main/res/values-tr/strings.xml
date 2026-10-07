@@ -171,6 +171,7 @@
     <string name="settings_purchase" formatted="false">Satın alma</string>
     <string name="settings_advanced" formatted="false">Gelişmiş ve tanılama</string>
     <string name="source_last_refresh">Son yenileme %1$s</string>
+    <string name="catalog_restoring" formatted="false">Katalog yeniden yükleniyor…</string>
     <string name="source_never_refreshed" formatted="false">Hiç yenilenmedi</string>
     <string name="source_epg_shift" formatted="false">EPG saat kaydırma</string>
     <string name="source_auto_refresh" formatted="false">Otomatik yenileme</string>

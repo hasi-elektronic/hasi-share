@@ -127,8 +127,15 @@ enum AppBootstrap {
 
     static func makeEnvironment() -> AppEnvironment {
         let isUITest = arguments.contains("-uiTestReset")
-        let suite = isUITest ? UserDefaults(suiteName: "uitest") ?? .standard : .standard
-        if isUITest { suite.removePersistentDomain(forName: "uitest") }
+        // DEBUG `-uiSandbox <name>`: real SQLite file + Keychain + UserDefaults under their own names (relaunch
+        // and purge tests); `-uiTestReset` then wipes that sandbox instead of switching to in-memory stores.
+        var sandbox: String?
+        #if DEBUG
+        sandbox = argument("-uiSandbox")
+        #endif
+        let suiteName = sandbox.map { "uisandbox.\($0)" } ?? (isUITest ? "uitest" : nil)
+        let suite = suiteName.flatMap { UserDefaults(suiteName: $0) } ?? .standard
+        if isUITest, let suiteName { suite.removePersistentDomain(forName: suiteName) }
         defaults = suite
 
         #if os(tvOS)
@@ -150,14 +157,27 @@ enum AppBootstrap {
                                backendBaseURL: URL(string: backendOverride ?? info("BACKEND_BASE_URL")) ?? URL(string: "https://invalid.example")!,
                                productIDs: ProductIDs(lifetime: info("PRODUCT_LIFETIME"), trial: info("PRODUCT_TRIAL")),
                                licenseKeysJSON: licenseKeys(), platform: platform, rawDeviceId: deviceId, deviceName: deviceName)
-        let database: AppDatabase
-        do {
-            database = isUITest ? try AppDatabase.inMemory() : try AppDatabase.onDisk()
-        } catch {
-            SafeLog.error("database open failed: \(error)")
-            database = try! AppDatabase.inMemory()
+        let secretsService = (Bundle.main.bundleIdentifier ?? "app") + ".secrets" + (sandbox.map { ".uisandbox.\($0)" } ?? "")
+        let fileName = sandbox.map { "uisandbox-\($0).sqlite" } ?? "catalog.sqlite"
+        #if DEBUG
+        // `-debugDeleteCatalogDB`: simulates tvOS purging Application Support (the mirror must restore the sources).
+        if arguments.contains("-debugDeleteCatalogDB") || (isUITest && sandbox != nil),
+           let dir = try? AppDatabase.applicationSupportDirectory() {
+            AppDatabase.deleteFiles(at: dir.appendingPathComponent(fileName))
         }
-        let secure: any SecureStore = isUITest ? InMemorySecureStore() : KeychainStore(service: (Bundle.main.bundleIdentifier ?? "app") + ".secrets")
+        if isUITest, sandbox != nil { KeychainStore(service: secretsService).removeAll() }
+        #endif
+        let database: AppDatabase
+        if isUITest && sandbox == nil {
+            database = try! AppDatabase.inMemory()
+        } else {
+            let opened = AppDatabase.open(fileName: fileName)   // never fails: corrupt → recreate, Caches, memory
+            database = opened.database
+            if opened.location != .applicationSupport || opened.recreatedCorruptFile {
+                SafeLog.warning("database location: \(opened.location.rawValue), recreated: \(opened.recreatedCorruptFile)")
+            }
+        }
+        let secure: any SecureStore = isUITest && sandbox == nil ? InMemorySecureStore() : KeychainStore(service: secretsService)
         let kv = UserDefaultsStore(suite)
         let settings = AppSettings(defaults: suite)
         #if DEBUG
