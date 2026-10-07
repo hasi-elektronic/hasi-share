@@ -730,10 +730,12 @@ struct MobileTopBar: View {
             .accessibilityHidden(true)
     }
 
-    /// Text tabs. `fill`: spread over the full width (each tab's slot is tappable); `shrink`: last
-    /// resort, labels scale down instead of being clipped.
+    /// Text tabs. `fill`: spread over the full width with even gaps (each tab's slot is tappable);
+    /// `shrink`: last resort, labels scale down alike instead of being clipped. Labels stop growing at
+    /// accessibility1 (the header itself at accessibility2) so they do not scale raggedly.
     private func tabRow(_ font: Font, spacing: CGFloat = 0, fill: Bool = false, shrink: Bool = false) -> some View {
-        HStack(spacing: spacing) {
+        let layout = fill ? AnyLayout(EvenTabsLayout()) : AnyLayout(HStackLayout(spacing: spacing))
+        return layout {
             ForEach(AppSection.mobile, id: \.self) { section in
                 let selected = router.section == section
                 Button { router.section = section } label: {
@@ -756,6 +758,7 @@ struct MobileTopBar: View {
                 .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private var actions: some View {
@@ -772,6 +775,31 @@ struct MobileTopBar: View {
             }
             .accessibilityLabel(L10n.t("action_settings"))
             .accessibilityIdentifier("open_settings")
+        }
+    }
+}
+
+/// Header tab slots (portrait): each slot is its label's width plus an equal share of the free width,
+/// so the gaps between labels are even (equal slots left short labels with wide gaps) and the whole
+/// slot stays tappable. Narrower than the labels: every slot gets the same fraction of its width, so
+/// labels with `minimumScaleFactor` shrink by one common factor.
+private struct EvenTabsLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        return CGSize(width: proposal.width ?? sizes.reduce(0) { $0 + $1.width }, height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let ideal = subviews.map { $0.sizeThatFits(.unspecified).width }
+        let total = ideal.reduce(0, +)
+        guard total > 0 else { return }
+        let extra = (bounds.width - total) / CGFloat(subviews.count)
+        var x = bounds.minX
+        for (subview, width) in zip(subviews, ideal) {
+            let slot = extra >= 0 ? width + extra : width * bounds.width / total
+            subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                          proposal: ProposedViewSize(width: slot, height: bounds.height))
+            x += slot
         }
     }
 }

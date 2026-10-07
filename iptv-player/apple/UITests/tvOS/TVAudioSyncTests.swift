@@ -128,6 +128,12 @@ final class TVAudioSyncTests: XCTestCase {
         UITestSupport.snap("tvos-\(context)-sync-panel", in: self)
         press(.right, 2)
         XCTAssertEqual(device.value as? String, "0 ms", "\(context)")
+        // Play/Pause under the panel toggles playback but never puts the overlay over it.
+        press(.playPause)
+        XCTAssertFalse(app.buttons["player_close"].exists, "\(context): no overlay over the sync panel")
+        XCTAssertTrue(device.exists, "\(context): panel stays")
+        press(.playPause)
+        XCTAssertFalse(app.buttons["player_close"].exists, "\(context): still no overlay")
         press(.menu)
         XCTAssertTrue(content.waitForNonExistence(timeout: 3), "\(context): Menu closes the panel")
         XCTAssertTrue(app.otherElements["video_surface"].exists, "\(context): player stays open")

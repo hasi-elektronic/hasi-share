@@ -129,6 +129,18 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 4
         }
+        if db.userVersion < 5 {
+            // Category lists read `item_categories` since v3; the v1 `category_id` indexes serve no query any
+            // more and only slow down catalog refreshes.
+            try db.transaction {
+                try db.execute("""
+                DROP INDEX IF EXISTS channels_cat;
+                DROP INDEX IF EXISTS movies_cat;
+                DROP INDEX IF EXISTS series_cat;
+                """)
+            }
+            db.userVersion = 5
+        }
     }
 
     // MARK: Key/value (small app state such as sync cursor)

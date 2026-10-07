@@ -93,4 +93,21 @@ final class CategoryMembershipTests: XCTestCase {
         try catalog.deleteContent(sourceId: "s1")
         XCTAssertEqual(try database.db.scalar("SELECT COUNT(*) FROM item_categories"), 0)
     }
+
+    /// Payloads encoded before `categoryIds` existed still decode: the field defaults to `[categoryId]`
+    /// (or empty without a category); new payloads round-trip it.
+    func testOldPayloadsWithoutCategoryIdsDecode() throws {
+        let decoder = JSONDecoder()
+        let channel = try decoder.decode(Channel.self, from: Data(#"""
+            {"sourceId":"s","id":"c1","name":"C","categoryId":"news","catchup":{"type":"none","days":0},"drm":false,"sort":3}
+            """#.utf8))
+        XCTAssertEqual(channel.categoryIds, ["news"])
+        XCTAssertEqual(channel.sort, 3)
+        let movie = try decoder.decode(Movie.self, from: Data(#"{"sourceId":"s","id":"m1","name":"M","sort":0}"#.utf8))
+        XCTAssertEqual(movie.categoryIds, [])
+        let series = try decoder.decode(Series.self, from: Data(#"{"sourceId":"s","id":"d1","name":"D","categoryId":"tr","sort":1}"#.utf8))
+        XCTAssertEqual(series.categoryIds, ["tr"])
+        let multi = Series(sourceId: "s", id: "d2", name: "D2", categoryId: "x", categoryIds: ["x", "y"])
+        XCTAssertEqual(try decoder.decode(Series.self, from: JSONEncoder().encode(multi)), multi)
+    }
 }

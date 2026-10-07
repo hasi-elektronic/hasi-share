@@ -93,6 +93,16 @@ final class IOSAudioSyncTests: XCTestCase {
         app.otherElements["video_surface"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         XCTAssertTrue(plus.waitForNonExistence(timeout: 3), "panel closed by a tap on the picture")
         XCTAssertFalse(app.buttons["player_close"].exists, "no overlay after that tap")
+        // A double tap with the panel open closes it too – never the overlay on top of it.
+        showOverlay(app)
+        app.buttons["Audio"].tap()
+        XCTAssertTrue(syncRow.waitForExistence(timeout: 3))
+        syncRow.tap()
+        XCTAssertTrue(plus.waitForExistence(timeout: 5), "sync panel again")
+        app.otherElements["video_surface"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).doubleTap()
+        XCTAssertTrue(plus.waitForNonExistence(timeout: 3), "panel closed by a double tap")
+        sleep(1)
+        XCTAssertFalse(app.buttons["player_close"].exists, "no overlay after the double tap")
 
         showOverlay(app)
         app.buttons["action_resync"].tap()

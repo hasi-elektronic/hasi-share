@@ -63,6 +63,35 @@ final class NumberZapTargetTests: XCTestCase {
         XCTAssertNil(try repo.channelForNumberZap(sourceId: "s", number: 0))
     }
 
+    /// A target deep in its category gets real neighbours as zap list: up to 100 before and 100 after it
+    /// in list order (other categories interleaved in the source are not part of it).
+    func testZapWindowAroundATargetDeepInItsCategory() throws {
+        let channels = (0..<1000).map {
+            Channel(sourceId: "s", id: "x\($0)", name: "X\($0)", number: $0 + 1, categoryId: $0 % 2 == 0 ? "even" : "odd", sort: $0)
+        }
+        let (db, repo) = try catalog(channels)
+        let plan = try db.db.query("""
+            EXPLAIN QUERY PLAN SELECT ic.item_id FROM item_categories ic JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
+            WHERE ic.source_id = 's' AND ic.kind = 'live' AND ic.category_id = 'even' AND ic.sort < 700 ORDER BY ic.sort DESC LIMIT 100
+            """) { $0.string(3) }.joined(separator: " | ")
+        XCTAssertTrue(plan.contains("item_categories_sort") && !plan.contains("TEMP B-TREE"), plan)
+        // x700 is row 350 of "even" (beyond the first 200).
+        let window = try repo.channelZapWindow(sourceId: "s", categoryId: "even", around: "x700")
+        XCTAssertEqual(window.count, 201)
+        XCTAssertEqual(window.first?.id, "x500")
+        XCTAssertEqual(window[100].id, "x700", "target in the middle")
+        XCTAssertEqual(window.last?.id, "x900")
+        XCTAssertEqual(window.map(\.sort), Array(stride(from: 500, through: 900, by: 2)), "contiguous, list order")
+        // Near the start / end of the category: only what exists.
+        let start = try repo.channelZapWindow(sourceId: "s", categoryId: "even", around: "x10")
+        XCTAssertEqual(start.first?.id, "x0")
+        XCTAssertEqual(start.count, 5 + 1 + 100)
+        let end = try repo.channelZapWindow(sourceId: "s", categoryId: "odd", around: "x999")
+        XCTAssertEqual(end.last?.id, "x999")
+        XCTAssertEqual(end.count, 101)
+        XCTAssertEqual(try repo.channelZapWindow(sourceId: "s", categoryId: "odd", around: "x700"), [], "not a member")
+    }
+
     func testNumberLookupUsesTheIndex() throws {
         let (db, _) = try catalog(numbered)
         let plan = try db.db.query("EXPLAIN QUERY PLAN SELECT id FROM channels WHERE source_id = ? AND number = ?",

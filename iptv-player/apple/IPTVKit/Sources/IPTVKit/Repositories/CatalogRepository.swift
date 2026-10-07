@@ -146,6 +146,27 @@ public final class CatalogRepository: Sendable {
         return try channels(sourceId: sourceId, offset: number - 1, limit: 1).first
     }
 
+    /// Zap list for a number-zap target (SCREENS §3.7): up to `before` channels before and `after` after
+    /// it in its category's list order, so ▲▼ reach real neighbours wherever the target sits. Empty when
+    /// the channel is not a member of the category. Walks the membership index from the target's row.
+    public func channelZapWindow(sourceId: String, categoryId: String, around channelId: String,
+                                 before: Int = 100, after: Int = 100) throws -> [Channel] {
+        let args: [SQLiteValue] = [.text(sourceId), .text(categoryId)]
+        guard let sort = try db.queryFirst(
+            "SELECT sort FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ? AND item_id = ?",
+            args + [.text(channelId)], map: { $0.int(0) }) else { return [] }
+        let select = """
+            SELECT \(Self.qualifiedChannelColumns) FROM item_categories ic
+            JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
+            WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ?
+            """
+        let head = try db.query(select + " AND ic.sort < ? ORDER BY ic.sort DESC LIMIT ?",
+                                args + [.int(Int64(sort)), .int(Int64(before))], map: Self.channel)
+        let tail = try db.query(select + " AND ic.sort >= ? ORDER BY ic.sort LIMIT ?",
+                                args + [.int(Int64(sort)), .int(Int64(after + 1))], map: Self.channel)
+        return head.reversed() + tail
+    }
+
     /// Channels by id, in the order given (favorites / recent rows).
     public func channels(sourceId: String, ids: [String]) throws -> [Channel] {
         guard !ids.isEmpty else { return [] }

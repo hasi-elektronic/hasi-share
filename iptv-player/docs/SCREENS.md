@@ -296,8 +296,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   **Rakamlar (numara ile kanal):** IR kumanda (HDMI-CEC) / klavye rakamları canlıda sağ üstte büyük
   gösterilir (en fazla 4 hane; senkron paneli açıkken yok sayılır); son rakamdan 1,5 sn sonra numara
   **kaynağın tüm kanallarında** aranır (`CatalogRepository.channelForNumberZap`, `(source_id, number)`
-  indeksi; aynı numara birden çoksa liste sırasında ilki). Kanal zapping listesinde değilse kendi kategorisi
-  (ilk 200) yeni zapping listesi olur. Kaynakta **hiç kanal numarası yoksa** numara listedeki sıra olarak
+  indeksi; aynı numara birden çoksa liste sırasında ilki). Kanal zapping listesinde değilse kendi kategorisinde
+  çevresi (liste sırasında en fazla 100 önce + 100 sonra, `channelZapWindow`) yeni zapping listesi olur; ▲▼
+  gerçek komşulara gider. Veritabanı hatası "Kanal yok" gibi gösterilmez: loglanır, kanal değişmez. Kaynakta **hiç kanal numarası yoksa** numara listedeki sıra olarak
   okunur (1'den); numaralı kaynakta olmayan numara → kanal değişmez, aynı yerde 2 sn "Kanal yok"
   (`zap_no_channel`). Siri Remote'ta rakam yoktur.
 * **Görüntü oranı:** Sığdır · Doldur (kırp) · Uzat · 16:9 · 4:3 – seçim kanal başına değil,
@@ -309,7 +310,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   satırlık kontroller). İki satır: "Bu kanal/içerik" (bu içerik için kaydedilir) ve "Ses gecikmesi
   (TV/soundbar)" (cihaz gecikmesi, her içeriğe eklenir) – böylece cihaz gecikmesi izlerken
   ayarlanabilir. −2000…+2000 ms, 50 ms adım; değer yönüyle gösterilir: "+150 ms · ses daha geç",
-  "−100 ms · ses daha erken"; her değişiklik canlı uygulanır. Altında yön ipucu ("Ses görüntüden önce
+  "−100 ms · ses daha erken"; her değişiklik canlı uygulanır (kanal değişimi 400 ms beklerken yapılan
+  değişiklik hedef kanala kaydedilir ve o kanal açılınca uygulanır, terk edilen kanala asla). Panel açıkken
+  katman hiçbir yoldan (dokunma, Oynat/Duraklat, VoiceOver) üstüne açılmaz. Altında yön ipucu ("Ses görüntüden önce
   mi geliyor? + kullan…"). iOS: kaydırıcı + −/+ düğmeleri, kapat düğmesi; tvOS: her satır tek
   odaklanabilir kontrol, ◀▶ değiştirir, art arda/basılı tutunca hızlanır (50 → 100 → 250 ms),
   Menü paneli kapatır. Motor AVPlayer ise not: "Gecikme ayarlanınca bu kanal VLC motoruyla

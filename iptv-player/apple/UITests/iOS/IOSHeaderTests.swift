@@ -57,7 +57,7 @@ final class IOSHeaderTests: XCTestCase {
     }
 
     @MainActor
-    static func cycleAllTabs(_ app: XCUIApplication, label: String, file: StaticString = #filePath, line: UInt = #line) {
+    static func cycleAllTabs(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         for id in tabs.dropFirst() + ["home"] {
             fingerTap(id, in: app, file: file, line: line)
             assertSelected(id, in: app, file: file, line: line)
@@ -79,7 +79,7 @@ final class IOSHeaderTests: XCTestCase {
     func testEveryTabFromHomeTopPortrait() {
         let app = launchHome()
         UITestSupport.snap("header-01-portrait-top", in: self)
-        Self.cycleAllTabs(app, label: "top")
+        Self.cycleAllTabs(app)
     }
 
     @MainActor
@@ -107,7 +107,7 @@ final class IOSHeaderTests: XCTestCase {
         XCTAssertTrue(app.buttons["settings_close"].waitForExistence(timeout: 5), "settings on first tap")
         app.buttons["settings_close"].tap()
         XCTAssertTrue(app.buttons["settings_close"].waitForNonExistence(timeout: 5))
-        Self.cycleAllTabs(app, label: "after settings")
+        Self.cycleAllTabs(app)
 
         app.buttons["open_search"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 5), "search on first tap")
@@ -139,7 +139,7 @@ final class IOSHeaderTests: XCTestCase {
         close.tap()
         XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 10))
         Self.assertSelected("home", in: app)
-        Self.cycleAllTabs(app, label: "after player")
+        Self.cycleAllTabs(app)
     }
 
     /// Large Dynamic Type: the header grows, so screens without hero must start BELOW it (no fixed
@@ -161,13 +161,35 @@ final class IOSHeaderTests: XCTestCase {
         Self.assertSelected("guide", in: app)
     }
 
+    /// Portrait in en / tr / de: the tab slots tile the strip between the app mark and search (even
+    /// gaps, no overlap) and every tab still takes one tap.
+    @MainActor
+    func testTabStripPortraitInEveryLanguage() {
+        for (lang, home) in [("en", "Home"), ("tr", "Ana Sayfa"), ("de", "Start")] {
+            let app = UITestSupport.launch(["-uiSeedLibrary", "-AppleLanguages", "(\(lang))"])
+            XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 30), "\(lang): home hero")
+            XCTAssertEqual(app.buttons["tab_home"].label, home, "\(lang) UI")
+            let frames = Self.tabs.map { app.buttons["tab_\($0)"].frame }
+            for (a, b) in zip(frames, frames.dropFirst()) {
+                XCTAssertEqual(a.maxX, b.minX, accuracy: 1, "\(lang): slots side by side (\(a) | \(b))")
+                XCTAssertEqual(a.midY, b.midY, accuracy: 1, "\(lang): one row")
+            }
+            UITestSupport.snap("header-08-portrait-\(lang)", in: self)
+            for id in ["guide", "home"] {
+                Self.fingerTap(id, in: app)
+                Self.assertSelected(id, in: app)
+            }
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testEveryTabLandscape() {
         let app = launchHome()
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(2)
         UITestSupport.snap("header-03-landscape-top", in: self)
-        Self.cycleAllTabs(app, label: "landscape")
+        Self.cycleAllTabs(app)
         app.swipeUp()
         sleep(1)
         UITestSupport.snap("header-04-landscape-scrolled", in: self)

@@ -93,10 +93,11 @@ public enum XtreamMapper {
             let catchup = archive
                 ? CatchupInfo(type: .xtream, days: item["tv_archive_duration"]?.intValue ?? 0)
                 : CatchupInfo.none
+            let categories = categoryIds(item)
             out.append(Channel(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
                                number: item["num"]?.intValue, logoUrl: item["stream_icon"]?.stringValue,
-                               categoryId: categoryIds(item).first, epgId: item["epg_channel_id"]?.stringValue,
-                               catchup: catchup, sort: out.count, categoryIds: categoryIds(item)))
+                               categoryId: categories.first, epgId: item["epg_channel_id"]?.stringValue,
+                               catchup: catchup, sort: out.count, categoryIds: categories))
         }
         return out
     }
@@ -105,11 +106,12 @@ public enum XtreamMapper {
         var out: [Movie] = []
         for item in listItems(json) {
             guard let id = item["stream_id"]?.stringValue else { continue }
+            let categories = categoryIds(item)
             out.append(Movie(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
-                             posterUrl: item["stream_icon"]?.stringValue, categoryId: categoryIds(item).first,
+                             posterUrl: item["stream_icon"]?.stringValue, categoryId: categories.first,
                              rating: item["rating"]?.doubleValue, year: item["year"]?.intValue,
                              plot: item["plot"]?.stringValue, containerExt: item["container_extension"]?.stringValue,
-                             addedAt: epochDate(item["added"]), sort: out.count, categoryIds: categoryIds(item)))
+                             addedAt: epochDate(item["added"]), sort: out.count, categoryIds: categories))
         }
         return out
     }
@@ -118,10 +120,11 @@ public enum XtreamMapper {
         var out: [Series] = []
         for item in listItems(json) {
             guard let id = item["series_id"]?.stringValue else { continue }
+            let categories = categoryIds(item)
             out.append(Series(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
-                              posterUrl: item["cover"]?.stringValue, categoryId: categoryIds(item).first,
+                              posterUrl: item["cover"]?.stringValue, categoryId: categories.first,
                               plot: item["plot"]?.stringValue, rating: item["rating"]?.doubleValue,
-                              year: year(item), sort: out.count, categoryIds: categoryIds(item)))
+                              year: year(item), sort: out.count, categoryIds: categories))
         }
         return out
     }

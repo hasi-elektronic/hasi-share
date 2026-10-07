@@ -39,7 +39,7 @@ final class DatabaseMigrationTests: XCTestCase {
 
         // Reopen with the current code.
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 4)
+        XCTAssertEqual(db.db.userVersion, 5)
         XCTAssertEqual(db.value(forKey: "k"), "kept")
         XCTAssertEqual(try CatalogRepository(database: db).channelCount(sourceId: "s"), 1)
         let epg = EpgRepository(database: db)
@@ -62,7 +62,7 @@ final class DatabaseMigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         _ = try AppDatabase(db: SQLiteDatabase(path: path))
         let again = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(again.db.userVersion, 4)
+        XCTAssertEqual(again.db.userVersion, 5)
     }
 
     /// A v2 database (no `item_categories`) keeps its category lists: v3 backfills memberships from `category_id`.
@@ -82,11 +82,35 @@ final class DatabaseMigrationTests: XCTestCase {
             db.db.userVersion = 2
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 4)
+        XCTAssertEqual(db.db.userVersion, 5)
         let catalog = CatalogRepository(database: db)
         XCTAssertEqual(try catalog.channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
         XCTAssertEqual(try catalog.channelCount(sourceId: "s", categoryId: "de"), 1)
         XCTAssertEqual(try catalog.movies(sourceId: "s", categoryId: "tr-film").map(\.id), ["m1"])
         XCTAssertEqual(try catalog.series(sourceId: "s", categoryId: "tr-dizi").map(\.id), ["d1"])
+    }
+
+    /// v5 drops the v1 `*_cat` indexes: category lists read `item_categories` since v3, nothing queries them.
+    func testSchemaV4DatabaseDropsUnusedCategoryIndexes() throws {
+        let path = tempPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        do {
+            let db = try AppDatabase(db: SQLiteDatabase(path: path))
+            try db.db.execute("""
+            CREATE INDEX IF NOT EXISTS channels_cat ON channels (source_id, category_id, sort);
+            CREATE INDEX IF NOT EXISTS movies_cat ON movies (source_id, category_id, sort);
+            CREATE INDEX IF NOT EXISTS series_cat ON series (source_id, category_id, sort);
+            """)
+            let session = try CatalogRepository(database: db).beginRefresh(sourceId: "s")
+            try session.write(channels: [TestData.channel(id: "c1", sourceId: "s", categoryId: "tr", sort: 0)])
+            try session.commit()
+            db.db.userVersion = 4
+        }
+        let db = try AppDatabase(db: SQLiteDatabase(path: path))
+        XCTAssertEqual(db.db.userVersion, 5)
+        let indexes = try db.db.query("SELECT name FROM sqlite_master WHERE type = 'index'") { $0.string(0) }
+        for name in ["channels_cat", "movies_cat", "series_cat"] { XCTAssertFalse(indexes.contains(name), name) }
+        XCTAssertTrue(indexes.contains("item_categories_sort"))
+        XCTAssertEqual(try CatalogRepository(database: db).channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
     }
 }

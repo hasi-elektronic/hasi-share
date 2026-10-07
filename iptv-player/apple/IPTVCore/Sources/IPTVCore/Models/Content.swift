@@ -188,6 +188,48 @@ public struct Series: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+// Payloads encoded before `categoryIds` existed decode with the init's default (`[categoryId]` or empty).
+extension Channel {
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(sourceId: try c.decode(String.self, forKey: .sourceId), id: try c.decode(String.self, forKey: .id),
+                  name: try c.decode(String.self, forKey: .name), number: try c.decodeIfPresent(Int.self, forKey: .number),
+                  logoUrl: try c.decodeIfPresent(String.self, forKey: .logoUrl),
+                  categoryId: try c.decodeIfPresent(String.self, forKey: .categoryId),
+                  epgId: try c.decodeIfPresent(String.self, forKey: .epgId),
+                  catchup: try c.decode(CatchupInfo.self, forKey: .catchup), url: try c.decodeIfPresent(String.self, forKey: .url),
+                  userAgent: try c.decodeIfPresent(String.self, forKey: .userAgent),
+                  referrer: try c.decodeIfPresent(String.self, forKey: .referrer), drm: try c.decode(Bool.self, forKey: .drm),
+                  sort: try c.decode(Int.self, forKey: .sort), categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds))
+    }
+}
+
+extension Movie {
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(sourceId: try c.decode(String.self, forKey: .sourceId), id: try c.decode(String.self, forKey: .id),
+                  name: try c.decode(String.self, forKey: .name), posterUrl: try c.decodeIfPresent(String.self, forKey: .posterUrl),
+                  categoryId: try c.decodeIfPresent(String.self, forKey: .categoryId),
+                  rating: try c.decodeIfPresent(Double.self, forKey: .rating), year: try c.decodeIfPresent(Int.self, forKey: .year),
+                  plot: try c.decodeIfPresent(String.self, forKey: .plot),
+                  containerExt: try c.decodeIfPresent(String.self, forKey: .containerExt),
+                  url: try c.decodeIfPresent(String.self, forKey: .url), addedAt: try c.decodeIfPresent(Date.self, forKey: .addedAt),
+                  sort: try c.decode(Int.self, forKey: .sort), categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds))
+    }
+}
+
+extension Series {
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(sourceId: try c.decode(String.self, forKey: .sourceId), id: try c.decode(String.self, forKey: .id),
+                  name: try c.decode(String.self, forKey: .name), posterUrl: try c.decodeIfPresent(String.self, forKey: .posterUrl),
+                  categoryId: try c.decodeIfPresent(String.self, forKey: .categoryId),
+                  plot: try c.decodeIfPresent(String.self, forKey: .plot), rating: try c.decodeIfPresent(Double.self, forKey: .rating),
+                  year: try c.decodeIfPresent(Int.self, forKey: .year), sort: try c.decode(Int.self, forKey: .sort),
+                  categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds))
+    }
+}
+
 /// An episode of a series (CONTRACT §1).
 public struct Episode: Codable, Sendable, Hashable, Identifiable {
     public var sourceId: String

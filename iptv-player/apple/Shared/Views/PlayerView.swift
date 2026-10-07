@@ -30,6 +30,7 @@ struct PlayerView: View {
     /// An audio/subtitle/aspect menu is open: removing its source view would close it.
     @State private var menuOpen = false
     #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// Scrubber position while the finger is down (nil = follow playback).
     @State private var scrubFraction: Double?
     @State private var ripple: SeekRipple?
@@ -103,7 +104,7 @@ struct PlayerView: View {
                 // status is always visible (above the transport row when the overlay is shown).
                 if !overlayVisible { statusLayer }
                 if case .reconnecting(let attempt, let max) = player.phase {
-                    reconnectingCard(attempt, max).offset(y: overlayVisible ? (Theme.isTV ? -190 : -120) : 0)
+                    reconnectingCard(attempt, max).offset(y: overlayVisible ? reconnectLift : 0)
                 }
                 #if os(iOS)
                 if let ripple { rippleLabel(ripple) }
@@ -296,12 +297,31 @@ struct PlayerView: View {
         }
     }
 
+    /// iPhone landscape (compact height): one-line card.
+    private var compactHeight: Bool {
+        #if os(iOS)
+        verticalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    /// Reconnect card offset while the overlay is shown: between the top bar and the transport row.
+    /// iPhone landscape (375–440 pt high): the 46 pt card at −80 spans ~85…145 pt from the top – below
+    /// the top bar (12…56) and above play/pause (from H/2 − 32 ≥ 155); −120 with the two-line card
+    /// reached up to ~35 pt and covered the title.
+    private var reconnectLift: CGFloat {
+        if Theme.isTV { return -190 }
+        return compactHeight ? -80 : -120
+    }
+
     private func reconnectingCard(_ attempt: Int, _ max: Int) -> some View {
-        VStack(spacing: 10) {
+        let layout = compactHeight ? AnyLayout(HStackLayout(spacing: 10)) : AnyLayout(VStackLayout(spacing: 10))
+        return layout {
             ProgressView().tint(.white)
             LText("player_reconnecting", String(attempt), String(max)).font(Theme.body).foregroundStyle(.white)
         }
-        .padding(20).background(RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.6)))
+        .padding(compactHeight ? 12 : 20).background(RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.6)))
     }
 
     private func errorCard(_ error: PlaybackError) -> some View {
@@ -379,7 +399,10 @@ struct PlayerView: View {
 
     // MARK: Overlay visibility
 
+    /// Never on top of the Sync panel (double tap, Play/Pause, VoiceOver "show controls"): the panel
+    /// replaces the overlay until it is closed.
     private func showOverlay() {
+        guard !syncPanelVisible else { return }
         overlayVisible = true
         scheduleHide()
     }
@@ -602,12 +625,20 @@ struct PlayerView: View {
     }
 
     /// Tunes the typed number anywhere in the source (CatalogRepository.channelForNumberZap); a channel
-    /// outside the zap list brings its category (first 200) as the new zap list. Unknown → "No such channel".
+    /// outside the zap list brings its category window (100 before/after it) as the new zap list.
+    /// Unknown → "No such channel"; a database error keeps the current channel (logged, no UI).
     private func commitNumberZap() {
         let number = numberZap.commitIfDue(atMs: SystemClock.monotonicMs())
         zapDigits = ""
         guard let number, let current = player.currentChannel else { return }
-        guard let channel = (try? env.catalog.channelForNumberZap(sourceId: current.sourceId, number: number)) ?? nil else {
+        let target: Channel?
+        do {
+            target = try env.catalog.channelForNumberZap(sourceId: current.sourceId, number: number)
+        } catch {
+            SafeLog.error("number zap lookup failed: \(error)")
+            return
+        }
+        guard let channel = target else {
             zapNoChannel = true
             numberZapTask = Task {
                 try? await Task.sleep(for: .seconds(2))
@@ -618,10 +649,18 @@ struct PlayerView: View {
         guard channel.id != current.id else { return }
         if player.request?.channels.contains(where: { $0.id == channel.id }) == true {
             player.zap(to: channel)
-        } else {
-            let category = channel.categoryId.flatMap { try? env.catalog.channels(sourceId: channel.sourceId, categoryId: $0, limit: 200) } ?? []
-            player.zap(to: channel, channels: category.contains { $0.id == channel.id } ? category : [channel])
+            return
         }
+        var window: [Channel] = []
+        if let categoryId = channel.categoryId {
+            do {
+                window = try env.catalog.channelZapWindow(sourceId: channel.sourceId, categoryId: categoryId, around: channel.id)
+            } catch {
+                SafeLog.error("number zap list failed: \(error)")
+                return
+            }
+        }
+        player.zap(to: channel, channels: window.isEmpty ? [channel] : window)
     }
 
     /// Big digits top right while a number is typed.

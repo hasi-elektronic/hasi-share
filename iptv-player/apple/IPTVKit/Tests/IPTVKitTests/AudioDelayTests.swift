@@ -336,6 +336,31 @@ final class AudioDelayPlayerTests: XCTestCase {
         XCTAssertEqual((av.loads + vlc.loads).map(\.url.lastPathComponent), ["1.m3u8", "2.m3u8"], "only the zap target opens")
     }
 
+    /// A delay changed while a zap waits for its debounce belongs to the zap target, never to the
+    /// channel being left; it is applied when the target opens.
+    func testDelayChangedDuringZapDebounceIsSavedForTheZapTarget() async throws {
+        let c = controller()
+        let channels = [channel("1", "http://h.example.com/live/1.m3u8"), channel("2", "http://h.example.com/live/2.m3u8")]
+        let first = request(.channel(channels[0]), channels: channels)
+        let second = request(.channel(channels[1]), channels: channels)
+        store.setContentDelay(100, for: try key(first))
+        try await open(c, first)
+        vlc.emit(.playing)
+        XCTAssertEqual(c.contentAudioDelay, 100)
+        c.zap(by: 1)
+        XCTAssertEqual(c.contentAudioDelay, 0, "the panel shows the zap target's own delay")
+        c.setAudioDelay(250)
+        XCTAssertEqual(store.contentDelay(try key(first)), 100, "the channel being left keeps its delay")
+        XCTAssertEqual(store.contentDelay(try key(second)), 250, "saved for the zap target")
+        XCTAssertEqual(c.contentAudioDelay, 250)
+        XCTAssertEqual(vlc.audioDelays.last, 100, "not applied to the old channel still playing")
+        try await Task.sleep(for: .milliseconds(PlayerController.zapDebounceMs + 250))
+        XCTAssertEqual(c.currentChannel?.id, "2")
+        XCTAssertEqual(c.currentAudioDelay, 250)
+        XCTAssertEqual(vlc.loads.last?.url.lastPathComponent, "2.m3u8")
+        XCTAssertEqual(vlc.audioDelays.last, 250, "applied when the target opens")
+    }
+
     /// tvOS stepper: held/repeated ◀▶ accelerate 50 → 100 → 250 ms.
     func testStepperAcceleration() {
         XCTAssertEqual(AudioDelayStore.stepSize(repeatCount: 0), 50)

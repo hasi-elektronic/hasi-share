@@ -589,6 +589,7 @@ public final class PlayerController {
         zapTarget = channel
         zapTask?.cancel()
         zapPending = true
+        refreshAudioDelay()   // the Sync panel now edits the target (applied when it opens)
         zapTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(Self.zapDebounceMs))
             guard !Task.isCancelled, let self else { return }
@@ -773,11 +774,19 @@ public final class PlayerController {
 
     // MARK: Audio sync
 
+    /// Content key the "Sync" control edits: the zap target while a zap waits for its debounce (the
+    /// channel being left must not get the change), else the current request's.
+    private var audioDelayContentKey: String? {
+        guard zapPending, let zapTarget, var target = request else { return request?.contentKey }
+        target.item = .channel(zapTarget)
+        return target.contentKey
+    }
+
     /// Re-reads the effective delay of the current request (store or raw-URL session value).
     private func refreshAudioDelay() {
         let device = audioDelayStore?.deviceDelay ?? 0
         deviceAudioDelay = device
-        if let key = request?.contentKey, let audioDelayStore {
+        if let key = audioDelayContentKey, let audioDelayStore {
             contentAudioDelay = audioDelayStore.contentDelay(key)
             currentAudioDelay = audioDelayStore.effectiveDelay(key)
         } else {
@@ -790,7 +799,7 @@ public final class PlayerController {
     /// On AVPlayer (no audio delay) a delay ≠ 0 reloads the same position in VLCKit (CONTRACT §6.1).
     public func setAudioDelay(_ ms: Int) {
         let value = AudioDelayStore.normalize(ms)
-        if let key = request?.contentKey, let audioDelayStore {
+        if let key = audioDelayContentKey, let audioDelayStore {
             audioDelayStore.setContentDelay(value, for: key)
         } else {
             unkeyedContentDelay = value
@@ -852,6 +861,7 @@ public final class PlayerController {
         openTask?.cancel()
         zapTask?.cancel()
         zapPending = false
+        refreshAudioDelay()
         resolving = false   // the cancelled open's resolve never finishes
         let wasPaused = phase == .paused
         stopPlayback()
