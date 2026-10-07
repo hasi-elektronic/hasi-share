@@ -25,8 +25,11 @@ struct NovaPlayerTVApp: App {
                 .preferredColorScheme(.dark)
                 .tint(Theme.primary)
                 .task {
+                    // Tester access: sandbox receipt synchronously; otherwise AppTransaction confirms in the background.
+                    let testerAccess = AppBootstrap.applyTesterAccess(env: env)
                     await AppBootstrap.applyDebugHooks(env: env, router: router)
-                    await AppBootstrap.quickStart(env: env, router: router)   // after tester access + first StoreKit snapshot, before env.start()
+                    // After tester access + first StoreKit snapshot (≤ 1.5 s in all), before env.start().
+                    await AppBootstrap.quickStart(env: env, router: router, testerAccess: testerAccess)
                     await env.start()
                 }
         }

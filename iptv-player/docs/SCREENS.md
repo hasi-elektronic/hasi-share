@@ -145,7 +145,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   zapping listesi = kanalın kategorisi, ilk 200). Kullanıcı oynatıcıyı Geri / Kapat ile kapattıysa ya da en
   son VOD oynattıysa bayrak düşer ve normal Ana Sayfa açılır. Hiç kaynak yoksa (karşılama), kanal artık
   yoksa veya oynatma kilitliyse (`canPlay` false; TestFlight tam erişimi değerlendirildikten SONRA kontrol
-  edilir) QuickStart çalışmaz. Hedef: soğuk başlangıç → ilk kare ≤ 1,5 sn.
+  edilir) QuickStart çalışmaz. TestFlight erişimi önce eşzamanlı sandbox makbuzuyla verilir (StoreKit beklenmez);
+  yalnızca o vermezse `AppTransaction` arka planda doğrular ve QuickStart onu en çok StoreKit yetki
+  beklemesiyle aynı **1,5 sn** pencere içinde bekler. Hedef: soğuk başlangıç → ilk kare ≤ 1,5 sn.
 
 ### 3.3 Canlı TV
 **Liste görünümü** (TestFlight build 6 sonrası kullanıcı kararı: kart grid'i yerine, ekranda daha çok kanal).

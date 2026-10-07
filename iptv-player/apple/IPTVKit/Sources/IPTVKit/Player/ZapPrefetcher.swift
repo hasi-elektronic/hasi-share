@@ -16,7 +16,10 @@ public protocol NetworkConditions: Sendable { var isExpensiveOrConstrained: Bool
 /// The byte read opens an extra connection to the provider, and many Xtream accounts allow only one
 /// (`max_connections = 1`) – a second connection could kick the playing stream. So the read happens
 /// only for HLS and only when the source is not Xtream or its stored account allows more than one
-/// connection (unknown → no read); otherwise the neighbour is resolve-only.
+/// connection (unknown → no read); otherwise the neighbour is resolve-only. An M3U playlist of an
+/// Xtream panel (`get.php?type=m3u_plus`) counts as Xtream with unknown account: its Xtream-shaped
+/// live URLs are not even resolved here, because the resolver would probe the panel (HLS twin GET /
+/// sniffer) – such neighbours are skipped, the zap resolves them like a direct open.
 ///
 /// A cached resolution expires after `ttl` (tokenized URLs go stale).
 @MainActor
@@ -49,16 +52,31 @@ public final class ZapPrefetcher {
     }
 
     /// Whether pre-reading bytes of `stream` is safe for `request` (whose item is the neighbour channel):
-    /// HLS only, and not on an Xtream source unless its stored account allows `max_connections > 1`.
+    /// HLS only, and only where an extra provider connection is safe (`allowsExtraConnection`).
     public static func allowsByteRead(stream: ResolvedStream, request: PlaybackRequest) -> Bool {
         guard stream.container == .hls, case .channel(let channel) = request.item else { return false }
+        return allowsExtraConnection(channel: channel, source: request.source)
+    }
+
+    /// Whether a second connection to the neighbour's provider is safe while the current channel plays:
+    /// not for an Xtream source unless its stored account allows `max_connections > 1`, and never for an
+    /// Xtream-shaped URL of another source type (M3U playlist of an Xtream panel; the account is unknown).
+    static func allowsExtraConnection(channel: Channel, source: Source?) -> Bool {
         // The request's source describes the neighbour only when both belong to the same source.
-        if let source = request.source, source.id == channel.sourceId {
-            guard source.type == .xtream else { return true }
+        if let source, source.id == channel.sourceId, source.type == .xtream {
             return (source.xtreamAccount?.maxConnections ?? 0) > 1
         }
-        // No (matching) source info: a channel without its own URL is an Xtream one (URL built from secrets) → unknown.
-        return channel.url != nil
+        // A channel without its own URL is an Xtream one (URL built from secrets) with unknown account.
+        guard let url = channel.url else { return false }
+        return !isXtreamShapedLive(url)
+    }
+
+    /// Xtream live URL shape in M3U lists: `{base}/[live/]U/P/{numericId}` with `.ts`, `.m3u8` or no extension.
+    private static let xtreamLivePattern = try! NSRegularExpression(pattern: #"^https?://[^/]+/(live/)?[^/]+/[^/]+/\d+(\.ts|\.m3u8)?$"#)
+
+    static func isXtreamShapedLive(_ url: String) -> Bool {
+        let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        return xtreamLivePattern.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)) != nil
     }
 
     public func prefetch(around current: Channel, request: PlaybackRequest) {
@@ -66,6 +84,8 @@ public final class ZapPrefetcher {
         guard !network.isExpensiveOrConstrained else { return }
         let targets = Self.neighbours(of: current, in: request.channels).prefix(maxConcurrent)
         for channel in targets {
+            // Own URL of an Xtream panel: resolving it probes the panel (HLS twin / sniffer) – skip.
+            if channel.url != nil, !Self.allowsExtraConnection(channel: channel, source: request.source) { continue }
             var req = request
             req.item = .channel(channel)
             let maxBytes = self.maxBytes, fetcher = self.fetcher

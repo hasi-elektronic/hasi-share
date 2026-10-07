@@ -208,3 +208,72 @@ final class PlaybackRobustnessTests: XCTestCase {
         XCTAssertEqual(c.phase, .ended)
     }
 }
+
+/// Final review I3: while a new `open()` resolves, the engine still plays (or fails) the previous item.
+/// Its events must not count for the new request: no phase flip, no first frame, no last-session
+/// record, no reconnect of the old stream.
+@MainActor
+final class StaleEngineEventTests: XCTestCase {
+    private let a = TestData.channel(id: "a", url: "http://cdn.example.com/a.m3u8")
+    /// Xtream-shaped M3U `.ts` URL: the resolver probes its HLS twin (slow probe = long resolve window).
+    private let b = TestData.channel(id: "b", url: "http://panel.example.com:8080/u/p/2.ts")
+
+    private func make() -> (PlayerController, FakeEngine, () -> [LastSession?]) {
+        let av = FakeEngine(kind: .avPlayer)
+        let resolver = StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: { _, _ in
+            try? await Task.sleep(for: .milliseconds(300))
+            return true
+        }, vlcAvailable: false)
+        let c = PlayerController(resolver: resolver, library: nil, reconnectPolicy: ReconnectPolicy(delaysMs: [30, 30]),
+                                 engines: PlaybackEngines(avPlayer: { av }, vlc: nil))
+        var events: [LastSession?] = []
+        c.onLastSessionChange = { events.append($0) }
+        return (c, av, { events })
+    }
+
+    private func settle(_ cond: @autoclosure () -> Bool) async throws {
+        for _ in 0..<200 where !cond() { try await Task.sleep(for: .milliseconds(5)) }
+    }
+
+    /// Opens A, plays it, then opens B (resolve in flight).
+    private func zapToBWhileResolving(_ c: PlayerController, _ av: FakeEngine) async throws {
+        c.open(PlaybackRequest(item: .channel(a), source: nil, channels: [a, b]))
+        try await settle(av.loads.count == 1)
+        av.emit(.playing)
+        XCTAssertEqual(c.phase, .playing)
+        c.open(PlaybackRequest(item: .channel(b), source: nil, channels: [a, b]))
+        XCTAssertEqual(c.phase, .loading)
+    }
+
+    func testStalePlayingDuringResolveIsIgnored() async throws {
+        let (c, av, events) = make()
+        try await zapToBWhileResolving(c, av)
+        av.emit(.playing)   // A's item (re)starts playing inside B's resolve window
+        XCTAssertEqual(c.phase, .loading, "spinner stays until B plays")
+        XCTAssertNil(PerfTrace.shared.interval(from: .playRequested, to: .firstFrame), "no first frame for B")
+        XCTAssertEqual(events(), [LastSession(sourceId: "s1", channelId: "a", endedInPlayer: true)], "no record for B")
+
+        try await settle(av.loads.count == 2)
+        XCTAssertEqual(av.loads.last?.url.absoluteString, "http://panel.example.com:8080/u/p/2.m3u8")
+        XCTAssertEqual(c.phase, .loading)
+        av.emit(.playing)   // B's first frame
+        XCTAssertEqual(c.phase, .playing)
+        XCTAssertNotNil(PerfTrace.shared.interval(from: .playRequested, to: .firstFrame))
+        XCTAssertEqual(events().last, LastSession(sourceId: "s1", channelId: "b", endedInPlayer: true))
+    }
+
+    func testStaleFailureDuringResolveStartsNoReconnect() async throws {
+        let (c, av, events) = make()
+        try await zapToBWhileResolving(c, av)
+        av.emit(.failed(.network(.timeout)))   // A's item fails inside B's resolve window
+        XCTAssertEqual(c.phase, .loading, "no reconnect of the old stream")
+        try await Task.sleep(for: .milliseconds(80))   // a stale retry (30 ms) would reload A here
+        XCTAssertEqual(av.loads.count, 1)
+
+        try await settle(av.loads.count == 2)
+        try await Task.sleep(for: .milliseconds(120))   // …or B a second time after it loaded
+        XCTAssertEqual(av.loads.count, 2, "B loaded exactly once")
+        XCTAssertEqual(c.phase, .loading)
+        XCTAssertEqual(events(), [LastSession(sourceId: "s1", channelId: "a", endedInPlayer: true)])
+    }
+}

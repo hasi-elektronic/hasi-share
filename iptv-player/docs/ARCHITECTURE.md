@@ -158,6 +158,9 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   CONTRACT §4.5).
 * Yeniden bağlanma: `ReconnectPolicy` (1-2-4-8-15 sn, 5 deneme, 30 sn stabil oynatmada sıfırlanır).
 * Kanal değiştirme: aynı oynatıcı örneği yeniden kullanılır, 400 ms debounce, bilgi kartı anında.
+  Yeni istek çözümlenirken (`resolving`) motor hâlâ önceki öğeyi bildirir: bu olaylar (oynatma, hata,
+  bitiş, zaman) yok sayılır – faz, ilk kare ölçümü (`PerfTrace`), `LastSession` ve yeniden bağlanma
+  yalnızca yeni yüklenen akışa aittir.
 * Ses/altyazı: Media3 `TrackSelectionParameters` / AVFoundation `AVMediaSelectionGroup` /
   VLCKit `audioTrackIndexes` + `videoSubTitlesIndexes` (dil `tracksInformation`'dan).
 * Görüntü oranı: Media3 `resizeMode` (+ 16:9 / 4:3 için `AspectRatioFrameLayout` oranı) /
@@ -275,7 +278,10 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
   açar ve `max_connections = 1` olan Xtream hesaplarında oynayan yayını düşürebilir; bu yüzden
   yalnızca **HLS** (`.m3u8`) için ve yalnızca kaynak Xtream değilse ya da kayıtlı
   `xtreamAccount.maxConnections > 1` ise yapılır (Xtream + bilgi yok/1 ya da komşu farklı kaynaktan → yalnızca URL çözümü;
-  bedel: tek bağlantılı hesaplarda daha az ısınma). Başka bir kanal açılınca (önbellekte yoksa),
+  bedel: tek bağlantılı hesaplarda daha az ısınma). **Xtream biçimli URL** (`{base}/[live/]U/P/{sayı}` + `.ts` /
+  `.m3u8` / uzantısız; ör. `get.php?type=m3u_plus` ile M3U olarak eklenmiş Xtream hesabı) kaynak türünden
+  bağımsız olarak hesabı bilinmeyen Xtream sayılır: bayt okunmaz ve URL ön ısıtmada **çözülmez** bile, çünkü
+  çözümleyici panele istek atar (`.m3u8` ikizi GET'i / içerik koklama) – geçişte doğrudan açılış gibi çözülür. Başka bir kanal açılınca (önbellekte yoksa),
   ekran/oynatıcı kapanınca ve uygulama `.active` dışına çıkınca (`release()`) iptal edilir;
   URL'ler loglanmaz.
 

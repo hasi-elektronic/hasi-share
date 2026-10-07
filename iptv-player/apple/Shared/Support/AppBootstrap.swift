@@ -179,41 +179,55 @@ enum AppBootstrap {
     /// TestFlight builds run in the StoreKit sandbox: with `TESTFLIGHT_FULL_ACCESS = YES`
     /// (Config/Shared.xcconfig) testers get full access without buying. App Store installs
     /// report `.production` and keep the normal trial/purchase flow.
-    static func applyTesterAccess(env: AppEnvironment) async {
-        guard info("TESTFLIGHT_FULL_ACCESS").uppercased() == "YES" else { return }
-        // Cheap synchronous signal first (TestFlight installs carry a sandbox receipt), so the
-        // UI never flashes the trial state; then confirm via AppTransaction. Verification can
-        // fail on tvOS/TestFlight – the environment of an unverified payload is still the right
-        // signal for this non-security-critical unlock.
+    ///
+    /// Synchronous and cheap: TestFlight installs carry a sandbox receipt, which grants access right
+    /// away (the UI never flashes the trial state, QuickStart never waits on StoreKit). Only when that
+    /// check does not grant, `AppTransaction` confirms in the background; the returned task is that
+    /// confirmation (nil = nothing pending) – `quickStart` waits for it at most until its own deadline.
+    /// Verification can fail on tvOS/TestFlight – the environment of an unverified payload is still the
+    /// right signal for this non-security-critical unlock.
+    @discardableResult
+    static func applyTesterAccess(env: AppEnvironment) -> Task<Void, Never>? {
+        guard info("TESTFLIGHT_FULL_ACCESS").uppercased() == "YES" else { return nil }
         if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
             env.license.testerFullAccess = true
+            SafeLog.info("TestFlight build: tester full access enabled (receipt)")
+            return nil
         }
-        let environment: AppStore.Environment?
-        switch try? await AppTransaction.shared {
-        case .verified(let t)?: environment = t.environment
-        case .unverified(let t, _)?: environment = t.environment
-        case nil: environment = nil
-        }
-        if environment == .sandbox {
-            env.license.testerFullAccess = true
-            SafeLog.info("TestFlight build: tester full access enabled")
+        return Task { @MainActor in
+            let environment: AppStore.Environment?
+            switch try? await AppTransaction.shared {
+            case .verified(let t)?: environment = t.environment
+            case .unverified(let t, _)?: environment = t.environment
+            case nil: environment = nil
+            }
+            if environment == .sandbox {
+                env.license.testerFullAccess = true
+                SafeLog.info("TestFlight build: tester full access enabled")
+            }
         }
     }
 
     /// QuickStart (docs/SCREENS.md §3.2): when the app was left while a live channel was playing, open that
     /// channel in the player right away – before any source refresh (`env.start()`). Call AFTER
-    /// `applyTesterAccess`. `canPlay` is only trusted after the first StoreKit entitlement snapshot
-    /// (`awaitEntitlements`, ≤ 1.5 s, local read), otherwise trial/purchase users would never get quick start.
+    /// `applyTesterAccess` and pass its pending `AppTransaction` confirmation (if any). `canPlay` is only
+    /// trusted after the first StoreKit entitlement snapshot (`awaitEntitlements`, local read), otherwise
+    /// trial/purchase users would never get quick start; while it is still false the tester confirmation
+    /// gets the rest of the same window – the whole wait stays ≤ 1.5 s (`QuickStart.entitlementTimeout`).
     /// The "ended in player" flag is consumed only when it can never resume (feature off / channel gone),
     /// never because of a transient `canPlay == false`.
-    static func quickStart(env: AppEnvironment, router: Router) async {
+    static func quickStart(env: AppEnvironment, router: Router, testerAccess: Task<Void, Never>? = nil) async {
         guard !router.playerPresented, !router.onboarding, !env.sources.isEmpty,
               env.settings.lastSession?.endedInPlayer == true else { return }
         let channelOf: (LastSession?) -> Channel? = { last in
             last.flatMap { (try? env.catalog.channel(sourceId: $0.sourceId, id: $0.channelId)) ?? nil }
         }
         if env.settings.quickStart, channelOf(env.settings.lastSession) != nil {
+            let deadline = ContinuousClock.now + QuickStart.entitlementTimeout
             await env.awaitEntitlements(timeout: QuickStart.entitlementTimeout)
+            if !env.license.canPlay, let testerAccess {
+                _ = await QuickStart.wait(for: testerAccess, until: deadline)   // runs on after the deadline
+            }
         }
         guard !router.playerPresented else { return }   // e.g. the user was faster than the wait
         let last = env.settings.lastSession
@@ -235,7 +249,6 @@ enum AppBootstrap {
     /// Debug/UI-test hooks: `-seedM3U <url>` adds a source, `-uiScreen <name>` opens a screen,
     /// `-uiTrial` simulates an active StoreKit trial (only in DEBUG builds).
     static func applyDebugHooks(env: AppEnvironment, router: Router) async {
-        await applyTesterAccess(env: env)
         #if DEBUG
         if arguments.contains("-uiTrial") {
             env.license.update(store: StoreSnapshot(trialStartMs: env.license.nowMs() - 2 * 86_400_000, trialTransactionId: nil))

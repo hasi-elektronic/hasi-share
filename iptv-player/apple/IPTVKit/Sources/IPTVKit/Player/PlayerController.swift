@@ -179,7 +179,8 @@ public final class PlayerController {
     @ObservationIgnored public var audioDelayStore: AudioDelayStore? { didSet { refreshAudioDelay() } }
     /// Content delay of a request without content key (raw URL): this session only.
     @ObservationIgnored private var unkeyedContentDelay = 0
-    /// The open's resolve is in flight: `stream` still belongs to the previous request.
+    /// The open's resolve is in flight: `stream` still belongs to the previous request, and the engine's
+    /// events still come from the previous item – they are ignored until the new stream is loaded.
     @ObservationIgnored private var resolving = false
     /// A channel switch waits for its 400 ms debounce: `stream` still is the channel being left.
     @ObservationIgnored private var zapPending = false
@@ -248,8 +249,10 @@ public final class PlayerController {
     public func open(_ request: PlaybackRequest) {
         saveProgress()
         openTask?.cancel()
+        resolving = false   // the cancelled open's resolve never finishes (a locked open starts none)
         retryTask?.cancel()
         probeTask?.cancel()
+        cancelStallTimer()   // the previous item's stall deadline must not reconnect it during the resolve
         reconnectState = ReconnectState()
         pausedByInterruption = false
         systemPauseUnclaimed = false
@@ -422,9 +425,11 @@ public final class PlayerController {
 
     // MARK: Engine events
 
-    /// Applies an engine event (internal for tests).
+    /// Applies an engine event (internal for tests). While a new request resolves, the engine still
+    /// reports the previous item: its first frame, failure, end or ticks are not the new request's.
     func handle(_ event: EngineEvent) {
         if case .time = event {} else { SafeLog.debug("player event \(event) phase=\(phase)") }
+        guard !resolving else { return }
         switch event {
         case .playing:
             loadReady = true
@@ -480,6 +485,7 @@ public final class PlayerController {
     /// Applies the fallback and reconnect policy to a playback error (internal for tests).
     func handle(_ error: PlaybackError) {
         if case .failed = phase { return }
+        guard !resolving else { return }   // the previous item's error: `stream` is not the new request's yet
         if delayRoutedToVLC, let stream, engine?.kind == .vlcKit,
            ApplePlayback.fallbackEngine(after: error, on: .avPlayer, vlcAvailable: true) != nil {
             // VLCKit cannot play what AVPlayer can: play it there without the delay (once, with a notice).

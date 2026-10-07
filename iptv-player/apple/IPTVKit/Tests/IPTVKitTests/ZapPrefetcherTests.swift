@@ -70,6 +70,41 @@ final class ZapPrefetcherTests: XCTestCase {
         XCTAssertEqual(m3uFetches, 2)
     }
 
+    /// Final review I1: an Xtream account added as an M3U playlist (`get.php?type=m3u_plus`) carries
+    /// Xtream-shaped live URLs and may allow one connection. Prefetch must neither run the resolver's
+    /// network probes (HLS twin GET, sniffer) nor pre-read bytes for such neighbours – and must not cache
+    /// a probe-less resolution (the zap resolves and picks the engine like a direct open).
+    func testM3USourceWithXtreamShapedURLsOpensNoConnection() async throws {
+        let probes = CallCounter(), sniffs = CallCounter()
+        let resolver = StreamResolver(secrets: { _ in nil }, sniffer: { _, _ in sniffs.hit(); return ("video/mp2t", nil, 200) },
+                                      hlsProbe: { _, _ in probes.hit(); return true }, vlcAvailable: true)
+        let m3u = Source.make(name: "M", secrets: .m3u(M3USecrets(url: "http://panel.example.com:8080/get.php?type=m3u_plus")), id: "s1")
+        let shapes = ["http://panel.example.com:8080/live/u/p/%d.ts", "http://panel.example.com:8080/u/p/%d.ts",
+                      "http://panel.example.com:8080/live/u/p/%d.m3u8", "http://panel.example.com:8080/u/p/%d"]
+        for shape in shapes {
+            for source in [m3u, nil] as [Source?] {
+                let list = (0..<3).map { TestData.channel(id: "c\($0)", url: String(format: shape, 100 + $0)) }
+                let fetcher = CountingFetcher()
+                let p = ZapPrefetcher(resolver: { try await resolver.resolve($0) }, fetcher: fetcher,
+                                      network: Net(isExpensiveOrConstrained: false))
+                p.prefetch(around: list[1], request: PlaybackRequest(item: .channel(list[1]), source: source, channels: list))
+                try await Task.sleep(for: .milliseconds(100))
+                XCTAssertEqual(fetcher.urls.count, 0, "\(shape) source=\(source?.type.rawValue ?? "nil"): no byte read")
+                XCTAssertNil(p.takeResolved(channelId: "c2"), "\(shape): not resolved by the prefetcher")
+            }
+        }
+        XCTAssertEqual(probes.count, 0, "no HLS twin probe")
+        XCTAssertEqual(sniffs.count, 0, "no sniffer GET")
+        // Same gate in the byte-read check itself.
+        let shaped = TestData.channel(id: "c1", url: "http://panel.example.com:8080/live/u/p/1.m3u8")
+        let stream = ResolvedStream(url: URL(string: shaped.url!)!, container: .hls, headers: [:])
+        XCTAssertFalse(ZapPrefetcher.allowsByteRead(stream: stream, request: PlaybackRequest(item: .channel(shaped), source: m3u)))
+        // An ordinary M3U HLS channel stays warmed (resolved + read).
+        let plain = TestData.channel(id: "c1", url: "http://cdn.example.com/hls/ch1/index.m3u8")
+        XCTAssertTrue(ZapPrefetcher.allowsByteRead(stream: ResolvedStream(url: URL(string: plain.url!)!, container: .hls, headers: [:]),
+                                                   request: PlaybackRequest(item: .channel(plain), source: m3u)))
+    }
+
     private final class Clock: @unchecked Sendable {
         private let lock = NSLock(); private var t = Date(timeIntervalSince1970: 1_000)
         var date: Date { lock.withLock { t } }

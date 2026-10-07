@@ -109,6 +109,37 @@ final class QuickStartFlagTests: XCTestCase {
     }
 }
 
+/// Final review I2: the TestFlight AppTransaction fallback may run while QuickStart decides, but it never
+/// holds the launch beyond QuickStart's own wait.
+final class QuickStartBoundedWaitTests: XCTestCase {
+    func testReturnsAsSoonAsTheTaskFinishes() async {
+        let task = Task<Void, Never> { try? await Task.sleep(for: .milliseconds(30)) }
+        let start = ContinuousClock.now
+        let finished = await QuickStart.wait(for: task, until: start + .seconds(2))
+        XCTAssertTrue(finished)
+        XCTAssertLessThan(start.duration(to: .now), .milliseconds(1_000))
+    }
+
+    func testStopsWaitingAtTheDeadlineAndLeavesTheTaskRunning() async {
+        let task = Task<Void, Never> { try? await Task.sleep(for: .seconds(3)) }
+        let start = ContinuousClock.now
+        let finished = await QuickStart.wait(for: task, until: start + .milliseconds(80))
+        XCTAssertFalse(finished)
+        XCTAssertLessThan(start.duration(to: .now), .milliseconds(1_000), "bounded by the deadline, not by the task")
+        XCTAssertFalse(task.isCancelled, "the confirmation keeps running in the background")
+        task.cancel()
+    }
+
+    func testPassedDeadlineDoesNotWait() async {
+        let task = Task<Void, Never> { try? await Task.sleep(for: .seconds(3)) }
+        let start = ContinuousClock.now
+        let finished = await QuickStart.wait(for: task, until: start - .milliseconds(1))
+        XCTAssertFalse(finished)
+        XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+        task.cancel()
+    }
+}
+
 @MainActor
 final class QuickStartSettingsTests: XCTestCase {
     func testDefaultsAndPersistence() {
