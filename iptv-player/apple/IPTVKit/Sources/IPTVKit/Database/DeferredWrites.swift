@@ -13,6 +13,7 @@ public final class DeferredWrites: @unchecked Sendable {
 
     /// Runs `write` now when nothing is queued and the writer is free (returns true), else queues it (false) and
     /// calls `completion` on the queue after it ran.
+    @MainActor
     @discardableResult
     func perform(_ db: SQLiteDatabase, _ write: @escaping @Sendable () -> Void,
                  queued: (() -> Void)? = nil, completion: (@Sendable () -> Void)? = nil) -> Bool {

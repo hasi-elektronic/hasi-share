@@ -123,6 +123,7 @@ public final class LibraryRepository: Sendable {
 
     /// Favorite toggle from the UI, never blocking (`putWithoutBlocking`).
     /// Throws only when written at once and the write failed (the caller restores its optimistic state).
+    @MainActor
     @discardableResult
     public func setFavoriteWithoutBlocking(_ on: Bool, contentKey: String, title: String, kind: ContentKind, posterUrl: String?,
                                            nowMs: Int64) throws -> SyncItem {
@@ -132,37 +133,46 @@ public final class LibraryRepository: Sendable {
         return item
     }
 
-    /// Writes a local change without ever blocking the caller: at once when the writer is free (returns true);
+    /// Writes a local change without ever blocking the main actor: at once when the writer is free (returns true);
     /// while a commit holds it the item waits in `deferredWrites` (in order) and meanwhile **overlays** every read
-    /// of this repository (read-your-writes). When it is finally written its `updatedAt` is moved on by the
-    /// time it waited (a sync push after the save must still see it as changed), and it is skipped if the stored
-    /// row became newer meanwhile (LWW: a sync merge won). `onDone` runs after a queued write.
+    /// of this repository (read-your-writes). The queued write keeps the user's **action time** as `updatedAt`
+    /// (LWW across devices) and is skipped when a newer local change of the same key is queued after it, or when
+    /// the stored row is newer than that action (a sync merge won). Written late, it gets a push marker
+    /// (`library_push`) so sync sends it even if the push cursor already passed its time. `onDone` runs after a
+    /// queued write.
+    @MainActor
     @discardableResult
     public func putWithoutBlocking(_ item: SyncItem, onDone: (@Sendable () -> Void)? = nil) -> Bool {
         (try? putWithoutBlockingThrowing(item, onDone: onDone)) ?? true
     }
 
     /// `putWithoutBlocking`, rethrowing the error of a write made at once.
+    @MainActor
     @discardableResult
     func putWithoutBlockingThrowing(_ item: SyncItem, onDone: (@Sendable () -> Void)? = nil) throws -> Bool {
         if database.deferredWrites.isIdle, try db.ifWriterFree({ try put(item) }) != nil { return true }
-        let enqueued = DispatchTime.now()
         let overlay = overlay
         let token = overlay.set(item)
         database.deferredWrites.enqueue { [self] in
-            // Decided once the writer is ours (inside the transaction): the wait is over, the stored row is final.
+            // Decided once the writer is ours (inside the transaction): the stored row is final.
             try? db.transaction {
-                var adjusted = item
-                adjusted.updatedAt = item.updatedAt + Int64((DispatchTime.now().uptimeNanoseconds - enqueued.uptimeNanoseconds) / 1_000_000)
-                if let stored = try storedItem(key: item.key), stored.updatedAt > adjusted.updatedAt {
-                    return   // a newer version arrived meanwhile (sync merge): keep it
-                }
-                try put(adjusted)
+                guard overlay.token(of: item.key) == token else { return }   // a newer local change follows
+                if let stored = try storedItem(key: item.key), stored.updatedAt > item.updatedAt { return }   // LWW
+                try put(item)
+                try db.run("INSERT OR IGNORE INTO library_push (key) VALUES (?)", [.text(item.key)])
             }
             overlay.remove(item.key, token: token)
             onDone?()
         }
         return false
+    }
+
+    /// Sync pushed these keys: their late-write markers are done.
+    public func clearPushMarkers(_ keys: [String]) throws {
+        guard !keys.isEmpty else { return }
+        try db.transaction {
+            for key in keys { try db.run("DELETE FROM library_push WHERE key = ?", [.text(key)]) }
+        }
     }
 
     private let overlay = LibraryOverlay()
@@ -174,7 +184,8 @@ public final class LibraryRepository: Sendable {
     public func changed(after ms: Int64, limit: Int = 500) throws -> [SyncItem] {
         // Sync runs off the main actor: let queued local changes land first so they are pushed.
         if !overlay.isEmpty { database.deferredWrites.drain(timeout: 2) }
-        return try db.query("SELECT \(Self.columns) FROM library WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?",
+        return try db.query("SELECT \(Self.columns) FROM library WHERE updated_at > ? OR key IN (SELECT key FROM library_push) "
+                            + "ORDER BY updated_at ASC LIMIT ?",
                      [.int(ms), .int(Int64(limit))], map: Self.item)
     }
 
@@ -209,5 +220,6 @@ final class LibraryOverlay: @unchecked Sendable {
     }
 
     func get(_ key: String) -> SyncItem? { lock.lock(); defer { lock.unlock() }; return items[key]?.item }
+    func token(of key: String) -> UInt64? { lock.lock(); defer { lock.unlock() }; return items[key]?.token }
     func all() -> [SyncItem] { lock.lock(); defer { lock.unlock() }; return items.values.map(\.item) }
 }

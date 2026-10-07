@@ -223,8 +223,8 @@ public final class SourceRefresher: Sendable {
                                         [.text(xmltvId), .text(source.id), .text(channelId)])
                 }
             }
-            // The replaced programme index is emptied in small steps after the swap (not inside it).
-            do { try epg.collectIndexGarbage() } catch { SafeLog.warning("epg index garbage failed") }
+            // The replaced programme index is dropped after the swap, in the background.
+            epg.collectIndexGarbageInBackground()
             return written
         } catch {
             session.abort()

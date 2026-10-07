@@ -144,8 +144,9 @@ final class SQLiteConnection: @unchecked Sendable {
         return Int(sqlite3_changes(handle))
     }
 
-    func query<T>(_ sql: String, _ args: [SQLiteValue], map: (SQLiteRow) throws -> T) throws -> [T] {
+    func query<T>(_ sql: String, _ args: [SQLiteValue], busyTimeoutMs: Int32? = nil, map: (SQLiteRow) throws -> T) throws -> [T] {
         lock.lock(); defer { lock.unlock() }
+        if let busyTimeoutMs { sqlite3_busy_timeout(handle, busyTimeoutMs) }
         // Stale searches: a cancelled task interrupts its statement (SQLITE_INTERRUPT) instead of running on.
         let interruptible = SQLiteDatabase.interruptsOnCancel
         if interruptible { sqlite3_progress_handler(handle, 1000, sqliteCancelCheck, nil) }
@@ -215,7 +216,6 @@ public final class SQLiteDatabase: @unchecked Sendable {
             #endif
             reader = try? SQLiteConnection(path: self.path, flags: readFlags)
             try? reader?.execute("PRAGMA temp_store = MEMORY; PRAGMA cache_size = -32000;")
-            if let handle = reader?.handle { sqlite3_busy_timeout(handle, 1500) }   // WAL recovery/checkpoint edge cases
         } else {
             reader = nil
         }
@@ -245,7 +245,10 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     /// Runs a query and maps every row.
     public func query<T>(_ sql: String, _ args: [SQLiteValue] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
-        try readConnection.query(sql, args, map: map)
+        let connection = readConnection
+        // Reader busy wait (WAL recovery/checkpoint edge cases): short on the main thread, 1.5 s in the background.
+        let timeout: Int32? = connection === reader ? (Thread.isMainThread ? 100 : 1500) : nil
+        return try connection.query(sql, args, busyTimeoutMs: timeout, map: map)
     }
 
     /// First row of a query, if any.

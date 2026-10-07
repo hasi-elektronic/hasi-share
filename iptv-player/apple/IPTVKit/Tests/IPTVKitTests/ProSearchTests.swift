@@ -186,7 +186,7 @@ final class SearchIndexV7MigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         try makeV6(path)
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 7)
+        XCTAssertEqual(db.db.userVersion, 8)
         let catalog = CatalogRepository(database: db)
         XCTAssertTrue(db.searchBackfillPending, "migration does not copy (launch stays fast)")
         XCTAssertEqual(try searchIndexCount(db), 0)
@@ -204,7 +204,7 @@ final class SearchIndexV7MigrationTests: XCTestCase {
         XCTAssertEqual(try catalog.search("sohbet", sourceId: "s").first?.match, .description, "plot indexed from the content row")
         XCTAssertEqual(try catalog.search("konusanlar", sourceId: "s").map(\.itemId), ["k"])
         if db.db.hasTrigram { XCTAssertEqual(try catalog.correction(for: "konuşanlr", sourceId: "s"), "konuşanlar", "dictionary built") }
-        XCTAssertEqual(try AppDatabase(db: SQLiteDatabase(path: path)).db.userVersion, 7, "idempotent")
+        XCTAssertEqual(try AppDatabase(db: SQLiteDatabase(path: path)).db.userVersion, 8, "idempotent")
     }
 
     /// A refresh committed while the copy is pending replaces its source's rows; the copy skips that source.
@@ -242,7 +242,7 @@ final class SearchIndexV7MigrationTests: XCTestCase {
             db.db.userVersion = 5
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 7)
+        XCTAssertEqual(db.db.userVersion, 8)
         let catalog = CatalogRepository(database: db)
         XCTAssertTrue(try catalog.backfillSearchIndex())
         XCTAssertEqual(try catalog.search("kizilcik", sourceId: "s").map(\.itemId), ["k"])

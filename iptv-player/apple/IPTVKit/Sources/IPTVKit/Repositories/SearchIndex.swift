@@ -166,9 +166,10 @@ enum SearchIndex {
     }
 }
 
-/// Index tables no longer used (replaced by a refresh, aborted, deleted source, retired shared table): emptied
-/// in small transactions with pauses and then dropped, so no single step holds the writer for long (a DROP of a
-/// 50k-row FTS table took hundreds of ms on Apple TV). Listed in kv `index.garbage`; survives a kill.
+/// Index tables no longer used (replaced by a refresh, aborted, deleted source, retired shared table). Each is
+/// dropped in its own transaction after the swap – one DROP (≈ 40 ms for 50k rows) is far cheaper than emptying
+/// it first (chunked FTS deletes: 1.6 s of writer time). Listed in kv `index.garbage`, so a kill before the
+/// DROP leaves nothing behind. `collectInBackground` runs it without making the caller wait.
 enum IndexGarbage {
     static let key = "index.garbage"
 
@@ -195,29 +196,26 @@ enum IndexGarbage {
         }
     }
 
-    /// Empties and drops every garbage table: `chunkSize` rows per transaction, `pause` between them. Call off the
-    /// main thread. Returns false when stopped by `maxChunks`.
+    /// Drops every garbage table, one per transaction. Returns false when stopped by `maxTables`.
     @discardableResult
-    static func collect(_ db: SQLiteDatabase, chunkSize: Int = 1000, maxChunks: Int = .max, pause: TimeInterval = 0.01) throws -> Bool {
-        var chunks = 0
+    static func collect(_ db: SQLiteDatabase, maxTables: Int = .max) throws -> Bool {
+        var dropped = 0
         for name in list(db) {
-            while true {
-                guard chunks < maxChunks else { return false }
-                chunks += 1
-                let removed: Int = try db.transaction {
-                    guard try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ?", [.text(name)]) > 0 else { return 0 }
-                    return try db.run("DELETE FROM \(name) WHERE rowid IN (SELECT rowid FROM \(name) LIMIT ?)", [.int(Int64(chunkSize))])
-                }
-                if removed == 0 {
-                    try db.transaction {
-                        try SearchIndex.dropTable(db, name)
-                        try remove(db, name)
-                    }
-                    break
-                }
-                if pause > 0 { Thread.sleep(forTimeInterval: pause) }
+            guard dropped < maxTables else { return false }
+            try db.transaction {
+                guard list(db).contains(name) else { return }   // another collector was faster
+                try SearchIndex.dropTable(db, name)
+                try remove(db, name)
             }
+            dropped += 1
         }
         return true
+    }
+
+    /// `collect` on a utility queue (after a commit: the refresh does not wait for the DROP).
+    static func collectInBackground(_ db: SQLiteDatabase) {
+        DispatchQueue.global(qos: .utility).async {
+            do { try collect(db) } catch { SafeLog.warning("index garbage failed") }
+        }
     }
 }

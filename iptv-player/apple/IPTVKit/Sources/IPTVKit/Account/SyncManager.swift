@@ -66,8 +66,10 @@ public actor SyncManager {
             guard !items.isEmpty else { break }
             _ = try await backend.syncPush(items, sessionToken: token)
             pushCalls += 1
-            let maxUpdated = items.map(\.updatedAt).max() ?? since
+            // Late-written items (push markers) may be older than the cursor: never move it back.
+            let maxUpdated = max(since, items.map(\.updatedAt).max() ?? since)
             database.setValue(String(maxUpdated), forKey: Keys.lastPush)
+            try library.clearPushMarkers(items.map(\.key))
             lastSyncedAt = Date()
             if items.count < Self.batchLimit { break }
         }

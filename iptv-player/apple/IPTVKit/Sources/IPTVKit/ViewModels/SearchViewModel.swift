@@ -28,6 +28,7 @@ public final class RecentSearchStore: @unchecked Sendable {
         return cache[sourceId] ?? stored
     }
 
+    @MainActor
     private func store(_ list: [String], sourceId: String) {
         lock.lock(); cache[sourceId] = list; lock.unlock()
         let json = list.isEmpty ? nil : (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) }
@@ -36,6 +37,7 @@ public final class RecentSearchStore: @unchecked Sendable {
     }
 
     /// Adds `query` on top (case/diacritics-insensitive duplicates removed). Blank queries are ignored.
+    @MainActor
     @discardableResult
     public func add(_ query: String, sourceId: String) -> [String] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -46,6 +48,7 @@ public final class RecentSearchStore: @unchecked Sendable {
         return list
     }
 
+    @MainActor
     @discardableResult
     public func remove(_ query: String, sourceId: String) -> [String] {
         let list = recent(sourceId: sourceId).filter { $0 != query }
@@ -53,11 +56,13 @@ public final class RecentSearchStore: @unchecked Sendable {
         return list
     }
 
+    @MainActor
     public func clear(sourceId: String) {
         store([], sourceId: sourceId)
     }
 
     /// Build 11 stored the list in UserDefaults (`search.recent.<id>`, backed up): moved here once, then deleted.
+    @MainActor
     public func migrateLegacy(from kv: any KeyValueStore, sourceIds: [String]) {
         for id in sourceIds {
             guard let legacy = kv.value([String].self, forKey: Self.key(id)) else { continue }

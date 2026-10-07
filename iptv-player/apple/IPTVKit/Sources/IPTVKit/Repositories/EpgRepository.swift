@@ -144,6 +144,11 @@ public final class EpgRepository: Sendable {
         try IndexGarbage.collect(db)
     }
 
+    /// `collectIndexGarbage` without waiting (after an EPG refresh).
+    public func collectIndexGarbageInBackground() {
+        IndexGarbage.collectInBackground(db)
+    }
+
     @discardableResult
     public func maintainSearchIndex(chunkSize: Int = 2000, maxChunks: Int = .max, pause: TimeInterval = 0.015) throws -> Bool {
         try EpgSearchIndex.backfill(db, chunkSize: chunkSize, maxChunks: maxChunks, pause: pause)
@@ -229,7 +234,7 @@ enum EpgSearchIndex {
     static func backfill(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int, pause: TimeInterval = 0) throws -> Bool {
         guard db.hasFTS5 else { return true }
         try SearchIndex.maintain(db)   // leftovers of killed refreshes → garbage (decided on the writer)
-        try IndexGarbage.collect(db, pause: pause)
+        try IndexGarbage.collect(db)
         var chunks = 0
         let sources = try db.query("SELECT id FROM sources ORDER BY sort") { $0.string(0) }
         for sourceId in sources where table(db, sourceId: sourceId) == nil {
@@ -313,7 +318,6 @@ public final class EpgRefreshSession: @unchecked Sendable {
 
     public func commit() throws {
         guard !finished else { return }
-        finished = true
         try db.transaction {
             try db.run("DELETE FROM epg WHERE source_id = ?", [.text(sourceId)])
             try db.run("UPDATE epg SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
@@ -323,6 +327,7 @@ public final class EpgRefreshSession: @unchecked Sendable {
                 try db.run("DELETE FROM kv WHERE key = ?", [.text(EpgSearchIndex.backfillKey(sourceId))])
             }
         }
+        finished = true   // only after success: a failed commit can still be aborted (cleanup)
         if let searchTable { EpgSearchIndex.inFlight.remove(searchTable) }
     }
 

@@ -147,10 +147,16 @@ final class NonBlockingWriteTests: XCTestCase {
         XCTAssertTrue(db.deferredWrites.drain(timeout: 5), "flushed (going to the background)")
         let stored = try XCTUnwrap(try library.storedItem(key: SyncItem.progressKey("k")))
         XCTAssertEqual(stored.data.positionMs, 42_000)
-        XCTAssertGreaterThanOrEqual(stored.updatedAt, 1_150, "moved on by the time it waited (still pushed by sync)")
+        XCTAssertEqual(stored.updatedAt, 1_000, "the action time (LWW across devices)")
         XCTAssertFalse(library.hasPendingWrites)
+        // Pushed although the push cursor already passed its action time (late-write marker).
+        XCTAssertEqual(try library.changed(after: 5_000).map(\.key), [SyncItem.progressKey("k")])
+        try library.clearPushMarkers([SyncItem.progressKey("k")])
+        XCTAssertTrue(try library.changed(after: 5_000).isEmpty)
     }
 
+    /// Device A favorites at T (queued, written at T+3); device B's change at T+1 is merged meanwhile: B stays.
+    @MainActor
     func testDeferredWriteDoesNotOverwriteANewerStoredItem() throws {
         let path = tempPath()
         defer { cleanup(path) }
@@ -158,7 +164,7 @@ final class NonBlockingWriteTests: XCTestCase {
         let library = LibraryRepository(database: db)
         let held = Flag(), release = Flag(), queued = Flag()
         let newer = SyncItem.progress(contentKey: "k", title: "T", contentKind: .movie, positionMs: 99_000, durationMs: 100_000,
-                                      posterUrl: nil, seriesKey: nil, updatedAt: 9_000_000_000_000)
+                                      posterUrl: nil, seriesKey: nil, updatedAt: 1_001)   // remote, 1 ms after the action
         let done = holdWriter(db, held: held, release: release) {
             queued.wait()
             try? library.put(newer)   // a sync merge landing while the local save waits
@@ -169,7 +175,31 @@ final class NonBlockingWriteTests: XCTestCase {
         release.set()
         done.wait()
         XCTAssertTrue(db.deferredWrites.drain(timeout: 5))
-        XCTAssertEqual(try library.progress(contentKey: "k")?.data.positionMs, 99_000, "LWW: the newer row stays")
+        XCTAssertEqual(try library.progress(contentKey: "k")?.data.positionMs, 99_000, "LWW: the newer remote row stays")
+        XCTAssertEqual(try library.storedItem(key: SyncItem.progressKey("k"))?.updatedAt, 1_001)
+    }
+
+    /// Two queued changes of one key: only the last is written.
+    @MainActor
+    func testOnlyTheLatestQueuedChangeOfAKeyIsWritten() throws {
+        let path = tempPath()
+        defer { cleanup(path) }
+        let db = try AppDatabase(db: SQLiteDatabase(path: path))
+        let library = LibraryRepository(database: db)
+        let held = Flag(), release = Flag()
+        let done = holdWriter(db, held: held, release: release)
+        func favorite(_ on: Bool, _ at: Int64) -> SyncItem {
+            SyncItem.favorite(contentKey: "c", title: "C", contentKind: .live, posterUrl: nil, updatedAt: at, deleted: !on)
+        }
+        library.putWithoutBlocking(favorite(true, 2_000))
+        library.putWithoutBlocking(favorite(false, 3_000))
+        XCTAssertEqual(try library.item(key: SyncItem.favoriteKey("c"))?.deleted, true, "overlay: the latest")
+        release.set()
+        done.wait()
+        XCTAssertTrue(db.deferredWrites.drain(timeout: 5))
+        let stored = try XCTUnwrap(try library.storedItem(key: SyncItem.favoriteKey("c")))
+        XCTAssertEqual(stored.updatedAt, 3_000)
+        XCTAssertTrue(stored.deleted)
     }
 
     // MARK: 3. Favorites and recent searches never block
@@ -200,6 +230,7 @@ final class NonBlockingWriteTests: XCTestCase {
         XCTAssertEqual(RecentSearchStore(database: db).recent(sourceId: "s"), ["derby"], "persisted")
     }
 
+    @MainActor
     func testLegacyRecentSearchesMigrateOnce() throws {
         let db = try AppDatabase.inMemory()
         let kv = InMemoryKeyValueStore()
@@ -213,7 +244,7 @@ final class NonBlockingWriteTests: XCTestCase {
 
     // MARK: Garbage, paging
 
-    func testReplacedIndexIsEmptiedInSmallSteps() throws {
+    func testReplacedIndexIsDroppedAfterTheSwap() throws {
         let db = try AppDatabase.inMemory()
         let catalog = CatalogRepository(database: db)
         for round in 0..<2 {
@@ -221,14 +252,20 @@ final class NonBlockingWriteTests: XCTestCase {
             try session.write(movies: (0..<2_500).map { Movie(sourceId: "s", id: "m\($0)", name: "Film \($0) \(round)", sort: $0) })
             try session.commit()
         }
-        // The commit collected the replaced index in 1000-row steps: only the live one is left.
+        // The commit queued the replaced index for a background DROP; collect (idempotent with that) leaves the live one.
+        try IndexGarbage.collect(db.db)
         XCTAssertTrue(IndexGarbage.list(db.db).isEmpty)
         XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'search_fts_%' AND sql LIKE 'CREATE VIRTUAL%'"), 1)
-        // Stopped after one chunk (kill): resumes later.
-        try db.db.transaction { try IndexGarbage.add(db.db, try XCTUnwrap(SearchIndex.table(db.db, sourceId: "s"))) }
-        XCTAssertFalse(try IndexGarbage.collect(db.db, maxChunks: 1, pause: 0))
+        // Two garbage tables, stopped after one (kill): the other stays listed and is dropped later.
+        let extra = try SearchIndex.create(db.db)
+        IndexTablesInFlight.shared.remove(extra)
+        try db.db.transaction {
+            try IndexGarbage.add(db.db, extra)
+            try IndexGarbage.add(db.db, try XCTUnwrap(SearchIndex.table(db.db, sourceId: "s")))
+        }
+        XCTAssertFalse(try IndexGarbage.collect(db.db, maxTables: 1))
         XCTAssertEqual(IndexGarbage.list(db.db).count, 1)
-        XCTAssertTrue(try IndexGarbage.collect(db.db, pause: 0))
+        XCTAssertTrue(try IndexGarbage.collect(db.db))
         XCTAssertTrue(IndexGarbage.list(db.db).isEmpty)
     }
 

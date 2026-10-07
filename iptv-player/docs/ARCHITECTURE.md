@@ -146,18 +146,20 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
      `busy_timeout` 1,5 sn, yazıcıyla aynı önbellek).
    * **Ana iş parçacığı yazımları hiç beklemez (Build 13):** oynatıcının ilerleme / "izlendi" kaydı, favori ve son
      aramalar yazıcı boşsa hemen, değilse tek sıralı arka plan kuyruğuna (`DeferredWrites`) gider; kuyrukta
-     bekleyen kitaplık öğesi tüm okumalarda üstte görünür (okuduğunu-gör, `LibraryOverlay`). Yazılırken
-     `updatedAt` beklediği süre kadar ilerletilir (senkron gönderimi kaçırmaz) ve bu arada daha yeni bir satır
-     geldiyse (senkron birleştirme, LWW) yazılmaz. Uygulama arka plana geçerken kuyruk boşaltılır (iOS/tvOS
+     bekleyen kitaplık öğesi tüm okumalarda üstte görünür (okuduğunu-gör, `LibraryOverlay`). `updatedAt` kullanıcının
+     **eylem zamanı** kalır (cihazlar arası LWW); aynı anahtarın daha yeni bir yerel değişikliği kuyruktaysa ya da
+     kayıtlı satır o eylemden yeniyse (senkron birleştirme) yazılmaz. Geç yazılan öğe `library_push` işareti alır
+     (v8), gönderim imleci zamanını geçmiş olsa da senkronla gönderilir. Uygulama arka plana geçerken kuyruk boşaltılır (iOS/tvOS
      `beginBackgroundTask`, en fazla 20 sn).
-   * **Eski dizinler (Build 13):** değiştirilen, iptal edilen, silinen kaynağın veya emekli edilen ortak tablo
-     `kv` `index.garbage` listesine girer ve 1000 satırlık işlemlerle boşaltılıp sonra DROP edilir (Apple TV'de
-     büyük bir FTS DROP'u yüzlerce ms yazıcıyı tutuyordu). Açılış bakımı (sahipsiz tabloları bulma, ortak
+   * **Eski dizinler (Build 13/14):** değiştirilen, iptal edilen, silinen kaynağın veya emekli edilen ortak tablo
+     `kv` `index.garbage` listesine girer (kapanmaya karşı) ve takastan sonra arka planda **tek DROP** ile, kendi
+     işleminde silinir (50k satırda ~40 ms; parça parça FTS silmesi 1,6 sn yazıcı süresi tutuyordu). Açılış bakımı (sahipsiz tabloları bulma, ortak
      tabloyu emekli etme) **tek bir yazıcı işleminde** karar verir: Build 12'de bakım eski eşlemeyi okuyucudan
      okuyup hemen commit edilen yeni dizini silebiliyordu ("no such table" → aramada sonuç yok). Yeni tablo
      commit işlemi bitene kadar "yapımda" sayılır; arama tabloyu sorgu arasında değişmiş bulursa yeni adla bir
      kez yeniden dener (EPG dahil). Ortak tablo boşalınca `search.shared.empty` işaretlenir (her açılışta
-     tarama yok). Trigram dizini sonradan kurulursa var olan sözcükler 2000'lik adımlarla eklenir; sözlük
+     tarama yok). Trigram dizini sonradan kurulursa var olan sözcükler 2000'lik adımlarla eklenir (silme tetikleyicisi dolum
+     bitince eklenir); sözlük
      farkı 1500 değişiklikli işlemlerle yazılır.
    * **Tüm kaynaklarda arama** (`sourceId == nil`): her tablodan ilk `offset + limit` satır, `(ifade, rank)` ile
      birleştirilip sayfa kesilir (atlama/tekrar yok). Ölçüm (`CommitLockTests`, sahip boyutu 4k canlı + 35k

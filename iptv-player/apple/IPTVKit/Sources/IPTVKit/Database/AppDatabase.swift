@@ -216,6 +216,16 @@ public final class AppDatabase: Sendable {
                 try db.execute("PRAGMA user_version = 7")   // with the schema change: a kill cannot re-run it
             }
         }
+        if db.userVersion < 8 {
+            // Library items written late (a local change queued behind a commit) keep the user's action time as
+            // `updatedAt` (LWW); a marker makes sync push them even when the push cursor already passed that time.
+            try db.transaction {
+                try db.execute("""
+                CREATE TABLE IF NOT EXISTS library_push (key TEXT PRIMARY KEY);
+                PRAGMA user_version = 8;
+                """)
+            }
+        }
     }
 
     /// True while the search index is still being (re-)built in the background after a v6/v7 migration
@@ -444,6 +454,13 @@ enum SearchTermsIndex {
         exists(db) && ((try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(fillKey)]) { $0.string(0) }) ?? nil) == nil
     }
 
+    static func createDeleteTrigger(_ db: SQLiteDatabase) throws {
+        try db.execute("""
+        CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
+          INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
+        """)
+    }
+
     /// Creates the index if missing but supported: table + triggers at once (new words are indexed from now on),
     /// the words that already existed then in transactions of `chunkSize` (no single long 'rebuild'). Resumable.
     static func ensure(_ db: SQLiteDatabase, chunkSize: Int = 2000, pause: TimeInterval = 0.01) throws {
@@ -456,10 +473,13 @@ enum SearchTermsIndex {
                   gram, content = 'search_terms', content_rowid = 'rowid', tokenize = 'trigram');
                 CREATE TRIGGER IF NOT EXISTS search_terms_ai AFTER INSERT ON search_terms BEGIN
                   INSERT INTO search_terms_tri (rowid, gram) VALUES (new.rowid, new.gram); END;
-                CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
-                  INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
                 """)
-                if max > 0 { try db.run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", [.text(fillKey), .text("\(max)|0")]) }
+                // The delete trigger only after the fill: an FTS5 'delete' of a row never inserted corrupts the index.
+                if max > 0 {
+                    try db.run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", [.text(fillKey), .text("\(max)|0")])
+                } else {
+                    try createDeleteTrigger(db)
+                }
             }
         }
         while let state = (try db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(fillKey)]) { $0.string(0) }) {
@@ -474,6 +494,7 @@ enum SearchTermsIndex {
                                [.int(at), .int(last)])
                     try db.run("UPDATE kv SET value = ? WHERE key = ?", [.text("\(max)|\(last)"), .text(fillKey)])
                 } else {
+                    try createDeleteTrigger(db)
                     try db.run("DELETE FROM kv WHERE key = ?", [.text(fillKey)])
                 }
             }

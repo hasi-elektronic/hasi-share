@@ -993,7 +993,6 @@ public final class CatalogRefreshSession: @unchecked Sendable {
     /// Makes the staged rows the live content of the source (atomic swap).
     public func commit() throws {
         guard !finished else { return }
-        finished = true
         let started = DispatchTime.now()
         try db.transaction {
             for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
@@ -1034,14 +1033,15 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         }
         // The did-you-mean dictionary follows in its own transaction (only a suggestion source; the first fill
         // after the v7 update writes ~30k words, which should not lengthen the swap's lock).
+        finished = true   // only after the swap succeeded: a failed commit can still be aborted (cleanup)
         swapMilliseconds = Self.ms(since: started)
         // Only now (committed) may maintenance treat the new index like any referenced one.
         if let searchTable { IndexTablesInFlight.shared.remove(searchTable) }
         let dictionaryStart = DispatchTime.now()
         do { try terms.replace(db, sourceId: sourceId) } catch { SafeLog.warning("search terms update failed") }
         dictionaryMilliseconds = Self.ms(since: dictionaryStart)
-        // The replaced index is emptied in small steps (this runs on the refresh's background task).
-        do { try IndexGarbage.collect(db) } catch { SafeLog.warning("index garbage failed") }
+        // The replaced index is dropped in its own transaction, without making the refresh wait.
+        IndexGarbage.collectInBackground(db)
     }
 
     static func ms(since start: DispatchTime) -> Double { Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6 }

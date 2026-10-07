@@ -72,6 +72,9 @@ final class CommitLockTests: XCTestCase {
         XCTAssertGreaterThan(reads, 3)
         XCTAssertLessThan(maxRead, 50, "a read waited for the commit")
         XCTAssertEqual(try repo.search("kizilcik", scope: .descriptions, sourceId: "o", limit: 5).count, 5)
+        let dropStart = DispatchTime.now()
+        try IndexGarbage.collect(db.db)   // the commit started it in the background; idempotent
+        print("PERF drop of the replaced index (owner size): \(String(format: "%.1f", CatalogRefreshSession.ms(since: dropStart))) ms")
         XCTAssertEqual(SearchIndex.owned(db.db).count, 1, "one live index, the previous one dropped")
         XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'search_fts_%' AND sql LIKE 'CREATE VIRTUAL%'"), 1)
     }
@@ -192,7 +195,7 @@ final class SearchReviewFixTests: XCTestCase {
             db.db.userVersion = 6   // the kill: schema is v7, version still 6
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 7)
+        XCTAssertEqual(db.db.userVersion, 8)
         XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'"), 1, "v6 kept")
         let catalog = CatalogRepository(database: db)
         XCTAssertTrue(try catalog.backfillSearchIndex(pause: 0))
