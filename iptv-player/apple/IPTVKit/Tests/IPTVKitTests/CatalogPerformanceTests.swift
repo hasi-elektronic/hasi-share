@@ -167,7 +167,8 @@ final class CatalogPerformanceTests: XCTestCase {
         report("category infos (400 categories, 50k movies)", ms, budget: 100)
         XCTAssertEqual(infos.count, 400)
         XCTAssertEqual(infos.filter { $0.countryCode == "TR" }.count, 100)
-        XCTAssertEqual(infos.filter { $0.countryCode == nil }.count, 200, "EN and 4K have no country")
+        XCTAssertEqual(infos.filter { $0.countryCode == "EN" }.count, 100, "language group")
+        XCTAssertEqual(infos.filter { $0.countryCode == nil }.count, 100, "\"4K …\" has no group")
         XCTAssertEqual(infos.map(\.itemCount).reduce(0, +), 2 * Self.n - duplicateMemberships(), "every membership counted")
         XCTAssertLessThan(ms, 100 * factor, "category infos \(ms) ms")
     }

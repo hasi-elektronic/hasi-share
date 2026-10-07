@@ -464,6 +464,7 @@ private struct LiveCategoryColumn: View {
             .padding(.vertical, 20)
         }
         .scrollClipDisabled()
+        .tvTopClipped()
         .focusSection()
         .accessibilityIdentifier("live_category_chips")
     }

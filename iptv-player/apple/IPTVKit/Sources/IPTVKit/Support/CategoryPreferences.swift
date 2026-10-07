@@ -64,11 +64,12 @@ public final class CategoryPreferences {
         update(sourceId, kind) { $0.country = code ?? Self.allCountries }
     }
 
-    /// Country of the UI language: tr → TR, de → DE; English (and anything else) → nil = All.
+    /// Group of the UI language: tr → TR, de → DE, en → EN (language group "EN | …"); anything else → nil = All.
     public nonisolated static func languageCountry(_ languageCode: String?) -> String? {
         switch languageCode?.lowercased() {
         case "tr": return "TR"
         case "de": return "DE"
+        case "en": return "EN"
         default: return nil
         }
     }

@@ -48,6 +48,19 @@ final class TVSeriesCategoriesTests: XCTestCase {
         XCTAssertTrue(focus(columnFocused, pressing: .left, limit: 6), "column focusable")
         UITestSupport.snap("catnav-tvos-01-column", in: self)
 
+        // English UI → the EN language group is preselected; switch to All with the country picker (first row).
+        XCTAssertTrue(picker.label.contains("English"), "default group EN")
+        XCTAssertTrue(focus(discover, pressing: .up, limit: 30), "Discover row")
+        remote.press(.up)   // the country picker is the row above (its focus is reported on an inner element)
+        usleep(600_000)
+        remote.press(.select)
+        // tvOS renders the menu out of the app's accessibility tree; its first entry "All (14)" has focus.
+        sleep(1)
+        UITestSupport.snap("catnav-tvos-00-country-menu", in: self)
+        remote.press(.select)
+        sleep(1)
+        XCTAssertTrue(picker.label.contains("All"), "All selected")
+
         // Down the column to the last (Turkish) category.
         let turkish = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'category_row_' AND label CONTAINS 'Türk Dizileri'")).firstMatch
         XCTAssertTrue(focus(turkish, pressing: .down, limit: 24), "last category reachable")

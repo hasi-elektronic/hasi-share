@@ -138,12 +138,18 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   `category_ids`, CONTRACT §4.3) her birinde görünür. İzlemeye devam et ve Favoriler **filtrelenmez**.
 * **Kategori gezintisi (Build 9, Filmler/Diziler):** sağlayıcılar yüzlerce kategori listeler
   ("TR • NETFLIX DIZILER", "DE | …", "EN | …"); eski yatay çip satırı aranamıyordu (kaldırıldı).
-  * **Ülke:** kategori adındaki kod/ülke adından tespit edilir (`CategoryCountry`, IPTVKit: "TR | …",
-    "[TR] …", "TÜRKİYE", "Germany" …; "EN", "IT", "4K" gibi belirteçler ülke sayılmaz → yalnız "Tümü"nde).
+  * **Ülke / dil grubu:** kategori adının başındaki 2–3 büyük harfli kod + ayraç (`•`, `|`, `:`, `-`, `]`
+    ya da `[XX]`) grubu belirler — ISO ülke kodu olsun olmasın ("TR • …" → TR, "IT | Serie" → IT,
+    "EN • Drama" → EN, "AR | مسلسلات" → AR; rakam içeren "4K | …" grup değildir). Öneki olmayan adlarda
+    eski tespit sürer (ülke adları, "Sport (UK)", takma adlar UK → GB, USA → US, TÜRKİYE → TR); grubu olmayan
+    kategoriler yalnız "Tümü"nde. **Gösterim:** rozet = kod (EN, AR, TR); ad = dil önce gelen kodlarda (EN,
+    AR ve ISO ülkesi olmayan her kod) uygulama dilinde dil adı ("İngilizce", "Arapça"), diğerlerinde ülke adı
+    ("Türkiye", "Almanya", "İtalya"); bayrak emojisi yalnız gerçek ülkelerde (EN'de bayrak yok, AR'de 🇦🇷 yok;
+    TV/HD gibi etiketlerde de yok). Bayraksız gruplarda satırda kod rozeti durur.
     Seçim **kaynak + tür (film/dizi) başına** cihazda saklanır. İlk kullanımda varsayılan = arayüz dilinin
-    ülkesi (tr → TR, de → DE, en → Tümü), **yalnızca** o ülkenin (gizlenmemiş) kategorisi varsa; yoksa ya da
-    seçilen ülkenin kategorisi kalmadıysa Tümü. Ülke seçiliyse **Yeni eklenenler, Top 10, hero** ve
-    kategori satırları o ülkenin kategorilerinden gelir ("Tümünü gör" grid'i de); **Tümü** = önceki davranış
+    grubu (tr → TR, de → DE, en → EN), **yalnızca** o grubun (gizlenmemiş) kategorisi varsa; yoksa ya da
+    seçilen grubun kategorisi kalmadıysa Tümü. Grup seçiliyse **Yeni eklenenler, Top 10, hero** ve
+    kategori satırları o grubun kategorilerinden gelir ("Tümünü gör" grid'i de); **Tümü** = önceki davranış
     (tüm kaynak, sağlayıcı sırası).
   * **iPhone/iPad:** üst sekmelerin hemen altında **sabit satır** (sayfa kayarken görünür kalır; hero üzerinde
     şeffaf, başlık siyaha dönünce siyah): geniş **"Kategoriler ▾"** düğmesi + **ülke seçici** hap

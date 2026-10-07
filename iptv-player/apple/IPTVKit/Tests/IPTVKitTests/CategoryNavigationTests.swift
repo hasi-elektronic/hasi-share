@@ -11,26 +11,66 @@ final class CategoryCountryTests: XCTestCase {
         XCTAssertEqual(CategoryCountry.code(for: "DE | Serien"), "DE")
         XCTAssertEqual(CategoryCountry.code(for: "TR | DİZİLER"), "TR")
         XCTAssertEqual(CategoryCountry.code(for: "[TR] Ulusal"), "TR")
-        XCTAssertEqual(CategoryCountry.code(for: "Sport (UK)"), "GB", "alias")
+        XCTAssertEqual(CategoryCountry.code(for: "Sport (UK)"), "GB", "alias without prefix")
+        XCTAssertEqual(CategoryCountry.code(for: "UK | Sport"), "GB", "alias as prefix")
+        XCTAssertEqual(CategoryCountry.code(for: "USA: Movies"), "US", "3-letter alias prefix")
         XCTAssertEqual(CategoryCountry.code(for: "TÜRKİYE"), "TR", "alias")
         XCTAssertEqual(CategoryCountry.code(for: "Germany Sport"), "DE", "country name")
         XCTAssertEqual(CategoryCountry.code(for: "Almanya Filmleri"), "DE", "Turkish alias")
-        // Existing mapping kept: "EN" is a language, not a region → no country.
-        XCTAssertNil(CategoryCountry.code(for: "[EN] Drama"))
-        XCTAssertNil(CategoryCountry.code(for: "EN | Netflix Series"))
-        XCTAssertNil(CategoryCountry.code(for: "4K MOVIES"))
-        XCTAssertNil(CategoryCountry.code(for: "IT | Serie TV"), "IT is an ignored token")
         XCTAssertNil(CategoryCountry.code(for: "Türk Dizileri"))
         XCTAssertNil(CategoryCountry.code(for: "LATAM | Series"), "multi-country group")
     }
 
+    /// Owner ruling (Build 9): a leading code with a separator is the group, language codes included.
+    func testLeadingCodeWithSeparatorIsTheGroupLanguagesIncluded() {
+        XCTAssertEqual(CategoryCountry.code(for: "IT | Serie TV"), "IT", "separator beats the ignored-token list")
+        XCTAssertEqual(CategoryCountry.code(for: "EN • Drama"), "EN")
+        XCTAssertEqual(CategoryCountry.code(for: "EN | Netflix Series"), "EN")
+        XCTAssertEqual(CategoryCountry.code(for: "[EN] Drama"), "EN", "bracket form")
+        XCTAssertEqual(CategoryCountry.code(for: "AR | مسلسلات"), "AR")
+        XCTAssertEqual(CategoryCountry.code(for: "FR: Séries"), "FR")
+        XCTAssertEqual(CategoryCountry.code(for: "NL - Series"), "NL")
+        XCTAssertEqual(CategoryCountry.code(for: "ES] Series"), "ES")
+        XCTAssertNil(CategoryCountry.code(for: "4K | Movies"), "a digit is no code")
+        XCTAssertNil(CategoryCountry.code(for: "4K MOVIES"))
+        XCTAssertNil(CategoryCountry.code(for: "NETFLIX | Series"), "longer than 3 letters")
+        XCTAssertNil(CategoryCountry.code(for: "En | Drama"), "upper case only")
+        XCTAssertNil(CategoryCountry.code(for: "Kids Movies"), "no separator, no country")
+    }
+
+    func testMeaningFlagAndDisplayName() {
+        let en = Locale(identifier: "en"), tr = Locale(identifier: "tr"), de = Locale(identifier: "de")
+        XCTAssertEqual(CategoryCountry.meaning(of: "TR"), .region)
+        XCTAssertEqual(CategoryCountry.meaning(of: "EN"), .language)
+        XCTAssertEqual(CategoryCountry.meaning(of: "AR"), .language, "AR means Arabic, not Argentina")
+        XCTAssertEqual(CategoryCountry.meaning(of: "IT"), .region)
+        XCTAssertEqual(CategoryCountry.meaning(of: "HD"), .tag)
+        XCTAssertEqual(CategoryCountry.flagEmoji(forCode: "TR"), "🇹🇷")
+        XCTAssertEqual(CategoryCountry.flagEmoji(forCode: "GB"), "🇬🇧")
+        XCTAssertNil(CategoryCountry.flagEmoji(forCode: "EN"), "no flag for a language")
+        XCTAssertNil(CategoryCountry.flagEmoji(forCode: "AR"), "no Argentina flag")
+        XCTAssertNil(CategoryCountry.flagEmoji(forCode: "TV"), "no Tuvalu flag for a tag")
+        XCTAssertEqual(CategoryCountry.displayName(of: "EN", locale: en), "English")
+        XCTAssertEqual(CategoryCountry.displayName(of: "EN", locale: tr), "İngilizce")
+        XCTAssertEqual(CategoryCountry.displayName(of: "AR", locale: de), "Arabisch")
+        XCTAssertEqual(CategoryCountry.displayName(of: "AR", locale: tr), "Arapça")
+        XCTAssertEqual(CategoryCountry.displayName(of: "DE", locale: de), "Deutschland")
+        XCTAssertEqual(CategoryCountry.displayName(of: "IT", locale: de), "Italien")
+        XCTAssertEqual(CategoryCountry.displayName(of: "TR", locale: tr), "Türkiye")
+        XCTAssertEqual(CategoryCountry.displayName(of: "XYZ", locale: en), "XYZ", "unknown code stays raw")
+    }
+
     func testFlagAndStrippedTitle() {
         XCTAssertEqual(CategoryCountry.emoji(for: "DE | Serien"), "🇩🇪")
+        XCTAssertEqual(CategoryCountry.emoji(for: "IT | Serie TV"), "🇮🇹")
+        XCTAssertNil(CategoryCountry.emoji(for: "EN | Netflix Series"))
+        XCTAssertNil(CategoryCountry.emoji(for: "AR | مسلسلات"))
         XCTAssertNil(CategoryCountry.emoji(for: "4K MOVIES"))
         XCTAssertEqual(CategoryCountry.strippedTitle("DE | Sport"), "Sport")
         XCTAssertEqual(CategoryCountry.strippedTitle("TR • NETFLIX DIZILER"), "NETFLIX DIZILER")
         XCTAssertEqual(CategoryCountry.strippedTitle("[TR] Ulusal"), "Ulusal")
-        XCTAssertEqual(CategoryCountry.strippedTitle("[EN] Drama"), "[EN] Drama", "no country → unchanged")
+        XCTAssertEqual(CategoryCountry.strippedTitle("EN | Netflix Series"), "EN | Netflix Series", "no flag → code kept")
+        XCTAssertEqual(CategoryCountry.nameWithoutPrefix("EN | Netflix Series"), "Netflix Series")
         XCTAssertEqual(CategoryCountry.strippedTitle("Germany Sport"), "Germany Sport")
     }
 
@@ -69,7 +109,7 @@ final class CategoryInfoTests: XCTestCase {
         let infos = try catalog.categoryInfos(sourceId: "s", kind: .series)
         XCTAssertEqual(infos.map(\.id), ["a", "b", "c", "d", "e"], "provider order, empty category left out")
         XCTAssertEqual(infos.map(\.itemCount), [1, 1, 2, 1, 1])
-        XCTAssertEqual(infos.map(\.countryCode), [nil, "DE", "TR", nil, "TR"])
+        XCTAssertEqual(infos.map(\.countryCode), ["EN", "DE", "TR", nil, "TR"])
         // Same id in another kind does not leak (Xtream VOD/series ids collide).
         let movieInfos = try catalog.categoryInfos(sourceId: "s", kind: .movie)
         XCTAssertEqual(movieInfos.map(\.id), ["a"])
@@ -95,7 +135,9 @@ final class CategoryPreferencesTests: XCTestCase {
         let available: Set<String> = ["TR", "DE"]
         XCTAssertEqual(CategoryPreferences.resolveCountry(stored: nil, available: available, languageCode: "tr"), "TR")
         XCTAssertEqual(CategoryPreferences.resolveCountry(stored: nil, available: available, languageCode: "de"), "DE")
-        XCTAssertNil(CategoryPreferences.resolveCountry(stored: nil, available: available, languageCode: "en"), "en → All")
+        XCTAssertNil(CategoryPreferences.resolveCountry(stored: nil, available: available, languageCode: "en"), "en without EN groups → All")
+        XCTAssertEqual(CategoryPreferences.resolveCountry(stored: nil, available: ["EN", "TR"], languageCode: "en"), "EN")
+        XCTAssertNil(CategoryPreferences.resolveCountry(stored: nil, available: available, languageCode: "fr"), "other languages → All")
         XCTAssertNil(CategoryPreferences.resolveCountry(stored: nil, available: ["DE"], languageCode: "tr"), "no TR categories → All")
         XCTAssertNil(CategoryPreferences.resolveCountry(stored: "all", available: available, languageCode: "tr"), "explicit All wins")
         XCTAssertEqual(CategoryPreferences.resolveCountry(stored: "DE", available: available, languageCode: "tr"), "DE")

@@ -37,7 +37,7 @@ func keyed(_ section: String, _ infos: [CategoryInfo]) -> [KeyedCategory] {
 /// "🇹🇷 Türkiye (12)" – country menu / column entries.
 @MainActor
 func countryMenuTitle(_ code: String, count: Int) -> String {
-    "\(CategoryCountry.flag(code)) \(CountryFlag.countryName(code)) (\(count))"
+    "\(CountryFlag.flagPrefix(code))\(CountryFlag.countryName(code)) (\(count))"
 }
 
 /// Country picker entries: "All" + every country present (selected first, then most categories first).
@@ -96,10 +96,32 @@ struct CategoryMenuItems: View {
     }
 }
 
+/// Category name in the navigation: the group code is shown as flag or badge, so its prefix is dropped
+/// ("EN | Netflix Series" → "Netflix Series" next to an "EN" badge).
+@MainActor
+func categoryTitle(_ info: CategoryInfo) -> String {
+    info.countryCode == nil ? info.category.name : CategoryCountry.nameWithoutPrefix(info.category.name)
+}
+
+/// Leading mark of a category entry: flag for real regions, the code badge for language groups ("EN", "AR").
+struct CategoryLeadingMark: View {
+    let code: String?
+
+    var body: some View {
+        if let code {
+            if let flag = CategoryCountry.flagEmoji(forCode: code) {
+                Text(flag).accessibilityHidden(true)
+            } else {
+                CountryBadge(code: code)
+            }
+        }
+    }
+}
+
 /// Accessibility label of a category entry ("DİZİLER, Turkey, 4 titles").
 @MainActor
 func categoryAccessibilityLabel(_ info: CategoryInfo) -> String {
-    [CountryFlag.strippedTitle(info.category.name), info.countryCode.map(CountryFlag.countryName),
+    [categoryTitle(info), info.countryCode.map(CountryFlag.countryName),
      L10n.t("catnav_items", String(info.itemCount))].compactMap { $0 }.joined(separator: ", ")
 }
 
@@ -223,7 +245,7 @@ struct CategorySheet: View {
                 Section {
                     countryChips
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
                 }
                 if !searching && !pinned.isEmpty {
                     Section {
@@ -247,7 +269,7 @@ struct CategorySheet: View {
                         ForEach(keyed("row", matches)) { row($0.info, identifier: "category_row_\($0.info.id)") }
                     }
                 } header: {
-                    header(model.country.map { "\(CategoryCountry.flag($0)) \(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"),
+                    header(model.country.map { "\(CountryFlag.flagPrefix($0))\(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"),
                            icon: nil, identifier: "category_section_all")
                 }
                 if !hidden.isEmpty {
@@ -262,6 +284,9 @@ struct CategorySheet: View {
                 }
             }
             .listStyle(.insetGrouped)
+            // The country chips sit right under the search field (no empty first-section gap).
+            .listSectionSpacing(.compact)
+            .contentMargins(.top, 4, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .background(Theme.bg)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: L10n.t("catnav_search"))
@@ -285,7 +310,7 @@ struct CategorySheet: View {
                 model.selectCountry(nil)
             }
             ForEach(model.countries, id: \.code) { entry in
-                chip(title: "\(CategoryCountry.flag(entry.code)) \(entry.code) \(entry.count)", selected: model.country == entry.code,
+                chip(title: "\(CountryFlag.flagPrefix(entry.code))\(entry.code) \(entry.count)", selected: model.country == entry.code,
                      identifier: "country_chip_\(entry.code)") {
                     model.selectCountry(entry.code)
                 }
@@ -321,8 +346,8 @@ struct CategorySheet: View {
 
     private func label(_ info: CategoryInfo, pinned: Bool) -> some View {
         HStack(spacing: 10) {
-            if let code = info.countryCode { Text(CategoryCountry.flag(code)) }
-            Text(CountryFlag.strippedTitle(info.category.name)).foregroundStyle(Theme.textPrimary).lineLimit(2)
+            CategoryLeadingMark(code: info.countryCode)
+            Text(categoryTitle(info)).foregroundStyle(Theme.textPrimary).lineLimit(2)
             Spacer(minLength: 8)
             if pinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(Theme.primary) }
             Text("\(info.itemCount)").font(.subheadline.monospacedDigit()).foregroundStyle(Theme.textSecondary)
@@ -408,6 +433,16 @@ struct FlowLayout: Layout {
 #endif
 
 #if os(tvOS)
+extension View {
+    /// tvOS side columns keep `scrollClipDisabled` (focus scaling and shadows must not be cut at the sides),
+    /// but rows scrolled up must not draw under / next to the floating tab bar: clip only the top edge.
+    func tvTopClipped() -> some View {
+        mask {
+            Rectangle().padding(.horizontal, -80).padding(.bottom, -400)
+        }
+    }
+}
+
 /// Apple TV Movies/Series (SCREENS §3.2 TV): left category column (~360 pt; one focusable control per
 /// row) | right content. The column: country picker · Discover (the browse page) · Pinned · Recently
 /// opened · the country's categories with counts · hidden ones. OK on a category shows its grid on the
@@ -490,6 +525,7 @@ struct TVCategoryBrowseView: View {
                 }
                 .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
                 .focused($focused, equals: "country")
+                .accessibilityLabel("\(L10n.t("catnav_country")): \(model.country.map(CountryFlag.countryName) ?? L10n.t("all"))")
                 .accessibilityIdentifier("country_picker")
                 .padding(.bottom, 8)
 
@@ -510,7 +546,7 @@ struct TVCategoryBrowseView: View {
                     sectionHeader(L10n.t("catnav_recent"), icon: "clock")
                     ForEach(keyed("recent", recent)) { categoryEntry(model, $0.info, prefix: "recent", identifier: "category_recent_\($0.info.id)") }
                 }
-                sectionHeader(model.country.map { "\(CategoryCountry.flag($0)) \(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"), icon: nil)
+                sectionHeader(model.country.map { "\(CountryFlag.flagPrefix($0))\(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"), icon: nil)
                 ForEach(keyed("row", scoped)) { categoryEntry(model, $0.info, prefix: "row", identifier: "category_row_\($0.info.id)") }
                 if !hidden.isEmpty {
                     entry(key: "show_hidden", selected: false, identifier: "category_show_hidden", action: { showHidden.toggle() }) {
@@ -528,6 +564,7 @@ struct TVCategoryBrowseView: View {
             .padding(.vertical, 20)
         }
         .scrollClipDisabled()
+        .tvTopClipped()
         .focusSection()
         .accessibilityIdentifier("category_column")
     }
@@ -551,8 +588,8 @@ struct TVCategoryBrowseView: View {
             lastColumnKey = key
             model.recordOpened(info)
         }) {
-            if let code = info.countryCode { Text(CategoryCountry.flag(code)) }
-            Text(CountryFlag.strippedTitle(info.category.name)).lineLimit(1)
+            CategoryLeadingMark(code: info.countryCode)
+            Text(categoryTitle(info)).lineLimit(1)
             Spacer(minLength: 8)
             Text("\(info.itemCount)").monospacedDigit().foregroundStyle(Theme.textSecondary)
         }

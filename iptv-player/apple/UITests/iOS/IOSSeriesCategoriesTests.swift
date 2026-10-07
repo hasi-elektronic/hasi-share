@@ -21,10 +21,12 @@ final class IOSSeriesCategoriesTests: XCTestCase {
         let app = UITestSupport.launch(["-seedM3U", UITestSupport.seriesCategoriesM3U, "-seedName", "Series"], seed: false)
         IOSFlowTests.openSection("series", in: app)
 
-        // Sticky row under the header: Categories ▾ + country picker (English UI → "All").
+        // Sticky row under the header: Categories ▾ + country picker. English UI + "EN | …" groups in the
+        // fixture → the EN language group is the default.
         let categories = app.buttons["category_button"]
         XCTAssertTrue(categories.waitForExistence(timeout: 20), "sticky Categories button")
         XCTAssertTrue(app.buttons["country_picker"].exists, "country picker")
+        XCTAssertTrue(app.buttons["country_picker"].label.contains("English"), "default group follows the UI language (en → EN)")
         XCTAssertFalse(app.descendants(matching: .any)["categories"].exists, "old chip shelf removed")
         UITestSupport.snap("catnav-ios-01-page", in: self)
 
@@ -35,8 +37,12 @@ final class IOSSeriesCategoriesTests: XCTestCase {
 
         categories.tap()
         XCTAssertTrue(app.navigationBars["Series categories"].waitForExistence(timeout: 5), "sheet title")
-        // A series-only category is listed.
+        // A series-only category of the EN group is listed; DE ones are not.
         XCTAssertTrue(element("category_row_", containing: "Netflix Series", in: app).waitForExistence(timeout: 5))
+        XCTAssertFalse(element("category_row_", containing: "Serien", in: app).exists, "EN group only")
+        // All: every category.
+        app.buttons["country_chip_all"].tap()
+        XCTAssertTrue(element("category_row_", containing: "Serien", in: app).waitForExistence(timeout: 5))
         UITestSupport.snap("catnav-ios-02-sheet", in: self)
 
         // Search: case/diacritics-insensitive, finds the last (14th) category.

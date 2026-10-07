@@ -443,9 +443,15 @@ enum CountryFlag {
         [emoji(for: title), strippedTitle(title)].compactMap { $0 }.joined(separator: " ")
     }
 
-    /// Localized country name of a region code in the UI language ("TR" → "Türkiye" / "Turkey" / "Türkei").
+    /// Name of a group code in the UI language: regions "TR" → "Türkiye" / "Türkei", language groups
+    /// "EN" → "English" / "İngilizce", "AR" → "Arabisch" (CategoryCountry.displayName).
     static func countryName(_ code: String) -> String {
-        L10n.locale.localizedString(forRegionCode: code) ?? code
+        CategoryCountry.displayName(of: code, locale: L10n.locale)
+    }
+
+    /// "🇹🇷 " for real regions, "" for language groups / tags (no 🇦🇷 for "AR").
+    static func flagPrefix(_ code: String) -> String {
+        CategoryCountry.flagEmoji(forCode: code).map { "\($0) " } ?? ""
     }
 }
 
