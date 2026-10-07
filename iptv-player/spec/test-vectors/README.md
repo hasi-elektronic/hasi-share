@@ -50,7 +50,9 @@ Error files: `{"error": "InvalidFormat" | "Empty"}`.
   or `release_date`.
 * Movie + series `cast`, `director`, `genre` (people search, CONTRACT §4.3): a string is trimmed; an
   array of strings is joined with `", "` after trimming and dropping empty/null entries; missing, null,
-  `""` or an empty result → null.
+  `""` or an empty result → null. The same rule applies to `get_series_info.info` and `get_vod_info.info`
+  (`series_info.expected.json` `details`, `vod_info.expected.json`); `get_vod_info` uses `actors` when `cast`
+  is missing or empty.
 * Episode: `number` ← `episode_num`; `season` ← `season` (fallback: object key, or
   array index + 1); `durationSec` ← `info.duration_secs`; `plot` ← `info.plot`;
   `posterUrl` ← `info.movie_image`.

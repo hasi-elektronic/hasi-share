@@ -207,8 +207,11 @@ public final class MoviesViewModel {
         guard case .xtream(let secrets)? = env.secrets(for: movie.sourceId),
               let client = XtreamClient(sourceId: movie.sourceId, secrets: secrets) else { return nil }
         let info = try? await client.vodInfo(vodId: movie.id)
-        if let info {   // cast/director become searchable (people search, SCREENS §3.6)
-            try? env.catalog.updatePeople(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast, director: info.director)
+        if let info {   // cast/director become searchable (people search, SCREENS §3.6); off the main actor
+            let catalog = env.catalog
+            Task.detached(priority: .utility) {
+                try? catalog.updatePeople(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast, director: info.director)
+            }
         }
         return info
     }
@@ -294,8 +297,11 @@ public final class SeriesDetailViewModel {
                 episodes = info.episodes.sorted { ($0.season, $0.number) < ($1.season, $1.number) }
                 if plot == nil { plot = info.details.plot }
                 try? env.catalog.replaceEpisodes(sourceId: series.sourceId, seriesId: series.id, episodes: episodes)
-                try? env.catalog.updatePeople(sourceId: series.sourceId, kind: .series, itemId: series.id,
-                                              cast: info.details.cast ?? series.cast, director: info.details.director ?? series.director)
+                let catalog = env.catalog, item = series, details = info.details
+                Task.detached(priority: .utility) {
+                    try? catalog.updatePeople(sourceId: item.sourceId, kind: .series, itemId: item.id,
+                                              cast: details.cast ?? item.cast, director: details.director ?? item.director)
+                }
             }
         }
         if let next = continueEpisode { season = next.season } else if let first = seasons.first { season = first }
@@ -471,10 +477,21 @@ public final class SearchViewModel {
             guard let sourceId else { categories = []; return }
             let prefs = env.categoryPrefs
             let hiddenLive = hiddenLiveCategories(sourceId)
-            categories = (try? env.catalog.searchCategories(text, sourceId: sourceId) { kind in
+            categories = CatalogRepository.matchCategories(text, infos: categoryInfos(sourceId: sourceId)) { kind in
                 kind == .live ? hiddenLive : prefs.hidden(sourceId: sourceId, kind: kind)
-            }) ?? []
+            }
         }
+    }
+
+    /// Category lists per source, cached until the catalog changes (not three GROUP BY queries per keystroke).
+    @ObservationIgnored private var categoryCache: (key: String, infos: [CategoryInfo])?
+
+    private func categoryInfos(sourceId: String) -> [CategoryInfo] {
+        let key = "\(sourceId)|\(env.catalogVersion)"
+        if let categoryCache, categoryCache.key == key { return categoryCache.infos }
+        let infos = [CategoryKind.movie, .series, .live].flatMap { (try? env.catalog.categoryInfos(sourceId: sourceId, kind: $0)) ?? [] }
+        categoryCache = (key, infos)
+        return infos
     }
 
     public func channel(_ hit: SearchHit) -> Channel? { (try? env.catalog.channel(sourceId: hit.sourceId, id: hit.itemId)) ?? nil }

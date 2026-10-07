@@ -105,6 +105,13 @@ public final class AppEnvironment {
         wire()
         sourceRepository.registerSecretsForRedaction()
         reloadSources()
+        // Search index v6: titles of older catalogs are re-indexed in the background, never at launch.
+        if database.searchBackfillPending {
+            let catalog = self.catalog
+            Task.detached(priority: .utility) {
+                do { try catalog.backfillSearchIndex() } catch { SafeLog.warning("search backfill failed") }
+            }
+        }
     }
 
     private func wire() {

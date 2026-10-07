@@ -37,7 +37,12 @@
           "plot": null,
           "posterUrl": null
         }
-      ]
+      ],
+      "details": {
+        "cast": "Bryan Cranston, Aaron Paul",
+        "director": "Vince Gilligan",
+        "genre": "Drama, Crime"
+      }
     },
     {
       "file": "series_info_list_variant.json",
@@ -65,7 +70,12 @@
           "plot": null,
           "posterUrl": null
         }
-      ]
+      ],
+      "details": {
+        "cast": null,
+        "director": null,
+        "genre": null
+      }
     }
   ]
 }

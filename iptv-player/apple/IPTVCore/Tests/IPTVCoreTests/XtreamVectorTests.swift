@@ -15,11 +15,12 @@ final class XtreamVectorTests: XCTestCase {
             "live_streams.json", "live_streams.expected.json", "vod_streams.json", "vod_streams.expected.json",
             "series.json", "series.expected.json", "series_info.expected.json", "short_epg.json",
             "short_epg.expected.json", "url-vectors.json", "series_categories.json", "series_categories.expected.json",
-            "category_ids.json", "category_ids.expected.json",
+            "category_ids.json", "category_ids.expected.json", "vod_info.expected.json",
         ]
         var referenced = covered
         for c in try XCTUnwrap(Vectors.object("xtream/auth.expected.json").arr("cases")) { referenced.insert(c.str("file") ?? "") }
         for c in try XCTUnwrap(Vectors.object("xtream/series_info.expected.json").arr("cases")) { referenced.insert(c.str("file") ?? "") }
+        for c in try XCTUnwrap(Vectors.object("xtream/vod_info.expected.json").arr("cases")) { referenced.insert(c.str("file") ?? "") }
         XCTAssertEqual(Set(try Vectors.files(in: "xtream")), referenced)
     }
 
@@ -153,12 +154,28 @@ final class XtreamVectorTests: XCTestCase {
                  "containerExt": j(e.containerExt), "durationSec": j(e.durationSec), "plot": j(e.plot), "posterUrl": j(e.posterUrl)]
             }
             assertJSONEqual(try XCTUnwrap(c["episodes"]), actual, file)
+            let details = XtreamMapper.seriesDetails(try json(file))
+            assertJSONEqual(try XCTUnwrap(c["details"]),
+                            ["cast": j(details.cast), "director": j(details.director), "genre": j(details.genre)] as [String: Any], "\(file) details")
         }
         let details = XtreamMapper.seriesDetails(try json("series_info.json"))
         XCTAssertEqual(details.name, "Breaking Bad")
         XCTAssertEqual(details.year, 2008)
         XCTAssertEqual(details.rating, 9.5)
         XCTAssertNil(XtreamMapper.seriesDetails(try json("series_info_list_variant.json")).name, "info: [] is an empty object")
+    }
+
+    /// `get_vod_info` people fields: strings or arrays, `actors` fallback (CONTRACT §4.3).
+    func testVodInfoPeople() throws {
+        let cases = try XCTUnwrap(Vectors.object("xtream/vod_info.expected.json").arr("cases"))
+        XCTAssertEqual(cases.count, 2)
+        for c in cases {
+            let file = try XCTUnwrap(c.str("file"))
+            let info = XtreamMapper.vodInfo(try json(file))
+            let actual: [String: Any] = ["file": file, "name": j(info.name), "cast": j(info.cast), "director": j(info.director),
+                                         "genre": j(info.genre), "durationSec": j(info.durationSec), "containerExt": j(info.containerExt)]
+            assertJSONEqual(c, actual, file)
+        }
     }
 
     func testShortEpg() throws {

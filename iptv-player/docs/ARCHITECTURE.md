@@ -93,9 +93,14 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    sonraki yenilemelerde de dizine yazılır. Türkçe noktasız "ı" / noktalı "İ" FTS'de aksan sayılmadığından
    bu harfleri içeren başlık/kişi metinlerine görünmez bir ayraçtan (U+2063) sonra "ı → i" varyantı eklenir
    ("yilmaz" → "Yılmaz"). Sorgu: iki FTS sorgusu — önce `{title}` (tür başına ilk 30, pencere fonksiyonu),
-   sonra `{people} : … NOT {title} : …` (başlığı eşleşmeyen kişi eşleşmeleri, en fazla 30). v6 göçü tabloyu
-   yeniden kurar ve başlıkları içerik tablolarından hemen yeniden dizinler; `people` için CatalogFormat 3
-   her kaynağı bir kez yeniler. Bütçe: 50k film + 10k dizi ile ≤ 100 ms (`CatalogPerformanceTests`).
+   sonra `{people} : … NOT {title} : …` (başlığı eşleşmeyen kişi eşleşmeleri, en fazla 30). v6 göçü yalnızca
+   tabloyu yeniden kurar (açılışı bloklamaz); eski başlıklar **arka planda** (`SearchBackfill`, 2000'lik
+   işlemler, `kv` imleçleri: tablo başına göç anındaki en büyük rowid + son dizinlenen rowid) yeniden
+   dizinlenir — uygulama kapatılsa da kaldığı yerden sürer, hiçbir satır iki kez dizinlenmez; bitene kadar
+   arama LIKE yoluyla (yalnız başlık) çalışır. Detaydan öğrenilen kişiler değişmediyse yeniden yazılmaz;
+   dizin satırı başlık sözcükleriyle (FTS) bulunup rowid ile güncellenir (tam tarama yok), ana iş parçacığı
+   dışında. Yenileme sürerken öğrenilen kişiler commit'te eklenir. `people` için CatalogFormat 3 her kaynağı
+   bir kez yeniler. Bütçe: 50k film + 10k dizi ile ≤ 100 ms (`CatalogPerformanceTests`).
 
 ### 3.2 Oynatma
 `PlayerController` (her iki platformda aynı sorumluluklar):

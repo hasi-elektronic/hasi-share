@@ -51,8 +51,8 @@ public enum CatalogPeople {
     }
 
     /// The person of a `people` text that matches every token (prefix match per word, case and diacritics
-    /// folded): "hasan" in "Hasan Can Kaya, Ali Yılmaz" → "Hasan Can Kaya". Falls back to the first person
-    /// matching any token, then to the whole text.
+    /// folded): "hasan" in "Hasan Can Kaya, Ali Yılmaz" → "Hasan Can Kaya". Otherwise the (at most two)
+    /// people matching some token, joined; then the whole text.
     public static func matchedPerson(_ people: String, tokens: [String]) -> String {
         let names = people.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         let folded = tokens.map(CategoryCountry.fold)
@@ -62,9 +62,10 @@ public enum CatalogPeople {
         if let all = names.first(where: { name in let w = words(name); return folded.allSatisfy { t in w.contains { $0.hasPrefix(t) } } }) {
             return all
         }
-        if let any = names.first(where: { name in let w = words(name); return folded.contains { t in w.contains { $0.hasPrefix(t) } } }) {
-            return any
-        }
+        // No single person has every token ("hasan kaya" in "Hasan Yılmaz, Ali Kaya"): the names that matched,
+        // at most two.
+        let some = names.filter { name in let w = words(name); return folded.contains { t in w.contains { $0.hasPrefix(t) } } }
+        if !some.isEmpty { return some.prefix(2).joined(separator: ", ") }
         return people
     }
 }
@@ -370,8 +371,19 @@ public final class CatalogRepository: Sendable {
     public func search(_ text: String, sourceId: String? = nil, perKindLimit: Int = 30) throws -> [SearchHit] {
         let tokens = Self.tokens(text)
         guard !tokens.isEmpty, perKindLimit > 0 else { return [] }
-        if db.hasFTS5 { return try searchFTS(tokens: tokens, sourceId: sourceId, perKindLimit: perKindLimit) }
+        // While the v6 index is still being filled in the background (`backfillSearchIndex`) FTS would miss
+        // titles: the LIKE path answers (titles only) until it is done.
+        if db.hasFTS5, !database.searchBackfillPending {
+            return try searchFTS(tokens: tokens, sourceId: sourceId, perKindLimit: perKindLimit)
+        }
         return try searchLike(tokens: tokens, sourceId: sourceId, perKindLimit: perKindLimit)
+    }
+
+    /// Re-indexes titles of content stored before search index v6 (`SearchBackfill`), in transactions of
+    /// `chunkSize` rows; resumable after a kill. Call off the main thread. Returns true when done.
+    @discardableResult
+    public func backfillSearchIndex(chunkSize: Int = 2000, maxChunks: Int = .max) throws -> Bool {
+        try SearchBackfill.run(db, chunkSize: chunkSize, maxChunks: maxChunks)
     }
 
     static func tokens(_ text: String) -> [String] {
@@ -408,37 +420,85 @@ public final class CatalogRepository: Sendable {
     }
 
     /// Cast/director learned from a detail fetch (Xtream `get_vod_info` / `get_series_info`): searchable at
-    /// once and kept across refreshes (`item_people`).
+    /// once and kept across refreshes (`item_people`). Unchanged people are not rewritten; the index row is
+    /// found through its title tokens (FTS) and updated by rowid – no scan of the whole index. Call off the
+    /// main thread.
     public func updatePeople(sourceId: String, kind: ContentKind, itemId: String, cast: String?, director: String?) throws {
         guard let people = CatalogPeople.text(cast: cast, director: director) else { return }
+        let known = try db.queryFirst("SELECT people FROM item_people WHERE source_id = ? AND kind = ? AND item_id = ?",
+                                      [.text(sourceId), .text(kind.rawValue), .text(itemId)]) { $0.string(0) }
+        guard known != people else { return }
         try db.transaction {
             try db.run("INSERT OR REPLACE INTO item_people (source_id, kind, item_id, people) VALUES (?,?,?,?)",
                        [.text(sourceId), .text(kind.rawValue), .text(itemId), .text(people)])
-            if db.hasFTS5 {
-                try db.run("UPDATE search_index SET people = ? WHERE source_id = ? AND kind = ? AND item_id = ?",
-                           [.text(CatalogPeople.indexed(people)), .text(sourceId), .text(kind.rawValue), .text(itemId)])
-            }
+            try Self.setIndexPeople(db: db, sourceId: sourceId, kind: kind, itemId: itemId, people: people)
         }
     }
 
-    /// Categories whose name contains every token (case/diacritics folded, the group code included – like the
-    /// category sheet search): movie, series, then live, provider order, at most `limit`. `hidden` gives the
-    /// hidden category ids per kind (they are left out).
-    public func searchCategories(_ text: String, sourceId: String, limit: Int = 12,
-                                 hidden: (CategoryKind) -> Set<String> = { _ in [] }) throws -> [CategoryInfo] {
-        let tokens = text.split(whereSeparator: { $0.isWhitespace }).map { CategoryCountry.fold(String($0)) }.filter { !$0.isEmpty }
-        guard !tokens.isEmpty, limit > 0 else { return [] }
+    /// Writes `people` into the search index row of one item (located via its title tokens, then rowid).
+    static func setIndexPeople(db: SQLiteDatabase, sourceId: String, kind: ContentKind, itemId: String, people: String) throws {
+        guard db.hasFTS5 else { return }
+        let table: String
+        switch kind {
+        case .live: table = "channels"
+        case .movie: table = "movies"
+        case .series: table = "series"
+        case .episode: return
+        }
+        let name = try db.queryFirst("SELECT name FROM \(table) WHERE source_id = ? AND id = ?", [.text(sourceId), .text(itemId)]) { $0.string(0) }
+        let scope: [SQLiteValue] = [.text(sourceId), .text(kind.rawValue), .text(itemId)]
+        let rowids: [Int64]
+        let titleTokens = name.map(tokens) ?? []
+        if titleTokens.isEmpty {
+            rowids = try db.query("SELECT rowid FROM search_index WHERE source_id = ? AND kind = ? AND item_id = ?", scope) { $0.int64(0) }
+        } else {
+            let match = "{title} : (" + titleTokens.map { "\"\($0)\"" }.joined(separator: " ") + ")"
+            rowids = try db.query("SELECT rowid FROM search_index WHERE search_index MATCH ? AND source_id = ? AND kind = ? AND item_id = ?",
+                                  [.text(match)] + scope) { $0.int64(0) }
+        }
+        for rowid in rowids {
+            try db.run("UPDATE search_index SET people = ? WHERE rowid = ?", [.text(CatalogPeople.indexed(people)), .int(rowid)])
+        }
+    }
+
+    /// Categories matching every token of `text` (≥ 2 characters): each token is the start of a word of the
+    /// name without its group code ("disney" → "EN | Disney+ Movies"); the group code itself only counts next
+    /// to another token ("tr disney"), so "tr" or "a" alone do not fill the result with whole countries.
+    /// Movie, series, then live, provider order, at most `limit`; hidden ones left out.
+    public static func matchCategories(_ text: String, infos: [CategoryInfo], limit: Int = 12,
+                                       hidden: (CategoryKind) -> Set<String> = { _ in [] }) -> [CategoryInfo] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tokens = trimmed.split(whereSeparator: { $0.isWhitespace }).map { CategoryCountry.fold(String($0)) }.filter { !$0.isEmpty }
+        guard trimmed.count >= 2, !tokens.isEmpty, limit > 0 else { return [] }
+        let order: [CategoryKind: Int] = [.movie: 0, .series: 1, .live: 2]
+        var hiddenCache: [CategoryKind: Set<String>] = [:]
         var out: [CategoryInfo] = []
-        for kind in [CategoryKind.movie, .series, .live] {
-            let skip = hidden(kind)
-            for info in try categoryInfos(sourceId: sourceId, kind: kind) where !skip.contains(info.id) {
-                let name = CategoryCountry.fold(info.category.name)
-                guard tokens.allSatisfy({ name.contains($0) }) else { continue }
-                out.append(info)
-                if out.count == limit { return out }
+        for info in infos.sorted(by: { (order[$0.category.kind] ?? 3, $0.category.sort) < (order[$1.category.kind] ?? 3, $1.category.sort) }) {
+            let kind = info.category.kind
+            if hiddenCache[kind] == nil { hiddenCache[kind] = hidden(kind) }
+            guard !(hiddenCache[kind] ?? []).contains(info.id) else { continue }
+            let words = CategoryCountry.fold(CategoryCountry.nameWithoutPrefix(info.category.name))
+                .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }
+            let codes = Set([info.countryCode, CategoryCountry.leadingPrefix(info.category.name)?.token]
+                .compactMap { $0.map(CategoryCountry.fold) })
+            var nameHits = 0
+            let all = tokens.allSatisfy { t in
+                if words.contains(where: { $0.hasPrefix(t) }) { nameHits += 1; return true }
+                return tokens.count > 1 && codes.contains(t)
             }
+            guard all, nameHits > 0 else { continue }
+            out.append(info)
+            if out.count == limit { break }
         }
         return out
+    }
+
+    /// `matchCategories` over the source's movie, series and live categories (tests / one-off use; the search
+    /// screen caches `categoryInfos`).
+    public func searchCategories(_ text: String, sourceId: String, limit: Int = 12,
+                                 hidden: (CategoryKind) -> Set<String> = { _ in [] }) throws -> [CategoryInfo] {
+        let infos = try [CategoryKind.movie, .series, .live].flatMap { try categoryInfos(sourceId: sourceId, kind: $0) }
+        return Self.matchCategories(text, infos: infos, limit: limit, hidden: hidden)
     }
 
     /// Fallback without FTS5: LIKE over the three tables, same per-kind limit and order.
@@ -570,6 +630,14 @@ public final class CatalogRefreshSession: @unchecked Sendable {
             if db.hasFTS5 {
                 try db.run("DELETE FROM search_index WHERE source_id = ?", [.text(sourceId)])
                 try db.run("UPDATE search_index SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
+                // People learned from detail pages while this refresh ran (after the snapshot in `init`).
+                let current = try db.query("SELECT kind, item_id, people FROM item_people WHERE source_id = ?", [.text(sourceId)]) {
+                    (kind: $0.string(0), itemId: $0.string(1), people: $0.string(2))
+                }
+                for row in current where detailPeople["\(row.kind)|\(row.itemId)"] != row.people {
+                    guard let kind = ContentKind(rawValue: row.kind) else { continue }
+                    try CatalogRepository.setIndexPeople(db: db, sourceId: sourceId, kind: kind, itemId: row.itemId, people: row.people)
+                }
             }
         }
     }

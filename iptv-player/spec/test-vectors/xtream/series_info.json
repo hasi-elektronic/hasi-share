@@ -16,7 +16,18 @@
     "plot": "A chemistry teacher turns to crime.",
     "releaseDate": "2008-01-20",
     "rating": "9.5",
-    "category_id": "20"
+    "category_id": "20",
+    "cast": [
+      "Bryan Cranston",
+      " ",
+      null,
+      "Aaron Paul"
+    ],
+    "director": " Vince Gilligan ",
+    "genre": [
+      "Drama",
+      "Crime"
+    ]
   },
   "episodes": {
     "1": [

@@ -54,6 +54,7 @@ class XtreamVectorsTest {
             "series_info_list_variant.json", "short_epg.expected.json", "short_epg.json", "url-vectors.json",
             "vod_streams.expected.json", "vod_streams.json", "series_categories.json", "series_categories.expected.json",
             "category_ids.json", "category_ids.expected.json",
+            "vod_info.json", "vod_info_actors.json", "vod_info.expected.json",
         )
         val present = Vectors.file("xtream/auth_ok.json").parentFile.listFiles()!!.map { it.name }.toSet()
         assertEquals(present, used, "new xtream vector files must get a test")
@@ -174,6 +175,10 @@ class XtreamVectorsTest {
             val seriesId = c.getValue("seriesId").jsonPrimitive.content
             val info = XtreamMapper.seriesInfo(json(file), src, seriesId)
             assertJsonEquals(c.getValue("episodes"), JsonArray(info.episodes.map(::episodeJson)), file)
+            val details = buildJsonObject {
+                put("cast", str(info.details.cast)); put("director", str(info.details.director)); put("genre", str(info.details.genre))
+            }
+            assertJsonEquals(c.getValue("details"), details, "$file details")
         }
         val details = XtreamMapper.seriesDetails(json("series_info.json"))
         assertEquals("Breaking Bad", details.name)
@@ -182,6 +187,27 @@ class XtreamVectorsTest {
         assertEquals("20", details.categoryId)
         // `info: []` → empty details, not a failure.
         assertEquals(XtreamSeriesDetails(), XtreamMapper.seriesDetails(json("series_info_list_variant.json")))
+    }
+
+    /** `get_vod_info` people fields: strings or arrays, `actors` fallback (CONTRACT §4.3). */
+    @Test
+    fun vodInfoPeople() {
+        val cases = json("vod_info.expected.json").jsonObject.getValue("cases").jsonArray
+        assertEquals(2, cases.size)
+        for (c in cases.map { it.jsonObject }) {
+            val file = c.getValue("file").jsonPrimitive.content
+            val info = XtreamMapper.vodInfo(json(file))
+            val actual = buildJsonObject {
+                put("file", file)
+                put("name", str(info.name))
+                put("cast", str(info.cast))
+                put("director", str(info.director))
+                put("genre", str(info.genre))
+                put("durationSec", num(info.durationSec))
+                put("containerExt", str(info.containerExt))
+            }
+            assertJsonEquals(c, actual, file)
+        }
     }
 
     @Test

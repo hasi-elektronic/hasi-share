@@ -31,9 +31,11 @@ struct InteractivePopEnabler: UIViewControllerRepresentable {
             if pop.delegate !== self { pop.delegate = self }
         }
 
-        /// Only with something to go back to (the root never starts a pop – that would freeze the stack).
+        /// Only with something to go back to and no push/pop animating: replacing the system delegate drops
+        /// UIKit's own "no pop during a transition" guard, and a pop started mid-push freezes the stack.
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            (navigationController?.viewControllers.count ?? 0) > 1
+            guard let nav = navigationController else { return false }
+            return nav.viewControllers.count > 1 && nav.transitionCoordinator == nil
         }
     }
 }
@@ -45,26 +47,23 @@ struct EdgeSwipeDismiss: ViewModifier {
     static let edgeWidth: CGFloat = 24
     static let threshold: CGFloat = 80
     let dismiss: () -> Void
-    @State private var offset: CGFloat = 0
+    /// Resets by itself when the gesture ends or the system cancels it (springs back).
+    @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.25))) private var offset: CGFloat = 0
 
     func body(content: Content) -> some View {
         content
             .offset(x: offset)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 12, coordinateSpace: .global)
-                    .onChanged { value in
+                    .updating($offset) { value, state, _ in
                         guard value.startLocation.x <= Self.edgeWidth else { return }
                         let dx = value.translation.width, dy = value.translation.height
                         guard dx > 0, abs(dy) < dx else { return }
-                        offset = dx
+                        state = dx
                     }
                     .onEnded { value in
                         let dx = value.translation.width, dy = value.translation.height
-                        if value.startLocation.x <= Self.edgeWidth, dx > Self.threshold, abs(dy) < dx * 0.6 {
-                            dismiss()
-                        } else {
-                            withAnimation(.spring(duration: 0.25)) { offset = 0 }
-                        }
+                        if value.startLocation.x <= Self.edgeWidth, dx > Self.threshold, abs(dy) < dx * 0.6 { dismiss() }
                     }
             )
     }

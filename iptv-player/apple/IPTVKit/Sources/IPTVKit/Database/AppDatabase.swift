@@ -143,10 +143,12 @@ public final class AppDatabase: Sendable {
         }
         if db.userVersion < 6 {
             // People search (Build 10): the FTS index gets a second searchable column `people` (cast + director).
-            // FTS5 tables cannot be altered → drop and recreate; titles are re-indexed from the content tables
-            // right away (search keeps working), `people` is filled by the next catalog refresh
-            // (`CatalogFormat` 3 triggers one per source) and by detail fetches. `item_people` keeps people
-            // known only from details (Xtream `get_vod_info` / `get_series_info`) across refreshes.
+            // FTS5 tables cannot be altered → drop and recreate. Re-indexing every title here blocked app launch
+            // (≈ 1 s on Apple TV HD at 65k rows), so the migration only records which content rows still need
+            // their title indexed (`SearchBackfill`, kv cursors) and `CatalogRepository.backfillSearchIndex()`
+            // does it in small transactions in the background – resumable after a kill. Until it is done
+            // search uses the LIKE path. `people` is filled by the next catalog refresh (`CatalogFormat` 3) and
+            // by detail fetches; `item_people` keeps people known only from details across refreshes.
             try db.transaction {
                 try db.execute("""
                 CREATE TABLE IF NOT EXISTS item_people (
@@ -160,18 +162,15 @@ public final class AppDatabase: Sendable {
                       title, people, source_id UNINDEXED, kind UNINDEXED, item_id UNINDEXED,
                       tokenize = 'unicode61 remove_diacritics 2');
                     """)
-                    // Same indexed form as `CatalogPeople.indexed` (dotless-i variant after U+2063).
-                    let indexed = "name || CASE WHEN instr(name, 'ı') > 0 OR instr(name, 'İ') > 0 THEN ' ' || char(8291) || ' ' "
-                        + "|| replace(replace(name, 'ı', 'i'), 'İ', 'I') ELSE '' END"
-                    for (table, kind) in [("channels", "live"), ("movies", "movie"), ("series", "series")] {
-                        try db.execute("INSERT INTO search_index (title, people, source_id, kind, item_id) "
-                                       + "SELECT \(indexed), '', source_id, '\(kind)', id FROM \(table);")
-                    }
+                    try SearchBackfill.schedule(db)
                 }
             }
             db.userVersion = 6
         }
     }
+
+    /// True while titles of pre-v6 content are still being re-indexed (search uses the LIKE path meanwhile).
+    public var searchBackfillPending: Bool { SearchBackfill.isPending(db) }
 
     // MARK: Key/value (small app state such as sync cursor)
 
@@ -186,5 +185,83 @@ public final class AppDatabase: Sendable {
         } else {
             _ = try? db.run("DELETE FROM kv WHERE key = ?", [.text(key)])
         }
+    }
+}
+
+/// Background re-indexing of titles after the v6 search index rebuild. Per table: the highest content rowid
+/// that existed at migration time (`…max`) and the last rowid indexed (`…at`); rows created later are
+/// indexed by their own refresh. Each chunk inserts its index rows and advances the cursor in ONE
+/// transaction, so a kill loses nothing and indexes nothing twice.
+enum SearchBackfill {
+    static let tables: [(table: String, kind: String)] = [("channels", "live"), ("movies", "movie"), ("series", "series")]
+    static let pendingKey = "search.backfill.pending"
+    static func maxKey(_ table: String) -> String { "search.backfill.\(table).max" }
+    static func atKey(_ table: String) -> String { "search.backfill.\(table).at" }
+
+    /// Same indexed form as `CatalogPeople.indexed` (dotless-i variant after U+2063).
+    static let indexedTitle = "name || CASE WHEN instr(name, 'ı') > 0 OR instr(name, 'İ') > 0 THEN ' ' || char(8291) || ' ' "
+        + "|| replace(replace(name, 'ı', 'i'), 'İ', 'I') ELSE '' END"
+
+    static func setValue(_ db: SQLiteDatabase, _ value: String?, _ key: String) throws {
+        if let value {
+            try db.run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                       [.text(key), .text(value)])
+        } else {
+            try db.run("DELETE FROM kv WHERE key = ?", [.text(key)])
+        }
+    }
+
+    static func value(_ db: SQLiteDatabase, _ key: String) -> Int64? {
+        (try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(key)]) { $0.string(0) }).flatMap { $0.flatMap { Int64($0) } }
+    }
+
+    /// Nothing to do for an empty catalog (new install): the flag is only set when rows exist.
+    static func schedule(_ db: SQLiteDatabase) throws {
+        var any = false
+        for (table, _) in tables {
+            let max = Int64(try db.scalar("SELECT COALESCE(MAX(rowid), 0) FROM \(table)"))
+            any = any || max > 0
+            try setValue(db, String(max), maxKey(table))
+            try setValue(db, "0", atKey(table))
+        }
+        if any { try setValue(db, "1", pendingKey) }
+    }
+
+    static func isPending(_ db: SQLiteDatabase) -> Bool { value(db, pendingKey) != nil }
+
+    /// Indexes up to `chunkSize` rows per transaction; stops after `maxChunks` (tests simulate a kill).
+    /// Returns true when everything is indexed (flag cleared).
+    @discardableResult
+    static func run(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int) throws -> Bool {
+        guard db.hasFTS5, isPending(db) else { return true }
+        var chunks = 0
+        for (table, kind) in tables {
+            let max = value(db, maxKey(table)) ?? 0
+            while (value(db, atKey(table)) ?? 0) < max {
+                guard chunks < maxChunks else { return false }
+                chunks += 1
+                try db.transaction {
+                    let at = value(db, atKey(table)) ?? 0
+                    let last = Int64(try db.scalar("""
+                        SELECT COALESCE(MAX(rowid), ?) FROM (SELECT rowid FROM \(table) WHERE rowid > ? AND rowid <= ?
+                        ORDER BY rowid LIMIT ?)
+                        """, [.int(max), .int(at), .int(max), .int(Int64(chunkSize))]))
+                    try db.run("""
+                        INSERT INTO search_index (title, people, source_id, kind, item_id)
+                        SELECT \(indexedTitle), '', source_id, '\(kind)', id FROM \(table)
+                        WHERE rowid > ? AND rowid <= ? AND source_id NOT LIKE '%\(AppDatabase.stagingSuffix)'
+                        """, [.int(at), .int(last)])
+                    try setValue(db, String(last), atKey(table))
+                }
+            }
+        }
+        try db.transaction {
+            for (table, _) in tables {
+                try setValue(db, nil, maxKey(table))
+                try setValue(db, nil, atKey(table))
+            }
+            try setValue(db, nil, pendingKey)
+        }
+        return true
     }
 }

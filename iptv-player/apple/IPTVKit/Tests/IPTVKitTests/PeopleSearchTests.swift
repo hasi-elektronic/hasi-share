@@ -65,6 +65,18 @@ final class PeopleSearchTests: XCTestCase {
         XCTAssertEqual(try database.db.scalar("SELECT COUNT(*) FROM item_people WHERE source_id = 's'") as Int, 0)
     }
 
+    /// Review: a detail fetch during a running refresh is not lost at commit; unchanged people are not rewritten.
+    func testPeopleLearnedDuringRefreshSurviveCommit() throws {
+        let session = try catalog.beginRefresh(sourceId: "s")
+        try session.write(movies: [Movie(sourceId: "s", id: "m2", name: "Inception", sort: 0)])
+        try catalog.updatePeople(sourceId: "s", kind: .movie, itemId: "m2", cast: "Cillian Murphy", director: nil)
+        try session.commit()
+        XCTAssertEqual(try catalog.search("cillian", sourceId: "s").map(\.itemId), ["m2"])
+        XCTAssertEqual(try database.db.scalar("SELECT COUNT(*) FROM search_index WHERE item_id = 'm2'") as Int, 1, "one index row")
+        try catalog.updatePeople(sourceId: "s", kind: .movie, itemId: "m2", cast: "Cillian Murphy", director: nil)   // no-op
+        XCTAssertEqual(try catalog.search("cillian", sourceId: "s").map(\.itemId), ["m2"])
+    }
+
     func testCategorySearchAllTokensGroupCodeHiddenAndKinds() throws {
         let disney = try catalog.searchCategories("disney", sourceId: "s")
         XCTAssertEqual(disney.map { "\($0.category.kind.rawValue):\($0.id)" }, ["movie:d", "series:d", "live:l"], "movie, series, live")
@@ -74,10 +86,18 @@ final class PeopleSearchTests: XCTestCase {
         XCTAssertEqual(try catalog.searchCategories("disney", sourceId: "s", hidden: { $0 == .live ? ["l"] : [] }).count, 2, "hidden left out")
         XCTAssertEqual(try catalog.searchCategories("disney", sourceId: "s", limit: 1).count, 1)
         XCTAssertTrue(try catalog.searchCategories("  ", sourceId: "s").isEmpty)
+        // Build 11 review: word-prefix match, ≥ 2 characters, a group code alone does not flood the section.
+        XCTAssertEqual(try catalog.searchCategories("dis", sourceId: "s").count, 3, "word prefix")
+        XCTAssertTrue(try catalog.searchCategories("isney", sourceId: "s").isEmpty, "no inner substring")
+        XCTAssertTrue(try catalog.searchCategories("d", sourceId: "s").isEmpty, "one character")
+        XCTAssertTrue(try catalog.searchCategories("tr", sourceId: "s").isEmpty, "group code alone")
+        XCTAssertEqual(try catalog.searchCategories("de disney", sourceId: "s").map(\.id), ["l"], "group code next to a name word")
     }
 
     func testMatchedPersonPicksTheMatchingName() {
         XCTAssertEqual(CatalogPeople.matchedPerson("Ali Yılmaz, Hasan Can Kaya", tokens: ["can", "kaya"]), "Hasan Can Kaya")
+        XCTAssertEqual(CatalogPeople.matchedPerson("Hasan Yılmaz, Ali Kaya, Veli Kaya", tokens: ["hasan", "kaya"]), "Hasan Yılmaz, Ali Kaya",
+                       "no single person matches all tokens: the matched names, at most two")
         XCTAssertEqual(CatalogPeople.text(cast: " Hasan Can Kaya ", director: ""), "Hasan Can Kaya")
         XCTAssertNil(CatalogPeople.text(cast: nil, director: " "))
     }
@@ -107,6 +127,17 @@ final class SearchIndexMigrationTests: XCTestCase {
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
         XCTAssertEqual(db.db.userVersion, 6)
         let catalog = CatalogRepository(database: db)
+        // The migration does not index titles itself (launch stays fast): pending → LIKE path meanwhile.
+        XCTAssertTrue(db.searchBackfillPending)
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 0)
+        XCTAssertEqual(try catalog.search("trt", sourceId: "s").map(\.itemId), ["c1"], "LIKE fallback")
+        // Killed after two chunks of one row: resumes where it stopped, nothing indexed twice.
+        XCTAssertFalse(try catalog.backfillSearchIndex(chunkSize: 1, maxChunks: 2))
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 2)
+        let reopened = CatalogRepository(database: try AppDatabase(db: SQLiteDatabase(path: path)))
+        XCTAssertTrue(try reopened.backfillSearchIndex(chunkSize: 1))
+        XCTAssertFalse(db.searchBackfillPending)
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 4, "every row once")
         XCTAssertEqual(try catalog.search("trt", sourceId: "s").map(\.itemId), ["c1"])
         XCTAssertEqual(try catalog.search("konusanlar", sourceId: "s").map(\.itemId), ["k"], "titles re-indexed from content tables")
         XCTAssertEqual(try catalog.search("ayla", sourceId: "s").map(\.kind), [.movie])
@@ -118,5 +149,27 @@ final class SearchIndexMigrationTests: XCTestCase {
         XCTAssertEqual(try catalog.search("hasan", sourceId: "s").first?.matchedPerson, "Hasan Can Kaya")
         // Idempotent.
         XCTAssertEqual(try AppDatabase(db: SQLiteDatabase(path: path)).db.userVersion, 6)
+    }
+
+    /// A refresh committed while the backfill is pending indexes its own rows; the backfill then skips them.
+    func testRefreshDuringBackfillIndexesEachRowOnce() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("v6r-\(UUID().uuidString).sqlite").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        do {
+            let db = try AppDatabase(db: SQLiteDatabase(path: path))
+            try db.db.execute("""
+            INSERT INTO movies (source_id, id, name, sort) VALUES ('s', 'm1', 'Ayla', 0), ('t', 'x1', 'Other', 0);
+            """)
+            db.db.userVersion = 5
+        }
+        let db = try AppDatabase(db: SQLiteDatabase(path: path))
+        XCTAssertTrue(db.searchBackfillPending)
+        let catalog = CatalogRepository(database: db)
+        let session = try catalog.beginRefresh(sourceId: "s")
+        try session.write(movies: [Movie(sourceId: "s", id: "m1", name: "Ayla", sort: 0), Movie(sourceId: "s", id: "m2", name: "Ayla 2", sort: 1)])
+        try session.commit()
+        XCTAssertTrue(try catalog.backfillSearchIndex())
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 3, "m1, m2 (refresh) + x1 (backfill)")
+        XCTAssertEqual(Set(try catalog.search("ayla", sourceId: "s").map(\.itemId)), ["m1", "m2"])
     }
 }

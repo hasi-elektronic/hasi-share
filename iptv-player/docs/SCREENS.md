@@ -77,7 +77,8 @@ kategori çipi "★ Favoriler", TV Rehberi'nde "Tümü"nün ardından "Favoriler
 kenarından sağa kaydırmak bir önceki sayfaya döner — gezinti çubuğu gizli olsa da (sistem kenar kaydırması
 yeniden etkin; kök ekranda bir şey yapmaz). Sayfa gibi davranan tam ekran Kategoriler sayfası da sol kenardan
 (ilk ~24 pt) yatay ≥ 80 pt kaydırmayla kapanır (sayfa parmağı izler). Yalnız kenardan başlar; yatay raflar,
-kaydırma çubuğu ve liste kaydırma eylemleri etkilenmez. Oynatıcı kendi hareketlerini korur (§3.7).
+kaydırma çubuğu ve liste kaydırma eylemleri etkilenmez. Bir geçiş (itme/geri) animasyonu sürerken kenar
+kaydırması başlamaz. Oynatıcı kendi hareketlerini korur (§3.7).
 
 Kaynak yoksa Karşılama ekranı. Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; boş durum gösterir.
 Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster min. 104 pt).
@@ -270,15 +271,17 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   sürükle-bırak; TV: öğeyi seç → ▲▼ ile taşı → tekrar seç bırakır (taşınırken diğer satırlar odak almaz).
   "Bitti" çıkar. Sıra cihazda saklanır, diğer kaynakların favorileri yerinde kalır.
 * Arama: tek alan, sonuçlar satır olarak, sırayla:
-  1. **Kategoriler** (en üstte, en fazla 12): adında (büyük/küçük harf ve aksan duyarsız, grup kodu dahil —
-     kategori sayfasındaki arama gibi) **her** kelime geçen film, dizi ve canlı kategorileri; kartta bayrak /
+  1. **Kategoriler** (en üstte, en fazla 12; en az 2 karakterlik sorguda): her kelime, grup kodu olmadan adın
+     bir sözcüğünün **başı** olmalı (büyük/küçük harf ve aksan duyarsız; "dis" → "Disney+", "isney" değil);
+     grup kodu ("tr") yalnızca yanında başka bir kelime varsa sayılır ("tr disney") — tek başına "tr" ya da
+     "a" bölümü doldurmaz. Film, dizi ve canlı kategorileri; kartta bayrak /
      kod rozeti, ad, tür ve içerik (canlıda kanal) sayısı. Gizlenen kategoriler (film/dizi: kaynak + tür,
      canlı: `HiddenStore`) gösterilmez. Film/dizi kategorisi → o kategorinin grid'i; canlı kategori → Canlı TV
      o kategoriyle açılır.
   2. Başlığa göre **Kanallar** kartları · **Filmler** · **Diziler** posterleri (tür başına en fazla 30).
   3. **Kişiler**: başlığı eşleşmeyen ama oyuncu/yönetmeni (Xtream `cast` / `director`) her kelimeyle
      eşleşen filmler ve diziler (önek eşleşmesi, ör. "Hasan" → Hasan Can Kaya'nın programı); posterin altında
-     eşleşen kişinin adı. Film oyuncuları listede yoksa film detayı bir kez açıldığında aranabilir olur.
+     eşleşen kişinin adı (kelimeler farklı kişilerde eşleştiyse en fazla iki ad: "Hasan Yılmaz, Ali Kaya"). Film oyuncuları listede yoksa film detayı bir kez açıldığında aranabilir olur.
      M3U kaynaklarında kişi bilgisi yoktur. Türkçe "ı" ile "i" aynı aranır ("kizilcik" → "Kızılcık").
   tvOS'ta bölümler raf olarak, kart başına tek odak hedefi.
 
