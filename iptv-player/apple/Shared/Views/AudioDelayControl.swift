@@ -152,12 +152,16 @@ private struct TVAudioDelayStepper: View {
         .animation(.easeOut(duration: 0.15), value: focused)
         .background {
             if focused {
-                TVHoldSeek { direction, heldMs in step(direction * (heldMs < 1500 ? 100 : 250)) }
+                TVHoldSeek { direction, heldMs in
+                    step(direction * (heldMs < 1500 ? 100 : 250))
+                    return true
+                }
             }
         }
         .focusable()
         .focused(externalFocus ?? $ownFocus)
         .onMoveCommand { direction in
+            if TVHoldSeek.consumesRelease(direction) { return }   // a held ◀▶ already stepped
             switch direction {
             case .left: move(-1)
             case .right: move(1)

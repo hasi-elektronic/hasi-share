@@ -133,6 +133,8 @@
     <string name="player_state_paused" formatted="false">Duraklatıldı</string>
     <string name="player_show_controls" formatted="false">Kontrolleri göster</string>
     <string name="player_position" formatted="false">Oynatma konumu</string>
+    <string name="player_seek_target">%1$s konumuna atla, %2$s</string>
+    <string name="player_seek_preview_image" formatted="false">Önizleme görüntüsü</string>
     <string name="player_locked" formatted="false">Deneme süreniz bitti. İzlemeye devam etmek için satın alın.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
     <string name="paywall_subtitle" formatted="false">Tek seferlik satın alma · abonelik yok</string>
@@ -207,6 +209,7 @@
     <string name="perf_zap" formatted="false">Kanal geçiş süresi</string>
     <string name="perf_engine" formatted="false">Motor</string>
     <string name="perf_buffer" formatted="false">Arabellek</string>
+    <string name="perf_seeks" formatted="false">Atlama</string>
     <string name="perf_bitrate" formatted="false">Bit hızı</string>
     <string name="perf_dropped" formatted="false">Atlanan kareler</string>
     <string name="perf_output_latency" formatted="false">Çıkış gecikmesi</string>

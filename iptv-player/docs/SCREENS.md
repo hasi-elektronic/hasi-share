@@ -350,7 +350,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   **Son izlenen kanal** (bir önceki açık kanala dönüş): mobilde ve TV'de katmanın araçlarındaki
   `arrow.uturn.backward` düğmesi (TV: üst satırın son öğesi); Geri tuşu değildir. Bilgi kartındaki ▲▼ ise
   zapping listesinde **önceki/sonraki kanaldır**.
-* **VOD:** ◀▶ 10 sn ileri/geri (basılı tutunca hızlanır), OK oynat/duraklat. Kaldığı yerden
+* **VOD:** ◀▶ 10 sn ileri/geri (TV: önce hedef gösterilir, basılı tutunca hızlanır), OK oynat/duraklat. Kaldığı yerden
   devam: açılışta otomatik devam + "Baştan başla" kısa düğmesi (5 sn görünür, katmandan
   bağımsız; kayıtlı konum ≥ 10 sn ve < %95 ise).
   * **Mobil (iOS):** katmanın ortasında büyük taşıma satırı: ⟲10 · oynat/duraklat (64 pt) ·
@@ -358,21 +358,39 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     üçte bir +10 sn, kısa "−10 sn"/"+10 sn" halkası (ard arda çift dokunmalar toplanır, katman
     açılıp kapanmaz); tek dokunma katmanı açar/kapatır; senkron paneli açıkken tek veya (orta üçte bir / canlı) çift
     dokunma önce paneli kapatır, katman açılmaz. Altta sürüklenebilir zaman çizgisi
-    (44 pt dokunma yüksekliği): sürüklerken hedef zaman balonda görünür, gelen zaman
-    güncellemeleri başparmağı oynatmaz, bırakınca atlar. Süre bilinmiyorsa çizgi yalnızca
-    gösterir (sürükleme yok), süre "--:--".
-  * **TV (tvOS):** ◀▶ 10 sn; basılı tutunca 0,3 sn'de bir tekrar, 1 sn sonra 30 sn adım. Katman
-    görünürken odak oynat/duraklat'tadır: OK oynat/duraklat, ◀▶ atlar (odak yana kaymaz);
+    (44 pt dokunma yüksekliği): sürüklerken balonda hedef zaman + sıçrama ("01:30 · +1:26",
+    sürüklemenin başladığı konuma göre; güvenli durumda önizleme karesiyle, TV ile aynı kural), gelen zaman
+    güncellemeleri başparmağı oynatmaz, bırakınca atlar; balon bırakıştan sonra 1,5 sn iniş noktasında kalır.
+    Süre bilinmiyorsa çizgi yalnızca gösterir (sürükleme yok), süre "--:--".
+  * **TV (tvOS) – önizlemeli sarma (YouTube gibi, Build 14):** ◀▶ hemen atlamaz; oynatma sürerken zaman
+    çizgisinde bir **hedef** işaretini taşır. Çizgi kalınlaşır, işaretin üstünde büyük balon hedef zamanı ve
+    sıçramayı gösterir ("1:23:40 · +2:30", sarmanın başladığı konuma göre); sol etiket hedef zamanı, sağ etiket
+    hedeften kalan süreyi ("−12:34") gösterir. Basış 10 sn; basılı tutunca 0,3 sn'de bir tekrar ve adım büyür:
+    10 sn → 30 sn (1 sn) → 60 sn (3 sn) → 120 sn (5 sn); hedef [0, süre] içinde kalır (süre bilinmiyorsa üst
+    sınır yok, çizgide işaret yok). **Gerçek atlama bir kez olur:** OK'de ya da 0,8 sn hiç girdi olmayınca;
+    **Menü iptal eder** (hedef geri döner, atlama yok, katman açık kalır). **Oynat/Duraklat** önce hedefe atlar,
+    sonra her zamanki gibi duraklatır/sürdürür (duraklatılmışken hedefte oynatır). ▲ önce hedefe atlar, sonra
+    üst satıra geçer. Önizleme sürerken katman kendiliğinden kapanmaz. **Siri Remote dokunmatik yüzeyi:**
+    yatay kaydırma hedefi parmakla birlikte taşır (tam kaydırma ≈ max(5 dk, sürenin %10'u), momentum yok;
+    parmak yüzeyde durdukça atlanmaz, kaldırınca 0,8 sn sonra ya da tıklamayla atlar); dikey kaydırmalar
+    odak motorunda kalır; kanal/senkron paneli, bilgi kartı veya üst satır kullanılırken kapalıdır.
+    **Önizleme karesi** (balonda ~320 px) yalnızca güvenliyse: yayın AVPlayer'da (VLCKit değil), ilerlemeli
+    VOD dosyası (MP4; HLS'de görüntü üretici yok) ve kaynak `max_connections ≤ 1` (veya bilinmeyen) bir Xtream
+    hesabı değil; M3U/ham URL'de Xtream biçimli adres (`/live|movie|series/U/P/id`, `ZapPrefetcher.isXtreamShaped`)
+    bilinmeyen hesap sayılır → kare yok. Kare `AVAssetImageGenerator` ile oynayan URL'den (aynı User-Agent /
+    Referer başlıkları) alınır: 300 ms'de en fazla bir istek, eski istek iptal, 10 sn'lik dilim başına önbellek,
+    3 hata sonrası o yayın için kapanır. Aksi halde balon yalnızca zamanı gösterir; ikinci bağlantı açılmaz.
+    Canlı yayında motor bir DVR/catch-up penceresi bildirmediği için önizleme yok (◀▶ eskisi gibi katmanı açar).
+    Performans katmanı motorun atlama sayısını gösterir ("Atlama: n"). Katman
+    görünürken odak oynat/duraklat'tadır: OK oynat/duraklat (önizleme varken: atla), ◀▶ hedefi taşır (odak yana kaymaz);
     ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Üst satırda ◀▶ araçlar
     arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · ⭐ · canlıda Kanal listesi ·
     Son izlenen kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
     kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
     satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
     VOD'da duraklatır/sürdürür ve katmanı açar; **canlıda kanal panelini açar** (katman: ◀▶ veya
-    Oynat/Duraklat tuşu). Tam tuş haritası aşağıdaki tabloda. Siri Remote dokunmatik
-    yüzeyinde kaydırarak sarma v1'de yok (SwiftUI odak modeliyle güvenilir değil); basılı tutma
-    aynı ihtiyacı karşılar.
-  * Katman 3 sn sonra yalnızca oynarken kaybolur: duraklatılmışken, çizgi sürüklenirken,
+    Oynat/Duraklat tuşu). Tam tuş haritası aşağıdaki tabloda.
+  * Katman 3 sn sonra yalnızca oynarken kaybolur: duraklatılmışken, çizgi sürüklenirken / TV'de hedef gösterilirken,
     ses/altyazı/oran menüsü açıkken veya kanal listesi açıkken kalır; her atlama/duraklatma
     sayacı yeniden başlatır.
   * **İlerleme kaydı:** oynarken 10 sn'de bir, duraklatınca, kapatınca ve uygulama arka plana
@@ -392,8 +410,11 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   | Bilgi kartı (⭐ odakta) | Favori ekle/çıkar | Listede önceki kanal (Geri al teklifinde: ⭐) | Listede sonraki kanal (Geri al teklifinde: Geri al) | – | Duraklat/sürdür | Kartı kapat | Numaraya geç |
   | Kanal paneli | Kanala geç, paneli kapat | Odak yukarı (ilk satırda kategori seçici) | Odak aşağı | – | Duraklat/sürdür | Paneli kapat | Numaraya geç |
   | Senkron paneli | – | Satırlar arası | Satırlar arası | Değeri değiştir (hızlanır) | Duraklat/sürdür | Paneli kapat | – (yok sayılır) |
-  | VOD, katman kapalı | Duraklat/sürdür + katman | Katmanı aç | Katmanı aç | −/+10 sn (basılı: hızlanır) | Duraklat/sürdür + katman | Oynatıcıdan çık | – |
-  | VOD, katman açık | Duraklat/sürdür | Üst satır | – | −/+10 sn | Duraklat/sürdür | Katmanı kapat | – |
+  | VOD, katman kapalı | Duraklat/sürdür + katman | Katmanı aç | Katmanı aç | Hedef −/+10 sn (basılı: 30/60/120 sn) + katman | Duraklat/sürdür + katman | Oynatıcıdan çık | – |
+  | VOD, katman açık | Duraklat/sürdür | Üst satır | – | Hedef −/+10 sn (basılı: hızlanır) | Duraklat/sürdür | Katmanı kapat | – |
+  | VOD, hedef gösteriliyor (balon) | Hedefe atla | Hedefe atla + üst satır | – | Hedefi taşı (basılı: hızlanır; dokunmatik: kaydır) | Hedefe atla + duraklat/sürdür | İptal (atlama yok) | – |
+
+  Hedef gösterilirken 0,8 sn girdi yoksa hedefe atlanır (tek atlama).
 
   "Üst satır" araçlarının sonu: Kanal listesi · **Son izlenen kanal** (yalnızca bir önceki kanal varsa).
 

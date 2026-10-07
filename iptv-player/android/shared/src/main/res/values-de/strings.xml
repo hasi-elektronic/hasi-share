@@ -133,6 +133,8 @@
     <string name="player_state_paused" formatted="false">Pausiert</string>
     <string name="player_show_controls" formatted="false">Steuerelemente anzeigen</string>
     <string name="player_position" formatted="false">Wiedergabeposition</string>
+    <string name="player_seek_target">Springen zu %1$s, %2$s</string>
+    <string name="player_seek_preview_image" formatted="false">Vorschaubild</string>
     <string name="player_locked" formatted="false">Ihre Testphase ist beendet. Jetzt kaufen und weiterschauen.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
     <string name="paywall_subtitle" formatted="false">Einmalkauf · kein Abo</string>
@@ -207,6 +209,7 @@
     <string name="perf_zap" formatted="false">Umschaltzeit</string>
     <string name="perf_engine" formatted="false">Engine</string>
     <string name="perf_buffer" formatted="false">Puffer</string>
+    <string name="perf_seeks" formatted="false">Sprünge</string>
     <string name="perf_bitrate" formatted="false">Bitrate</string>
     <string name="perf_dropped" formatted="false">Verworfene Bilder</string>
     <string name="perf_output_latency" formatted="false">Ausgabelatenz</string>

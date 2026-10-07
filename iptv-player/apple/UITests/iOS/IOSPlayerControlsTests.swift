@@ -159,6 +159,37 @@ final class IOSPlayerControlsTests: XCTestCase {
         try runVODControls(Self.launchMovie(VLCTestSupport.movieM3U), name: "vlc")
     }
 
+    /// Dragging the scrubber shows the target bubble ("Seek to 7:24, +6:50"); after release it stays a
+    /// moment on the landing point (AVPlayer MP4: with a preview image).
+    @MainActor
+    func testScrubberShowsSeekBubble() throws {
+        let app = try Self.launchMovie(VLCTestSupport.mp4MovieM3U)
+        Self.playFromDetail(app)
+        XCTAssertTrue(Self.waitPlaying(app), "plays")
+        Self.showOverlay(app)
+        let playPause = app.buttons["player_play_pause"]
+        playPause.tap()
+        XCTAssertEqual(playPause.value as? String, "Paused")
+        let before = Self.time(app)
+        let duration = Self.duration(app)
+        XCTAssertGreaterThan(duration, 60)
+        let scrubber = app.descendants(matching: .any)["player_scrubber"]
+        XCTAssertTrue(scrubber.exists)
+        // Hold at the end of the drag: the thumbnail for the target arrives meanwhile.
+        scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                   withVelocity: .default, thenHoldForDuration: 1.5)
+        let bubble = app.descendants(matching: .any)["player_seek_bubble"]
+        XCTAssertTrue(bubble.waitForExistence(timeout: 1), "bubble after the drag")
+        let label = bubble.label
+        UITestSupport.snap("seek-ios-bubble", in: self)
+        XCTAssertTrue(label.hasPrefix("Seek to "), label)
+        XCTAssertTrue(label.contains(", +"), "forward jump in the bubble: \(label)")
+        XCTAssertEqual(bubble.value as? String, "Preview image", "thumbnail on AVPlayer (local MP4)")
+        XCTAssertTrue(bubble.waitForNonExistence(timeout: 4), "the bubble goes away")
+        XCTAssertEqual(Self.time(app), duration / 2, accuracy: 2, "seeked on release (from \(before))")
+    }
+
     @MainActor
     private func runVODControls(_ app: XCUIApplication, name: String) throws {
         Self.playFromDetail(app)

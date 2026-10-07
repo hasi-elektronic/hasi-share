@@ -660,6 +660,16 @@
    "tr": "Oynatma konumu",
    "de": "Wiedergabeposition"
   },
+  "player_seek_target": {
+   "en": "Seek to {0}, {1}",
+   "tr": "{0} konumuna atla, {1}",
+   "de": "Springen zu {0}, {1}"
+  },
+  "player_seek_preview_image": {
+   "en": "Preview image",
+   "tr": "Önizleme görüntüsü",
+   "de": "Vorschaubild"
+  },
   "player_locked": {
    "en": "Your trial has ended. Purchase to keep watching.",
    "tr": "Deneme süreniz bitti. İzlemeye devam etmek için satın alın.",
@@ -1023,6 +1033,11 @@
    "en": "Buffer",
    "tr": "Arabellek",
    "de": "Puffer"
+  },
+  "perf_seeks": {
+   "en": "Seeks",
+   "tr": "Atlama",
+   "de": "Sprünge"
   },
   "perf_bitrate": {
    "en": "Bitrate",

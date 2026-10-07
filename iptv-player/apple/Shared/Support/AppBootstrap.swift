@@ -189,6 +189,10 @@ enum AppBootstrap {
                                          settings: settings, engines: .app)
             AudioSessionConfigurator.configure()
             env.player.audioSession = AudioSessionConfigurator.hooks
+            #if DEBUG
+            // UI tests: a longer seek-preview idle commit, so the bubble can be read before it commits.
+            if let ms = argument("-seekCommitMs").flatMap(Int64.init), ms > 0 { env.player.seekCommitIdleMs = ms }
+            #endif
             audioObserver.start(player: env.player)
             return env
         } catch {
