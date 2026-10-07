@@ -36,6 +36,8 @@ enum BrowseRoute: Hashable {
     case favorites
     /// Poster grid behind a row's "See all" (category or sort).
     case grid(kind: ContentKind, categoryId: String?, title: String, sort: CatalogSort)
+    /// Poster grid of every (visible) category of one country ("See all" of a country-filtered row).
+    case countryGrid(kind: ContentKind, country: String, title: String, sort: CatalogSort)
 }
 
 /// App-wide navigation state shared by iOS and tvOS (section, player / paywall / settings presentation).

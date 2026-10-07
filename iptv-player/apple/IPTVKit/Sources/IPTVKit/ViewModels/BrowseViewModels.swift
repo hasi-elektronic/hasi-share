@@ -159,6 +159,8 @@ public final class LiveTVViewModel {
 public final class MoviesViewModel {
     public private(set) var categories: [IPTVCore.Category] = []
     public var categoryId: String? { didSet { if categoryId != oldValue { reload() } } }
+    /// Items of any of these categories (a country's categories); overrides `categoryId` when set.
+    public var categoryIds: [String]? { didSet { if categoryIds != oldValue { reload() } } }
     public var sort: CatalogSort = .added { didSet { if sort != oldValue { reload() } } }
     public private(set) var movies: [Movie] = []
     public private(set) var reachedEnd = false
@@ -179,7 +181,8 @@ public final class MoviesViewModel {
 
     public func loadMore() {
         guard let sourceId, !reachedEnd else { return }
-        let page = (try? env.catalog.movies(sourceId: sourceId, categoryId: categoryId, sort: sort, offset: movies.count, limit: 90)) ?? []
+        let page = (try? categoryIds.map { try env.catalog.movies(sourceId: sourceId, categoryIds: $0, sort: sort, offset: movies.count, limit: 90) }
+            ?? env.catalog.movies(sourceId: sourceId, categoryId: categoryId, sort: sort, offset: movies.count, limit: 90)) ?? []
         reachedEnd = page.count < 90
         movies += page
     }
@@ -202,6 +205,8 @@ public final class MoviesViewModel {
 public final class SeriesListViewModel {
     public private(set) var categories: [IPTVCore.Category] = []
     public var categoryId: String? { didSet { if categoryId != oldValue { reload() } } }
+    /// Items of any of these categories (a country's categories); overrides `categoryId` when set.
+    public var categoryIds: [String]? { didSet { if categoryIds != oldValue { reload() } } }
     public var sort: CatalogSort = .added { didSet { if sort != oldValue { reload() } } }
     public private(set) var series: [Series] = []
     public private(set) var reachedEnd = false
@@ -222,7 +227,8 @@ public final class SeriesListViewModel {
 
     public func loadMore() {
         guard let sourceId, !reachedEnd else { return }
-        let page = (try? env.catalog.series(sourceId: sourceId, categoryId: categoryId, sort: sort, offset: series.count, limit: 90)) ?? []
+        let page = (try? categoryIds.map { try env.catalog.series(sourceId: sourceId, categoryIds: $0, sort: sort, offset: series.count, limit: 90) }
+            ?? env.catalog.series(sourceId: sourceId, categoryId: categoryId, sort: sort, offset: series.count, limit: 90)) ?? []
         reachedEnd = page.count < 90
         series += page
     }

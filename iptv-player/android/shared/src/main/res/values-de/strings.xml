@@ -318,6 +318,21 @@
     <string name="zap_number">Sender %1$s</string>
     <string name="zap_no_channel" formatted="false">Kein Sender</string>
     <string name="player_tv_hint" formatted="false">◀▶ Werkzeuge · ▲ Info</string>
+    <string name="catnav_title_movies" formatted="false">Film-Kategorien</string>
+    <string name="catnav_title_series" formatted="false">Serien-Kategorien</string>
+    <string name="catnav_search" formatted="false">Kategorien durchsuchen</string>
+    <string name="catnav_pinned" formatted="false">Angeheftet</string>
+    <string name="catnav_recent" formatted="false">Zuletzt geöffnet</string>
+    <string name="catnav_all_categories" formatted="false">Alle Kategorien</string>
+    <string name="catnav_pin" formatted="false">Anheften</string>
+    <string name="catnav_unpin" formatted="false">Lösen</string>
+    <string name="catnav_unhide" formatted="false">Einblenden</string>
+    <string name="catnav_show_hidden" formatted="false">Ausgeblendete anzeigen</string>
+    <string name="catnav_hidden" formatted="false">Ausgeblendet</string>
+    <string name="catnav_country" formatted="false">Land</string>
+    <string name="catnav_discover" formatted="false">Entdecken</string>
+    <string name="catnav_no_match" formatted="false">Keine passenden Kategorien</string>
+    <string name="catnav_items">%1$s Titel</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

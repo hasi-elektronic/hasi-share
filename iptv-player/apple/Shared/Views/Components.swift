@@ -429,64 +429,23 @@ struct ChipBar<ID: Hashable>: View {
 }
 
 /// Flag emoji for category names that contain a country name or code ("DE | Sport", "Germany", "TÜRKİYE").
+/// The detection lives in IPTVKit (`CategoryCountry`, unit-tested); this is the view-side shorthand.
 enum CountryFlag {
-    private static let ignoredCodes: Set<String> = ["TV", "FM", "AM", "SD", "HD", "VO", "IN", "IT", "TO", "NO", "BE", "ME", "IS", "AS", "AT", "BY", "MY", "AN"]
-    private static let aliases: [String: String] = [
-        "UK": "GB", "USA": "US", "U.S.": "US", "UAE": "AE", "KSA": "SA", "EX-YU": "RS", "EXYU": "RS", "LATAM": "",
-        "TURKIYE": "TR", "TÜRKİYE": "TR", "TURKEY": "TR", "DEUTSCHLAND": "DE", "ALMANYA": "DE", "ENGLAND": "GB",
-    ]
+    static func code(for title: String) -> String? { CategoryCountry.code(for: title) }
 
-    /// Lowercased country names (English, Turkish, German) → ISO region code.
-    private static let names: [String: String] = {
-        var map: [String: String] = [:]
-        let locales = ["en", "tr", "de"].map(Locale.init(identifier:))
-        for region in Locale.Region.isoRegions where region.identifier.count == 2 && region.identifier.allSatisfy(\.isLetter) {
-            for locale in locales {
-                if let name = locale.localizedString(forRegionCode: region.identifier) {
-                    map[name.lowercased()] = region.identifier
-                }
-            }
-        }
-        return map
-    }()
-
-    static func code(for title: String) -> String? {
-        let upperTokens = title.split(whereSeparator: { " |:-_[]()/,.".contains($0) }).map(String.init)
-        // Leading or bracketed upper-case code ("DE | Sport", "[TR] Ulusal", "Sport (UK)").
-        for token in upperTokens.prefix(3) {
-            if let alias = aliases[token.uppercased()] { return alias.isEmpty ? nil : alias }
-            if token.count == 2, token == token.uppercased(), token.allSatisfy(\.isLetter), !ignoredCodes.contains(token),
-               Locale.Region.isoRegions.contains(where: { $0.identifier == token }) {
-                return token
-            }
-        }
-        let lower = title.lowercased()
-        let words = lower.split(whereSeparator: { !$0.isLetter && $0 != " " }).map { $0.trimmingCharacters(in: .whitespaces) }
-        for word in words where !word.isEmpty {
-            if let code = names[word] { return code }
-            for token in word.split(separator: " ") {
-                if let code = names[String(token)] { return code }
-                if let alias = aliases[String(token).uppercased()], !alias.isEmpty { return alias }
-            }
-        }
-        return nil
-    }
-
-    static func emoji(for title: String) -> String? {
-        guard let code = code(for: title) else { return nil }
-        let base: UInt32 = 0x1F1E6 - 65
-        return String(String.UnicodeScalarView(code.uppercased().unicodeScalars.compactMap { UnicodeScalar(base + $0.value) }))
-    }
+    static func emoji(for title: String) -> String? { CategoryCountry.emoji(for: title) }
 
     /// Removes a leading code prefix ("DE | Sport" → "Sport") so the flag is not repeated.
-    static func strippedTitle(_ title: String) -> String {
-        guard code(for: title) != nil else { return title }
-        let parts = title.split(maxSplits: 1, whereSeparator: { "|:".contains($0) })
-        if parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces).count <= 3 {
-            let rest = parts[1].trimmingCharacters(in: .whitespaces)
-            return rest.isEmpty ? title : rest
-        }
-        return title
+    static func strippedTitle(_ title: String) -> String { CategoryCountry.strippedTitle(title) }
+
+    /// "🇹🇷 DİZİLER" – flag (when a country is detected) + name without its code prefix.
+    static func displayTitle(_ title: String) -> String {
+        [emoji(for: title), strippedTitle(title)].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// Localized country name of a region code in the UI language ("TR" → "Türkiye" / "Turkey" / "Türkei").
+    static func countryName(_ code: String) -> String {
+        L10n.locale.localizedString(forRegionCode: code) ?? code
     }
 }
 

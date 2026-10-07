@@ -74,6 +74,17 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 6. Yenileme atomiktir: yeni veri geçici tabloya/işleme yazılır, başarıyla bitince eskisinin
    yerine geçer (yarım liste görünmez). Favoriler/ilerleme `contentKey` ile bağlı olduğu için
    yenilemeden etkilenmez.
+7. **Katalog biçim sürümü (`CatalogFormat.current`, Apple: `SourceRefresher.swift`; şu an 2):** her
+   başarılı katalog yüklemesi kaynağın kataloğunun hangi biçimle kurulduğunu `kv` tablosuna yazar
+   (`catalog.format.<kaynakId>`). Açılışta (`env.start()` → `refreshDueSources`, QuickStart'tan sonra, arka
+   planda) kayıtlı sürümü küçük olan **ya da hiç olmayan** (Build 9 öncesi kataloglar) her kaynak, otomatik
+   yenileme ayarından bağımsız olarak normal yenileme hattından **bir kez** yenilenir; başarı güncel sürümü
+   yazar, hata yazmaz → sonraki açılışta tekrar denenir. Neden: Build 6'nın kaydettiği kataloglarda
+   `category_ids` üyelikleri yoktu ve kullanıcı elle yenileyene kadar kategoriler eksik kaldı.
+   **Artırma kuralı:** eşleme (ayrıştırıcı → model) ya da saklama (tablo/sütun, üyelik, arama dizini)
+   değişikliği mevcut kataloğun **yeniden içe aktarılmasını** gerektiriyorsa `CatalogFormat.current` bir
+   artırılır (salt şema göçüyle — `AppDatabase` v1…v5 gibi — veriden türetilebilen değişiklikler için
+   artırılmaz). Yalnızca okuma/arayüz değişikliği artırmaz.
 
 ### 3.2 Oynatma
 `PlayerController` (her iki platformda aynı sorumluluklar):

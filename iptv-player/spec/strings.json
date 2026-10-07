@@ -1578,6 +1578,81 @@
    "en": "◀▶ Tools · ▲ Info",
    "tr": "◀▶ Araçlar · ▲ Bilgi",
    "de": "◀▶ Werkzeuge · ▲ Info"
+  },
+  "catnav_title_movies": {
+   "en": "Movie categories",
+   "tr": "Film kategorileri",
+   "de": "Film-Kategorien"
+  },
+  "catnav_title_series": {
+   "en": "Series categories",
+   "tr": "Dizi kategorileri",
+   "de": "Serien-Kategorien"
+  },
+  "catnav_search": {
+   "en": "Search categories",
+   "tr": "Kategori ara",
+   "de": "Kategorien durchsuchen"
+  },
+  "catnav_pinned": {
+   "en": "Pinned",
+   "tr": "Sabitlenenler",
+   "de": "Angeheftet"
+  },
+  "catnav_recent": {
+   "en": "Recently opened",
+   "tr": "Son açılanlar",
+   "de": "Zuletzt geöffnet"
+  },
+  "catnav_all_categories": {
+   "en": "All categories",
+   "tr": "Tüm kategoriler",
+   "de": "Alle Kategorien"
+  },
+  "catnav_pin": {
+   "en": "Pin",
+   "tr": "Sabitle",
+   "de": "Anheften"
+  },
+  "catnav_unpin": {
+   "en": "Unpin",
+   "tr": "Sabitlemeyi kaldır",
+   "de": "Lösen"
+  },
+  "catnav_unhide": {
+   "en": "Show again",
+   "tr": "Tekrar göster",
+   "de": "Einblenden"
+  },
+  "catnav_show_hidden": {
+   "en": "Show hidden",
+   "tr": "Gizlenenleri göster",
+   "de": "Ausgeblendete anzeigen"
+  },
+  "catnav_hidden": {
+   "en": "Hidden",
+   "tr": "Gizlenenler",
+   "de": "Ausgeblendet"
+  },
+  "catnav_country": {
+   "en": "Country",
+   "tr": "Ülke",
+   "de": "Land"
+  },
+  "catnav_discover": {
+   "en": "Discover",
+   "tr": "Keşfet",
+   "de": "Entdecken"
+  },
+  "catnav_no_match": {
+   "en": "No matching categories",
+   "tr": "Eşleşen kategori yok",
+   "de": "Keine passenden Kategorien"
+  },
+  "catnav_items": {
+   "en": "{0} titles",
+   "tr": "{0} içerik",
+   "de": "{0} Titel"
   }
  }
 }

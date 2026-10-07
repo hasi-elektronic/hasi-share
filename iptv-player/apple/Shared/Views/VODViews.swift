@@ -23,6 +23,8 @@ extension View {
                     FavoritesView().navigationTitle(L10n.t("nav_favorites")).toolbar(.visible, for: .navigationBar)
                     #endif
                 case let .grid(kind, categoryId, title, sort): CatalogGridView(kind: kind, categoryId: categoryId, title: title, initialSort: sort)
+                case let .countryGrid(kind, country, title, sort):
+                    CatalogGridView(kind: kind, categoryId: nil, country: country, title: title, initialSort: sort)
                 }
             }
     }
@@ -41,12 +43,24 @@ private var gridPosterWidth: CGFloat? { Theme.isTV ? Theme.posterWidth : nil }
 
 /// Movies tab: hero + rows (SCREENS §3.2).
 struct MoviesView: View {
-    var body: some View { BrowseView(kind: .movies) }
+    var body: some View {
+        #if os(tvOS)
+        TVCategoryBrowseView(kind: .movies)
+        #else
+        BrowseView(kind: .movies)
+        #endif
+    }
 }
 
-/// Series tab: hero + rows (SCREENS §3.2).
+/// Series tab: hero + rows (SCREENS §3.2); Apple TV adds the category column.
 struct SeriesView: View {
-    var body: some View { BrowseView(kind: .series) }
+    var body: some View {
+        #if os(tvOS)
+        TVCategoryBrowseView(kind: .series)
+        #else
+        BrowseView(kind: .series)
+        #endif
+    }
 }
 
 // MARK: - Detail

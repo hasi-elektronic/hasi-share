@@ -11,6 +11,17 @@ public enum RefreshProgress: Sendable, Hashable {
     case epg
 }
 
+/// Version of the way catalogs are mapped and stored. A catalog built by an older app version can lack
+/// data newer code relies on (Build 6 catalogs had no `category_ids` memberships until the next manual
+/// refresh), so every source whose stored version is older – or missing – is refreshed once in the
+/// background on launch (`AppEnvironment.refreshDueSources`). Bump rule: docs/ARCHITECTURE.md §3.1.
+public enum CatalogFormat {
+    /// 1 = up to Build 6 (implicit, never stored); 2 = `item_categories` from Xtream `category_ids`.
+    public static let current = 2
+
+    static func key(_ sourceId: String) -> String { "catalog.format.\(sourceId)" }
+}
+
 /// Loads a source (M3U streaming or Xtream API) into the database atomically, then its EPG.
 public final class SourceRefresher: Sendable {
     private let sources: SourceRepository
@@ -73,6 +84,7 @@ public final class SourceRefresher: Sendable {
         source.lastRefreshAt = now
         source.lastRefreshResult = status
         try sources.save(source)
+        database.setValue(String(CatalogFormat.current), forKey: CatalogFormat.key(sourceId))
 
         if includeEpg, let epgURL {
             onProgress(.epg)
@@ -89,6 +101,21 @@ public final class SourceRefresher: Sendable {
     }
 
     static func headerEpgKey(_ sourceId: String) -> String { "epg.header.\(sourceId)" }
+
+    /// Catalog format the stored catalog of a source was built with (nil: before Build 9 / never loaded).
+    public func catalogFormat(sourceId: String) -> Int? {
+        database.value(forKey: CatalogFormat.key(sourceId)).flatMap(Int.init)
+    }
+
+    /// True when the stored catalog predates `CatalogFormat.current` and needs one re-import.
+    public func needsFormatRefresh(sourceId: String) -> Bool {
+        (catalogFormat(sourceId: sourceId) ?? 1) < CatalogFormat.current
+    }
+
+    /// Forgets the stored format (source deleted).
+    public func clearCatalogFormat(sourceId: String) {
+        database.setValue(nil, forKey: CatalogFormat.key(sourceId))
+    }
 
     /// EPG URL of a source: override, else playlist header (`url-tvg`) / Xtream `xmltv.php`.
     public func epgURL(sourceId: String) -> URL? {

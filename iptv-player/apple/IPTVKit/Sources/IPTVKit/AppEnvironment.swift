@@ -47,6 +47,8 @@ public final class AppEnvironment {
     @ObservationIgnored public let syncManager: SyncManager
     /// One-tap favorites: cached set, undo, device-local order, favorite categories.
     public let favorites: FavoritesController
+    /// Movies/Series category navigation: country, pinned, recent, hidden (per source + kind, device-local).
+    public let categoryPrefs: CategoryPreferences
     @ObservationIgnored public let secureStore: any SecureStore
     public let settings: AppSettings
     public let store: StoreManager
@@ -79,6 +81,7 @@ public final class AppEnvironment {
         epg = EpgRepository(database: database)
         library = LibraryRepository(database: database)
         favorites = FavoritesController(library: library, kv: kv, now: { Int64(Date().timeIntervalSince1970 * 1000) })
+        categoryPrefs = CategoryPreferences(kv: kv)
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
@@ -269,14 +272,21 @@ public final class AppEnvironment {
         }
     }
 
+    /// Launch (`start()`): sources whose auto refresh is due, and – once per launch, whatever their auto
+    /// refresh setting – sources whose catalog was built with an older `CatalogFormat`. Runs through the
+    /// normal refresh pipeline after QuickStart; a successful refresh stores the current format, a failed
+    /// one is retried on the next launch.
     public func refreshDueSources() async {
         let now = Date()
-        for source in sources where source.isRefreshDue(now: now) {
+        for source in sources where !refreshing.contains(source.id)
+            && (source.isRefreshDue(now: now) || refresher.needsFormatRefresh(sourceId: source.id)) {
             await refreshSource(id: source.id)
         }
     }
 
     public func deleteSource(id: String) {
+        refresher.clearCatalogFormat(sourceId: id)
+        categoryPrefs.removeAll(sourceId: id)
         try? catalog.deleteContent(sourceId: id)
         try? sourceRepository.delete(id: id)
         reloadSources()

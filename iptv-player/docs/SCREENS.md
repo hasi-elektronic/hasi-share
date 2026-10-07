@@ -86,7 +86,9 @@ listesinde satır başına tek odak hedefi vardır (favori / arşiv uzun OK men�
 1. Oynatıcıda: açık panel/menü varsa kapatır → yoksa oynatıcıdan çıkar (önceki ekrana, odak
    oynatılan öğede).
 2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir.
-3. Bir bölümün içeriğinde (satır/grid/EPG): odağı üst sekme çubuğuna taşır.
+3. Bir bölümün içeriğinde (satır/grid/EPG): odağı üst sekme çubuğuna taşır. İstisna Filmler/Diziler:
+   sağ içerikte (göz atma sayfası / kategori grid'i) önce odağı soldaki kategori sütununa (seçili satır)
+   taşır, sütunda ikinci basış sekme çubuğuna (§3.2).
 4. Sekme çubuğundayken: Ana Sayfa değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
 5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında).
 
@@ -130,11 +132,39 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   Yeni eklenen filmler · Yeni eklenen diziler · Canlı kanallar (kanal kartları).
 * **Filmler / Diziler satırları:** İzlemeye devam et (yalnız o tür) · Favoriler · **Yeni eklenenler**
   (2:3 poster, altta küçük `primary` "YENİ" rozeti) · **Top 10** (posterin arkasında büyük, içi boş
-  çerçeveli sıra numarası 1–10) · ardından kaynaktaki **her kategori için bir satır** (kategori adı,
-  ülke adı/kodu içeriyorsa bayrak emojisi; içeriği olan ilk 12 kategori, satır başına 20 öğe).
-  "Yeni eklenenler"in üstünde **Kategoriler** çip satırı: içeriği olan **tüm** kategoriler (sağlayıcı
-  sırası, bayraklı; yatay kaydırılır) → dokununca o kategorinin poster grid'i. Bir öğe birden fazla
-  kategorideyse (Xtream `category_ids`, CONTRACT §4.3) her birinde görünür.
+  çerçeveli sıra numarası 1–10) · ardından **kategori satırları**: önce sabitlenen (📌) kategoriler, sonra
+  seçili ülkenin kategorileri sağlayıcı sırasıyla (ilk 12, satır başına 20 öğe; ad + bayrak emojisi).
+  Her satırda "Tümünü gör" → o kategorinin poster grid'i. Bir öğe birden fazla kategorideyse (Xtream
+  `category_ids`, CONTRACT §4.3) her birinde görünür. İzlemeye devam et ve Favoriler **filtrelenmez**.
+* **Kategori gezintisi (Build 9, Filmler/Diziler):** sağlayıcılar yüzlerce kategori listeler
+  ("TR • NETFLIX DIZILER", "DE | …", "EN | …"); eski yatay çip satırı aranamıyordu (kaldırıldı).
+  * **Ülke:** kategori adındaki kod/ülke adından tespit edilir (`CategoryCountry`, IPTVKit: "TR | …",
+    "[TR] …", "TÜRKİYE", "Germany" …; "EN", "IT", "4K" gibi belirteçler ülke sayılmaz → yalnız "Tümü"nde).
+    Seçim **kaynak + tür (film/dizi) başına** cihazda saklanır. İlk kullanımda varsayılan = arayüz dilinin
+    ülkesi (tr → TR, de → DE, en → Tümü), **yalnızca** o ülkenin (gizlenmemiş) kategorisi varsa; yoksa ya da
+    seçilen ülkenin kategorisi kalmadıysa Tümü. Ülke seçiliyse **Yeni eklenenler, Top 10, hero** ve
+    kategori satırları o ülkenin kategorilerinden gelir ("Tümünü gör" grid'i de); **Tümü** = önceki davranış
+    (tüm kaynak, sağlayıcı sırası).
+  * **iPhone/iPad:** üst sekmelerin hemen altında **sabit satır** (sayfa kayarken görünür kalır; hero üzerinde
+    şeffaf, başlık siyaha dönünce siyah): geniş **"Kategoriler ▾"** düğmesi + **ülke seçici** hap
+    ("TR Türkiye ▾" metin kodu rozeti + ülke adı, ya da "🌐 Tümü ▾"). Ülke seçici menüsü: "Tümü (n)" +
+    kategorisi olan her ülke (bayrak, ad, kategori sayısı); seçili ülke önce, sonra en çok kategorisi olan.
+  * **Kategori sayfası** (iPhone'da tam ekran, iPad'de büyük sheet): başlık "Film kategorileri" / "Dizi
+    kategorileri"; **arama alanı** (büyük/küçük harf ve aksan duyarsız, "TR | " gibi ülke öneki aranmaz);
+    **ülke çipleri** (Tümü + ülkeler, sayılı, satır kaydırmalı – seçim sayfanın ülkesidir); bölümler
+    **Sabitlenenler** · **Son açılanlar** (son 5, en yeni önce) · seçili ülkenin (ya da tüm) kategorileri,
+    her birinde içerik sayısı. Dokunmak sheet'i kapatır, kategorinin grid'ini açar ve "Son açılanlar"a
+    yazar. Uzun bas: **Sabitle / Sabitlemeyi kaldır**, **Kategoriyi gizle** (gizlemek sabitlemeyi de
+    kaldırır). Sonda **"Gizlenenleri göster (n)"** anahtarı gizlenenleri listeler (👁 **Tekrar göster**).
+    Gizlenen film/dizi kategorileri **kaynak + tür** başına tutulur (Xtream VOD ve dizi kategori kimlikleri
+    çakışabilir); Canlı TV'nin gizlenenleri (`HiddenStore`) ayrıdır ve değişmedi.
+  * **Apple TV:** solda ~360 pt **kategori sütunu**, sağda içerik. Sütun (satır başına tek odak hedefi):
+    ülke seçici (menü) · **Keşfet** (sağda hero + satırlı göz atma sayfası; varsayılan) · Sabitlenenler ·
+    Son açılanlar (sekme açıldığındaki hâli; seçim sırasında odak kaymasın diye canlı güncellenmez) ·
+    ülkenin kategorileri (sayılı) · gizlenen varsa "Gizlenenleri göster (n)". Kategoride **OK** → sağda
+    o kategorinin grid'i (odak sütunda kalır, ▶ grid'e geçer). Uzun OK: sabitle / gizle (gizlenende tekrar
+    göster). **Geri:** sağ içerikte → odak sütundaki seçili satıra; sütunda → üst sekme çubuğu (§2 TV).
+    Sütunda arama yok (genel arama sekmesi var).
 * **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
   gönderilmez – sıralama tamamen yereldir.)

@@ -139,6 +139,60 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(ms, 100 * factor, "epg grid \(ms) ms")
     }
 
+    /// Movies/Series category navigation (docs/SCREENS.md §3.2) at 50 000 movies in 400 provider categories
+    /// ("TR | …", "DE | …", "EN | …", "4K …"), every movie in two categories (Xtream `category_ids`).
+    func makeVodCatalog() throws -> CatalogRepository {
+        let db = try AppDatabase.inMemory()
+        let repo = CatalogRepository(database: db)
+        let session = try repo.beginRefresh(sourceId: "v")
+        let prefixes = ["TR | ", "DE | ", "EN | ", "4K "]
+        try session.write(categories: (0..<400).map {
+            IPTVCore.Category(sourceId: "v", id: "vc\($0)", kind: .movie, name: "\(prefixes[$0 % 4])Kategorie \($0)", sort: $0)
+        })
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        for chunk in stride(from: 0, to: Self.n, by: 1000) {
+            try session.write(movies: (chunk..<(chunk + 1000)).map {
+                Movie(sourceId: "v", id: "m\($0)", name: "Film \($0)", rating: Double($0 % 97) / 10, addedAt: base.addingTimeInterval(Double($0)),
+                      sort: $0, categoryIds: ["vc\($0 % 400)", "vc\(($0 * 7 + 3) % 400)"])
+            })
+        }
+        try session.commit()
+        return repo
+    }
+
+    func testCategoryInfosUnderBudget() throws {
+        let repo = try makeVodCatalog()
+        var infos: [CategoryInfo] = []
+        let ms = try median { infos = try repo.categoryInfos(sourceId: "v", kind: .movie) }
+        report("category infos (400 categories, 50k movies)", ms, budget: 100)
+        XCTAssertEqual(infos.count, 400)
+        XCTAssertEqual(infos.filter { $0.countryCode == "TR" }.count, 100)
+        XCTAssertEqual(infos.filter { $0.countryCode == nil }.count, 200, "EN and 4K have no country")
+        XCTAssertEqual(infos.map(\.itemCount).reduce(0, +), 2 * Self.n - duplicateMemberships(), "every membership counted")
+        XCTAssertLessThan(ms, 100 * factor, "category infos \(ms) ms")
+    }
+
+    /// Movies whose two generated categories coincide have one membership row, not two.
+    private func duplicateMemberships() -> Int {
+        (0..<Self.n).filter { $0 % 400 == ($0 * 7 + 3) % 400 }.count
+    }
+
+    func testCountryRowsUnderBudget() throws {
+        let repo = try makeVodCatalog()
+        let tr = try repo.categoryInfos(sourceId: "v", kind: .movie).filter { $0.countryCode == "TR" }.map(\.id)
+        var newest: [Movie] = []
+        let msNew = try median { newest = try repo.movies(sourceId: "v", categoryIds: tr, sort: .added, limit: 20) }
+        report("country new (100 categories, 50k movies)", msNew, budget: 100)
+        XCTAssertEqual(newest.count, 20)
+        XCTAssertEqual(Set(newest.map(\.id)).count, 20, "distinct")
+        var top: [Movie] = []
+        let msTop = try median { top = try repo.movies(sourceId: "v", categoryIds: tr, sort: .rating, limit: 10) }
+        report("country top 10 (100 categories, 50k movies)", msTop, budget: 100)
+        XCTAssertEqual(top.count, 10)
+        XCTAssertLessThan(msNew, 100 * factor, "country new \(msNew) ms")
+        XCTAssertLessThan(msTop, 100 * factor, "country top 10 \(msTop) ms")
+    }
+
     /// The repository's real EPG SQL must be served by the `epg_lookup_lc` expression index (deterministic
     /// guard that does not depend on machine speed).
     func testEpgQueriesUseChannelIndex() throws {

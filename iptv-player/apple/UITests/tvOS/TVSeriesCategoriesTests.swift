@@ -1,7 +1,8 @@
 import XCTest
 
-/// Task 7c on Apple TV: the Series tab's category chips are focusable and reach the last (Turkish)
-/// category of `series-cats.m3u`; selecting a chip opens that category's grid.
+/// Build 9 category navigation on Apple TV (SCREENS §3.2 TV): the Series tab has a left category column
+/// (country picker · Discover · Pinned · Recently opened · categories). `series-cats.m3u` has 14 series
+/// categories, the Turkish ones last; OK on one shows its grid on the right, Menu returns to the column.
 final class TVSeriesCategoriesTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -20,7 +21,7 @@ final class TVSeriesCategoriesTests: XCTestCase {
     }
 
     @MainActor
-    func testSeriesCategoryChipsReachTurkishCategory() throws {
+    func testCategoryColumnOpensTurkishCategoryGrid() throws {
         try UITestSupport.requireServed(UITestSupport.seriesCategoriesM3U)
         let app = UITestSupport.launch(["-seedM3U", UITestSupport.seriesCategoriesM3U, "-seedName", "Series"], seed: false)
         let seriesTab = app.tabBars.buttons["Series"]
@@ -34,17 +35,40 @@ final class TVSeriesCategoriesTests: XCTestCase {
         }
         XCTAssertTrue(found, "Series tab")
         sleep(2)
-        let chips = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'category_chip_'"))
-        XCTAssertTrue(chips.firstMatch.waitForExistence(timeout: 10), "category chips")
-        let focusedChip = chips.matching(NSPredicate(format: "hasFocus == true")).firstMatch
-        XCTAssertTrue(focus(focusedChip, pressing: .down, limit: 6), "chip row focusable")
-        let turkish = chips.matching(NSPredicate(format: "label CONTAINS 'Türk Dizileri'")).firstMatch
-        XCTAssertTrue(focus(turkish, pressing: .right, limit: 16), "last chip reachable")
-        UITestSupport.snap("tvos-series-categories-chip", in: self)
+
+        // Column: country picker first, then Discover.
+        let picker = app.buttons["country_picker"]
+        let discover = app.buttons["category_discover"]
+        XCTAssertTrue(discover.waitForExistence(timeout: 10), "category column")
+        XCTAssertTrue(picker.exists, "country picker in the column")
+        remote.press(.down)
+        usleep(800_000)
+        // Wherever the content focus landed (column or hero), ◀ reaches the column.
+        let columnFocused = app.buttons.matching(NSPredicate(format: "hasFocus == true AND (identifier == 'category_discover' OR identifier == 'country_picker' OR identifier BEGINSWITH 'category_')")).firstMatch
+        XCTAssertTrue(focus(columnFocused, pressing: .left, limit: 6), "column focusable")
+        UITestSupport.snap("catnav-tvos-01-column", in: self)
+
+        // Down the column to the last (Turkish) category.
+        let turkish = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'category_row_' AND label CONTAINS 'Türk Dizileri'")).firstMatch
+        XCTAssertTrue(focus(turkish, pressing: .down, limit: 24), "last category reachable")
         remote.press(.select)
         let poster = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH 'grid_' AND label CONTAINS 'Yalı Çapkını'")).firstMatch
-        XCTAssertTrue(poster.waitForExistence(timeout: 10), "category grid lists the Turkish series")
-        UITestSupport.snap("tvos-series-categories-grid", in: self)
+        XCTAssertTrue(poster.waitForExistence(timeout: 10), "category grid on the right lists the Turkish series")
+        XCTAssertTrue(turkish.hasFocus, "focus stays in the column after OK")
+        UITestSupport.snap("catnav-tvos-02-grid", in: self)
+
+        // ▶ into the grid, Menu back to the selected column row (not to the tab bar).
+        remote.press(.right)
+        usleep(800_000)
+        XCTAssertFalse(turkish.hasFocus, "▶ moves focus into the grid")
+        let focusedPoster = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "hasFocus == true AND label CONTAINS 'Kızılcık Şerbeti'")).firstMatch
+        XCTAssertTrue(focusedPoster.exists, "first poster of the grid focused")
+        UITestSupport.snap("catnav-tvos-03-grid-focus", in: self)
+        remote.press(.menu)
+        usleep(800_000)
+        XCTAssertTrue(turkish.hasFocus, "Menu in the content returns focus to the column")
+        XCTAssertTrue(seriesTab.exists && !seriesTab.hasFocus, "not to the tab bar")
     }
 }

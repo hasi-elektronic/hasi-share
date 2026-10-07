@@ -318,6 +318,21 @@
     <string name="zap_number">Channel %1$s</string>
     <string name="zap_no_channel" formatted="false">No such channel</string>
     <string name="player_tv_hint" formatted="false">◀▶ Tools · ▲ Info</string>
+    <string name="catnav_title_movies" formatted="false">Movie categories</string>
+    <string name="catnav_title_series" formatted="false">Series categories</string>
+    <string name="catnav_search" formatted="false">Search categories</string>
+    <string name="catnav_pinned" formatted="false">Pinned</string>
+    <string name="catnav_recent" formatted="false">Recently opened</string>
+    <string name="catnav_all_categories" formatted="false">All categories</string>
+    <string name="catnav_pin" formatted="false">Pin</string>
+    <string name="catnav_unpin" formatted="false">Unpin</string>
+    <string name="catnav_unhide" formatted="false">Show again</string>
+    <string name="catnav_show_hidden" formatted="false">Show hidden</string>
+    <string name="catnav_hidden" formatted="false">Hidden</string>
+    <string name="catnav_country" formatted="false">Country</string>
+    <string name="catnav_discover" formatted="false">Discover</string>
+    <string name="catnav_no_match" formatted="false">No matching categories</string>
+    <string name="catnav_items">%1$s titles</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

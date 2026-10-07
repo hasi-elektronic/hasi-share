@@ -23,6 +23,21 @@ public struct CatalogCounts: Sendable, Hashable {
     public var episodes: Int
 }
 
+/// A category of the Movies/Series navigation: the category, how many items it lists and the country
+/// detected from its name (nil = no single country; such categories appear only under "All").
+public struct CategoryInfo: Sendable, Hashable, Identifiable {
+    public var category: IPTVCore.Category
+    public var itemCount: Int
+    public var countryCode: String?
+    public var id: String { category.id }
+
+    public init(category: IPTVCore.Category, itemCount: Int, countryCode: String?) {
+        self.category = category
+        self.itemCount = itemCount
+        self.countryCode = countryCode
+    }
+}
+
 /// Read and write access to catalog content (categories, channels, movies, series, episodes)
 /// with paged queries and FTS5 search.
 public final class CatalogRepository: Sendable {
@@ -81,6 +96,48 @@ public final class CatalogRepository: Sendable {
             """, [.text(sourceId), .text(kind.rawValue)]) {
             IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: $0.string(1), sort: $0.int(2))
         }
+    }
+
+    /// Categories with ≥ 1 item, provider order, with item counts (all memberships) and the detected
+    /// country – the Movies/Series category navigation (docs/SCREENS.md §3.2). One grouped query over the
+    /// `item_categories` index; the country comes from the name (cached per name in `CategoryCountry`).
+    public func categoryInfos(sourceId: String, kind: CategoryKind) throws -> [CategoryInfo] {
+        try db.query("""
+            SELECT c.id, c.name, c.sort, n.cnt FROM categories c
+            JOIN (SELECT category_id, COUNT(*) AS cnt FROM item_categories WHERE source_id = ? AND kind = ? GROUP BY category_id) n
+              ON n.category_id = c.id
+            WHERE c.source_id = ? AND c.kind = ?
+            ORDER BY c.sort
+            """, [.text(sourceId), .text(kind.rawValue), .text(sourceId), .text(kind.rawValue)]) {
+            let name = $0.string(1)
+            return CategoryInfo(category: IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: name, sort: $0.int(2)),
+                                itemCount: $0.int(3), countryCode: CategoryCountry.code(for: name))
+        }
+    }
+
+    /// `id IN (…)` filter: items of a set of categories (country filter: "new" / Top 10 of one country).
+    static func memberSetFilter(_ kind: CategoryKind, count: Int) -> String {
+        let placeholders = Array(repeating: "?", count: count).joined(separator: ",")
+        return "id IN (SELECT item_id FROM item_categories WHERE source_id = ? AND kind = '\(kind.rawValue)' AND category_id IN (\(placeholders)))"
+    }
+
+    /// Movies that belong to any of `categoryIds` (each once), sorted, first `limit`.
+    public func movies(sourceId: String, categoryIds: [String], sort: CatalogSort, offset: Int = 0, limit: Int) throws -> [Movie] {
+        guard !categoryIds.isEmpty else { return [] }
+        let sql = "SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND \(Self.memberSetFilter(.movie, count: categoryIds.count))"
+            + " ORDER BY \(Self.order(sort)) LIMIT ? OFFSET ?"
+        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + [.int(Int64(limit)), .int(Int64(offset))]
+        return try db.query(sql, args, map: Self.movie)
+    }
+
+    /// Series that belong to any of `categoryIds` (each once), sorted, first `limit`.
+    public func series(sourceId: String, categoryIds: [String], sort: CatalogSort, offset: Int = 0, limit: Int) throws -> [Series] {
+        guard !categoryIds.isEmpty else { return [] }
+        let order = sort == .added ? "sort DESC" : Self.order(sort)
+        let sql = "SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND \(Self.memberSetFilter(.series, count: categoryIds.count))"
+            + " ORDER BY \(order) LIMIT ? OFFSET ?"
+        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + [.int(Int64(limit)), .int(Int64(offset))]
+        return try db.query(sql, args, map: Self.series)
     }
 
     /// `id IN (…)` filter: items of one category (all memberships, not just the primary `category_id`).

@@ -62,14 +62,17 @@ enum BrowseKind {
 }
 
 /// Rows of a browse screen. Rules (SCREENS §3.2): "new" = 20 newest by `added`; Top 10 = rating
-/// descending, or the 10 newest when the source has no ratings; one row per category (first 12 non-empty);
-/// every non-empty category as a chip (`allCategories`) – a provider may have hundreds.
+/// descending, or the 10 newest when the source has no ratings; category rows = pinned categories, then
+/// the first 12 of the selected country (provider order). Movies/Series follow the selected country
+/// ("new", Top 10, hero, rows); every category – a provider may have hundreds – is reachable from the
+/// category sheet (iOS) / category column (tvOS).
 @MainActor
 @Observable
 final class BrowseModel {
     struct CategoryRow: Identifiable {
         let category: IPTVCore.Category
         let items: [CatalogItem]
+        let pinned: Bool
         var id: String { category.id }
     }
 
@@ -83,8 +86,10 @@ final class BrowseModel {
     private(set) var newSeries: [CatalogItem] = []
     private(set) var top10: [CatalogItem] = []
     private(set) var categoryRows: [CategoryRow] = []
-    /// Movies/Series: every category with content, provider order (category chips).
-    private(set) var allCategories: [IPTVCore.Category] = []
+    /// Movies/Series: every category with content (hidden ones included), provider order, counts + country.
+    private(set) var categoryInfos: [CategoryInfo] = []
+    /// Movies/Series: effective country filter, nil = All.
+    private(set) var country: String?
     private(set) var liveRows: [ChannelRow] = []
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private let home: HomeViewModel
@@ -130,36 +135,159 @@ final class BrowseModel {
         case .movies: favorites = favs.movies.map(CatalogItem.movie)
         case .series: favorites = favs.series.map(CatalogItem.series)
         }
-        if kind != .series { newMovies = ((try? env.catalog.movies(sourceId: sid, sort: .added, limit: 20)) ?? []).map(CatalogItem.movie) }
-        if kind != .movies { newSeries = ((try? env.catalog.series(sourceId: sid, sort: .added, limit: 20)) ?? []).map(CatalogItem.series) }
         top10 = []
         categoryRows = []
-        allCategories = []
+        categoryInfos = []
+        country = nil
         liveRows = []
         switch kind {
-        case .movies:
-            let rated = (try? env.catalog.movies(sourceId: sid, sort: .rating, limit: 10)) ?? []
-            top10 = rated.contains { ($0.rating ?? 0) > 0 } ? rated.map(CatalogItem.movie) : Array(newMovies.prefix(10))
-            allCategories = (try? env.catalog.categoriesWithContent(sourceId: sid, kind: .movie)) ?? []
-            categoryRows = allCategories.prefix(12).compactMap { c in
-                let items = ((try? env.catalog.movies(sourceId: sid, categoryId: c.id, sort: .added, limit: 20)) ?? []).map(CatalogItem.movie)
-                return items.isEmpty ? nil : CategoryRow(category: c, items: items)
-            }
-        case .series:
-            let rated = (try? env.catalog.series(sourceId: sid, sort: .rating, limit: 10)) ?? []
-            top10 = rated.contains { ($0.rating ?? 0) > 0 } ? rated.map(CatalogItem.series) : Array(newSeries.prefix(10))
-            allCategories = (try? env.catalog.categoriesWithContent(sourceId: sid, kind: .series)) ?? []
-            categoryRows = allCategories.prefix(12).compactMap { c in
-                let items = ((try? env.catalog.series(sourceId: sid, categoryId: c.id, sort: .added, limit: 20)) ?? []).map(CatalogItem.series)
-                return items.isEmpty ? nil : CategoryRow(category: c, items: items)
-            }
+        case .movies, .series:
+            reloadCategoryContent(sourceId: sid)
         case .home:
+            newMovies = ((try? env.catalog.movies(sourceId: sid, sort: .added, limit: 20)) ?? []).map(CatalogItem.movie)
+            newSeries = ((try? env.catalog.series(sourceId: sid, sort: .added, limit: 20)) ?? []).map(CatalogItem.series)
             let hidden = HiddenStore.shared
             let channels = ((try? env.catalog.channels(sourceId: sid, limit: 40)) ?? [])
                 .filter { !hidden.isHidden(channelId: $0.id, categoryId: $0.categoryId, sourceId: sid) }.prefix(20)
             let map = (try? env.epg.nowNext(sourceId: sid, epgIds: channels.compactMap(\.epgId), at: Date())) ?? [:]
             liveRows = channels.map { ChannelRow(channel: $0, nowNext: $0.epgId.flatMap { map[$0.lowercased()] }) }
         }
+    }
+
+    /// Movies/Series rows for the selected country (nil = All → whole source, provider order).
+    private func reloadCategoryContent(sourceId sid: String) {
+        guard let ck = categoryKind else { return }
+        let prefs = env.categoryPrefs
+        categoryInfos = (try? env.catalog.categoryInfos(sourceId: sid, kind: ck)) ?? []
+        let hidden = prefs.hidden(sourceId: sid, kind: ck)
+        let visible = categoryInfos.filter { !hidden.contains($0.id) }
+        // Only countries with visible categories count, so the language default never shows an empty page.
+        country = prefs.effectiveCountry(sourceId: sid, kind: ck, available: Set(visible.compactMap(\.countryCode)),
+                                         languageCode: AppSettings.uiLanguageCode(defaults: AppBootstrap.defaults))
+        let scoped = country.map { code in visible.filter { $0.countryCode == code } } ?? visible
+        let ids = country == nil ? nil : scoped.map(\.id)
+        let catalog = env.catalog
+        func items(_ sort: CatalogSort, _ limit: Int, categoryIds: [String]?) -> [CatalogItem] {
+            if ck == .movie {
+                let list = categoryIds.map { (try? catalog.movies(sourceId: sid, categoryIds: $0, sort: sort, limit: limit)) ?? [] }
+                    ?? ((try? catalog.movies(sourceId: sid, sort: sort, limit: limit)) ?? [])
+                return list.map(CatalogItem.movie)
+            }
+            let list = categoryIds.map { (try? catalog.series(sourceId: sid, categoryIds: $0, sort: sort, limit: limit)) ?? [] }
+                ?? ((try? catalog.series(sourceId: sid, sort: sort, limit: limit)) ?? [])
+            return list.map(CatalogItem.series)
+        }
+        let newest = items(.added, 20, categoryIds: ids)
+        if ck == .movie { newMovies = newest; newSeries = [] } else { newSeries = newest; newMovies = [] }
+        let rated = items(.rating, 10, categoryIds: ids)
+        let hasRatings = rated.contains { item in
+            switch item {
+            case .movie(let m): return (m.rating ?? 0) > 0
+            case .series(let s): return (s.rating ?? 0) > 0
+            }
+        }
+        top10 = hasRatings ? rated : Array(newest.prefix(10))
+        let pinnedIds = prefs.pinned(sourceId: sid, kind: ck)
+        let byId = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let pinned = pinnedIds.compactMap { byId[$0] }
+        let pinnedSet = Set(pinnedIds)
+        let rows = pinned.map { ($0, true) } + scoped.filter { !pinnedSet.contains($0.id) }.prefix(12).map { ($0, false) }
+        categoryRows = rows.compactMap { info, isPinned in
+            let list = items(.added, 20, categoryIds: [info.id])
+            return list.isEmpty ? nil : CategoryRow(category: info.category, items: list, pinned: isPinned)
+        }
+    }
+
+    // MARK: Category navigation (Movies/Series)
+
+    var categoryKind: CategoryKind? {
+        switch kind {
+        case .movies: return .movie
+        case .series: return .series
+        case .home: return nil
+        }
+    }
+
+    var sourceId: String? { env.currentSource?.id }
+
+    private var hiddenIds: Set<String> {
+        guard let sid = sourceId, let ck = categoryKind else { return [] }
+        return env.categoryPrefs.hidden(sourceId: sid, kind: ck)
+    }
+
+    /// Categories offered in the navigation (hidden ones removed).
+    var visibleInfos: [CategoryInfo] {
+        let hidden = hiddenIds
+        return categoryInfos.filter { !hidden.contains($0.id) }
+    }
+
+    var hiddenInfos: [CategoryInfo] {
+        let hidden = hiddenIds
+        return categoryInfos.filter { hidden.contains($0.id) }
+    }
+
+    /// Visible categories of a country (nil = all).
+    func infos(country code: String?) -> [CategoryInfo] {
+        guard let code else { return visibleInfos }
+        return visibleInfos.filter { $0.countryCode == code }
+    }
+
+    /// Countries with visible categories: the selected one first, then most categories first.
+    var countries: [(code: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for info in visibleInfos { if let c = info.countryCode { counts[c, default: 0] += 1 } }
+        return counts.map { (code: $0.key, count: $0.value) }.sorted { a, b in
+            if (a.code == country) != (b.code == country) { return a.code == country }
+            if a.count != b.count { return a.count > b.count }
+            return a.code < b.code
+        }
+    }
+
+    var pinnedInfos: [CategoryInfo] {
+        guard let sid = sourceId, let ck = categoryKind else { return [] }
+        let byId = Dictionary(visibleInfos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return env.categoryPrefs.pinned(sourceId: sid, kind: ck).compactMap { byId[$0] }
+    }
+
+    var recentInfos: [CategoryInfo] {
+        guard let sid = sourceId, let ck = categoryKind else { return [] }
+        let byId = Dictionary(visibleInfos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return env.categoryPrefs.recent(sourceId: sid, kind: ck).compactMap { byId[$0] }
+    }
+
+    func isPinned(_ info: CategoryInfo) -> Bool {
+        guard let sid = sourceId, let ck = categoryKind else { return false }
+        return env.categoryPrefs.isPinned(info.id, sourceId: sid, kind: ck)
+    }
+
+    /// nil = All. Persisted per source + kind; the page follows.
+    func selectCountry(_ code: String?) {
+        guard let sid = sourceId, let ck = categoryKind else { return }
+        env.categoryPrefs.setCountry(code, sourceId: sid, kind: ck)
+        reload()
+    }
+
+    func togglePin(_ info: CategoryInfo) {
+        guard let sid = sourceId, let ck = categoryKind else { return }
+        env.categoryPrefs.togglePin(info.id, sourceId: sid, kind: ck)
+        reload()
+    }
+
+    func setHidden(_ hidden: Bool, _ info: CategoryInfo) {
+        guard let sid = sourceId, let ck = categoryKind else { return }
+        env.categoryPrefs.setHidden(hidden, categoryId: info.id, sourceId: sid, kind: ck)
+        reload()
+    }
+
+    /// Opening a category records it under "Recently opened" (no page reload needed).
+    func recordOpened(_ info: CategoryInfo) {
+        guard let sid = sourceId, let ck = categoryKind else { return }
+        env.categoryPrefs.recordOpened(info.id, sourceId: sid, kind: ck)
+    }
+
+    /// Grid of one category ("See all").
+    func gridRoute(_ category: IPTVCore.Category) -> BrowseRoute {
+        .grid(kind: category.kind.contentKind, categoryId: category.id, title: CountryFlag.displayTitle(category.name), sort: .added)
     }
 
     private func resolve(_ progress: SyncItem) -> ContinueEntry? {
@@ -202,12 +330,40 @@ struct HomeView: View {
     var body: some View { BrowseView(kind: .home) }
 }
 
-/// Home / Movies / Series: hero + Netflix-style rows (SCREENS §3.2).
+/// Home / Movies / Series: hero + Netflix-style rows (SCREENS §3.2). iPhone/iPad Movies/Series add the
+/// sticky "Categories ▾ · country ▾" row under the header and the category sheet. On Apple TV the
+/// Movies/Series page is embedded in `TVCategoryBrowseView` (left category column), which owns the model.
 struct BrowseView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     let kind: BrowseKind
-    @State private var model: BrowseModel?
+    /// Model owned by a container (tvOS category column); nil → this view owns and reloads its own.
+    private let external: BrowseModel?
+    @State private var owned: BrowseModel?
+    #if !os(tvOS)
+    @State private var categorySheet = false
+    @State private var pendingRoute: BrowseRoute?
+    #endif
+
+    init(kind: BrowseKind) {
+        self.kind = kind
+        external = nil
+    }
+
+    init(model: BrowseModel) {
+        kind = model.kind
+        external = model
+    }
+
+    private var model: BrowseModel? { external ?? owned }
+
+    private var hasCategoryBar: Bool {
+        #if os(tvOS)
+        false
+        #else
+        kind != .home && !(model?.categoryInfos.isEmpty ?? true)
+        #endif
+    }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -217,7 +373,7 @@ struct BrowseView: View {
                     if featured.entry != nil || featured.item != nil {
                         BrowseHero(model: model, entry: featured.entry, item: featured.item)
                     } else {
-                        Color.clear.frame(height: Theme.isTV ? 0 : 60)
+                        Color.clear.frame(height: Theme.isTV ? 0 : (hasCategoryBar ? 120 : 60))
                     }
                     if model.isEmpty {
                         EmptyStateView(icon: kind == .series ? "rectangle.stack" : kind == .movies ? "film" : "sparkles.tv",
@@ -243,14 +399,24 @@ struct BrowseView: View {
         .scrollClipDisabled()
         #endif
         .ignoresSafeArea(edges: .top)
+        #if !os(tvOS)
+        // Sticky under the header (a top inset, so it stays while the page scrolls under it).
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if hasCategoryBar, let model {
+                CategoryNavBar(model: model, solid: router.headerSolid) { categorySheet = true }
+            }
+        }
+        .modifier(CategorySheetPresenter(isPresented: $categorySheet, pendingRoute: $pendingRoute, model: model))
+        #endif
         .screenBackground()
         .onAppear {
-            if model == nil { model = BrowseModel(env: env, kind: kind) }
-            model?.reload()
+            guard external == nil else { return }
+            if owned == nil { owned = BrowseModel(env: env, kind: kind) }
+            owned?.reload()
         }
-        .onChange(of: env.libraryVersion) { model?.reload() }
-        .onChange(of: env.catalogVersion) { model?.reload() }
-        .onChange(of: env.currentSource?.id) { model?.reload() }
+        .onChange(of: env.libraryVersion) { owned?.reload() }
+        .onChange(of: env.catalogVersion) { owned?.reload() }
+        .onChange(of: env.currentSource?.id) { owned?.reload() }
     }
 
     @ViewBuilder
@@ -298,26 +464,11 @@ struct BrowseView: View {
         case .movies, .series:
             let ck: ContentKind = kind == .movies ? .movie : .series
             let newTitle = L10n.t(kind == .movies ? "home_new_movies" : "home_new_series")
-            if !model.allCategories.isEmpty {
-                // Every category is reachable here; the rows below preview only the first 12.
-                Shelf(title: L10n.t("row_categories"), spacing: Theme.isTV ? 16 : 8, identifier: "categories") {
-                    ForEach(model.allCategories) { category in
-                        let title = [CountryFlag.emoji(for: category.name), CountryFlag.strippedTitle(category.name)].compactMap { $0 }.joined(separator: " ")
-                        NavigationLink(value: BrowseRoute.grid(kind: ck, categoryId: category.id, title: title, sort: .added)) {
-                            Text(title).lineLimit(1)
-                                .font(Theme.isTV ? Theme.caption.weight(.medium) : .subheadline.weight(.medium))
-                                .foregroundStyle(Theme.textPrimary)
-                                .padding(.horizontal, Theme.isTV ? 26 : 14).padding(.vertical, Theme.isTV ? 12 : 8)
-                                .background(Capsule().fill(Theme.surface))
-                                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
-                        }
-                        .buttonStyle(CardButtonStyle(radius: 40, scale: 1.1))
-                        .accessibilityIdentifier("category_chip_\(category.id)")
-                    }
-                }
-            }
+            // "New" / Top 10 / rows follow the selected country ("See all" too).
             if !model.newItems.isEmpty {
-                posterRow(newTitle, model.newItems, seeAll: .grid(kind: ck, categoryId: nil, title: newTitle, sort: .added), id: "new", markNew: true)
+                let seeAll: BrowseRoute = model.country.map { .countryGrid(kind: ck, country: $0, title: newTitle, sort: .added) }
+                    ?? .grid(kind: ck, categoryId: nil, title: newTitle, sort: .added)
+                posterRow(newTitle, model.newItems, seeAll: seeAll, id: "new", markNew: true)
             }
             if !model.top10.isEmpty {
                 Shelf(title: L10n.t("row_top10"), spacing: Theme.isTV ? 24 : 6, identifier: "top10") {
@@ -329,8 +480,8 @@ struct BrowseView: View {
                 }
             }
             ForEach(model.categoryRows) { row in
-                let title = [CountryFlag.emoji(for: row.category.name), CountryFlag.strippedTitle(row.category.name)].compactMap { $0 }.joined(separator: " ")
-                posterRow(title, row.items, seeAll: .grid(kind: ck, categoryId: row.category.id, title: title, sort: .added), id: "category_\(row.category.id)")
+                let title = (row.pinned ? "📌 " : "") + CountryFlag.displayTitle(row.category.name)
+                posterRow(title, row.items, seeAll: model.gridRoute(row.category), id: "category_\(row.category.id)")
             }
         }
     }
@@ -600,8 +751,12 @@ struct CatalogGridView: View {
     @Environment(AppEnvironment.self) private var env
     let kind: ContentKind
     let categoryId: String?
+    /// Country filter: every visible category of this country (instead of `categoryId`).
+    var country: String? = nil
     let title: String
     let initialSort: CatalogSort
+    /// tvOS category column: shown next to the column, not pushed (own title, no navigation bar).
+    var embedded = false
     @State private var movies: MoviesViewModel?
     @State private var series: SeriesListViewModel?
 
@@ -614,7 +769,49 @@ struct CatalogGridView: View {
     }
 
     var body: some View {
+        if embedded {
+            grid
+        } else {
+            grid
+                .navigationTitle(title)
+                #if !os(tvOS)
+                .toolbar(.visible, for: .navigationBar)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Picker(L10n.t("action_sort"), selection: Binding(get: { movies?.sort ?? series?.sort ?? initialSort },
+                                                                            set: { movies?.sort = $0; series?.sort = $0 })) {
+                                Text(L10n.t("sort_added")).tag(CatalogSort.added)
+                                Text(L10n.t("sort_az")).tag(CatalogSort.az)
+                                Text(L10n.t("sort_rating")).tag(CatalogSort.rating)
+                            }
+                        } label: { Image(systemName: "arrow.up.arrow.down") }
+                            .accessibilityLabel(L10n.t("action_sort"))
+                            .accessibilityIdentifier("sort_menu")
+                    }
+                }
+        }
+    }
+
+    /// Category ids of `country` (visible ones), nil without a country filter.
+    private func countryCategoryIds(sourceId: String?) -> [String]? {
+        guard let country, let sourceId else { return nil }
+        let ck: CategoryKind = kind == .movie ? .movie : .series
+        let hidden = env.categoryPrefs.hidden(sourceId: sourceId, kind: ck)
+        return ((try? env.catalog.categoryInfos(sourceId: sourceId, kind: ck)) ?? [])
+            .filter { $0.countryCode == country && !hidden.contains($0.id) }.map(\.id)
+    }
+
+    private var grid: some View {
         ScrollView {
+            if embedded {
+                Text(title).font(Theme.title).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Theme.safeH).padding(.top, 20)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("category_grid_title")
+            }
             LazyVGrid(columns: columns, spacing: Theme.isTV ? 56 : 18) {
                 if let movies {
                     ForEach(movies.movies) { m in
@@ -640,35 +837,20 @@ struct CatalogGridView: View {
         .scrollClipDisabled()
         #endif
         .screenBackground()
-        .navigationTitle(title)
-        #if !os(tvOS)
-        .toolbar(.visible, for: .navigationBar)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker(L10n.t("action_sort"), selection: Binding(get: { movies?.sort ?? series?.sort ?? initialSort },
-                                                                    set: { movies?.sort = $0; series?.sort = $0 })) {
-                        Text(L10n.t("sort_added")).tag(CatalogSort.added)
-                        Text(L10n.t("sort_az")).tag(CatalogSort.az)
-                        Text(L10n.t("sort_rating")).tag(CatalogSort.rating)
-                    }
-                } label: { Image(systemName: "arrow.up.arrow.down") }
-                    .accessibilityLabel(L10n.t("action_sort"))
-                    .accessibilityIdentifier("sort_menu")
-            }
-        }
         .onAppear {
             guard movies == nil, series == nil else { return }
+            let ids = countryCategoryIds(sourceId: env.currentSource?.id)
             if kind == .movie {
                 let m = MoviesViewModel(env: env)
                 m.categoryId = categoryId
+                m.categoryIds = ids
                 m.sort = initialSort
                 m.reload()
                 movies = m
             } else {
                 let s = SeriesListViewModel(env: env)
                 s.categoryId = categoryId
+                s.categoryIds = ids
                 s.sort = initialSort
                 s.reload()
                 series = s

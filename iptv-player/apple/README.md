@@ -138,7 +138,7 @@ Bütçeler ve gerekçeler: `docs/superpowers/specs/2026-10-06-performance-ux-des
   kanal değişmez. Siri Remote'ta rakam yoktur (HDMI-CEC / klavye).
 * **Canlı TV listesi + favori:** satır başına numara, logo, ad, şimdi/sonraki; bilgi paneli (iPad,
   iPhone yatay, tvOS). ⭐ tek dokunuş + 4 sn "Geri al"; favoriler her listede önce. Sıra cihazda
-  tutulur. Diziler/Filmler her kategoriyi çiple gösterir (`item_categories`: bir öğe birden çok
+  tutulur. Diziler/Filmler'de her kategoriye "Kategoriler" sayfasından (iOS) / sol kategori sütunundan (tvOS) ulaşılır, ülke filtresiyle (Build 9, SCREENS §3.2) (`item_categories`: bir öğe birden çok
   kategoride görünür; veritabanı şeması v2–v5 göçleriyle yükselir, mevcut veri korunur).
 
 ## Oynatıcı: AVPlayer + VLCKit
@@ -259,6 +259,8 @@ UI testleri yerel bir test listesi kullanır (uygulamada örnek liste yoktur –
 # 1) Test M3U + XMLTV'yi Mac'te sunun (simülatör Mac'e localhost ile ulaşır)
 mkdir -p /tmp/iptv-test && cd /tmp/iptv-test   # test.m3u (ör. Apple bipbop HLS) + epg.xml
 python3 -m http.server 8765 --bind 127.0.0.1
+# Kategori gezintisi testleri (IOS/TVSeriesCategoriesTests) aynı klasörde series-cats.m3u ister
+# (kopyası: UITests/Fixtures/series-cats.m3u; yoksa test XCTSkip ile atlanır).
 # VLCKit / VOD / oynatıcı kontrol testleri Range destekli ikinci sunucu ister (MKV, MP4, TS…, port 8766:
 # vlc-live.m3u, vlc-movie.m3u, vod-movie.m3u); yoksa bu testler XCTSkip ile atlanır.
 # 2) Ortam değişkenleri TEST_RUNNER_ önekiyle test sürecine geçer
