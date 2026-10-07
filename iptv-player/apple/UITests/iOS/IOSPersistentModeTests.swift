@@ -41,6 +41,9 @@ final class IOSPersistentModeTests: XCTestCase {
             XCTAssertTrue(gear.exists, "neither welcome nor home appeared")
             XCTAssertTrue(app.buttons["tab_home"].exists, "home with the header tabs")
             gear.tap()
+            let sources = app.buttons["settings_sources"]
+            XCTAssertTrue(sources.waitForExistence(timeout: 10), "settings should list 'Sources'")
+            sources.tap()
             let addM3ULink = app.buttons["settings_add_m3u"]
             XCTAssertTrue(addM3ULink.waitForExistence(timeout: 10), "settings should list 'M3U link'")
             addM3ULink.tap()
@@ -66,6 +69,8 @@ final class IOSPersistentModeTests: XCTestCase {
             let gone = NSPredicate(format: "count == %d", before - 1)
             let removed = XCTNSPredicateExpectation(predicate: gone, object: rows)
             XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 10), .completed, "deleted source should disappear from settings")
+            app.navigationBars.buttons.firstMatch.tap()   // Sources → Settings
+            XCTAssertTrue(app.buttons["settings_close"].waitForExistence(timeout: 5))
             app.buttons["settings_close"].tap()
             XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 10), "home with the header tabs")
         }

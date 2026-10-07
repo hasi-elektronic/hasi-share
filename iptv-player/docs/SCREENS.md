@@ -64,6 +64,15 @@ kategori çipi "★ Favoriler", TV Rehberi'nde "Tümü"nün ardından "Favoriler
 6. Favori sırası **yalnızca cihazda** (Favoriler ekranı → "Taşı"); senkronize olan yalnızca favori
    durumudur (CONTRACT §8 değişmez); yeni cihazda en yeni üstte.
 
+**3 dokunuş kuralı:** Ana Sayfa'dan sık yapılan her iş en fazla 3 dokunuşla (TV: 3 OK) biter
+(UI testi `testThreeTapPaths`):
+* Canlı kanal izlemek: **Canlı TV** sekmesi → kanal satırı (2) – ya da Ana Sayfa'nın ilk satırı
+  "Son izlenen kanallar" → kanal (1).
+* Uygulama dili: ⚙️ → **Uygulama dili** → dil (3).
+* Kaynak eklemek: ⚙️ → **Kaynaklar** → **+ M3U / Xtream** (3; form açık).
+* Ses/altyazı dili, Hızlı başlat, TV/soundbar ses gecikmesi: ⚙️ → satır (2).
+* Oynatıcıda başka kanal: kanal paneli (iOS liste düğmesi / soldan kaydırma, TV: OK) → kanal (2).
+
 Kaynak yoksa Karşılama ekranı. Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; boş durum gösterir.
 Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster min. 104 pt).
 
@@ -113,7 +122,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   · **beyaz pill "▶ Oynat"** (devam ediyorsa "Devam et (01:12:30)") ★ · **ⓘ Bilgi** (detay).
 * **Posterler** (satırlar, "Tümünü gör" grid'i, arama, Favoriler): iOS'ta sağ üst köşede küçük yuvarlak ☆/★
   (tek dokunuş, 44 pt hedef); uzun bas menüsünün ilk öğesi Favorilere ekle/çıkar (TV: uzun OK).
-* **Ana Sayfa satırları:** İzlemeye devam et (16:9 kart, ortada oynat ikonu, başlık kartın altında
+* **Ana Sayfa satırları:** **Son izlenen kanallar** (ilk satır: son oynatılan canlı kanallar, en yeni önce,
+  en fazla 20; gizli kanallar hariç; zapping listesi = bu satır; CONTRACT §8 canlı ilerleme öğeleri) ·
+  İzlemeye devam et (16:9 kart, ortada oynat ikonu, başlık kartın altında
   görsel üstünde, kartın altında `primary` ilerleme çubuğu; kural CONTRACT §8: %5 < konum < %95,
   süre bilinmiyorsa konum ≥ 10 sn ve çubuk gizli; en son `updatedAt` önce) · Favoriler (posterler) · Favori kanallar ·
   Yeni eklenen filmler · Yeni eklenen diziler · Canlı kanallar (kanal kartları).
@@ -128,7 +139,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
   gönderilmez – sıralama tamamen yereldir.)
 * Üstte deneme durum çipi ve (birden fazla kaynak varsa) kaynak seçici Ana Sayfa hero'sunun üstünde.
-* **QuickStart (Hızlı başlat, Ayarlar → Oynatma, varsayılan açık):** uygulama bir canlı kanal oynarken
+* **QuickStart (Hızlı başlat, Ayarlar üst düzey, varsayılan açık):** uygulama bir canlı kanal oynarken
   arka plana alındıysa / sonlandırıldıysa (`LastSession.endedInPlayer = true`), sonraki açılışta Ana Sayfa
   beklenmeden — kaynak yenilemesinden (`env.start()`) önce — o kanal doğrudan oynatıcıda açılır (kanal
   zapping listesi = kanalın kategorisi, ilk 200). Kullanıcı oynatıcıyı Geri / Kapat ile kapattıysa ya da en
@@ -210,6 +221,16 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   (VOD) veya program ilerlemesi (canlı), "CANLI" rozeti; sağda araçlar: Ses · Altyazı ·
   Görüntü oranı · **⭐ Favori** (kanal / film / bölümün dizisi; tek dokunuş, 4 sn geri al kapsülü alt çubuğun
   üstünde) · (canlı) Kanal listesi. Kanal listesinde favori kanallar en üstte.
+* **Kanal paneli (canlı, oynatıcı içinde):** oynatma arkada sürer. Solda panel: iOS yatayda genişliğin
+  %40'ı, iOS dikeyde tam ekran (sayfa gibi, kapat ✕), tvOS 600 pt. Üstte "Kanallar" + **kategori seçici**
+  (Tümü · ★ Favoriler · favori kategoriler · diğerleri; gizliler hariç); açılışta oynayan kanalın
+  kategorisi seçili, oynayan kanal görünür (TV: odakta) ve işaretli. **Favoriler önce** (Tümü: favoriler
+  bölümü, kategori: içindeki favoriler üstte). Satır: numara · logo · ad · şu anki program · ⭐ göstergesi.
+  Satıra dokunmak/OK o kanala geçer (zapping yolu, 400 ms birleştirme) ve paneli kapatır; gösterilen liste
+  yeni zapping listesi olur (▲▼ / kaydırma onda devam eder). Panel açılırken katman kapanır (kapanınca katman
+  takılı kalmaz). iOS: katmandaki liste düğmesi veya **soldan kaydırma** açar; panelin yanına dokunmak ya da
+  sola kaydırmak kapatır. tvOS: katman kapalıyken **OK** açar, Menü kapatır; ilk satırda ▲ kategori seçiciye,
+  oradan ▼ listeye gider. Açılış ≤ 100 ms (sayfa 120 satır; oynayan kanal en fazla 600 satır içinde aranır).
 * **TV canlı – ▲ = kanal bilgisi:** katman kapalıyken ▲ altta bilgi kartını açar (logo, numara, ad, Şimdi +
   saat + ilerleme, Sonra), **⭐ odakta** (OK = favori ekle/çıkar). Kart açıkken ▲/▼ kanal değiştirir (kart yeni
   kanalı gösterir), Geri kartı kapatır; ⭐ sonrası "Geri al" kapsülü kartın **altında** (⭐'ın hizasında) durur:
@@ -226,7 +247,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   * **Mobil (iOS):** katmanın ortasında büyük taşıma satırı: ⟲10 · oynat/duraklat (64 pt) ·
     10⟳ (canlıda yalnızca oynat/duraklat). Görüntüye çift dokunma: sol üçte bir −10 sn, sağ
     üçte bir +10 sn, kısa "−10 sn"/"+10 sn" halkası (ard arda çift dokunmalar toplanır, katman
-    açılıp kapanmaz); tek dokunma katmanı açar/kapatır. Altta sürüklenebilir zaman çizgisi
+    açılıp kapanmaz); tek dokunma katmanı açar/kapatır; senkron paneli açıkken tek veya (orta üçte bir / canlı) çift
+    dokunma önce paneli kapatır, katman açılmaz. Altta sürüklenebilir zaman çizgisi
     (44 pt dokunma yüksekliği): sürüklerken hedef zaman balonda görünür, gelen zaman
     güncellemeleri başparmağı oynatmaz, bırakınca atlar. Süre bilinmiyorsa çizgi yalnızca
     gösterir (sürükleme yok), süre "--:--".
@@ -237,7 +259,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     Önceki kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
     kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
     satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
-    duraklatır/sürdürür ve katmanı açar (canlıda yalnızca katmanı açar). Siri Remote dokunmatik
+    VOD'da duraklatır/sürdürür ve katmanı açar; **canlıda kanal panelini açar** (katman: ◀▶ veya
+    Oynat/Duraklat tuşu). Tam tuş haritası aşağıdaki tabloda. Siri Remote dokunmatik
     yüzeyinde kaydırarak sarma v1'de yok (SwiftUI odak modeliyle güvenilir değil); basılı tutma
     aynı ihtiyacı karşılar.
   * Katman 3 sn sonra yalnızca oynarken kaybolur: duraklatılmışken, çizgi sürüklenirken,
@@ -250,6 +273,22 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   * **Kendiliğinden duraklama yok** (canlı + VOD): oynatıcı yalnızca kullanıcı duraklatınca (veya
     kulaklık çıkarılınca / ses kesintisinde) duraklar; motorun başka her "paused" bildirimi
     takılmadır (yükleniyor göstergesi, otomatik sürdürme, 12 sn sonra yeniden bağlanma).
+* **TV tuş haritası (tvOS, Siri Remote + rakam tuşları):**
+
+  | Durum | OK | ▲ | ▼ | ◀ ▶ | Oynat/Duraklat | Menü | Rakamlar |
+  |---|---|---|---|---|---|---|---|
+  | Canlı, katman kapalı | Kanal paneli | Bilgi kartı | Sonraki kanal | Katmanı aç | Duraklat/sürdür + katman | Oynatıcıdan çık | Numaraya geç |
+  | Canlı, katman açık (odak oynat/duraklat) | Duraklat/sürdür | Üst satır (kapat'ta) | – | – | Duraklat/sürdür | Katmanı kapat | Numaraya geç |
+  | Üst satır (kapat + araçlar) | Seçili araç (menü / panel) | – | Oynat/duraklat'a dön | Araçlar arasında (uçlarda durur) | Duraklat/sürdür | Katmanı kapat | Numaraya geç |
+  | Bilgi kartı (⭐ odakta) | Favori ekle/çıkar | Önceki kanal (Geri al teklifinde: ⭐) | Sonraki kanal (Geri al teklifinde: Geri al) | – | Duraklat/sürdür | Kartı kapat | Numaraya geç |
+  | Kanal paneli | Kanala geç, paneli kapat | Odak yukarı (ilk satırda kategori seçici) | Odak aşağı | – | Duraklat/sürdür | Paneli kapat | Numaraya geç |
+  | Senkron paneli | – | Satırlar arası | Satırlar arası | Değeri değiştir (hızlanır) | Duraklat/sürdür | Paneli kapat | – |
+  | VOD, katman kapalı | Duraklat/sürdür + katman | Katmanı aç | Katmanı aç | −/+10 sn (basılı: hızlanır) | Duraklat/sürdür + katman | Oynatıcıdan çık | – |
+  | VOD, katman açık | Duraklat/sürdür | Üst satır | – | −/+10 sn | Duraklat/sürdür | Katmanı kapat | – |
+
+  **Rakamlar (numara ile kanal):** IR kumanda (HDMI-CEC) / klavye rakamları canlıda sağ üstte büyük
+  gösterilir (en fazla 4 hane); son rakamdan 1,5 sn sonra zapping listesinde `number` eşleşen kanala,
+  yoksa listedeki n'inci kanala (1'den) geçilir (`NumberZap`). Siri Remote'ta rakam yoktur.
 * **Görüntü oranı:** Sığdır · Doldur (kırp) · Uzat · 16:9 · 4:3 – seçim kanal başına değil,
   global hatırlanır.
 * **Ses / altyazı:** dil adıyla listelenir (`Türkçe`, `English`, bilinmiyorsa `Parça 2`),
@@ -266,7 +305,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   oynatılır"; VLCKit oynatamazsa yayın gecikmesiz AVPlayer ile sürer ve "Senkron bu yayında
   uygulanamadı" notu (4 sn) görünür. Katmanın araçlarında "Senkronu düzelt" düğmesi
   (`arrow.triangle.2.circlepath`): canlıyı canlı uçtan, VOD'u mevcut konumdan yeniden açar.
-  Ayarlar → Oynatma → "Ses gecikmesi (TV/soundbar)" (aynı kontrol, alt bilgide yön ipucu).
+  Ayarlar (üst düzey) → "Ses gecikmesi (TV/soundbar)" (aynı kontrol, alt bilgide yön ipucu).
 * **Bağlantı koparsa:** katmanda "Yeniden bağlanılıyor… (2/5)" + son kare donuk; 1-2-4-8-15 sn
   aralıklarla 5 deneme, ardından hata kartı (Tekrar dene ★ / Kanal listesi / Geri).
   Canlıda "canlı pencerenin gerisinde" hatası sessizce canlı uca atlar.
@@ -288,23 +327,29 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   bekliyor (banner), zaten sahip (geri yükleme yapar).
 
 ### 3.9 Ayarlar ve kaynak yönetimi
-* **Kaynaklar:** liste (ad, tür, host, son yenileme, durum rozeti, hesap bitiş tarihi) →
+**Üst düzey yalnızca kullanıcının sık değiştirdikleri** (tek grup, kaydırmasız):
+**Kaynaklar** (sayı ile → Kaynaklar ekranı) · **Uygulama dili** · **Ses dili** · **Altyazı dili** ·
+**Hızlı başlat** · **Ses gecikmesi (TV/soundbar)** (§3.7 – TV'deki dudak senkronu düzeltmesi, bu yüzden üstte);
+alt bilgide Hızlı başlat açıklaması ve gecikme yön ipucu. Altında tek satır **Gelişmiş ve tanılama** →
+geri kalan her şey.
+* **Kaynaklar ekranı:** liste (ad, tür, host, son yenileme, durum rozeti, hesap bitiş tarihi) →
   detay: Yenile · Düzenle · EPG URL · EPG saat kaydırma (−12..+12 saat, 15 dk adım) ·
-  Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "+ Kaynak ekle".
-* **Oynatma:** tercih edilen ses dili, altyazı dili, görüntü oranı varsayılanı, canlı yayın
-  formatı (Android: Otomatik/TS/HLS), arabellek (Normal/Büyük), TV'de önizleme oynatıcısı,
-  (Apple) "Ses gecikmesi (TV/soundbar)" (§3.7).
-* **Görünüm & dil:** Uygulama dili (Sistem / Deutsch / Türkçe / English – dil adları her zaman
-  kendi dilinde), EPG saat dilimi (Cihaz/özel), 24 saat biçimi. Arayüz üç dilde tamdır (EN/TR/DE);
-  "Sistem" cihaz dilini izler, desteklenmeyen dillerde English. Dil değişince arayüz hemen yeniden
-  çizilir; tarih/saat seçilen dile göre biçimlenir (DE/TR: 24 saat).
-* **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
-  senkronizasyon durumu, çıkış, **hesabı sil**.
-* **Satın alma:** durum, geri yükle.
-* **Gelişmiş/Tanılama:** Format testi (`stream-samples.json`; Apple'da her örneğin motoru –
-  AVPlayer/VLCKit – gösterilir ve `expect.apple` ile karşılaştırılır), önbelleği temizle (görsel / EPG),
-  uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +
-  tam metin, diğer bileşenler), gizlilik politikası.
+  Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "Kaynak ekle": **+ M3U** · **+ Xtream** ·
+  (TV) **Telefonla ekle (QR)**.
+* **Uygulama dili:** Sistem / Deutsch / Türkçe / English – dil adları her zaman kendi dilinde. Arayüz üç
+  dilde tamdır (EN/TR/DE); "Sistem" cihaz dilini izler, desteklenmeyen dillerde English. Dil değişince
+  arayüz hemen yeniden çizilir; tarih/saat seçilen dile göre biçimlenir (DE/TR: 24 saat).
+* **Gelişmiş ve tanılama** ekranı:
+  * **Oynatma:** görüntü oranı varsayılanı, canlı yayın formatı (Android: Otomatik/TS/HLS), arabellek
+    (Normal/Büyük), TV'de önizleme oynatıcısı.
+  * **Görünüm:** EPG saat dilimi (Cihaz/özel), 24 saat biçimi.
+  * **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
+    senkronizasyon durumu, çıkış, **hesabı sil**.
+  * **Satın alma:** durum, geri yükle.
+  * **Tanılama:** Format testi (`stream-samples.json`; Apple'da her örneğin motoru – AVPlayer/VLCKit –
+    gösterilir ve `expect.apple` ile karşılaştırılır), performans katmanı, önbelleği temizle (görsel / EPG),
+    uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +
+    tam metin, diğer bileşenler), gizlilik politikası.
 * Kilitliyken bu ekran tamamen erişilebilir.
 
 ## 4. Hata ve boş durumlar (ayrı ayrı mesajlar)

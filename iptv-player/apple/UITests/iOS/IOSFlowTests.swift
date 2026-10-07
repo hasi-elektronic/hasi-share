@@ -74,13 +74,16 @@ final class IOSFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
         sleep(1)
         UITestSupport.snap("ios-10-settings", in: self)
-        // Open-source licenses (LGPL-2.1 notice for VLCKit).
+        // Open-source licenses (LGPL-2.1 notice for VLCKit), under Advanced.
+        app.buttons["settings_advanced"].tap()
         let licenses = app.buttons["settings_licenses"]
         for _ in 0..<6 where !(licenses.exists && licenses.isHittable) { app.swipeUp() }
         licenses.tap()
         XCTAssertTrue(app.staticTexts["LGPL-2.1-or-later"].waitForExistence(timeout: 5), "VLCKit license entry")
         UITestSupport.snap("ios-10b-licenses", in: self)
-        app.navigationBars.buttons.firstMatch.tap()
+        app.navigationBars.buttons.firstMatch.tap()   // → Advanced
+        app.navigationBars.buttons.firstMatch.tap()   // → Settings
+        XCTAssertTrue(app.buttons["settings_close"].waitForExistence(timeout: 5))
         app.buttons["settings_close"].tap()
         XCTAssertTrue(app.buttons["tab_home"].waitForExistence(timeout: 5))
     }

@@ -16,7 +16,7 @@ final class TVVLCPlaybackTests: XCTestCase {
         VLCTestSupport.assertNoErrorCard(app, "MKV")
         UITestSupport.snap("vlc-tvos-01-mkv-playing", in: self)
 
-        remote.press(.select)   // overlay with the audio/subtitle/aspect tools
+        remote.press(.right)    // overlay with the audio/subtitle/aspect tools (live: OK = channel panel)
         sleep(1)
         UITestSupport.snap("vlc-tvos-02-mkv-overlay", in: self)
         XCTAssertTrue(app.buttons["Subtitles"].exists, "VLCKit subtitle tracks listed")

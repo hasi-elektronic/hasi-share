@@ -78,8 +78,20 @@ final class IOSLiveListTests: XCTestCase {
         XCTAssertTrue(panel.waitForExistence(timeout: 5), "wide layout: info panel")
         sleep(1)
         UITestSupport.snap("live-list/ios-05-landscape-panel", in: self)
-        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).element(boundBy: 1).tap()
-        XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 10), "iPhone landscape: the first tap plays")
+        let second = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel_'")).element(boundBy: 1)
+        let name = second.label.components(separatedBy: ",").first ?? ""
+        XCTAssertFalse(panel.staticTexts[name].exists, "panel starts on the first row")
+        second.tap()
+        let surface = app.otherElements["video_surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10), "iPhone landscape: the first tap plays")
+        // Back in the list, the info panel follows the channel just watched.
+        let close = app.buttons["player_close"]
+        if !close.exists { surface.tap() }
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        close.tap()
+        XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(panel.staticTexts[name].waitForExistence(timeout: 3), "panel shows the last played \(name)")
+        UITestSupport.snap("live-list/ios-05b-landscape-panel-follows", in: self)
     }
 
     /// The last played channel is marked "● Watching" after the player is closed.

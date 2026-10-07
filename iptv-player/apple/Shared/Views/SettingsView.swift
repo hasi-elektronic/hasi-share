@@ -3,6 +3,8 @@ import IPTVKit
 import SwiftUI
 
 enum SettingsRoute: Hashable {
+    case sources
+    case advanced
     case source(String)
     case add(AddSourceRoute)
     case account
@@ -11,63 +13,23 @@ enum SettingsRoute: Hashable {
     case licenses
 }
 
-/// Settings and source management (SCREENS §3.9) – always reachable, also when locked.
+/// Settings (SCREENS §3.9) – always reachable, also when locked. Top level: only what users change
+/// (sources, languages, quick start, TV/soundbar audio delay); everything else under "Advanced".
 struct SettingsView: View {
     @Environment(AppEnvironment.self) private var env
 
     var body: some View {
         @Bindable var settings = env.settings
         Form {
-            Section(L10n.t("settings_sources")) {
-                ForEach(env.sources) { source in
-                    NavigationLink(value: SettingsRoute.source(source.id)) { SourceSummaryRow(source: source) }
-                        .accessibilityIdentifier("settings_source_\(source.name)")
-                }
-                NavigationLink(value: SettingsRoute.add(.m3u)) { Label(L10n.t("add_source_m3u"), systemImage: "plus") }
-                    .accessibilityIdentifier("settings_add_m3u")
-                NavigationLink(value: SettingsRoute.add(.xtream)) { Label(L10n.t("add_source_xtream"), systemImage: "plus") }
-                #if os(tvOS)
-                NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
-                #endif
-            }
             Section {
-                Toggle(L10n.t("settings_quick_start"), isOn: $settings.quickStart)
-                    .accessibilityIdentifier("settings_quick_start")
-                Picker(L10n.t("pref_default_aspect"), selection: $settings.aspect) {
-                    ForEach(AspectMode.allCases, id: \.self) { Text(L10n.t($0.titleKey)).tag($0) }
+                NavigationLink(value: SettingsRoute.sources) {
+                    HStack {
+                        Label(L10n.t("settings_sources"), systemImage: "antenna.radiowaves.left.and.right")
+                        Spacer()
+                        Text(verbatim: String(env.sources.count)).foregroundStyle(Theme.textSecondary)
+                    }
                 }
-                .onChange(of: settings.aspect) { env.player.aspect = settings.aspect }
-                Picker(L10n.t("pref_audio_lang"), selection: $settings.audioLanguage) {
-                    Text(L10n.t("automatic")).tag("")
-                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
-                }
-                Picker(L10n.t("pref_subtitle_lang"), selection: $settings.subtitleLanguage) {
-                    Text(L10n.t("automatic")).tag("")
-                    Text(L10n.t("off")).tag("off")
-                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
-                }
-                .onChange(of: settings.audioLanguage) { env.applyLanguagePreferences() }
-                .onChange(of: settings.subtitleLanguage) { env.applyLanguagePreferences() }
-                Picker(L10n.t("pref_buffer"), selection: $settings.largeBuffer) {
-                    Text(L10n.t("buffer_normal")).tag(false)
-                    Text(L10n.t("buffer_large")).tag(true)
-                }
-                .onChange(of: settings.largeBuffer) { env.player.largeBuffer = settings.largeBuffer }
-                // Constant A/V offset of this TV/soundbar (SCREENS §3.9); ≠ 0 plays through VLCKit.
-                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: env.player.deviceAudioDelay,
-                                  identifier: "settings_device_audio_delay") { env.player.setDeviceAudioDelay($0) }
-                #if os(tvOS)
-                Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
-                #endif
-            } header: {
-                Text(L10n.t("settings_playback"))
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.t("settings_quick_start_hint"))
-                    Text(L10n.t("audio_sync_hint"))   // direction of the device delay row
-                }
-            }
-            Section(L10n.t("settings_appearance")) {
+                .accessibilityIdentifier("settings_sources")
                 // Switching re-renders the whole app in the new language (root views are keyed by it).
                 Picker(L10n.t("pref_app_language"), selection: Binding(get: { settings.appLanguage }, set: { code in
                     L10n.setLanguage(code)
@@ -78,6 +40,112 @@ struct SettingsView: View {
                     ForEach(AppSettings.supportedLanguages, id: \.self) { Text(verbatim: Self.languageNames[$0] ?? $0).tag($0) }
                 }
                 .accessibilityIdentifier("settings_app_language")
+                Picker(L10n.t("pref_audio_lang"), selection: $settings.audioLanguage) {
+                    Text(L10n.t("automatic")).tag("")
+                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
+                }
+                .accessibilityIdentifier("settings_audio_language")
+                Picker(L10n.t("pref_subtitle_lang"), selection: $settings.subtitleLanguage) {
+                    Text(L10n.t("automatic")).tag("")
+                    Text(L10n.t("off")).tag("off")
+                    ForEach(Self.languages, id: \.self) { Text(L10n.locale.localizedString(forLanguageCode: $0) ?? $0).tag($0) }
+                }
+                .accessibilityIdentifier("settings_subtitle_language")
+                .onChange(of: settings.audioLanguage) { env.applyLanguagePreferences() }
+                .onChange(of: settings.subtitleLanguage) { env.applyLanguagePreferences() }
+                Toggle(L10n.t("settings_quick_start"), isOn: $settings.quickStart)
+                    .accessibilityIdentifier("settings_quick_start")
+                // Constant A/V offset of this TV/soundbar (SCREENS §3.9) – the user's lip-sync fix,
+                // so it stays on the top level; ≠ 0 plays through VLCKit.
+                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: env.player.deviceAudioDelay,
+                                  identifier: "settings_device_audio_delay") { env.player.setDeviceAudioDelay($0) }
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.t("settings_quick_start_hint"))
+                    Text(L10n.t("audio_sync_hint"))   // direction of the device delay row
+                }
+            }
+            Section {
+                NavigationLink(value: SettingsRoute.advanced) {
+                    Label(L10n.t("settings_advanced"), systemImage: "slider.horizontal.3")
+                }
+                .accessibilityIdentifier("settings_advanced")
+            }
+        }
+        .hiddenListBackground()
+        .screenBackground()
+        .navigationTitle(L10n.t("nav_settings"))
+        .navigationDestination(for: SettingsRoute.self) { route in
+            switch route {
+            case .sources: SourcesView()
+            case .advanced: AdvancedSettingsView()
+            case .source(let id): SourceDetailView(sourceId: id)
+            case .add(.m3u): AddSourceView(kind: .m3u)
+            case .add(.xtream): AddSourceView(kind: .xtream)
+            case .add(.pairing): PairingView()
+            case .account: AccountView()
+            case .formatTest: FormatTestView()
+            case .paywall: PaywallView()
+            case .licenses: LicensesView()
+            }
+        }
+    }
+
+    static let languages = ["tr", "en", "de", "fr", "es", "ar", "ru"]
+    /// Endonyms for the app-language picker (always in their own language).
+    static let languageNames = ["de": "Deutsch", "tr": "Türkçe", "en": "English"]
+}
+
+/// Settings → Sources: list (→ detail) and "+ add" rows (M3U, Xtream, tvOS: phone/QR).
+struct SourcesView: View {
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(env.sources) { source in
+                    NavigationLink(value: SettingsRoute.source(source.id)) { SourceSummaryRow(source: source) }
+                        .accessibilityIdentifier("settings_source_\(source.name)")
+                }
+            }
+            Section(L10n.t("add_source")) {
+                NavigationLink(value: SettingsRoute.add(.m3u)) { Label(L10n.t("add_source_m3u"), systemImage: "plus") }
+                    .accessibilityIdentifier("settings_add_m3u")
+                NavigationLink(value: SettingsRoute.add(.xtream)) { Label(L10n.t("add_source_xtream"), systemImage: "plus") }
+                    .accessibilityIdentifier("settings_add_xtream")
+                #if os(tvOS)
+                NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
+                #endif
+            }
+        }
+        .hiddenListBackground()
+        .screenBackground()
+        .navigationTitle(L10n.t("settings_sources"))
+    }
+}
+
+/// Settings → Advanced: playback details, appearance, account, purchase, diagnostics and about.
+struct AdvancedSettingsView: View {
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        Form {
+            Section(L10n.t("settings_playback")) {
+                Picker(L10n.t("pref_default_aspect"), selection: $settings.aspect) {
+                    ForEach(AspectMode.allCases, id: \.self) { Text(L10n.t($0.titleKey)).tag($0) }
+                }
+                .onChange(of: settings.aspect) { env.player.aspect = settings.aspect }
+                Picker(L10n.t("pref_buffer"), selection: $settings.largeBuffer) {
+                    Text(L10n.t("buffer_normal")).tag(false)
+                    Text(L10n.t("buffer_large")).tag(true)
+                }
+                .onChange(of: settings.largeBuffer) { env.player.largeBuffer = settings.largeBuffer }
+                #if os(tvOS)
+                Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
+                #endif
+            }
+            Section(L10n.t("settings_appearance")) {
                 Picker(L10n.t("pref_epg_timezone"), selection: $settings.epgTimeZone) {
                     Text(L10n.t("timezone_device")).tag("")
                     ForEach(["UTC", "Europe/Istanbul", "Europe/Berlin", "Europe/London"], id: \.self) { Text($0).tag($0) }
@@ -110,24 +178,8 @@ struct SettingsView: View {
         }
         .hiddenListBackground()
         .screenBackground()
-        .navigationTitle(L10n.t("nav_settings"))
-        .navigationDestination(for: SettingsRoute.self) { route in
-            switch route {
-            case .source(let id): SourceDetailView(sourceId: id)
-            case .add(.m3u): AddSourceView(kind: .m3u)
-            case .add(.xtream): AddSourceView(kind: .xtream)
-            case .add(.pairing): PairingView()
-            case .account: AccountView()
-            case .formatTest: FormatTestView()
-            case .paywall: PaywallView()
-            case .licenses: LicensesView()
-            }
-        }
+        .navigationTitle(L10n.t("settings_advanced"))
     }
-
-    static let languages = ["tr", "en", "de", "fr", "es", "ar", "ru"]
-    /// Endonyms for the app-language picker (always in their own language).
-    static let languageNames = ["de": "Deutsch", "tr": "Türkçe", "en": "English"]
 }
 
 private struct PurchaseStatusRow: View {

@@ -314,6 +314,8 @@
     <string name="live_next_at">Sonra %1$s · %2$s</string>
     <string name="live_watching" formatted="false">İzleniyor</string>
     <string name="live_open_guide" formatted="false">Rehberde göster</string>
+    <string name="player_channels" formatted="false">Kanallar</string>
+    <string name="zap_number">Kanal %1$s</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

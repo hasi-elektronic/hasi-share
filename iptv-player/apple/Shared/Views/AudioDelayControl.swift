@@ -1,7 +1,7 @@
 import IPTVKit
 import SwiftUI
 
-/// Audio delay control (docs/SCREENS.md §3.7, Settings → Playback): −2000…+2000 ms in 50 ms steps,
+/// Audio delay control (docs/SCREENS.md §3.7, Settings top level): −2000…+2000 ms in 50 ms steps,
 /// value with its direction ("+150 ms · audio later"); every change is applied live through `onChange`.
 /// iOS: slider plus −/+ 50 ms buttons (one line in compact height). tvOS: ONE focusable row (Form
 /// rule) – ◀▶ on the remote change the value, repeated/held presses accelerate 50 → 100 → 250 ms.

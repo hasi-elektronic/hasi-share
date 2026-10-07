@@ -77,6 +77,8 @@ final class BrowseModel {
     private(set) var continueEntries: [ContinueEntry] = []
     private(set) var favorites: [CatalogItem] = []
     private(set) var favoriteChannels: [ChannelRow] = []
+    /// Home: live channels watched last (newest first) – the first row (one tap back into TV).
+    private(set) var recentChannels: [ChannelRow] = []
     private(set) var newMovies: [CatalogItem] = []
     private(set) var newSeries: [CatalogItem] = []
     private(set) var top10: [CatalogItem] = []
@@ -94,7 +96,7 @@ final class BrowseModel {
     }
 
     var newItems: [CatalogItem] { kind == .series ? newSeries : newMovies }
-    var isEmpty: Bool { continueEntries.isEmpty && newMovies.isEmpty && newSeries.isEmpty && liveRows.isEmpty && favorites.isEmpty }
+    var isEmpty: Bool { continueEntries.isEmpty && recentChannels.isEmpty && newMovies.isEmpty && newSeries.isEmpty && liveRows.isEmpty && favorites.isEmpty }
 
     /// Hero item: continue watching first, otherwise the newest item.
     var featured: (entry: ContinueEntry?, item: CatalogItem?) {
@@ -118,6 +120,9 @@ final class BrowseModel {
             }
         }
         favoriteChannels = kind == .home ? home.favoriteChannels : []
+        recentChannels = kind == .home
+            ? home.recentChannels.filter { !HiddenStore.shared.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sid) }
+            : []
         let favs = FavoritesViewModel(env: env)
         favs.reload()
         switch kind {
@@ -250,6 +255,11 @@ struct BrowseView: View {
 
     @ViewBuilder
     private func rows(_ model: BrowseModel) -> some View {
+        if !model.recentChannels.isEmpty {
+            Shelf(title: L10n.t("home_recent_channels"), identifier: "recent_channels") {
+                ForEach(model.recentChannels) { row in channelButton(row, list: model.recentChannels.map(\.channel)) }
+            }
+        }
         if !model.continueEntries.isEmpty {
             Shelf(title: L10n.t("home_continue"), identifier: "continue") {
                 ForEach(model.continueEntries) { entry in

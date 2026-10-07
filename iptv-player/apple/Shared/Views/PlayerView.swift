@@ -17,6 +17,7 @@ struct PlayerView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @State private var overlayVisible = true
     @State private var hideTask: Task<Void, Never>?
+    /// In-player channel panel (category picker, favorites first; SCREENS §3.7).
     @State private var channelListVisible = false
     /// "Play from start" chip after an automatic resume (5 s, independent of the overlay).
     @State private var resumeChipVisible = false
@@ -52,6 +53,11 @@ struct PlayerView: View {
     @FocusState private var undoFocused: Bool
     /// Now/next of the info card's channel (loaded per channel, not per render).
     @State private var infoNowNext: NowNext?
+    /// Number zapping with digit keys (IR remote / keyboard): digits shown top right, tuned 1.5 s
+    /// after the last one.
+    @State private var numberZap = NumberZap()
+    @State private var zapDigits = ""
+    @State private var numberZapTask: Task<Void, Never>?
     #endif
 
     private var player: PlayerController { env.player }
@@ -59,10 +65,8 @@ struct PlayerView: View {
     /// The play/pause control shows "play" (paused by the user or finished).
     private var showsPlayIcon: Bool { player.phase == .paused || player.phase == .ended || player.phase == .idle }
     private static let autoHideSeconds = 3
-    /// Per request / per opening, not per render: the series of an episode (⭐) and the zap list
-    /// with favorites on top.
+    /// Per request, not per render: the series of an episode (⭐).
     @State private var episodeSeries: Series?
-    @State private var channelListCache: [Channel] = []
 
     /// Undo toast sits above the bottom bar; tvOS with the info card: below the card, at the right
     /// under ⭐, so ▼ moves the focus to "Undo".
@@ -108,8 +112,11 @@ struct PlayerView: View {
             if let target = player.zapTarget { zapCard(target) }
             #if os(tvOS)
             if infoCardVisible, let channel = player.currentChannel { infoCard(channel) }
+            if !zapDigits.isEmpty { numberIndicator }
             #endif
-            if channelListVisible { channelList }
+            if channelListVisible {
+                PlayerChannelPanel(player: player) { closeChannelPanel() }
+            }
             if syncPanelVisible {
                 AudioSyncPanel(player: player) { closeSyncPanel() }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -123,6 +130,7 @@ struct PlayerView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: overlayVisible)
         .animation(.easeInOut(duration: 0.2), value: resumeChipVisible)
+        .animation(.easeInOut(duration: 0.2), value: channelListVisible)
         .persistentSystemOverlays(.hidden)
         .onAppear {
             showOverlay()
@@ -133,6 +141,7 @@ struct PlayerView: View {
             resumeChipTask?.cancel()
             #if os(tvOS)
             infoCardTask?.cancel()
+            numberZapTask?.cancel()
             #endif
         }
         .onChange(of: player.phase) { _, phase in
@@ -153,13 +162,15 @@ struct PlayerView: View {
             }
         }
         .task(id: player.request?.id) { loadEpisodeSeries() }
-        .onChange(of: channelListVisible) { _, visible in if visible { refreshChannelListOrder() } }
-        .onChange(of: env.libraryVersion) { if channelListVisible { refreshChannelListOrder() } }
         #if os(iOS)
         .statusBarHidden()
         .gesture(DragGesture(minimumDistance: 40).onEnded { value in
-            guard player.request?.isLive == true, abs(value.translation.height) > abs(value.translation.width) else { return }
-            player.zap(by: value.translation.height < 0 ? 1 : -1)
+            guard player.request?.isLive == true, !channelListVisible else { return }
+            if abs(value.translation.height) > abs(value.translation.width) {
+                player.zap(by: value.translation.height < 0 ? 1 : -1)
+            } else if value.translation.width > 0, value.startLocation.x < Self.edgeSwipeWidth {
+                openChannelPanel()   // swipe in from the left edge
+            }
         })
         #endif
         #if os(tvOS)
@@ -190,7 +201,7 @@ struct PlayerView: View {
             if live, overlayVisible, !channelListVisible, direction == .up {
                 // Live overlay: ▲ from play/pause into the top row (close + tools).
                 toolsActive = true
-                topFocus = .close
+                Task { @MainActor in topFocus = .close }   // after the row became focusable
                 return
             }
             // Live overlay / channel list shown: no zapping underneath.
@@ -214,16 +225,24 @@ struct PlayerView: View {
             guard infoCardVisible, let channel = player.currentChannel, let id = channel.epgId else { infoNowNext = nil; return }
             infoNowNext = (try? env.epg.nowNext(sourceId: channel.sourceId, epgIds: [id], at: Date()))?[id.lowercased()]
         }
-        // Select on the picture (overlay hidden): VOD pauses/resumes like the TV app; live shows the info.
+        // Select on the picture (overlay hidden): VOD pauses/resumes like the TV app; live opens the
+        // channel panel (the overlay: ◀▶ or Play/Pause). Only for the picture itself: OK on a focused
+        // Menu (Audio/Subtitles/Aspect) also reaches this gesture.
         .onTapGesture {
-            guard !syncPanelVisible else { return }
-            if isVOD { togglePlayPause() } else { showOverlay() }
+            guard !syncPanelVisible, !overlayVisible, !channelListVisible, !infoCardVisible else { return }
+            if isVOD { togglePlayPause() } else { openChannelPanel() }
+        }
+        // Digit keys (IR remote via HDMI-CEC / keyboard): number zapping on live.
+        .onKeyPress(characters: .decimalDigits) { press in
+            guard let digit = press.characters.first?.wholeNumberValue, player.request?.isLive == true else { return .ignored }
+            numberKey(digit)
+            return .handled
         }
         .onExitCommand {
             // Back rules (SCREENS §2): close panel/menu first, then leave the player.
             if syncPanelVisible { closeSyncPanel() }
             else if infoCardVisible { hideInfoCard() }
-            else if channelListVisible { channelListVisible = false }
+            else if channelListVisible { closeChannelPanel() }
             else if overlayVisible { hideOverlay() }
             else { router.closePlayer() }
         }
@@ -253,7 +272,7 @@ struct PlayerView: View {
                             .onEnded { value in doubleTap(at: value.location.x, width: geo.size.width) }
                             .exclusively(before: TapGesture(count: 1).onEnded {
                                 // Sync panel open: a tap on the picture closes it (no overlay on top of it).
-                                if syncPanelVisible { closeSyncPanel() } else if overlayVisible { hideOverlay() } else { showOverlay() }
+                                toggleOverlayOrClosePanel()
                             })
                     )
                 #endif
@@ -287,7 +306,7 @@ struct PlayerView: View {
         ErrorCardView(presentation: error.presentation) { action in
             switch action {
             case .retry: player.retry()
-            case .channelList: channelListVisible = true
+            case .channelList: openChannelPanel()
             default: router.closePlayer()
             }
         }
@@ -325,6 +344,34 @@ struct PlayerView: View {
             .padding(.top, Theme.safeV + (Theme.isTV ? 40 : 56))
             .allowsHitTesting(false)
             .accessibilityIdentifier("audio_sync_unavailable_notice")
+    }
+
+    // MARK: Channel panel
+
+    /// Left-edge band that starts the "swipe in" of the channel panel (iOS).
+    private static let edgeSwipeWidth: CGFloat = 44
+
+    /// Opens the channel panel and hides the overlay (and its top row), so closing the panel leaves
+    /// the picture alone instead of an overlay that would never auto-hide.
+    private func openChannelPanel() {
+        guard player.request?.isLive == true else { return }
+        hideTask?.cancel()
+        channelListVisible = true
+        overlayVisible = false
+        menuOpen = false
+        #if os(tvOS)
+        toolsActive = false
+        topFocus = nil
+        infoCardTask?.cancel()
+        infoCardVisible = false
+        #endif
+    }
+
+    private func closeChannelPanel() {
+        channelListVisible = false
+        #if os(tvOS)
+        surfaceFocused = true
+        #endif
     }
 
     // MARK: Overlay visibility
@@ -535,17 +582,60 @@ struct PlayerView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player_info_card")
     }
+
+    // MARK: Number zapping (tvOS)
+
+    private static let numberZapTimeoutMs = 1500
+
+    private func numberKey(_ digit: Int) {
+        zapDigits = numberZap.input(digit, atMs: SystemClock.monotonicMs())
+        numberZapTask?.cancel()
+        numberZapTask = Task {
+            try? await Task.sleep(for: .milliseconds(Self.numberZapTimeoutMs + 20))
+            guard !Task.isCancelled else { return }
+            commitNumberZap()
+        }
+    }
+
+    /// Tunes the typed number: the channel with that number in the zap list, else the n-th one.
+    private func commitNumberZap() {
+        let number = numberZap.commitIfDue(atMs: SystemClock.monotonicMs())
+        zapDigits = ""
+        guard let number, let channel = NumberZap.channel(number: number, in: player.request?.channels ?? []) else { return }
+        if channel.id != player.currentChannel?.id { player.zap(to: channel) }
+    }
+
+    /// Big digits top right while a number is typed.
+    private var numberIndicator: some View {
+        Text(verbatim: zapDigits)
+            .font(.system(size: 96, weight: .heavy).monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 36).padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: Theme.cardRadius).fill(.black.opacity(0.6)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, Theme.safeV)
+            .padding(.trailing, Theme.safeH)
+            .allowsHitTesting(false)
+            .accessibilityLabel(L10n.t("zap_number", zapDigits))
+            .accessibilityIdentifier("player_number_zap")
+    }
     #endif
 
     #if os(iOS)
+    /// Single tap / double tap outside the seek thirds: the sync panel closes first (no overlay on
+    /// top of it), otherwise the overlay toggles.
+    private func toggleOverlayOrClosePanel() {
+        if syncPanelVisible { closeSyncPanel() } else if overlayVisible { hideOverlay() } else { showOverlay() }
+    }
+
     private func doubleTap(at x: CGFloat, width: CGFloat) {
         guard isVOD, width > 0 else {
-            overlayVisible ? hideOverlay() : showOverlay()
+            toggleOverlayOrClosePanel()
             return
         }
         let third = width / 3
         guard x < third || x > width - third else {
-            overlayVisible ? hideOverlay() : showOverlay()
+            toggleOverlayOrClosePanel()
             return
         }
         let forward = x > width - third
@@ -635,8 +725,9 @@ struct PlayerView: View {
             tools
         }
         #if os(tvOS)
-        // VOD: not focusable until ▲ from play/pause (◀▶ there seeks); entering the row lands on close.
-        .disabled(isVOD && !toolsActive)
+        // Entering the row lands on close. Not focusable until ▲ from play/pause (VOD: ◀▶ there seek; live: the ◀▶ that shows the
+        // overlay must not carry the focus on into the tools).
+        .disabled(!toolsActive)
         .focusSection()
         .defaultFocus($topFocus, .close, priority: .userInitiated)
         #endif
@@ -791,8 +882,9 @@ struct PlayerView: View {
                     #endif
             }
             if player.request?.isLive == true {
-                Button { channelListVisible = true } label: { toolIcon("list.bullet") }
+                Button { openChannelPanel() } label: { toolIcon("list.bullet") }
                     .accessibilityLabel(L10n.t("action_channel_list"))
+                    .accessibilityIdentifier("action_channel_list")
                     #if os(tvOS)
                     .focused($topFocus, equals: .channelList)
                     #endif
@@ -934,16 +1026,6 @@ struct PlayerView: View {
         .padding(.top, Theme.safeV + 20)
     }
 
-    /// Zap list with the favorite channels on top (spec §2: favorites always first) – computed when
-    /// the list opens / favorites change, not on every render.
-    private func refreshChannelListOrder() {
-        let all = player.request?.channels ?? []
-        let isFavorite: (Channel) -> Bool = { c in env.favoriteTarget(c).map { env.favorites.isFavorite($0.contentKey) } ?? false }
-        channelListCache = all.filter(isFavorite) + all.filter { !isFavorite($0) }
-    }
-
-    private var channelListOrder: [Channel] { channelListCache.isEmpty ? (player.request?.channels ?? []) : channelListCache }
-
     /// The series of a playing episode (its poster/name for ⭐), once per request.
     private func loadEpisodeSeries() {
         guard case .episode(let e, _)? = player.request?.item else { episodeSeries = nil; return }
@@ -963,43 +1045,6 @@ struct PlayerView: View {
         $undoFocused
         #else
         nil
-        #endif
-    }
-
-    private var channelList: some View {
-        HStack {
-            Spacer()
-            ScrollView {
-                LazyVStack(spacing: 4) {
-                    ForEach(channelListOrder) { channel in
-                        Button {
-                            player.zap(to: channel)
-                            channelListVisible = false
-                        } label: {
-                            HStack {
-                                Text(channel.number.map(String.init) ?? "").frame(width: 50, alignment: .trailing)
-                                ChannelLogo(url: channel.logoUrl, width: Theme.isTV ? 90 : 48)
-                                Text(channel.name).lineLimit(1)
-                                Spacer()
-                            }
-                            .font(Theme.caption)
-                            .foregroundStyle(channel.id == player.currentChannel?.id ? Theme.primary : .white)
-                            .padding(8)
-                        }
-                        .buttonStyle(CardButtonStyle())
-                    }
-                }
-                .padding()
-            }
-            .frame(width: Theme.isTV ? 640 : 300)
-            .background(Theme.surface.opacity(0.95))
-            #if os(tvOS)
-            .focusSection()
-            #endif
-        }
-        .ignoresSafeArea()
-        #if os(iOS)
-        .onTapGesture { channelListVisible = false }
         #endif
     }
 }

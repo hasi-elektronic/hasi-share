@@ -314,6 +314,8 @@
     <string name="live_next_at">Danach %1$s · %2$s</string>
     <string name="live_watching" formatted="false">Läuft</string>
     <string name="live_open_guide" formatted="false">Im TV-Guide zeigen</string>
+    <string name="player_channels" formatted="false">Sender</string>
+    <string name="zap_number">Sender %1$s</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

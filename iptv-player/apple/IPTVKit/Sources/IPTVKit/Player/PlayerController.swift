@@ -577,7 +577,9 @@ public final class PlayerController {
         zap(to: target)
     }
 
-    public func zap(to channel: Channel) {
+    /// `channels`: a new zap list (in-player channel panel, another category) – ▲▼ continue in it.
+    public func zap(to channel: Channel, channels: [Channel]? = nil) {
+        if let channels, !channels.isEmpty { request?.channels = channels }
         zapTarget = channel
         zapTask?.cancel()
         zapPending = true

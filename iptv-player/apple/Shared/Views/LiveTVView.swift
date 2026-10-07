@@ -5,7 +5,7 @@ import SwiftUI
 /// Category menu entries shared by Live TV and the TV guide: All · Favorites · favorite categories
 /// (⭐) · the other categories; hidden categories removed.
 @MainActor
-private func channelFilters(_ model: LiveTVViewModel, env: AppEnvironment) -> [(id: ChannelFilter, title: String)] {
+func channelFilters(_ model: LiveTVViewModel, env: AppEnvironment) -> [(id: ChannelFilter, title: String)] {
     let sourceId = env.currentSource?.id
     let hidden = sourceId.map { HiddenStore.shared.hiddenCategories($0) } ?? []
     let favorite = sourceId.map { env.favorites.favoriteCategoryIds(sourceId: $0) } ?? []
@@ -17,7 +17,7 @@ private func channelFilters(_ model: LiveTVViewModel, env: AppEnvironment) -> [(
 
 /// ⭐ marker of the filter menu / chips: the Favorites entry and favorite categories.
 @MainActor
-private func isStarred(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
+func isStarred(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
     switch filter {
     case .favorites: return true
     case .category(let id): return env.currentSource.map { env.favorites.isFavoriteCategory(sourceId: $0.id, categoryId: id) } ?? false
@@ -27,7 +27,7 @@ private func isStarred(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
 
 /// Rows without hidden channels / categories.
 @MainActor
-private func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow] {
+func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow] {
     guard let sourceId else { return rows }
     let store = HiddenStore.shared
     return rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
@@ -193,7 +193,9 @@ struct LiveTVView: View {
     }
 }
 
-/// Info panel of the Live list: the selected / focused channel, else the first row.
+/// Info panel of the Live list: the selected / focused channel, else the one playing / played last
+/// from this source (iPhone landscape: a tap plays, so the panel follows what was watched), else the
+/// first row.
 private struct LivePanel: View {
     @Environment(AppEnvironment.self) private var env
     let selection: LiveSelection
@@ -202,9 +204,18 @@ private struct LivePanel: View {
 
     var body: some View {
         let sid = env.currentSource?.id
-        let shown = selection.channel ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel
+        let shown = selection.channel ?? watched(sourceId: sid)
+            ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel
             ?? visibleRows(model.rows, sourceId: sid).first?.channel
         GuidePanel(channel: shown, zapList: model.channels, onArchive: onArchive, liveActions: true, identifier: "live_info_panel")
+    }
+
+    /// The channel playing now, else the last one played from this source – if the shown list has it.
+    private func watched(sourceId: String?) -> Channel? {
+        guard let sourceId else { return nil }
+        let last = env.settings.lastSession
+        guard let id = env.player.currentChannel?.id ?? (last?.sourceId == sourceId ? last?.channelId : nil) else { return nil }
+        return visibleRows(model.favoriteRows + model.rows, sourceId: sourceId).first { $0.channel.id == id }?.channel
     }
 }
 
@@ -343,7 +354,7 @@ private struct RowFocusReporter<Content: View>: View {
 
 /// Chip title: flag + name (+ count).
 @MainActor
-private func chipTitle(_ title: String, count: Int?) -> String {
+func chipTitle(_ title: String, count: Int?) -> String {
     let flag = CountryFlag.emoji(for: title).map { "\($0) " } ?? ""
     return flag + CountryFlag.strippedTitle(title) + (count.map { "  \($0)" } ?? "")
 }

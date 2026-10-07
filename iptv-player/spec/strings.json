@@ -1558,6 +1558,16 @@
    "en": "Show in TV guide",
    "tr": "Rehberde göster",
    "de": "Im TV-Guide zeigen"
+  },
+  "player_channels": {
+   "en": "Channels",
+   "tr": "Kanallar",
+   "de": "Sender"
+  },
+  "zap_number": {
+   "en": "Channel {0}",
+   "tr": "Kanal {0}",
+   "de": "Sender {0}"
   }
  }
 }

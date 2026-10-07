@@ -7,11 +7,11 @@ final class TVPlaybackRobustnessTests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// "Playing"/"Paused" of the live overlay (OK on the picture shows it on live, it never pauses).
+    /// "Playing"/"Paused" of the live overlay (▶ on the picture shows it on live, it never pauses).
     @MainActor
     static func playState(_ app: XCUIApplication) -> String {
         let playPause = app.buttons["player_play_pause"]
-        if !playPause.exists { XCUIRemote.shared.press(.select) }
+        if !playPause.exists { XCUIRemote.shared.press(.right) }
         guard playPause.waitForExistence(timeout: 3) else { return "" }
         return playPause.value as? String ?? ""
     }

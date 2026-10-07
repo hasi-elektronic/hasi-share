@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings → Playback → device/soundbar delay on tvOS (SCREENS §3.7/§3.9): ONE focusable row,
+/// Settings (top level) → device/soundbar delay on tvOS (SCREENS §3.7/§3.9): ONE focusable row,
 /// ◀▶ on the remote change the value in 50 ms steps.
 final class TVAudioSyncTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
@@ -149,18 +149,18 @@ final class TVAudioSyncTests: XCTestCase {
         XCTAssertTrue(app.otherElements["video_surface"].exists)
     }
 
-    /// Live (VLCKit MKV channel with 2 audio + 2 subtitle tracks): OK shows the overlay, ▲ enters the
-    /// top row, ◀▶ walk it.
+    /// Live (VLCKit MKV channel with 2 audio + 2 subtitle tracks): ▶ shows the overlay (OK opens the
+    /// channel panel), ▲ enters the top row, ◀▶ walk it.
     @MainActor
     func testLiveTopRowAudioSyncAndFixSyncWithRemote() throws {
         try VLCTestSupport.requireServer()
         let app = UITestSupport.launch(["-uiScreen", "player", "-seedM3U", VLCTestSupport.liveM3U, "-seedName", "VLC"], seed: false)
         XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 30))
         sleep(8)   // tracks reported
-        ensureOverlay(app, showWith: .select)   // play/pause focused
+        ensureOverlay(app, showWith: .right)   // play/pause focused
         press(.up)       // top row: close
         audioMenuToSyncPanel(app, expectTracks: true, context: "live")
-        ensureOverlay(app, showWith: .select)
+        ensureOverlay(app, showWith: .right)
         press(.up)
         fixSyncFromTopRow(app, toResync: 4, context: "live")   // close → Audio → Subtitles → Aspect → Fix sync
     }
