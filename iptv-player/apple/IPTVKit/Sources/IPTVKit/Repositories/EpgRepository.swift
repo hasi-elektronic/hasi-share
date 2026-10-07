@@ -331,10 +331,20 @@ public final class EpgRefreshSession: @unchecked Sendable {
         if let searchTable { EpgSearchIndex.inFlight.remove(searchTable) }
     }
 
+    /// Discards the staged rows and the new index. Also after `commit()` when an **outer** transaction
+    /// (SourceRefresher: commit + channel epg ids) rolled the swap back – the staging rows are back then, or the
+    /// source's index is not this session's.
     public func abort() {
-        guard !finished else { return }
+        if finished, !swapRolledBack() { return }
         finished = true
         _ = try? db.run("DELETE FROM epg WHERE source_id = ?", [.text(stagingId)])
         if let searchTable { EpgSearchIndex.discard(db, table: searchTable) }
+    }
+
+    private func swapRolledBack() -> Bool {
+        let staged = ((try? db.scalar("SELECT EXISTS (SELECT 1 FROM epg WHERE source_id = ?)", [.text(stagingId)])) ?? 0) != 0
+        if staged { return true }
+        guard let searchTable else { return false }
+        return EpgSearchIndex.table(db, sourceId: sourceId) != searchTable
     }
 }

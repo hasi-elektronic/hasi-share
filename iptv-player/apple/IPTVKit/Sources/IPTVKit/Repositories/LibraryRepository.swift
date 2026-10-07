@@ -167,11 +167,17 @@ public final class LibraryRepository: Sendable {
         return false
     }
 
-    /// Sync pushed these keys: their late-write markers are done.
-    public func clearPushMarkers(_ keys: [String]) throws {
-        guard !keys.isEmpty else { return }
+    /// Sync pushed these versions: their late-write markers are done – but only while the stored row is still the
+    /// pushed version (a queued write of the same key may have landed during the push; its marker must stay).
+    public func clearPushMarkers(_ pushed: [SyncItem]) throws {
+        guard !pushed.isEmpty else { return }
         try db.transaction {
-            for key in keys { try db.run("DELETE FROM library_push WHERE key = ?", [.text(key)]) }
+            for item in pushed {
+                try db.run("""
+                    DELETE FROM library_push WHERE key = ?
+                    AND EXISTS (SELECT 1 FROM library WHERE key = ? AND updated_at = ?)
+                    """, [.text(item.key), .text(item.key), .int(item.updatedAt)])
+            }
         }
     }
 

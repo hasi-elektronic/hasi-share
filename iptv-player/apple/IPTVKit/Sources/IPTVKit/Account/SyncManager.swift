@@ -69,7 +69,7 @@ public actor SyncManager {
             // Late-written items (push markers) may be older than the cursor: never move it back.
             let maxUpdated = max(since, items.map(\.updatedAt).max() ?? since)
             database.setValue(String(maxUpdated), forKey: Keys.lastPush)
-            try library.clearPushMarkers(items.map(\.key))
+            try library.clearPushMarkers(items)
             lastSyncedAt = Date()
             if items.count < Self.batchLimit { break }
         }

@@ -151,7 +151,7 @@ final class NonBlockingWriteTests: XCTestCase {
         XCTAssertFalse(library.hasPendingWrites)
         // Pushed although the push cursor already passed its action time (late-write marker).
         XCTAssertEqual(try library.changed(after: 5_000).map(\.key), [SyncItem.progressKey("k")])
-        try library.clearPushMarkers([SyncItem.progressKey("k")])
+        try library.clearPushMarkers(try library.changed(after: 5_000))
         XCTAssertTrue(try library.changed(after: 5_000).isEmpty)
     }
 
@@ -286,5 +286,69 @@ final class NonBlockingWriteTests: XCTestCase {
         XCTAssertEqual(Set(paged).count, 75, "no repeats across pages")
         let overview = try catalog.searchTitles("zebra", perKindLimit: 30)
         XCTAssertEqual(overview.count, 30, "capped per kind across tables")
+    }
+}
+
+/// Re-review of Build 14: push markers of versions not pushed; EPG commit rolled back by an outer transaction.
+final class PushMarkerAndEpgAbortTests: XCTestCase {
+    func testMarkerOfAVersionWrittenDuringThePushStays() throws {
+        let db = try AppDatabase.inMemory()
+        let library = LibraryRepository(database: db)
+        func item(_ at: Int64, _ position: Int64) -> SyncItem {
+            SyncItem.progress(contentKey: "k", title: "T", contentKind: .movie, positionMs: position, durationMs: 100_000,
+                              posterUrl: nil, seriesKey: nil, updatedAt: at)
+        }
+        // A late write (marker) is in the push batch …
+        try library.put(item(1_000, 10_000))
+        try db.db.run("INSERT INTO library_push (key) VALUES (?)", [.text(SyncItem.progressKey("k"))])
+        let batch = try library.changed(after: 5_000)
+        XCTAssertEqual(batch.map(\.updatedAt), [1_000])
+        // … and during `await backend.syncPush` another queued write of the key lands (older than the cursor).
+        try library.put(item(2_000, 20_000))
+        try db.db.run("INSERT OR IGNORE INTO library_push (key) VALUES (?)", [.text(SyncItem.progressKey("k"))])
+        try library.clearPushMarkers(batch)
+        XCTAssertEqual(try library.changed(after: 5_000).map(\.updatedAt), [2_000], "the unpushed version is still pushed")
+        try library.clearPushMarkers(try library.changed(after: 5_000))
+        XCTAssertTrue(try library.changed(after: 5_000).isEmpty)
+    }
+
+    func testEpgCommitRolledBackByTheOuterTransactionCanBeAborted() throws {
+        let db = try AppDatabase.inMemory()
+        try db.db.run("INSERT INTO sources (id, sort, json) VALUES ('s', 0, '{}')")
+        let catalog = CatalogRepository(database: db)
+        let s = try catalog.beginRefresh(sourceId: "s")
+        try s.write(channels: [TestData.channel(id: "a", sourceId: "s", name: "A", epgId: "a.tv")])
+        try s.commit()
+        let epg = EpgRepository(database: db)
+        let now = Date()
+        func program(_ title: String) -> EpgProgram {
+            EpgProgram(sourceId: "s", channelEpgId: "a.tv", start: now, end: now.addingTimeInterval(3600), title: title)
+        }
+        let first = try epg.beginRefresh(sourceId: "s")
+        try first.write([program("Derby Eski")])
+        try first.commit()
+        let live = try XCTUnwrap(EpgSearchIndex.table(db.db, sourceId: "s"))
+
+        struct Failure: Error {}
+        let second = try epg.beginRefresh(sourceId: "s")
+        try second.write([program("Derby Yeni")])
+        let newTable = try XCTUnwrap(second.searchTable)
+        XCTAssertThrowsError(try db.db.transaction {   // SourceRefresher: commit + channel epg ids, then a failure
+            try second.commit()
+            throw Failure()
+        })
+        second.abort()
+        XCTAssertEqual(EpgSearchIndex.table(db.db, sourceId: "s"), live, "old index still live")
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM epg WHERE source_id = 's~staging'"), 0, "staging cleaned")
+        try epg.collectIndexGarbage()
+        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ?", [.text(newTable)]), 0, "not orphaned")
+        let engine = SearchEngine(catalog: catalog, epg: epg, sourceId: "s")
+        XCTAssertEqual(try engine.programmes("derby", offset: 0, limit: 5, now: now).items.map(\.program.title), ["Derby Eski"])
+        // A successful commit is not undone by a later abort().
+        let third = try epg.beginRefresh(sourceId: "s")
+        try third.write([program("Derby Son")])
+        try third.commit()
+        third.abort()
+        XCTAssertEqual(try engine.programmes("derby", offset: 0, limit: 5, now: now).items.map(\.program.title), ["Derby Son"])
     }
 }
