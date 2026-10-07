@@ -11,4 +11,4 @@ BACKEND_BASE_URL = https:/$()/iptv-backend.example.workers.dev
 // Set NO to test the paywall/trial flow via TestFlight.
 TESTFLIGHT_FULL_ACCESS = YES
 MARKETING_VERSION = 1.0.0
-CURRENT_PROJECT_VERSION = 12
+CURRENT_PROJECT_VERSION = 13
