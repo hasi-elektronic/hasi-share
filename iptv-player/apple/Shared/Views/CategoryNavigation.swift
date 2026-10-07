@@ -235,8 +235,10 @@ struct CategorySheet: View {
     private var searching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        let scoped = model.infos(country: model.country)
-        let matches = searching ? scoped.filter { CategoryCountry.matches($0.category.name, query: query) } : scoped
+        // While searching, results come from every country (a category is found even when it belongs to
+        // another country than the selected one); without a query the selected country's list.
+        let matches = searching ? model.visibleInfos.filter { CategoryCountry.matches($0.category.name, query: query) }
+            : model.infos(country: model.country)
         let pinned = model.pinnedInfos
         let recent = model.recentInfos
         let hidden = model.hiddenInfos
@@ -269,7 +271,8 @@ struct CategorySheet: View {
                         ForEach(keyed("row", matches)) { row($0.info, identifier: "category_row_\($0.info.id)") }
                     }
                 } header: {
-                    header(model.country.map { "\(CountryFlag.flagPrefix($0))\(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"),
+                    header(searching ? L10n.t("catnav_all_categories")
+                           : model.country.map { "\(CountryFlag.flagPrefix($0))\(CountryFlag.countryName($0))" } ?? L10n.t("catnav_all_categories"),
                            icon: nil, identifier: "category_section_all")
                 }
                 if !hidden.isEmpty {
@@ -467,7 +470,9 @@ struct TVCategoryBrowseView: View {
                 content(model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .focusSection()
-                    .onExitCommand { focused = lastColumnKey }
+                    // Menu in the content → the column's selected row; if that row is gone (country changed,
+                    // unpinned, hidden) → Discover, never a key no view has (focus would not move at all).
+                    .onExitCommand { focused = columnKeys(model).contains(lastColumnKey) ? lastColumnKey : "discover" }
             }
         }
         .padding(.leading, Theme.safeH)
@@ -487,8 +492,38 @@ struct TVCategoryBrowseView: View {
         }
         .onChange(of: model?.categoryInfos.map(\.id)) { _, ids in
             // The shown category disappeared (refresh / other source): back to Discover.
-            if let selected, !(ids ?? []).contains(selected.id) { self.selected = nil }
+            if let selected, !(ids ?? []).contains(selected.id) { showDiscover() }
         }
+        // Another country: the grid of a category of the old one makes no sense any more.
+        .onChange(of: model?.country) { showDiscover() }
+        // Pin / unpin / hide (long OK): the selected entry may have left the column.
+        .onChange(of: env.categoryPrefs.version) {
+            guard let model, !columnKeys(model).contains(lastColumnKey) else { return }
+            showDiscover()
+        }
+    }
+
+    private func showDiscover() {
+        selected = nil
+        lastColumnKey = "discover"
+    }
+
+    /// Sections of the column (recent from the snapshot).
+    private func sections(_ model: BrowseModel) -> (pinned: [CategoryInfo], recent: [CategoryInfo], scoped: [CategoryInfo], hidden: [CategoryInfo]) {
+        let visible = Dictionary(model.visibleInfos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let recent = recentSnapshot.map { $0.compactMap { visible[$0] } } ?? model.recentInfos
+        return (model.pinnedInfos, recent, model.infos(country: model.country), model.hiddenInfos)
+    }
+
+    /// Focus keys of the rows the column shows right now.
+    private func columnKeys(_ model: BrowseModel) -> Set<String> {
+        let s = sections(model)
+        var keys: Set<String> = ["country", "discover"]
+        keys.formUnion(keyed("pinned", s.pinned).map(\.key))
+        keys.formUnion(keyed("recent", s.recent).map(\.key))
+        keys.formUnion(keyed("row", s.scoped).map(\.key))
+        if showHidden { keys.formUnion(keyed("hidden", s.hidden).map(\.key)) }
+        return keys
     }
 
     @ViewBuilder
@@ -503,11 +538,7 @@ struct TVCategoryBrowseView: View {
     }
 
     private func column(_ model: BrowseModel) -> some View {
-        let pinned = model.pinnedInfos
-        let visible = Dictionary(model.visibleInfos.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let recent = recentSnapshot.map { $0.compactMap { visible[$0] } } ?? model.recentInfos
-        let scoped = model.infos(country: model.country)
-        let hidden = model.hiddenInfos
+        let (pinned, recent, scoped, hidden) = sections(model)
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 6) {
                 Menu {
@@ -529,10 +560,7 @@ struct TVCategoryBrowseView: View {
                 .accessibilityIdentifier("country_picker")
                 .padding(.bottom, 8)
 
-                entry(key: "discover", selected: selected == nil, identifier: "category_discover", action: {
-                    selected = nil
-                    lastColumnKey = "discover"
-                }) {
+                entry(key: "discover", selected: selected == nil, identifier: "category_discover", action: showDiscover) {
                     Image(systemName: "sparkles")
                     Text(L10n.t("catnav_discover")).lineLimit(1)
                     Spacer(minLength: 0)

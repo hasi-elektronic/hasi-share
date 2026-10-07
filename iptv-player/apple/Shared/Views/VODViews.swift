@@ -241,7 +241,7 @@ struct MovieDetailView: View {
         let clean = MediaTags.clean(movie.name)
         DetailScaffold(title: clean.title, imageURL: movie.posterUrl,
                        meta: DetailMetaRow(rating: movie.rating ?? info?.rating, year: movie.year ?? info?.year ?? clean.year, durationSec: duration),
-                       genres: env.categoryName(sourceId: movie.sourceId, kind: .movie, id: movie.categoryId).map(CountryFlag.strippedTitle),
+                       genres: env.categoryName(sourceId: movie.sourceId, kind: .movie, id: movie.categoryId).map(CountryFlag.genreName),
                        plot: info?.plot ?? movie.plot, onPlay: { router.play(.movie(movie)) }) {
             DetailActions(primaryTitle: canResume ? L10n.t("action_resume_at", L10n.clock(Double(resumeMs) / 1000)) : L10n.t("action_play"),
                           primaryAction: { router.play(.movie(movie)) },
@@ -327,7 +327,7 @@ struct SeriesDetailView: View {
         DetailScaffold(title: clean.title, imageURL: series.posterUrl,
                        meta: DetailMetaRow(rating: series.rating, year: series.year ?? clean.year, durationSec: nil,
                                            extra: model.flatMap { $0.seasons.isEmpty ? nil : L10n.t("seasons_value", String($0.seasons.count)) }),
-                       genres: env.categoryName(sourceId: series.sourceId, kind: .series, id: series.categoryId).map(CountryFlag.strippedTitle),
+                       genres: env.categoryName(sourceId: series.sourceId, kind: .series, id: series.categoryId).map(CountryFlag.genreName),
                        plot: model?.plot ?? series.plot, onPlay: play) {
             DetailActions(primaryTitle: primaryTitle, primaryAction: play,
                           format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) {

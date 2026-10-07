@@ -312,7 +312,7 @@ final class BrowseModel {
         case .movie(let m): genre = env.categoryName(sourceId: m.sourceId, kind: .movie, id: m.categoryId)
         case .series(let s): genre = env.categoryName(sourceId: s.sourceId, kind: .series, id: s.categoryId)
         }
-        return [genre.map(CountryFlag.strippedTitle), item.year.map(String.init), durationSec.flatMap { $0 > 0 ? DurationText.short($0) : nil }]
+        return [genre.map(CountryFlag.genreName), item.year.map(String.init), durationSec.flatMap { $0 > 0 ? DurationText.short($0) : nil }]
             .compactMap { $0 }.joined(separator: " · ")
     }
 }
@@ -842,17 +842,11 @@ struct CatalogGridView: View {
             let ids = countryCategoryIds(sourceId: env.currentSource?.id)
             if kind == .movie {
                 let m = MoviesViewModel(env: env)
-                m.categoryId = categoryId
-                m.categoryIds = ids
-                m.sort = initialSort
-                m.reload()
+                m.configure(categoryId: categoryId, categoryIds: ids, sort: initialSort)   // one query, not three
                 movies = m
             } else {
                 let s = SeriesListViewModel(env: env)
-                s.categoryId = categoryId
-                s.categoryIds = ids
-                s.sort = initialSort
-                s.reload()
+                s.configure(categoryId: categoryId, categoryIds: ids, sort: initialSort)
                 series = s
             }
         }

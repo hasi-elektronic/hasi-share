@@ -449,6 +449,12 @@ enum CountryFlag {
         CategoryCountry.displayName(of: code, locale: L10n.locale)
     }
 
+    /// Category as a genre (hero / detail line): the name without its group prefix ("EN | Amazon Prime" →
+    /// "Amazon Prime", "TR | DİZİLER" → "DİZİLER").
+    static func genreName(_ title: String) -> String {
+        code(for: title) == nil ? title : CategoryCountry.nameWithoutPrefix(title)
+    }
+
     /// "🇹🇷 " for real regions, "" for language groups / tags (no 🇦🇷 for "AR").
     static func flagPrefix(_ code: String) -> String {
         CategoryCountry.flagEmoji(forCode: code).map { "\($0) " } ?? ""

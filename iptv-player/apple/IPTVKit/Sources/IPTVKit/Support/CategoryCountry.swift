@@ -15,8 +15,31 @@ public enum CategoryCountry {
     static let ignoredCodes: Set<String> = ["TV", "FM", "AM", "SD", "HD", "VO", "IN", "IT", "TO", "NO", "BE", "ME", "IS", "AS", "AT", "BY", "MY", "AN"]
     /// Region codes that, as a group prefix, almost always mean a language: no flag, language name.
     static let languageFirstCodes: Set<String> = ["EN", "AR"]
-    /// Region codes that, as a group prefix, are tags, not countries ("TV | …", "HD | …"): no flag, raw code.
-    static let tagCodes: Set<String> = ["TV", "FM", "AM", "SD", "HD", "VO"]
+    /// Prefixes that are tags, channels or packages – never a country/language group ("FHD | …", "VIP | …",
+    /// "UFC | …", "BBC | …"). The single list for both the group detection and the display.
+    static let tagCodes: Set<String> = [
+        // Quality / format
+        "SD", "HD", "FHD", "UHD", "HDR", "VO", "VOD", "SUB", "DUB",
+        // Radio / TV
+        "TV", "FM", "AM",
+        // Packages and labels
+        "VIP", "PPV", "NEW", "TOP", "HOT", "ALL", "KID", "MIX", "XXX",
+        // Sports leagues / promotions
+        "UFC", "WWE", "NBA", "NFL", "NHL", "MLB",
+        // Broadcasters / networks often used as a group prefix
+        "BBC", "ITV", "CNN", "SKY", "FOX", "HBO", "AMC", "ABC", "CBS", "NBC", "MTV", "TRT",
+    ]
+    /// 3-letter language codes providers use (ISO 639-2/B and /T spellings of the languages the apps' users
+    /// actually see) → ISO 639-1 for the language name. Other 3-letter codes stay a group but show the raw
+    /// code: the full ISO 639 list would turn tags into obscure languages ("NEW" → Newari, "BBC" → Batak Toba).
+    static let threeLetterLanguages: [String: String] = [
+        "ENG": "en", "GER": "de", "DEU": "de", "FRA": "fr", "FRE": "fr", "TUR": "tr", "ARA": "ar", "SPA": "es",
+        "ESP": "es", "ITA": "it", "POR": "pt", "RUS": "ru", "POL": "pl", "NLD": "nl", "DUT": "nl", "KUR": "ku",
+        "PER": "fa", "FAS": "fa", "HIN": "hi", "ALB": "sq", "SQI": "sq", "BOS": "bs", "HRV": "hr", "SRP": "sr",
+    ]
+    /// Separators after a leading code ("TR • …", "DE | …", "EN: …", "NL - …", "ES] …"). "-" only with a
+    /// space after it, so words such as "Sci-Fi" or "X-Men" are not split.
+    static let prefixSeparators: Set<Character> = ["•", "|", ":", "-", "]"]
     /// Provider spellings → ISO region code ("" = known group without a single country).
     static let aliases: [String: String] = [
         "UK": "GB", "USA": "US", "U.S.": "US", "UAE": "AE", "KSA": "SA", "EX-YU": "RS", "EXYU": "RS", "LATAM": "",
@@ -48,20 +71,33 @@ public enum CategoryCountry {
         return code
     }
 
-    /// Leading "XX<sep>" / "XXX<sep>" (separator •, |, :, -, ]) or "[XX]" / "[XXX]": the code, aliases applied.
-    static func prefixCode(_ title: String) -> String? {
+    /// Leading code + separator, or the bracket form: ("TR", "NETFLIX DIZILER") for "TR • NETFLIX DIZILER",
+    /// ("EN", "Drama") for "[EN] Drama". Shared by the group detection, prefix stripping and search.
+    static func leadingPrefix(_ title: String) -> (token: String, rest: String)? {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         let token: String
+        var rest: Substring
         if trimmed.hasPrefix("[") {
             guard let close = trimmed.firstIndex(of: "]") else { return nil }
             token = String(trimmed[trimmed.index(after: trimmed.startIndex)..<close]).trimmingCharacters(in: .whitespaces)
+            rest = trimmed[trimmed.index(after: close)...].drop(while: { $0 == " " })
+            if let sep = rest.first, prefixSeparators.contains(sep) { rest = rest.dropFirst() }   // "[EN] | Drama"
         } else {
-            let end = trimmed.firstIndex(where: { !$0.isLetter }) ?? trimmed.endIndex
+            let end = trimmed.firstIndex(where: { !($0.isLetter || $0.isNumber) }) ?? trimmed.endIndex
             token = String(trimmed[..<end])
-            let rest = trimmed[end...].drop(while: { $0 == " " })
-            guard let sep = rest.first, "•|:-]".contains(sep) else { return nil }
+            rest = trimmed[end...].drop(while: { $0 == " " })
+            guard let sep = rest.first, prefixSeparators.contains(sep) else { return nil }
+            rest = rest.dropFirst()
+            if sep == "-", !(rest.first?.isWhitespace ?? false) { return nil }
         }
-        guard (2...3).contains(token.count), token.allSatisfy({ $0.isLetter && $0.isUppercase }) else { return nil }
+        guard (1...3).contains(token.count) else { return nil }
+        return (token, rest.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// Group code of a leading prefix: 2–3 upper-case letters, not a tag; aliases applied (UK → GB).
+    static func prefixCode(_ title: String) -> String? {
+        guard let token = leadingPrefix(title)?.token, (2...3).contains(token.count),
+              token.allSatisfy({ $0.isLetter && $0.isUppercase }), !tagCodes.contains(token) else { return nil }
         if let alias = aliases[token] { return alias.isEmpty ? nil : alias }
         return token
     }
@@ -112,11 +148,11 @@ public enum CategoryCountry {
         case .region:
             return locale.localizedString(forRegionCode: code.uppercased()) ?? code
         case .language:
-            let lower = code.lowercased()
-            if let name = locale.localizedString(forLanguageCode: lower), name.lowercased() != lower {
-                return name.prefix(1).uppercased() + name.dropFirst()
-            }
-            return code
+            // 2-letter codes (ISO 639-1) and a short list of 3-letter ones; anything else stays raw.
+            let upper = code.uppercased()
+            guard let language = upper.count == 2 ? upper.lowercased() : threeLetterLanguages[upper],
+                  let name = locale.localizedString(forLanguageCode: language), name.lowercased() != language else { return code }
+            return name.prefix(1).uppercased() + name.dropFirst()
         case .tag:
             return code
         }
@@ -143,20 +179,11 @@ public enum CategoryCountry {
         withoutPrefix(title) ?? title
     }
 
-    /// "XX | rest" / "XX • rest" / "XX: rest" / "[XX] rest" → "rest" when the prefix is a short code (≤ 3 letters).
+    /// "XX | rest" / "XX • rest" / "XX: rest" / "XX - rest" / "[XX] rest" → "rest" (prefix ≤ 3 characters,
+    /// same separators as the group detection).
     static func withoutPrefix(_ title: String) -> String? {
-        let trimmed = title.trimmingCharacters(in: .whitespaces)
-        if trimmed.hasPrefix("["), let close = trimmed.firstIndex(of: "]") {
-            let inner = trimmed[trimmed.index(after: trimmed.startIndex)..<close]
-            let rest = trimmed[trimmed.index(after: close)...].trimmingCharacters(in: CharacterSet(charactersIn: " |:•-"))
-            if inner.count <= 3, !rest.isEmpty { return rest }
-        }
-        let parts = trimmed.split(maxSplits: 1, whereSeparator: { "|:•".contains($0) })
-        if parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces).count <= 3 {
-            let rest = parts[1].trimmingCharacters(in: .whitespaces)
-            return rest.isEmpty ? nil : rest
-        }
-        return nil
+        guard let prefix = leadingPrefix(title), !prefix.rest.isEmpty else { return nil }
+        return prefix.rest
     }
 
     /// Search key of a category name: country prefix removed, case and diacritics folded

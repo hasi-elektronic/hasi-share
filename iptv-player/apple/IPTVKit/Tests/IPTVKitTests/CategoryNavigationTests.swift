@@ -38,6 +38,29 @@ final class CategoryCountryTests: XCTestCase {
         XCTAssertNil(CategoryCountry.code(for: "Kids Movies"), "no separator, no country")
     }
 
+    /// Review: tags, channels and packages are no groups; "-" separates only with a space after it.
+    func testTagPrefixesAreNoGroups() {
+        for tag in ["FHD | Movies", "UHD|Movies", "VIP | Sport", "PPV | Events", "UFC | Fight Night", "XXX | Adult",
+                    "HD | Kanäle", "TV | Sport", "NEW | Releases", "BBC | News", "TOP: 100", "HBO • Series"] {
+            XCTAssertNil(CategoryCountry.code(for: tag), tag)
+        }
+        XCTAssertEqual(CategoryCountry.code(for: "NL - Series"), "NL")
+        XCTAssertNil(CategoryCountry.code(for: "Sci-Fi"), "hyphenated word")
+        XCTAssertNil(CategoryCountry.code(for: "X-Men Series"))
+        XCTAssertEqual(CategoryCountry.code(for: "BTK | Mix"), "BTK", "unknown 3-letter prefix stays a group")
+        XCTAssertEqual(CategoryCountry.code(for: "ENG | Movies"), "ENG")
+    }
+
+    func testOneSeparatorSetForStrippingAndSearch() {
+        XCTAssertEqual(CategoryCountry.strippedTitle("NL - Series"), "Series", "flag replaces the prefix")
+        XCTAssertEqual(CategoryCountry.strippedTitle("ES] Series"), "Series")
+        XCTAssertEqual(CategoryCountry.nameWithoutPrefix("[EN] | Drama"), "Drama")
+        XCTAssertTrue(CategoryCountry.matches("NL - Series", query: "series"))
+        XCTAssertFalse(CategoryCountry.matches("NL - Series", query: "nl"), "prefix not searchable")
+        XCTAssertTrue(CategoryCountry.matches("Sci-Fi", query: "sci-fi"), "word kept whole")
+        XCTAssertEqual(CategoryCountry.nameWithoutPrefix("Sci-Fi"), "Sci-Fi")
+    }
+
     func testMeaningFlagAndDisplayName() {
         let en = Locale(identifier: "en"), tr = Locale(identifier: "tr"), de = Locale(identifier: "de")
         XCTAssertEqual(CategoryCountry.meaning(of: "TR"), .region)
@@ -58,6 +81,11 @@ final class CategoryCountryTests: XCTestCase {
         XCTAssertEqual(CategoryCountry.displayName(of: "IT", locale: de), "Italien")
         XCTAssertEqual(CategoryCountry.displayName(of: "TR", locale: tr), "Türkiye")
         XCTAssertEqual(CategoryCountry.displayName(of: "XYZ", locale: en), "XYZ", "unknown code stays raw")
+        XCTAssertEqual(CategoryCountry.displayName(of: "ENG", locale: en), "English", "whitelisted 3-letter code")
+        XCTAssertEqual(CategoryCountry.displayName(of: "TUR", locale: de), "Türkisch")
+        XCTAssertEqual(CategoryCountry.displayName(of: "BTK", locale: en), "BTK", "no obscure ISO 639 lookup (Batak Toba)")
+        XCTAssertEqual(CategoryCountry.displayName(of: "NEW", locale: en), "NEW", "tag, not Newari")
+        XCTAssertNil(CategoryCountry.flagEmoji(forCode: "ENG"))
     }
 
     func testFlagAndStrippedTitle() {
@@ -218,6 +246,38 @@ final class CatalogFormatRefreshTests: XCTestCase {
     private func requests(_ panel: Panel) -> Int {
         panel.lock.lock(); defer { panel.lock.unlock() }
         return panel.requests
+    }
+
+    /// Two old catalogs, one panel down: the reachable source stores the current format, the failing one
+    /// keeps its old (missing) version and is retried on the next launch.
+    func testFailingSourceKeepsOldVersionOtherSourceUpgrades() async throws {
+        let m3u = try Data(contentsOf: vectorURL("m3u/valid_basic.m3u"))
+        let down = Panel()
+        let transport = FakeTransport { request in
+            down.lock.lock(); defer { down.lock.unlock() }
+            if down.failing, request.url.host == "down.example.com" { return HTTPResponse(statusCode: 500) }
+            return HTTPResponse(statusCode: 200, body: m3u)
+        }
+        let config = AppConfig(displayName: "Test", bundleId: "de.hasielektronik.novaplayer", appVersion: "1.0",
+                               backendBaseURL: URL(string: "http://127.0.0.1:9")!, productIDs: ProductIDs(lifetime: "l", trial: "t"),
+                               licenseKeysJSON: TestSigner().jwkSetJSON, platform: .ios, rawDeviceId: "device", deviceName: "Test")
+        let env = try AppEnvironment(config: config, database: AppDatabase.inMemory(), secureStore: InMemorySecureStore(),
+                                     kv: InMemoryKeyValueStore(), transport: transport)
+        let up = try await env.addSource(name: "Up", secrets: .m3u(M3USecrets(url: "http://up.example.com/list.m3u"))) { _ in }
+        let failing = try await env.addSource(name: "Down", secrets: .m3u(M3USecrets(url: "http://down.example.com/list.m3u"))) { _ in }
+        env.database.setValue(nil, forKey: CatalogFormat.key(up.id))
+        env.database.setValue("1", forKey: CatalogFormat.key(failing.id))
+        down.lock.withLock { down.failing = true }
+
+        await env.refreshDueSources()
+        XCTAssertEqual(env.refresher.catalogFormat(sourceId: up.id), CatalogFormat.current, "reachable source upgraded")
+        XCTAssertEqual(env.refresher.catalogFormat(sourceId: failing.id), 1, "failing source keeps its old version")
+        XCTAssertTrue(env.refresher.needsFormatRefresh(sourceId: failing.id))
+        XCTAssertFalse(env.refresher.needsFormatRefresh(sourceId: up.id))
+
+        down.lock.withLock { down.failing = false }
+        await env.refreshDueSources()   // next launch
+        XCTAssertEqual(env.refresher.catalogFormat(sourceId: failing.id), CatalogFormat.current)
     }
 
     func testOldCatalogIsRefreshedOnceAndFailureRetriesNextLaunch() async throws {

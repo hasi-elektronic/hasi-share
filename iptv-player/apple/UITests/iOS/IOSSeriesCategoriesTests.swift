@@ -45,10 +45,30 @@ final class IOSSeriesCategoriesTests: XCTestCase {
         XCTAssertTrue(element("category_row_", containing: "Serien", in: app).waitForExistence(timeout: 5))
         UITestSupport.snap("catnav-ios-02-sheet", in: self)
 
-        // Search: case/diacritics-insensitive, finds the last (14th) category.
+        // Hide → gone; "Show hidden" lists it; show again → back (search keeps the rows near the top).
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
+        search.typeText("hbo")
+        let hbo = element("category_row_", containing: "HBO Series", in: app)
+        XCTAssertTrue(hbo.waitForExistence(timeout: 5), "search hit")
+        hbo.press(forDuration: 1.2)
+        let hide = app.buttons["Hide category"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 5), "context menu: Hide")
+        hide.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["category_no_match"].waitForExistence(timeout: 5), "hidden category no longer listed")
+        let showHidden = app.switches["category_show_hidden"]
+        XCTAssertTrue(showHidden.waitForExistence(timeout: 5), "Show hidden toggle")
+        if showHidden.switches.firstMatch.exists { showHidden.switches.firstMatch.tap() } else { showHidden.tap() }
+        let hiddenRow = element("category_hidden_", containing: "HBO Series", in: app)
+        XCTAssertTrue(hiddenRow.waitForExistence(timeout: 5), "hidden category listed under Show hidden")
+        UITestSupport.snap("catnav-ios-02b-hidden", in: self)
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'category_unhide_'")).firstMatch.tap()
+        XCTAssertTrue(hbo.waitForExistence(timeout: 5), "shown again")
+        XCTAssertFalse(showHidden.exists, "no hidden categories left")
+        search.buttons.firstMatch.tap()   // clear the field
+
+        // Search: case/diacritics-insensitive, across all countries, finds the last (14th) category.
         search.typeText("turk")
         XCTAssertTrue(element("category_row_", containing: "Türk Dizileri", in: app).waitForExistence(timeout: 5), "search hit")
         XCTAssertFalse(element("category_row_", containing: "Netflix", in: app).exists, "search filters")

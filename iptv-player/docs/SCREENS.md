@@ -142,8 +142,12 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     ya da `[XX]`) grubu belirler — ISO ülke kodu olsun olmasın ("TR • …" → TR, "IT | Serie" → IT,
     "EN • Drama" → EN, "AR | مسلسلات" → AR; rakam içeren "4K | …" grup değildir). Öneki olmayan adlarda
     eski tespit sürer (ülke adları, "Sport (UK)", takma adlar UK → GB, USA → US, TÜRKİYE → TR); grubu olmayan
-    kategoriler yalnız "Tümü"nde. **Gösterim:** rozet = kod (EN, AR, TR); ad = dil önce gelen kodlarda (EN,
-    AR ve ISO ülkesi olmayan her kod) uygulama dilinde dil adı ("İngilizce", "Arapça"), diğerlerinde ülke adı
+    kategoriler yalnız "Tümü"nde. Etiket / kanal / paket önekleri grup değildir (tek liste
+    `CategoryCountry.tagCodes`: SD, HD, FHD, UHD, HDR, VO, VOD, TV, VIP, PPV, NEW, TOP, XXX, UFC, NBA, BBC,
+    HBO, TRT …); `-` yalnızca ardından boşluk varsa ayraçtır ("Sci-Fi" bölünmez). Hero / detaydaki tür satırı
+    kategori adını öneksiz gösterir ("EN | Amazon Prime" → "Amazon Prime"). **Gösterim:** rozet = kod (EN, AR, TR); ad = dil önce gelen kodlarda (EN,
+    AR ve ISO ülkesi olmayan her kod; 3 harfli kodlarda yalnız kısa bir liste: ENG, GER, TUR, ARA, SPA …,
+    gerisi ham kod) uygulama dilinde dil adı ("İngilizce", "Arapça"), diğerlerinde ülke adı
     ("Türkiye", "Almanya", "İtalya"); bayrak emojisi yalnız gerçek ülkelerde (EN'de bayrak yok, AR'de 🇦🇷 yok;
     TV/HD gibi etiketlerde de yok). Bayraksız gruplarda satırda kod rozeti durur.
     Seçim **kaynak + tür (film/dizi) başına** cihazda saklanır. İlk kullanımda varsayılan = arayüz dilinin
@@ -159,7 +163,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     kategorileri"; **arama alanı** (büyük/küçük harf ve aksan duyarsız, "TR | " gibi ülke öneki aranmaz);
     **ülke çipleri** (Tümü + ülkeler, sayılı, satır kaydırmalı – seçim sayfanın ülkesidir); bölümler
     **Sabitlenenler** · **Son açılanlar** (son 5, en yeni önce) · seçili ülkenin (ya da tüm) kategorileri,
-    her birinde içerik sayısı. Dokunmak sheet'i kapatır, kategorinin grid'ini açar ve "Son açılanlar"a
+    her birinde içerik sayısı. **Arama yazılıyken** sonuçlar seçili ülkeden bağımsız olarak **tüm**
+    kategorilerden gelir (başlık "Tüm kategoriler"; Sabitlenenler / Son açılanlar gizlenir, ülke çipleri
+    görünür kalır); arama silinince seçili ülkenin listesi döner. Dokunmak sheet'i kapatır, kategorinin grid'ini açar ve "Son açılanlar"a
     yazar. Uzun bas: **Sabitle / Sabitlemeyi kaldır**, **Kategoriyi gizle** (gizlemek sabitlemeyi de
     kaldırır). Sonda **"Gizlenenleri göster (n)"** anahtarı gizlenenleri listeler (👁 **Tekrar göster**).
     Gizlenen film/dizi kategorileri **kaynak + tür** başına tutulur (Xtream VOD ve dizi kategori kimlikleri
@@ -169,7 +175,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     Son açılanlar (sekme açıldığındaki hâli; seçim sırasında odak kaymasın diye canlı güncellenmez) ·
     ülkenin kategorileri (sayılı) · gizlenen varsa "Gizlenenleri göster (n)". Kategoride **OK** → sağda
     o kategorinin grid'i (odak sütunda kalır, ▶ grid'e geçer). Uzun OK: sabitle / gizle (gizlenende tekrar
-    göster). **Geri:** sağ içerikte → odak sütundaki seçili satıra; sütunda → üst sekme çubuğu (§2 TV).
+    göster). Ülke değişince ya da seçili kategori sabitlemesi kaldırılıp / gizlenip sütundan çıkınca sağda
+    yeniden Keşfet açılır. **Geri:** sağ içerikte → odak sütundaki seçili satıra (satır artık yoksa
+    Keşfet'e); sütunda → üst sekme çubuğu (§2 TV).
     Sütunda arama yok (genel arama sekmesi var).
 * **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi

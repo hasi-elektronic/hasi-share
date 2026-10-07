@@ -158,10 +158,21 @@ public final class LiveTVViewModel {
 @Observable
 public final class MoviesViewModel {
     public private(set) var categories: [IPTVCore.Category] = []
-    public var categoryId: String? { didSet { if categoryId != oldValue { reload() } } }
+    public var categoryId: String? { didSet { if categoryId != oldValue, !configuring { reload() } } }
     /// Items of any of these categories (a country's categories); overrides `categoryId` when set.
-    public var categoryIds: [String]? { didSet { if categoryIds != oldValue { reload() } } }
-    public var sort: CatalogSort = .added { didSet { if sort != oldValue { reload() } } }
+    public var categoryIds: [String]? { didSet { if categoryIds != oldValue, !configuring { reload() } } }
+    public var sort: CatalogSort = .added { didSet { if sort != oldValue, !configuring { reload() } } }
+    @ObservationIgnored private var configuring = false
+
+    /// Sets the filter and sort, then loads once (setting them one by one reloads per property).
+    public func configure(categoryId: String?, categoryIds: [String]?, sort: CatalogSort) {
+        configuring = true
+        self.categoryId = categoryId
+        self.categoryIds = categoryIds
+        self.sort = sort
+        configuring = false
+        reload()
+    }
     public private(set) var movies: [Movie] = []
     public private(set) var reachedEnd = false
     @ObservationIgnored private let env: AppEnvironment
@@ -204,10 +215,21 @@ public final class MoviesViewModel {
 @Observable
 public final class SeriesListViewModel {
     public private(set) var categories: [IPTVCore.Category] = []
-    public var categoryId: String? { didSet { if categoryId != oldValue { reload() } } }
+    public var categoryId: String? { didSet { if categoryId != oldValue, !configuring { reload() } } }
     /// Items of any of these categories (a country's categories); overrides `categoryId` when set.
-    public var categoryIds: [String]? { didSet { if categoryIds != oldValue { reload() } } }
-    public var sort: CatalogSort = .added { didSet { if sort != oldValue { reload() } } }
+    public var categoryIds: [String]? { didSet { if categoryIds != oldValue, !configuring { reload() } } }
+    public var sort: CatalogSort = .added { didSet { if sort != oldValue, !configuring { reload() } } }
+    @ObservationIgnored private var configuring = false
+
+    /// Sets the filter and sort, then loads once (setting them one by one reloads per property).
+    public func configure(categoryId: String?, categoryIds: [String]?, sort: CatalogSort) {
+        configuring = true
+        self.categoryId = categoryId
+        self.categoryIds = categoryIds
+        self.sort = sort
+        configuring = false
+        reload()
+    }
     public private(set) var series: [Series] = []
     public private(set) var reachedEnd = false
     @ObservationIgnored private let env: AppEnvironment

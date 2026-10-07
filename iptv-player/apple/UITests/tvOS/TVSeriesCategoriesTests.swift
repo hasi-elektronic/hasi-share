@@ -83,5 +83,31 @@ final class TVSeriesCategoriesTests: XCTestCase {
         usleep(800_000)
         XCTAssertTrue(turkish.hasFocus, "Menu in the content returns focus to the column")
         XCTAssertTrue(seriesTab.exists && !seriesTab.hasFocus, "not to the tab bar")
+
+        // Country change while a category is shown: back to Discover; Menu from its content still reaches
+        // the column (Discover), and Menu in the column goes on to the tab bar.
+        XCTAssertTrue(focus(discover, pressing: .up, limit: 30), "Discover row")
+        remote.press(.up)
+        usleep(600_000)
+        remote.press(.select)        // country menu: All (selected) · English (4) · Germany (2) …
+        sleep(1)
+        remote.press(.down); usleep(400_000)
+        remote.press(.down); usleep(400_000)
+        remote.press(.select)
+        sleep(1)
+        XCTAssertTrue(picker.label.contains("Germany"), "country changed: \(picker.label)")
+        XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 5), "Discover page shown again")
+        XCTAssertFalse(poster.exists, "grid of the old country's category closed")
+        XCTAssertTrue(focus(discover, pressing: .down, limit: 4), "Discover row")
+        remote.press(.right)
+        usleep(800_000)
+        XCTAssertFalse(discover.hasFocus, "▶ into the Discover page")
+        remote.press(.menu)
+        usleep(800_000)
+        XCTAssertTrue(discover.hasFocus, "Menu in the content → column (Discover)")
+        UITestSupport.snap("catnav-tvos-04-discover", in: self)
+        remote.press(.menu)
+        usleep(800_000)
+        XCTAssertTrue(seriesTab.hasFocus, "Menu in the column → tab bar")
     }
 }
