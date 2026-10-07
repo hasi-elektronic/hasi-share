@@ -195,7 +195,10 @@ struct CategorySheetPresenter: ViewModifier {
 
     func body(content: Content) -> some View {
         if sizeClass == .compact {
-            content.fullScreenCover(isPresented: $isPresented, onDismiss: flush) { sheet }
+            // Full-screen page: a left-edge swipe closes it like "back" (SCREENS §2).
+            content.fullScreenCover(isPresented: $isPresented, onDismiss: flush) {
+                sheet.edgeSwipeToDismiss { isPresented = false }
+            }
         } else {
             content.sheet(isPresented: $isPresented, onDismiss: flush) {
                 sheet.presentationDetents([.large]).presentationDragIndicator(.visible)

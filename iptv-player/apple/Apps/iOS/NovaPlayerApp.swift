@@ -61,6 +61,8 @@ struct RootView: View {
                             MobileTopBar(solid: router.headerSolid || !hasHero)
                         }
                         .toolbar(.hidden, for: .navigationBar)
+                        // Edge swipe goes back although the bar is hidden (SCREENS §2).
+                        .background(InteractivePopEnabler().frame(width: 0, height: 0))
                         .catalogDestinations()
                 }
                 .onAppear(perform: applyDebugScreen)

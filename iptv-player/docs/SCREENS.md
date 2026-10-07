@@ -73,6 +73,12 @@ kategori çipi "★ Favoriler", TV Rehberi'nde "Tümü"nün ardından "Favoriler
 * Ses/altyazı dili, Hızlı başlat, TV/soundbar ses gecikmesi: ⚙️ → satır (2).
 * Oynatıcıda başka kanal: kanal paneli (iOS liste düğmesi / soldan kaydırma, TV: OK) → kanal (2).
 
+**Geri hareketi (iPhone/iPad):** her itilmiş sayfada (detay, grid, arama, ayarlar alt sayfaları) ekranın sol
+kenarından sağa kaydırmak bir önceki sayfaya döner — gezinti çubuğu gizli olsa da (sistem kenar kaydırması
+yeniden etkin; kök ekranda bir şey yapmaz). Sayfa gibi davranan tam ekran Kategoriler sayfası da sol kenardan
+(ilk ~24 pt) yatay ≥ 80 pt kaydırmayla kapanır (sayfa parmağı izler). Yalnız kenardan başlar; yatay raflar,
+kaydırma çubuğu ve liste kaydırma eylemleri etkilenmez. Oynatıcı kendi hareketlerini korur (§3.7).
+
 Kaynak yoksa Karşılama ekranı. Film/Dizi sekmesi, kaynak bunları sunmuyorsa gizlenmez; boş durum gösterir.
 Dikey ve yatay desteklenir; grid sütun sayısı genişliğe göre artar (poster min. 104 pt).
 
