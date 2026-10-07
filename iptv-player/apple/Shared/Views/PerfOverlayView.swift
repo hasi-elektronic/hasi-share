@@ -23,6 +23,7 @@ struct PerfOverlayView: View {
                 row("perf_engine", engineName)
                 row("perf_zap", zapText(trace))
                 row("perf_buffer", Self.bufferText(player.phase))
+                row("perf_seeks", String(player.seekCount))
                 row("perf_bitrate", diag.bitrate.map { String(format: "%.2f Mbit/s", $0 / 1_000_000) } ?? "—")
                 row("perf_dropped", diag.droppedFrames.map(String.init) ?? "—")
                 row("perf_output_latency", "\(Int((AVAudioSession.sharedInstance().outputLatency * 1000).rounded())) ms")

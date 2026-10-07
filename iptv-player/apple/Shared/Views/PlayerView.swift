@@ -29,12 +29,21 @@ struct PlayerView: View {
     @State private var syncNoticeTask: Task<Void, Never>?
     /// An audio/subtitle/aspect menu is open: removing its source view would close it.
     @State private var menuOpen = false
+    /// Seek bubble thumbnails (only where a second connection is safe – `SeekThumbnailPolicy`).
+    @State private var thumbnails = SeekThumbnailLoader()
+    /// Width of the VOD timeline (places the seek bubble above the target).
+    @State private var timelineWidth: CGFloat = 0
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// Scrubber position while the finger is down (nil = follow playback).
     @State private var scrubFraction: Double?
     @State private var ripple: SeekRipple?
     @State private var rippleTask: Task<Void, Never>?
+    /// Position when the current scrub began (the bubble's "+2:30" is measured from it).
+    @State private var scrubOrigin: Double?
+    /// After release the bubble stays a moment on the landing point (`landingSeconds`).
+    @State private var landing: SeekLanding?
+    @State private var landingTask: Task<Void, Never>?
     #endif
     #if os(tvOS)
     @FocusState private var surfaceFocused: Bool
@@ -61,6 +70,12 @@ struct PlayerView: View {
     /// "No such channel" in the number indicator (numbered source without that number).
     @State private var zapNoChannel = false
     @State private var numberZapTask: Task<Void, Never>?
+    /// Preview-then-commit seeking (VOD): ◀▶ / hold / touch-surface swipes move this target while
+    /// playback continues; one seek on OK, Play/Pause or 0.8 s without input; Menu cancels.
+    @State private var seekPreview: SeekPreview?
+    @State private var seekCommitTask: Task<Void, Never>?
+    /// When the last touch-surface swipe ended (a move command right after it is the same gesture).
+    @State private var lastPanEndMs: Int64 = 0
     #endif
 
     private var player: PlayerController { env.player }
@@ -142,14 +157,31 @@ struct PlayerView: View {
         .onDisappear {
             hideTask?.cancel()
             resumeChipTask?.cancel()
+            thumbnails.reset()
             #if os(tvOS)
             infoCardTask?.cancel()
             numberZapTask?.cancel()
+            seekCommitTask?.cancel()
+            #else
+            landingTask?.cancel()
             #endif
         }
         .onChange(of: player.phase) { _, phase in
+            #if os(tvOS)
+            // The item ended / failed under the preview: nothing left to seek in.
+            switch phase {
+            case .ended, .failed, .locked, .idle: cancelSeekPreview()
+            default: break
+            }
+            #endif
             // Never hide while paused/buffering; once playing (again) the 3 s count starts.
             if overlayVisible, phase == .playing { scheduleHide() }
+        }
+        .onChange(of: player.request?.id) {
+            thumbnails.reset()   // another item: its own connection rules and frames
+            #if os(tvOS)
+            cancelSeekPreview()
+            #endif
         }
         .onChange(of: player.resumedFromMs) { _, ms in
             if ms != nil { showResumeChip() } else { resumeChipVisible = false }
@@ -179,8 +211,15 @@ struct PlayerView: View {
         #if os(tvOS)
         .background {
             if isVOD {
-                TVHoldSeek { direction, heldMs in
-                    if !channelListVisible, !syncPanelVisible, !(overlayVisible && toolsActive) { tvSeek(direction, heldMs: heldMs) }
+                ZStack {
+                    TVHoldSeek { direction, heldMs in
+                        if seekInputAllowed { tvSeek(direction, heldMs: heldMs) }
+                    }
+                    // Siri Remote touch surface: a horizontal swipe moves the seek target.
+                    TVTouchScrub(enabled: seekInputAllowed,
+                                 onBegan: { touchScrubBegan() },
+                                 onChanged: { touchScrubMoved($0) },
+                                 onEnded: { touchScrubEnded() })
                 }
             }
         }
@@ -217,7 +256,11 @@ struct PlayerView: View {
             @unknown default: break
             }
         }
-        .onPlayPauseCommand { togglePlayPause() }
+        .onPlayPauseCommand {
+            // While seeking: jump to the target, then pause/resume as always.
+            if seekPreview != nil { commitSeekPreview() }
+            togglePlayPause()
+        }
         // A ⭐ toggle on the info card keeps it open for another full period.
         .onChange(of: env.favorites.pendingUndo) { _, pending in
             guard infoCardVisible else { return }
@@ -232,6 +275,10 @@ struct PlayerView: View {
         // channel panel (the overlay: ◀▶ or Play/Pause). Only for the picture itself: OK on a focused
         // Menu (Audio/Subtitles/Aspect) also reaches this gesture.
         .onTapGesture {
+            if seekPreview != nil {
+                commitSeekPreview()   // click while the overlay is still appearing
+                return
+            }
             guard !syncPanelVisible, !overlayVisible, !channelListVisible, !infoCardVisible else { return }
             if isVOD { togglePlayPause() } else { openChannelPanel() }
         }
@@ -242,8 +289,9 @@ struct PlayerView: View {
             return .handled
         }
         .onExitCommand {
-            // Back rules (SCREENS §2): close panel/menu first, then leave the player.
-            if syncPanelVisible { closeSyncPanel() }
+            // Back rules (SCREENS §2): cancel a seek preview, close panel/menu first, then leave the player.
+            if seekPreview != nil { cancelSeekPreview() }
+            else if syncPanelVisible { closeSyncPanel() }
             else if infoCardVisible { hideInfoCard() }
             else if channelListVisible { closeChannelPanel() }
             else if overlayVisible { hideOverlay() }
@@ -413,6 +461,7 @@ struct PlayerView: View {
         menuOpen = false   // a menu dismissed without a choice
         #if os(iOS)
         scrubFraction = nil   // a drag cut off by the hide never ends
+        scrubOrigin = nil
         #else
         toolsActive = false
         surfaceFocused = true
@@ -437,7 +486,7 @@ struct PlayerView: View {
         #else
         // tvOS: the top row (and the menus opened from it) is in use; ▼ to play/pause re-arms the hide.
         // (Menu items' onAppear is not a reliable "menu open" signal on tvOS.)
-        if toolsActive { return false }
+        if toolsActive || seekPreview != nil { return false }
         #endif
         return true
     }
@@ -458,6 +507,17 @@ struct PlayerView: View {
         showOverlay()
     }
 
+    /// The play/pause control: tvOS OK while the seek target is shown jumps there (no pause).
+    private func playPausePressed() {
+        #if os(tvOS)
+        if seekPreview != nil {
+            commitSeekPreview()
+            return
+        }
+        #endif
+        togglePlayPause()
+    }
+
     private func seek(by seconds: Double) {
         player.seek(by: seconds)
         if overlayVisible { scheduleHide() }
@@ -469,6 +529,7 @@ struct PlayerView: View {
     private func vodOverlayMove(_ direction: MoveCommandDirection) {
         switch direction {
         case .up where !toolsActive:
+            if seekPreview != nil { commitSeekPreview() }
             toolsActive = true
             Task { @MainActor in topFocus = .close }   // after the row became focusable
             scheduleHide()
@@ -514,11 +575,87 @@ struct PlayerView: View {
         scheduleHide()
     }
 
-    /// ◀▶: 10 s; held (`TVHoldSeek` repeats every 0.3 s) 30 s steps once held for 1 s.
+    /// ◀▶ / held ◀▶ / swipes may move the seek target (no panel, top row or menu in use).
+    private var seekInputAllowed: Bool {
+        !channelListVisible && !syncPanelVisible && !infoCardVisible && !(overlayVisible && toolsActive)
+    }
+
+    /// ◀▶ moves the seek target 10 s; held (`TVHoldSeek` repeats every 0.3 s) 30 → 60 → 120 s steps
+    /// (`SeekAccelerator`). The seek itself happens once, on commit.
     private func tvSeek(_ direction: Int, heldMs: Int64 = 0) {
         guard isVOD else { showOverlay(); return }
-        player.seek(by: SeekAccelerator.step(direction: direction, heldMs: heldMs))
-        showOverlay()
+        let now = SystemClock.monotonicMs()
+        // A swipe on the touch surface is already moving the target (or just did).
+        if seekPreview?.isPanning == true || now - lastPanEndMs < 250 { return }
+        var preview = seekPreview ?? SeekPreview(origin: player.currentTime, duration: player.duration, nowMs: now)
+        preview.step(direction: direction, heldMs: heldMs, nowMs: now)
+        updateSeekPreview(preview)
+        scheduleSeekCommit()
+    }
+
+    /// Shows the target (overlay + bubble, no auto-hide) and asks for its thumbnail.
+    private func updateSeekPreview(_ preview: SeekPreview) {
+        if seekPreview == nil { thumbnails.prepare(player: player) }
+        seekPreview = preview
+        hideTask?.cancel()
+        if !overlayVisible { overlayVisible = true }
+        thumbnails.request(preview.target)
+    }
+
+    /// Commits after `SeekPreview.commitIdleMs` without input (a resting finger keeps the preview).
+    private func scheduleSeekCommit() {
+        seekCommitTask?.cancel()
+        seekCommitTask = Task {
+            let idleMs = player.seekCommitIdleMs
+            try? await Task.sleep(for: .milliseconds(idleMs + 20))
+            guard !Task.isCancelled, let preview = seekPreview,
+                  preview.isCommitDue(nowMs: SystemClock.monotonicMs(), idleMs: idleMs) else { return }
+            commitSeekPreview()
+        }
+    }
+
+    /// One seek to the target (none when it did not move); the overlay's 3 s count restarts.
+    private func commitSeekPreview() {
+        seekCommitTask?.cancel()
+        guard let preview = seekPreview else { return }
+        seekPreview = nil
+        thumbnails.endScrub()
+        if abs(preview.delta) >= 0.5 { player.seek(toSeconds: preview.target) }
+        if overlayVisible { scheduleHide() }
+    }
+
+    /// Menu: the target snaps back, no seek.
+    private func cancelSeekPreview() {
+        seekCommitTask?.cancel()
+        guard seekPreview != nil else { return }
+        seekPreview = nil
+        thumbnails.endScrub()
+        if overlayVisible { scheduleHide() }
+    }
+
+    private func touchScrubBegan() {
+        guard isVOD else { return }
+        let now = SystemClock.monotonicMs()
+        seekCommitTask?.cancel()
+        var preview = seekPreview ?? SeekPreview(origin: player.currentTime, duration: player.duration, nowMs: now)
+        preview.beginPan(nowMs: now)
+        updateSeekPreview(preview)
+    }
+
+    /// `translation`: horizontal finger travel as a share of the surface width.
+    private func touchScrubMoved(_ translation: Double) {
+        guard var preview = seekPreview else { return }
+        preview.pan(translation: translation, nowMs: SystemClock.monotonicMs())
+        updateSeekPreview(preview)
+    }
+
+    private func touchScrubEnded() {
+        let now = SystemClock.monotonicMs()
+        lastPanEndMs = now
+        guard var preview = seekPreview else { return }
+        preview.endPan(nowMs: now)
+        seekPreview = preview
+        scheduleSeekCommit()
     }
 
     // MARK: Info card (tvOS live)
@@ -817,7 +954,7 @@ struct PlayerView: View {
             default: return false
             }
         }()
-        return Button { togglePlayPause() } label: {
+        return Button { playPausePressed() } label: {
             ZStack {
                 if busy {
                     ProgressView().tint(.white).controlSize(Theme.isTV ? .large : .regular)
@@ -1025,44 +1162,113 @@ struct PlayerView: View {
         }
     }
 
-    /// VOD timeline: iOS draggable scrubber, tvOS display bar (◀▶ seek).
+    /// VOD timeline: iOS draggable scrubber, tvOS display bar (◀▶ / swipes move the seek target).
+    /// Both show the seek bubble (target time · jump, thumbnail where safe) above the target.
     private var vodTimeline: some View {
         let duration = player.duration
-        #if os(iOS)
-        let shownTime = scrubFraction.map { $0 * duration } ?? player.currentTime
-        #else
-        let shownTime = player.currentTime
-        #endif
         let fraction = duration > 0 ? min(1, max(0, player.currentTime / duration)) : 0
+        #if os(iOS)
+        let target = scrubFraction.map { $0 * duration }
+        let bubble: SeekLanding? = target.map { SeekLanding(target: $0, delta: $0 - (scrubOrigin ?? player.currentTime)) } ?? landing
+        #else
+        let target = seekPreview?.target
+        let bubble = seekPreview.map { SeekLanding(target: $0.target, delta: $0.delta) }
+        #endif
+        let shownTime = target ?? player.currentTime
         return VStack(spacing: Theme.isTV ? 12 : 0) {
             #if os(iOS)
             PlayerScrubber(fraction: fraction, duration: duration, dragFraction: scrubBinding) { target in
                 player.seek(toFraction: target)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { timelineWidth = $0 }
+            .overlay(alignment: .bottomLeading) {
+                if let bubble {
+                    SeekBubble(target: bubble.target, delta: bubble.delta, thumbnail: thumbnails.image)
+                        .modifier(BubblePlacement(fraction: duration > 0 ? bubble.target / duration : 0, width: timelineWidth, lift: 50))
+                        .transition(.opacity)
+                }
+            }
             #else
-            ProgressBar(value: fraction).frame(height: 8)
+            tvTimelineBar(fraction: fraction)
             #endif
             HStack {
                 Text(L10n.clock(shownTime))
                     .accessibilityIdentifier("player_time")
                 Spacer()
-                Text(duration > 0 ? L10n.clock(duration) : "--:--")
+                // While seeking: the time left from the target.
+                Text(duration > 0 ? (target.map { "\u{2212}" + L10n.clock(max(0, duration - $0)) } ?? L10n.clock(duration)) : "--:--")
                     .accessibilityIdentifier("player_duration")
             }
             .font(Theme.caption.monospacedDigit())
             .foregroundStyle(.white)
         }
+        .animation(.easeOut(duration: 0.15), value: bubble != nil)
     }
+
+    #if os(tvOS)
+    /// Display bar; while a seek target is shown it grows and carries a marker + the bubble.
+    private func tvTimelineBar(fraction: Double) -> some View {
+        let preview = seekPreview
+        let barHeight: CGFloat = preview != nil ? 16 : 8
+        return ProgressBar(value: fraction)
+            .frame(height: barHeight)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { timelineWidth = $0 }
+            .overlay(alignment: .leading) {
+                if let targetFraction = preview?.fraction {
+                    Capsule().fill(.white)
+                        .frame(width: 8, height: 40)
+                        .shadow(color: .black.opacity(0.5), radius: 4)
+                        .offset(x: timelineWidth * min(1, max(0, targetFraction)) - 4)
+                        .accessibilityHidden(true)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if let preview {
+                    SeekBubble(target: preview.target, delta: preview.delta, thumbnail: thumbnails.image)
+                        .modifier(BubblePlacement(fraction: preview.fraction ?? fraction, width: timelineWidth, lift: barHeight + 30))
+                }
+            }
+    }
+    #endif
 
     #if os(iOS)
     private var scrubBinding: Binding<Double?> {
         Binding(get: { scrubFraction }, set: { value in
+            let started = scrubFraction == nil && value != nil
             let ended = scrubFraction != nil && value == nil
+            let last = scrubFraction
+            if started {
+                scrubOrigin = player.currentTime
+                landingTask?.cancel()
+                landing = nil
+                thumbnails.prepare(player: player)
+            }
             scrubFraction = value
+            if let value, player.duration > 0 { thumbnails.request(value * player.duration) }
             if value != nil { hideTask?.cancel() }
-            if ended { scheduleHide() }
+            if ended {
+                // The bubble stays a moment on the landing point (the scrubber seeks on release).
+                if let last, player.duration > 0 {
+                    let target = last * player.duration
+                    landing = SeekLanding(target: target, delta: target - (scrubOrigin ?? target))
+                    landingTask?.cancel()
+                    landingTask = Task {
+                        try? await Task.sleep(for: .seconds(Self.landingSeconds))
+                        guard !Task.isCancelled else { return }
+                        landing = nil
+                        thumbnails.endScrub()
+                    }
+                } else {
+                    thumbnails.endScrub()
+                }
+                scrubOrigin = nil
+                scheduleHide()
+            }
         })
     }
+
+    /// How long the bubble stays on the landing point after the finger lifts.
+    private static let landingSeconds = 1.5
     #endif
 
     private func zapCard(_ channel: Channel) -> some View {
@@ -1107,6 +1313,12 @@ struct PlayerView: View {
     }
 }
 
+/// What the seek bubble shows: target position and the jump from where seeking started.
+private struct SeekLanding: Equatable {
+    var target: Double
+    var delta: Double
+}
+
 #if os(iOS)
 /// Double-tap seek feedback ("−10 s" / "+20 s").
 private struct SeekRipple: Equatable {
@@ -1126,7 +1338,8 @@ private struct PressScaleButtonStyle: ButtonStyle {
 }
 
 /// Draggable VOD timeline (44 pt touch height). While the finger is down `dragFraction` holds the
-/// target – incoming time ticks do not move the thumb – and the seek happens on release.
+/// target – incoming time ticks do not move the thumb – and the seek happens on release. The target
+/// bubble (`SeekBubble`) is drawn by `PlayerView` above it.
 private struct PlayerScrubber: View {
     let fraction: Double
     let duration: Double
@@ -1153,15 +1366,6 @@ private struct PlayerScrubber: View {
                         .frame(width: thumb, height: thumb)
                         .shadow(color: .black.opacity(0.4), radius: 3)
                         .offset(x: width * shown - thumb / 2)
-                }
-                if let dragFraction {
-                    Text(L10n.clock(dragFraction * duration))
-                        .font(.subheadline.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Capsule().fill(.white))
-                        .fixedSize()
-                        .offset(x: min(max(0, width * dragFraction - 36), width - 72), y: -34)
                 }
             }
             .frame(width: width, height: geo.size.height)
@@ -1260,6 +1464,99 @@ struct TVHoldSeek: UIViewRepresentable {
                 break
             }
         }
+    }
+}
+
+/// Horizontal swipes on the Siri Remote touch surface (indirect touches) for the seek preview: a pan
+/// recognizer on the window reports the finger's travel as a share of the window width (a full
+/// swipe ≈ 1). Vertical swipes are left to the focus engine; disabled while panels/the top row are in use.
+struct TVTouchScrub: UIViewRepresentable {
+    var enabled: Bool
+    let onBegan: @MainActor () -> Void
+    let onChanged: @MainActor (Double) -> Void
+    let onEnded: @MainActor () -> Void
+
+    func makeUIView(context: Context) -> PanView {
+        let view = PanView()
+        updateUIView(view, context: context)
+        return view
+    }
+
+    func updateUIView(_ view: PanView, context: Context) {
+        view.onBegan = onBegan
+        view.onChanged = onChanged
+        view.onEnded = onEnded
+        view.enabled = enabled
+    }
+
+    static func dismantleUIView(_ view: PanView, coordinator: ()) { view.detach() }
+
+    final class PanView: UIView, UIGestureRecognizerDelegate {
+        var onBegan: (@MainActor () -> Void)?
+        var onChanged: (@MainActor (Double) -> Void)?
+        var onEnded: (@MainActor () -> Void)?
+        var enabled = true {
+            didSet { recognizer?.isEnabled = enabled }
+        }
+        private var recognizer: UIPanGestureRecognizer?
+        private weak var attachedWindow: UIWindow?
+        private var active = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window == nil { detach() } else { attach() }
+        }
+
+        private func attach() {
+            guard let window, attachedWindow !== window else { return }
+            detach()
+            let r = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+            r.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.indirect.rawValue)]
+            r.cancelsTouchesInView = false
+            r.delegate = self
+            r.isEnabled = enabled
+            window.addGestureRecognizer(r)
+            recognizer = r
+            attachedWindow = window
+        }
+
+        func detach() {
+            if active { onEnded?() }
+            active = false
+            if let recognizer { recognizer.view?.removeGestureRecognizer(recognizer) }
+            recognizer = nil
+            attachedWindow = nil
+        }
+
+        @objc private func panned(_ recognizer: UIPanGestureRecognizer) {
+            let width = max(1, recognizer.view?.bounds.width ?? 1)
+            let share = Double(recognizer.translation(in: recognizer.view).x / width)
+            switch recognizer.state {
+            case .began:
+                active = true
+                onBegan?()
+                onChanged?(share)
+            case .changed:
+                if active { onChanged?(share) }
+            case .ended, .cancelled, .failed:
+                // No momentum: the target stays where the finger left it.
+                if active { onEnded?() }
+                active = false
+            default:
+                break
+            }
+        }
+
+        /// Only clearly horizontal swipes start a scrub (UIView already declares this delegate selector).
+        override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, pan === recognizer else { return super.gestureRecognizerShouldBegin(gestureRecognizer) }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y) * 1.5
+        }
+
+        /// The focus engine and the press recognizers keep working alongside.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
     }
 }
 #endif

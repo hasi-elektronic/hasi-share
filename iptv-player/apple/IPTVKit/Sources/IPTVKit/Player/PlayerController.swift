@@ -144,6 +144,8 @@ public final class PlayerController {
     public private(set) var deviceAudioDelay = 0
     /// The delay could not be applied to this opened stream (VLCKit failed, playing on AVPlayer without it).
     public private(set) var audioSyncUnavailable = false
+    /// Seeks handed to the engine since launch (performance overlay; the tvOS seek preview seeks once per commit).
+    public private(set) var seekCount = 0
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -193,6 +195,8 @@ public final class PlayerController {
     @ObservationIgnored public var nowMs: @MainActor () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     @ObservationIgnored public var onLibraryChange: (@MainActor () -> Void)?
     @ObservationIgnored public var onAspectChange: (@MainActor (AspectMode) -> Void)?
+    /// tvOS seek preview: no input for this long commits the target (UI tests lengthen it).
+    @ObservationIgnored public var seekCommitIdleMs: Int64 = SeekPreview.commitIdleMs
     /// Settings → Playback → buffer size (large = no start tuning, bigger caches); set by `AppEnvironment`.
     @ObservationIgnored public var largeBuffer = false
     /// Neighbour-channel warm-up (docs/ARCHITECTURE.md §7); nil = no prefetch. Set by `AppEnvironment`.
@@ -753,6 +757,13 @@ public final class PlayerController {
         seek(to: duration * min(1, max(0, fraction)))
     }
 
+    /// Absolute position (VOD; seek preview commit), clamped like `seek(by:)`.
+    public func seek(toSeconds seconds: Double) {
+        guard request?.isLive == false, seconds.isFinite else { return }
+        let upper = duration > 0 ? max(0, duration - 1) : .greatestFiniteMagnitude
+        seek(to: max(0, min(upper, seconds)))
+    }
+
     public func restartFromBeginning() {
         resumedFromMs = nil
         seek(to: 0)
@@ -761,6 +772,7 @@ public final class PlayerController {
     private func seek(to target: Double) {
         currentTime = target
         pendingSeek = (target, nowMs())
+        seekCount += 1
         engine?.seek(to: target)
     }
 

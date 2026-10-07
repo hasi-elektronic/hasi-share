@@ -258,14 +258,37 @@ final class PlayerProgressTests: XCTestCase {
 
     // MARK: tvOS hold-to-accelerate
 
-    func testSeekAcceleratorStepsUpAfterOneSecondHeld() {
+    func testSeekAcceleratorStepsUpWhileHeld() {
         XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 0), 10, "click")
         XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 400), 10)
         XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 999), 10)
         XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 1_000), 30, "held ≥ 1 s")
-        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 5_000), 30)
+        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 2_999), 30)
+        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 3_000), 60, "held ≥ 3 s")
+        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 4_999), 60)
+        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 5_000), 120, "held ≥ 5 s")
+        XCTAssertEqual(SeekAccelerator.step(direction: 1, heldMs: 60_000), 120, "capped")
         XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 0), -10)
         XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 1_300), -30)
+        XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 3_300), -60)
+        XCTAssertEqual(SeekAccelerator.step(direction: -1, heldMs: 7_000), -120)
+    }
+
+    /// Seek-preview commit: one absolute seek, clamped like ±n, counted for the performance overlay.
+    func testSeekToSecondsClampsAndCounts() async throws {
+        let c = try controller()
+        let engine = try await open(c, movie)
+        engine.emit(.ready(duration: 600))
+        let before = c.seekCount
+        c.seek(toSeconds: 250)
+        XCTAssertEqual(engine.seeks.last, 250)
+        XCTAssertEqual(c.currentTime, 250)
+        c.seek(toSeconds: 9_999)
+        XCTAssertEqual(engine.seeks.last, 599, "clamped to duration − 1 s")
+        c.seek(toSeconds: -5)
+        XCTAssertEqual(engine.seeks.last, 0)
+        c.seek(toSeconds: .nan)
+        XCTAssertEqual(c.seekCount, before + 3, "one count per engine seek, NaN ignored")
     }
 
     /// End of a VOD whose length was never known: saved as watched, so it leaves "Continue watching".

@@ -133,6 +133,8 @@
     <string name="player_state_paused" formatted="false">Paused</string>
     <string name="player_show_controls" formatted="false">Show controls</string>
     <string name="player_position" formatted="false">Playback position</string>
+    <string name="player_seek_target">Seek to %1$s, %2$s</string>
+    <string name="player_seek_preview_image" formatted="false">Preview image</string>
     <string name="player_locked" formatted="false">Your trial has ended. Purchase to keep watching.</string>
     <string name="paywall_title" formatted="false">NovaPlayer Premium</string>
     <string name="paywall_subtitle" formatted="false">One-time purchase · no subscription</string>
@@ -206,6 +208,7 @@
     <string name="perf_zap" formatted="false">Zap time</string>
     <string name="perf_engine" formatted="false">Engine</string>
     <string name="perf_buffer" formatted="false">Buffer</string>
+    <string name="perf_seeks" formatted="false">Seeks</string>
     <string name="perf_bitrate" formatted="false">Bitrate</string>
     <string name="perf_dropped" formatted="false">Dropped frames</string>
     <string name="perf_output_latency" formatted="false">Output latency</string>

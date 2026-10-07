@@ -3027,6 +3027,52 @@
         }
       }
     },
+    "player_seek_target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seek to %1$@, %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ konumuna atla, %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Springen zu %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "player_seek_preview_image": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview image"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önizleme görüntüsü"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorschaubild"
+          }
+        }
+      }
+    },
     "player_locked": {
       "extractionState": "manual",
       "localizations": {
@@ -4669,6 +4715,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Puffer"
+          }
+        }
+      }
+    },
+    "perf_seeks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seeks"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atlama"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprünge"
           }
         }
       }

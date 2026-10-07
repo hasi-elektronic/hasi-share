@@ -72,11 +72,20 @@ public final class ZapPrefetcher {
     }
 
     /// Xtream live URL shape in M3U lists: `{base}/[live/]U/P/{numericId}` with `.ts`, `.m3u8` or no extension.
-    private static let xtreamLivePattern = try! NSRegularExpression(pattern: #"^https?://[^/]+/(live/)?[^/]+/[^/]+/\d+(\.ts|\.m3u8)?$"#)
+    nonisolated private static let xtreamLivePattern = try! NSRegularExpression(pattern: #"^https?://[^/]+/(live/)?[^/]+/[^/]+/\d+(\.ts|\.m3u8)?$"#)
 
-    static func isXtreamShapedLive(_ url: String) -> Bool {
+    nonisolated static func isXtreamShapedLive(_ url: String) -> Bool {
         let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
         return xtreamLivePattern.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)) != nil
+    }
+
+    /// Xtream VOD URL shape in M3U lists: `{base}/movie|series/U/P/{numericId}.{ext}`.
+    nonisolated private static let xtreamVODPattern = try! NSRegularExpression(pattern: #"^https?://[^/]+/(movie|series)/[^/]+/[^/]+/\d+\.[A-Za-z0-9]+$"#)
+
+    /// Live or VOD URL of an Xtream panel (its account – and connection limit – is unknown).
+    nonisolated static func isXtreamShaped(_ url: String) -> Bool {
+        let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isXtreamShapedLive(url) || xtreamVODPattern.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)) != nil
     }
 
     public func prefetch(around current: Channel, request: PlaybackRequest) {
