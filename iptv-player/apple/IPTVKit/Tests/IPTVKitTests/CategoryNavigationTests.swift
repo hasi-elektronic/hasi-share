@@ -56,9 +56,36 @@ final class CategoryCountryTests: XCTestCase {
         XCTAssertEqual(CategoryCountry.strippedTitle("ES] Series"), "Series")
         XCTAssertEqual(CategoryCountry.nameWithoutPrefix("[EN] | Drama"), "Drama")
         XCTAssertTrue(CategoryCountry.matches("NL - Series", query: "series"))
-        XCTAssertFalse(CategoryCountry.matches("NL - Series", query: "nl"), "prefix not searchable")
+        XCTAssertTrue(CategoryCountry.matches("NL - Series", query: "nl"), "full name searchable too")
         XCTAssertTrue(CategoryCountry.matches("Sci-Fi", query: "sci-fi"), "word kept whole")
         XCTAssertEqual(CategoryCountry.nameWithoutPrefix("Sci-Fi"), "Sci-Fi")
+    }
+
+    /// Build 10 review: network / tag prefixes stay searchable; hyphenated words give no flag; a tag prefix
+    /// stays in the display name.
+    func testNetworkPrefixesSearchableAndHyphenatedWords() {
+        XCTAssertTrue(CategoryCountry.matches("HBO | Series", query: "hbo"))
+        XCTAssertTrue(CategoryCountry.matches("TRT • Belgesel", query: "trt"))
+        XCTAssertTrue(CategoryCountry.matches("[4K] Movies", query: "4k"))
+        XCTAssertTrue(CategoryCountry.matches("007 - Bond", query: "007"))
+        XCTAssertTrue(CategoryCountry.matches("TR • Netflix Diziler", query: "netflix diz"))
+        XCTAssertEqual(CategoryCountry.searchKey("HBO | Series"), "hbo | series", "tag prefix kept in the key")
+        XCTAssertEqual(CategoryCountry.searchKey("TR | DİZİLER"), "diziler")
+
+        XCTAssertNil(CategoryCountry.code(for: "SCI-FI | Movies"), "not Finland")
+        XCTAssertNil(CategoryCountry.emoji(for: "SCI-FI | Movies"))
+        XCTAssertNil(CategoryCountry.code(for: "Sci-Fi"))
+        XCTAssertEqual(CategoryCountry.code(for: "EX-YU | Filme"), "RS", "alias on the unsplit word")
+        XCTAssertEqual(CategoryCountry.code(for: "EX-YU Filmovi"), "RS")
+        XCTAssertEqual(CategoryCountry.code(for: "TR-Yerli"), "TR", "first part of a hyphenated word (unchanged)")
+        XCTAssertNil(CategoryCountry.code(for: "IT-Serie"), "compact form: no prefix group")
+        XCTAssertNil(CategoryCountry.code(for: "EN-Drama"))
+
+        XCTAssertEqual(CategoryCountry.code(for: "4K | Germany"), "DE")
+        XCTAssertEqual(CategoryCountry.strippedTitle("4K | Germany"), "4K | Germany", "tag prefix stays")
+        XCTAssertEqual(CategoryCountry.nameWithoutPrefix("4K | Germany"), "4K | Germany")
+        XCTAssertEqual(CategoryCountry.strippedTitle("UK | Sport"), "Sport", "own code (alias) stripped")
+        XCTAssertEqual(CategoryCountry.nameWithoutPrefix("HBO • Series"), "HBO • Series")
     }
 
     func testMeaningFlagAndDisplayName() {
@@ -107,7 +134,8 @@ final class CategoryCountryTests: XCTestCase {
         XCTAssertTrue(CategoryCountry.matches("Türk Dizileri", query: "TURK"))
         XCTAssertTrue(CategoryCountry.matches("FR | Séries", query: "series"))
         XCTAssertTrue(CategoryCountry.matches("TR • NETFLIX DIZILER", query: "netflix diz"))
-        XCTAssertFalse(CategoryCountry.matches("TR | DİZİLER", query: "tr"), "the country prefix is not searchable")
+        XCTAssertTrue(CategoryCountry.matches("TR • Netflix Diziler", query: "tr"), "group codes are searchable (Build 10)")
+        XCTAssertFalse(CategoryCountry.matches("TR | DİZİLER", query: "netflix"))
         XCTAssertTrue(CategoryCountry.matches("Anything", query: "  "), "empty query matches all")
     }
 }

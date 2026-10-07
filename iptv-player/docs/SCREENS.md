@@ -144,7 +144,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     eski tespit sürer (ülke adları, "Sport (UK)", takma adlar UK → GB, USA → US, TÜRKİYE → TR); grubu olmayan
     kategoriler yalnız "Tümü"nde. Etiket / kanal / paket önekleri grup değildir (tek liste
     `CategoryCountry.tagCodes`: SD, HD, FHD, UHD, HDR, VO, VOD, TV, VIP, PPV, NEW, TOP, XXX, UFC, NBA, BBC,
-    HBO, TRT …); `-` yalnızca ardından boşluk varsa ayraçtır ("Sci-Fi" bölünmez). Hero / detaydaki tür satırı
+    HBO, TRT …); `-` yalnızca ardından boşluk varsa ayraçtır ("Sci-Fi" bölünmez); bitişik
+    "IT-Serie" / "EN-Drama" biçimleri önek grubu oluşturmaz (eski ad tespiti yalnızca tireli kelimenin ilk
+    parçasına bakar: "TR-Yerli" → TR, "SCI-FI" → grup yok). Etiket önekleri görünen adda kalır
+    ("4K | Germany" → 🇩🇪 "4K | Germany"); yalnızca grubun kendi kodu kaldırılır. Hero / detaydaki tür satırı
     kategori adını öneksiz gösterir ("EN | Amazon Prime" → "Amazon Prime"). **Gösterim:** rozet = kod (EN, AR, TR); ad = dil önce gelen kodlarda (EN,
     AR ve ISO ülkesi olmayan her kod; 3 harfli kodlarda yalnız kısa bir liste: ENG, GER, TUR, ARA, SPA …,
     gerisi ham kod) uygulama dilinde dil adı ("İngilizce", "Arapça"), diğerlerinde ülke adı
@@ -160,7 +163,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     ("TR Türkiye ▾" metin kodu rozeti + ülke adı, ya da "🌐 Tümü ▾"). Ülke seçici menüsü: "Tümü (n)" +
     kategorisi olan her ülke (bayrak, ad, kategori sayısı); seçili ülke önce, sonra en çok kategorisi olan.
   * **Kategori sayfası** (iPhone'da tam ekran, iPad'de büyük sheet): başlık "Film kategorileri" / "Dizi
-    kategorileri"; **arama alanı** (büyük/küçük harf ve aksan duyarsız, "TR | " gibi ülke öneki aranmaz);
+    kategorileri"; **arama alanı** (büyük/küçük harf ve aksan duyarsız; tam ad ve grup kodu olmadan ad aranır – "hbo", "trt", "4k",
+    "tr" bulunur);
     **ülke çipleri** (Tümü + ülkeler, sayılı, satır kaydırmalı – seçim sayfanın ülkesidir); bölümler
     **Sabitlenenler** · **Son açılanlar** (son 5, en yeni önce) · seçili ülkenin (ya da tüm) kategorileri,
     her birinde içerik sayısı. **Arama yazılıyken** sonuçlar seçili ülkeden bağımsız olarak **tüm**

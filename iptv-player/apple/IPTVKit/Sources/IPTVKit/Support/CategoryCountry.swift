@@ -103,18 +103,23 @@ public enum CategoryCountry {
     }
 
     static func detect(_ title: String) -> String? {
-        let upperTokens = title.split(whereSeparator: { " |:-_[]()/,.".contains($0) }).map(String.init)
+        // Words split on spaces and separators, NOT on "-": a hyphenated word is one word ("SCI-FI", "EX-YU").
+        let words = title.split(whereSeparator: { " |:_[]()/,.•".contains($0) }).map(String.init)
         // Bracketed or trailing upper-case code ("Sport (UK)", "Haber TR").
-        for token in upperTokens.prefix(3) {
-            if let alias = aliases[token.uppercased()] { return alias.isEmpty ? nil : alias }
+        for word in words.prefix(3) {
+            // Aliases on the whole word first ("EX-YU" → RS).
+            if let alias = aliases[word.uppercased()] { return alias.isEmpty ? nil : alias }
+            // Of a hyphenated word only its first part can be a code ("TR-Yerli" → TR); later parts are
+            // syllables ("SCI-FI" is not Finland, "X-Men" nothing).
+            let token = word.contains("-") ? String(word.split(separator: "-").first ?? "") : word
             if token.count == 2, token == token.uppercased(), token.allSatisfy(\.isLetter), !ignoredCodes.contains(token),
                regionCodes.contains(token) {
                 return token
             }
         }
         let lower = title.lowercased()
-        let words = lower.split(whereSeparator: { !$0.isLetter && $0 != " " }).map { $0.trimmingCharacters(in: .whitespaces) }
-        for word in words where !word.isEmpty {
+        let phrases = lower.split(whereSeparator: { !$0.isLetter && $0 != " " }).map { $0.trimmingCharacters(in: .whitespaces) }
+        for word in phrases where !word.isEmpty {
             if let code = names[word] { return code }
             for token in word.split(separator: " ") {
                 if let code = names[String(token)] { return code }
@@ -168,15 +173,23 @@ public enum CategoryCountry {
     public static func emoji(for title: String) -> String? { code(for: title).flatMap(flagEmoji(forCode:)) }
 
     /// Removes a leading code prefix when a flag replaces it: "DE | Sport" → "Sport", "TR • NETFLIX DIZILER" →
-    /// "NETFLIX DIZILER". Without a flag ("EN | Drama", "AR | …", "[EN] Drama") the name stays as written.
+    /// "NETFLIX DIZILER". Without a flag ("EN | Drama", "AR | …", "[EN] Drama") the name stays as written;
+    /// a tag prefix stays too ("4K | Germany" keeps "4K |", the flag comes from "Germany").
     public static func strippedTitle(_ title: String) -> String {
         guard emoji(for: title) != nil else { return title }
-        return withoutPrefix(title) ?? title
+        return ownPrefixRemoved(title) ?? title
     }
 
-    /// The name without its leading code prefix, whatever the code ("EN | Drama" → "Drama").
+    /// The name without its leading group code ("EN | Drama" → "Drama"); other prefixes (tags, "4K", "007")
+    /// stay.
     public static func nameWithoutPrefix(_ title: String) -> String {
-        withoutPrefix(title) ?? title
+        ownPrefixRemoved(title) ?? title
+    }
+
+    /// The rest after the leading prefix – only when that prefix is the name's own group code.
+    static func ownPrefixRemoved(_ title: String) -> String? {
+        guard let code = prefixCode(title), code == self.code(for: title) else { return nil }
+        return withoutPrefix(title)
     }
 
     /// "XX | rest" / "XX • rest" / "XX: rest" / "XX - rest" / "[XX] rest" → "rest" (prefix ≤ 3 characters,
@@ -186,10 +199,10 @@ public enum CategoryCountry {
         return prefix.rest
     }
 
-    /// Search key of a category name: country prefix removed, case and diacritics folded
-    /// ("TR | DİZİLER" → "diziler"), so a query does not match every category of a country by its prefix.
+    /// Search key of a category name without its group code ("TR | DİZİLER" → "diziler"); tags and other
+    /// prefixes are kept ("HBO | Series" → "hbo | series").
     public static func searchKey(_ title: String) -> String {
-        fold(withoutPrefix(title) ?? title)
+        fold(nameWithoutPrefix(title))
     }
 
     /// Case- and diacritics-insensitive form ("Türk Dİzİlerİ" → "turk dizileri").
@@ -200,10 +213,12 @@ public enum CategoryCountry {
             .lowercased()
     }
 
-    /// True when `title` matches the (already folded or raw) query.
+    /// True when the query (case/diacritics folded) is part of the full name or of the name without its group
+    /// code: networks and tags ("hbo", "trt", "4k", "007") and group codes ("tr") are searchable, and a query
+    /// that skips the separator ("netflix diz") still matches.
     public static func matches(_ title: String, query: String) -> Bool {
         let q = fold(query.trimmingCharacters(in: .whitespacesAndNewlines))
-        return q.isEmpty || searchKey(title).contains(q)
+        return q.isEmpty || fold(title).contains(q) || searchKey(title).contains(q)
     }
 }
 
