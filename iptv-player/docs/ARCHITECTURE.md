@@ -86,21 +86,51 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    artırılır (salt şema göçüyle — `AppDatabase` v1…v5 gibi — veriden türetilebilen değişiklikler için
    artırılmaz). Yalnızca okuma/arayüz değişikliği artırmaz.
    **Sürüm geçmişi:** 1 = Build 6'ya kadar (yazılmazdı) · 2 = Xtream `category_ids` üyelikleri (Build 9) ·
-   3 = arama dizini v6, `people` sütunu (oyuncu + yönetmen, Build 10).
-8. **Arama dizini (Apple, `AppDatabase` v6):** FTS5 `search_index(title, people, source_id, kind, item_id)`,
-   `unicode61 remove_diacritics 2`. `people` = Xtream `cast` + `director` (", " ile); listede yoksa
-   detaydan (`get_vod_info` / `get_series_info`) öğrenilen kişiler `item_people` tablosunda tutulur ve
-   sonraki yenilemelerde de dizine yazılır. Türkçe noktasız "ı" / noktalı "İ" FTS'de aksan sayılmadığından
-   bu harfleri içeren başlık/kişi metinlerine görünmez bir ayraçtan (U+2063) sonra "ı → i" varyantı eklenir
-   ("yilmaz" → "Yılmaz"). Sorgu: iki FTS sorgusu — önce `{title}` (tür başına ilk 30, pencere fonksiyonu),
-   sonra `{people} : … NOT {title} : …` (başlığı eşleşmeyen kişi eşleşmeleri, en fazla 30). v6 göçü yalnızca
-   tabloyu yeniden kurar (açılışı bloklamaz); eski başlıklar **arka planda** (`SearchBackfill`, 2000'lik
-   işlemler, `kv` imleçleri: tablo başına göç anındaki en büyük rowid + son dizinlenen rowid) yeniden
-   dizinlenir — uygulama kapatılsa da kaldığı yerden sürer, hiçbir satır iki kez dizinlenmez; bitene kadar
-   arama LIKE yoluyla (yalnız başlık) çalışır. Detaydan öğrenilen kişiler değişmediyse yeniden yazılmaz;
-   dizin satırı başlık sözcükleriyle (FTS) bulunup rowid ile güncellenir (tam tarama yok), ana iş parçacığı
-   dışında. Yenileme sürerken öğrenilen kişiler commit'te eklenir. `people` için CatalogFormat 3 her kaynağı
-   bir kez yeniler. Bütçe: 50k film + 10k dizi ile ≤ 100 ms (`CatalogPerformanceTests`).
+   3 = arama dizini v6, `people` sütunu (oyuncu + yönetmen, Build 10). Build 11'in arama dizini v7'si (açıklama,
+   sözlük, EPG dizini) artırmaz – veriden türetilir (bkz. 8).
+8. **Arama dizini (Apple, `AppDatabase` v7):** FTS5 `search_index(title, people, plot, source_id, kind, item_id)`,
+   `unicode61 remove_diacritics 2`, tablo `rank`'i `bm25(10, 4, 1)` (başlık ≫ kişi > açıklama). `people` = Xtream
+   `cast` + `director` (", " ile); `plot` = içerik satırının açıklaması (en fazla 1200 karakter dizinlenir).
+   Listede olmayan kişiler / açıklamalar detaydan (`get_vod_info` / `get_series_info`) öğrenilir, `item_people` /
+   `item_plot` tablolarında tutulur, hemen dizine (satır başlık sözcükleriyle FTS üzerinden bulunur, rowid ile
+   güncellenir) ve sonraki yenilemelerde de içeriğe/dizine yazılır; listenin kendi açıklaması değiştirilmez,
+   yenileme sürerken öğrenilenler commit'te eklenir. Türkçe noktasız "ı" / noktalı "İ" FTS'de aksan
+   sayılmadığından bu harfleri içeren metinlere görünmez bir ayraçtan (U+2063) sonra "ı → i" varyantı eklenir;
+   sorgu tarafında "ı"/"İ" her zaman "i"ye çevrilir (görüntülenen metin temiz kalır).
+   * **Sorgu:** belirteç başına önek (`"a"* "b"*`); birden çok kelimede tam ifade (`"a b"*`) eşleşen satırlar önce
+     (`rowid IN (ifade eşleşmesi)` sıralama anahtarı), sonra `rank`. Genel bakış: `{title}` (tür başına 30, pencere
+     fonksiyonu) → `{people} NOT {title}` (Kişiler) → `(tümü) NOT {title} NOT {people}` (Açıklamada; alıntı
+     Swift'te `SearchText.snippet`: katlanmış sözcük önekleri, ifade başına göre pencere, "…"). Tam listeler
+     (`SearchScope`: titles / people / descriptions / kind) aynı sorgularla `LIMIT 60 OFFSET n`.
+   * **v7 göçü (bloklamaz):** v6 tablosu `search_index_v6` adıyla saklanır (anlık), yeni tablo boş kurulur;
+     `SearchBackfill` arka planda 2000'lik işlemlerle önce v6 satırlarını (göç anındaki en büyük rowid'e kadar)
+     açıklama + `item_*` önceliğiyle kopyalar, sonra (Build 9'dan doğrudan güncellemede) v6 içerik dolgusunu yeni
+     tabloya yapar; `kv` imleçleri, uygulama kapansa da kaldığı yerden, hiçbir satır iki kez. Kopya sürerken
+     yenilenen / silinen kaynak `search.backfill.copy.skip` listesine girer (eski satırları geri gelmez). Bitene
+     kadar arama LIKE yoluyla (yalnız başlık). **CatalogFormat artırılmadı (3 kalır):** kişiler v6 dizininden
+     kopyalanır, açıklamalar zaten içerik tablolarında (`movies.plot`, `series.plot`) – yeniden içe aktarma
+     gerekmez.
+   * **"Bunu mu demek istediniz":** `search_terms(source_id, term, gram, display, freq)` – başlık ve kişi
+     adlarının katlanmış ≥ 3 harfli sözcükleri – ve dış içerikli FTS5 `search_terms_tri` (`trigram`, tetikleyicilerle
+     güncel; iOS/tvOS 17 sistem SQLite'ı 3.39, trigram 3.34'ten beri, çalışma anında yoklanır). Yenileme, takastan sonra ayrı bir işlemde,
+     sözlüğü yalnız değişen sözcüklerle günceller (fark), dolgu ve detaylar sayıları ekler. Sorgunun ön eki
+     sözlükte olmayan her kelimesi için trigram OR sorgusuyla 300 aday, Swift'te OSA mesafesi (≤ 4 harf: 1, sonra 2;
+     eşitlikte sık kelime). Yalnızca ana sonuç < 5 iken çalışır.
+   * **Öneriler:** `{title}` ve `{people}` önek eşleşmeleri, en fazla 5 (en fazla 2 kişi), 120 ms birleştirme, eski
+     sorgu iptal. **Son aramalar:** `RecentSearchStore` (cihaz `KeyValueStore`, kaynak başına 10).
+   * **TV programı araması:** kaynak başına FTS5 `epg_fts_<rastgele>` (`title`, `detail=none`, rowid = `epg.rowid`,
+     adı `kv` `epg.fts.<kaynakId>`). EPG yenilemesi staging satırlarıyla birlikte yeni tabloyu doldurur, commit
+     aynı işlemde kaydeder ve eskisini **tümden DROP** eder (500k satırlık FTS silmesi yok); iptalde yeni tablo
+     silinir, sahipsiz tablolar açılışta temizlenir. Build 11 öncesi saklanan EPG için arka planda 5000'lik
+     işlemlerle kurulur (`EpgRepository.maintainSearchIndex`, sürdürülebilir; araya giren yenileme kazanır).
+     Sorgu: eşleşme ⋈ `epg` (rowid), pencere şimdi − 2 sa … + 48 sa, sıra yayında → yaklaşan → biten; kanal
+     eşleme `lower(epg_id)`, gizli kanal/kategori hariç; biten program yalnızca catch-up kanalında, arşiv
+     gününde ve Xtream'de (timeshift URL'si).
+   * **Ekran modeli:** `SearchViewModel` (+ `SearchEngine`, `Sendable`) tüm SQL'i ana aktör dışında çalıştırır,
+     sonuçları toplu sorgularla kanal/film/diziye çevirir; yeni sorgu eski görevi iptal eder.
+   * **Bütçeler** (`CatalogPerformanceTests`, macOS debug ölçümleri parantezde): 50k film + 10k dizi ile arama
+     ≤ 100 ms (açıklama ifadesi ~6 ms, tüm açıklamalarda geçen kelime ~47 ms), düzeltme + düzeltilmiş arama
+     ≤ 150 ms (~14 ms, ~30k sözcük), öneriler ~1 ms; 500k EPG satırında program araması ≤ 100 ms (~18 ms).
 
 ### 3.2 Oynatma
 `PlayerController` (her iki platformda aynı sorumluluklar):

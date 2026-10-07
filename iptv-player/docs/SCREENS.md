@@ -270,20 +270,51 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Sıralama ("Taşı"):** sağ üstte (TV: segmentin yanında) "Taşı" → seçili segment liste olur. iOS: tutamaçla
   sürükle-bırak; TV: öğeyi seç → ▲▼ ile taşı → tekrar seç bırakır (taşınırken diğer satırlar odak almaz).
   "Bitti" çıkar. Sıra cihazda saklanır, diğer kaynakların favorileri yerinde kalır.
-* Arama: tek alan, sonuçlar satır olarak, sırayla:
-  1. **Kategoriler** (en üstte, en fazla 12; en az 2 karakterlik sorguda): her kelime, grup kodu olmadan adın
-     bir sözcüğünün **başı** olmalı (büyük/küçük harf ve aksan duyarsız; "dis" → "Disney+", "isney" değil);
-     grup kodu ("tr") yalnızca yanında başka bir kelime varsa sayılır ("tr disney") — tek başına "tr" ya da
-     "a" bölümü doldurmaz. Film, dizi ve canlı kategorileri; kartta bayrak /
-     kod rozeti, ad, tür ve içerik (canlıda kanal) sayısı. Gizlenen kategoriler (film/dizi: kaynak + tür,
-     canlı: `HiddenStore`) gösterilmez. Film/dizi kategorisi → o kategorinin grid'i; canlı kategori → Canlı TV
-     o kategoriyle açılır.
-  2. Başlığa göre **Kanallar** kartları · **Filmler** · **Diziler** posterleri (tür başına en fazla 30).
-  3. **Kişiler**: başlığı eşleşmeyen ama oyuncu/yönetmeni (Xtream `cast` / `director`) her kelimeyle
-     eşleşen filmler ve diziler (önek eşleşmesi, ör. "Hasan" → Hasan Can Kaya'nın programı); posterin altında
-     eşleşen kişinin adı (kelimeler farklı kişilerde eşleştiyse en fazla iki ad: "Hasan Yılmaz, Ali Kaya"). Film oyuncuları listede yoksa film detayı bir kez açıldığında aranabilir olur.
-     M3U kaynaklarında kişi bilgisi yoktur. Türkçe "ı" ile "i" aynı aranır ("kizilcik" → "Kızılcık").
-  tvOS'ta bölümler raf olarak, kart başına tek odak hedefi.
+* **Arama (Build 11, "profesyonel arama"):** tek alan (sistem klavyesinin mikrofonu / tvOS dikte çalışır, ayrı
+  ses tanıma yok). Yazarken 250 ms birleştirme; sorgu ana iş parçacığı dışında çalışır, yeni harf eski sorguyu iptal
+  eder. iOS'ta klavyedeki "Ara" tuşu sorguyu hemen çalıştırır, sonuçları kaydırmak klavyeyi kapatır.
+  * **Alan boşken – Son aramalar:** kaynağa göre cihazda son 10 arama (en yeni üstte, büyük/küçük harf ve aksan
+    farkı tekrar sayılmaz). Dokun = yeniden ara; iOS'ta sola kaydır veya uzun bas → Sil, başlıkta "Temizle";
+    tvOS'ta liste (uzun bas → Sil, son satır "Temizle"). Sorgu; "Ara" tuşu, öneri / "Bunu mu demek
+    istediniz" seçimi, bir sonucu açma ya da ekrandan çıkışta kaydedilir. Hiç arama yoksa kısa açıklama.
+  * **Öneriler (≥ 2 karakter, 120 ms):** en fazla 5 – başlık tamamlamaları, sonra en fazla 2 kişi adı. iOS'ta
+    alanın altında satırlar (sonuçlar altında görünmeye devam eder), tvOS'ta klavyenin altındaki sistem satırı.
+    Dokunmak sorguyu doldurur ve çalıştırır.
+  * **Filtre çipleri** (en az iki türde sonuç varsa): Tümü · Kategoriler · Canlı · Filmler · Diziler · TV programları –
+    yalnızca sonucu olan çipler (tvOS: yatay odak satırı). "Tümü" dışındaki çip o türün **tam listesini** gösterir
+    (60'lık sayfalar, kaydırdıkça yüklenir): Canlı/Filmler/Diziler'de başlık ≫ kişi > açıklama sıralı tüm
+    eşleşmeler (tam ifade önce), satırda kişi ya da açıklama alıntısı.
+  * **"Tümü" bölümleri** (her biri tür başına en fazla 30, başlıkta **"Tümünü göster"** → o bölümün tam,
+    sayfalı listesi; tvOS'ta rafın sonundaki kart):
+    1. **Kategoriler** (en üstte, en fazla 12; en az 2 karakterlik sorguda): her kelime, grup kodu olmadan adın
+       bir sözcüğünün **başı** olmalı (büyük/küçük harf ve aksan duyarsız; "dis" → "Disney+", "isney" değil);
+       grup kodu ("tr") yalnızca yanında başka bir kelime varsa sayılır ("tr disney"). Film, dizi ve canlı
+       kategorileri; kartta bayrak / kod rozeti, ad, tür ve içerik (canlıda kanal) sayısı. Gizlenen kategoriler
+       gösterilmez. Film/dizi kategorisi → grid; canlı kategori → Canlı TV o kategoriyle açılır.
+    2. Başlığa göre **Kanallar** kartları · **Filmler** · **Diziler** posterleri. Gizli kanallar gösterilmez.
+    3. **Kişiler**: başlığı eşleşmeyen ama oyuncu/yönetmeni (Xtream `cast` / `director`) her kelimeyle
+       eşleşen filmler ve diziler (önek eşleşmesi, ör. "Hasan" → Hasan Can Kaya'nın programı); posterin altında
+       eşleşen kişinin adı (kelimeler farklı kişilerde eşleştiyse en fazla iki ad). Film oyuncuları listede yoksa
+       film detayı bir kez açıldığında aranabilir olur. M3U kaynaklarında kişi bilgisi yoktur.
+    4. **Açıklamada geçenler**: kelimeleri ne yalnız başlıkta ne yalnız kişilerde olan, açıklamada (ya da
+       sütunlara dağılmış) geçen filmler/diziler. Geniş kart: poster, ad, tür · yıl ve **en fazla 2 satır
+       alıntı** – eşleşen sözcükler kalın ve açık renkte, kesilen yerlerde "…" (Türkçe harf katlamalı:
+       "kizilcik" "Kızılcık"ı işaretler). Tam ifade ("hasan can kaya") dağınık kelimelerden önce gelir. Film
+       açıklaması listede yoksa detay bir kez açılınca aranabilir olur.
+    5. **TV'de**: güncel kaynağın EPG'sinde başlığı her kelimeyle eşleşen programlar, şimdiden 2 saat önce
+       bitenlerden 48 saat sonrasına kadar; gizli kanallar hariç. Sıra: şu an yayında olanlar ("Şimdi" rozeti +
+       ilerleme), sonra yaklaşanlar (saat sırasıyla, "Bugün 20:45", "Yarın 18:00", sonra gün + saat), en
+       sonda bitmiş olanlar – yalnızca kanalın catch-up arşivi varsa ve oynatılabiliyorsa (Xtream; 🔁 simgesi).
+       Kart/satır: kanal logosu + adı, program adı, rozet/saat. Dokun/OK: yayında veya yaklaşan → o kanal
+       oynar; bitmiş → arşivden tekrar oynar.
+    6. **Az sonuç (< 5) – "Bunu mu demek istediniz: <düzeltme>"** çipi + **Benzer sonuçlar** rafı: bilinmeyen
+       her kelime kaynağın başlık/kişi sözlüğündeki en yakın kelimeyle değiştirilir ("hasn can kya" → "hasan can
+       kaya", "konuşanlr" → "konuşanlar"); çip düzeltilmiş sorguyu çalıştırır. Düzeltme sonuç vermezse ikisi de
+       gösterilmez.
+  * Türkçe "ı" ile "i" her yerde aynı aranır ("kizilcik" → "Kızılcık", "haberlerı" → "Haberleri").
+  * **tvOS:** bölümler raf, kart/satır başına tek odak hedefi; çipler yatay odak satırı; geri tuşu kuralları §2.
+  * Bir sonuç açılıp geri dönülünce sorgu, sonuçlar ve alan yerinde kalır (iOS 26: arama `.automatic`
+    yerleşimde; çekmece yerleşiminde geri dönünce alan kayboluyordu).
 
 ### 3.7 Oynatıcı
 * Tam ekran, sistem çubukları gizli, ekran açık kalır.

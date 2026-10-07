@@ -101,6 +101,10 @@ apple/
 * **Ayarlar → Açık kaynak lisansları:** VLCKit (LGPL-2.1, kaynak bağlantısı, `Vendor/VLCKit/COPYING.txt`
   tam metni paketlenir), swift-crypto / swift-asn1 (Apache-2.0). Format testi motoru (AVPlayer/VLCKit)
   gösterir ve `expect.apple` ile karşılaştırır.
+* **Arama (Build 11, SCREENS §3.6):** son aramalar, yazarken öneriler, filtre çipleri (Tümü · Kategoriler · Canlı ·
+  Filmler · Diziler · TV programları), bölüm başına "Tümünü göster" (60'lık sayfalar), açıklamada geçenler (alıntı),
+  "TV'de" (EPG programları, oynatır / arşivden oynatır), az sonuçta "Bunu mu demek istediniz" + benzer sonuçlar
+  (trigram sözlüğü). Dizin: `AppDatabase` v7, ARCHITECTURE §3.1 madde 8.
 * **Ekran görüntüleri:** `IOSFlowTests.testRedesignScreens` + `TVFlowTests` (`TEST_RUNNER_SCREENSHOT_DIR`),
   demo verisi için `-uiSeedLibrary` (devam/favori tohumlar) ve `-uiScreen movieDetail|seriesDetail|guide|search`.
 
