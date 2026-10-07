@@ -104,6 +104,43 @@ apple/
 * **Ekran görüntüleri:** `IOSFlowTests.testRedesignScreens` + `TVFlowTests` (`TEST_RUNNER_SCREENSHOT_DIR`),
   demo verisi için `-uiSeedLibrary` (devam/favori tohumlar) ve `-uiScreen movieDetail|seriesDetail|guide|search`.
 
+### Performans ve kullanım özellikleri (Build 7)
+
+Bütçeler ve gerekçeler: `docs/superpowers/specs/2026-10-06-performance-ux-design.md`; ölçümler:
+`docs/TEST_PLAN.md §D`. Ekran davranışları normatif olarak `docs/SCREENS.md`'dedir.
+
+* **Performans katmanı (`PerfTrace`):** Ayarlar → Gelişmiş ve tanılama → "Performans katmanı" açılınca
+  oynatıcıda sol üstte küçük bir kutu görünür: motor (AVPlayer/VLCKit), son zap süresi (+ son 50 örneğin
+  p50/p90'ı), tampon durumu, bitrate, düşen kare, ses çıkış gecikmesi ve motorun uyguladığı ses gecikmesi.
+  İşaretler: uygulama açılışı → oynatma isteği → ilk kare. Log'a yalnızca süreler (`perf coldStartMs=…`,
+  `perf zapMs=…`) yazılır, URL asla (`SafeLog`; DEBUG derlemesinde `info`). DEBUG'da `-perfOverlay`
+  katmanı açar.
+* **Hızlı başlat (`QuickStart`):** Ayarlar'ın üst düzeyinde, varsayılan açık. Canlı kanal oynarken
+  uygulama kapanırsa sonraki açılışta Ana Sayfa ve kaynak yenilemesi beklenmeden o kanal oynatıcıda açılır;
+  oynatıcıyı Geri/Kapat ile kapatmak ya da son olarak VOD izlemek bunu kapatır. Canlıda
+  komşu kanallar (önceki/sonraki) ilk kareden sonra arka planda çözülür (`ZapPrefetcher`: en fazla 2
+  eşzamanlı, ≤ 256 KB, yalnızca HLS ve çoklu bağlantılı hesapta bayt okuması; hücreselde / Düşük veri
+  modunda kapalı) – kanal değişimi bu çözümü kullanır.
+* **Ses senkronu:** oynatıcı → **Ses** → **Senkron**: "Bu kanal/içerik" (içerik anahtarıyla kaydedilir) ve
+  "Ses gecikmesi (TV/soundbar)" (**cihaz gecikmesi**, her içeriğe eklenir; Ayarlar'ın üst düzeyinde de var).
+  −2000…+2000 ms, 50 ms adım, canlı uygulanır; tvOS'ta ◀▶ basılı tutunca hızlanır. **Etkin gecikme ≠ 0
+  ise yayın VLCKit ile oynatılır** (AVPlayer HLS'de ses gecikmesi uygulayamaz); 0'a dönünce sonraki
+  açılışta AVPlayer'a dönülür, VLCKit oynatamazsa yayın gecikmesiz AVPlayer'da sürer ve not görünür.
+  Katmandaki "Senkronu düzelt" canlıyı canlı uçtan, VOD'u mevcut konumdan yeniden açar. Ayrıntı:
+  SCREENS §3.7, ARCHITECTURE §3.2.
+* **Oynatıcı içi kanal paneli:** iPhone'da katmandaki liste düğmesi veya soldan kaydırma, Apple TV'de
+  katman kapalıyken **OK**: kategori seçici (Tümü · Favoriler · kategoriler) + kanallar + şu anki
+  program, oynatma sürerken; favoriler önce. Satıra dokunmak/OK o kanala geçer ve gösterilen liste
+  zapping listesi olur.
+* **TV rakam tuşları (numara ile kanal):** canlıda girilen rakamlar (en fazla 4 hane) sağ üstte büyük
+  görünür; son rakamdan 1,5 sn sonra numara **kaynağın tüm kanallarında** aranır (`(source_id, number)`
+  indeksi). Kaynakta hiç numara yoksa listedeki sıra numarası sayılır; olmayan numara → "Kanal yok",
+  kanal değişmez. Siri Remote'ta rakam yoktur (HDMI-CEC / klavye).
+* **Canlı TV listesi + favori:** satır başına numara, logo, ad, şimdi/sonraki; bilgi paneli (iPad,
+  iPhone yatay, tvOS). ⭐ tek dokunuş + 4 sn "Geri al"; favoriler her listede önce. Sıra cihazda
+  tutulur. Diziler/Filmler her kategoriyi çiple gösterir (`item_categories`: bir öğe birden çok
+  kategoride görünür; veritabanı şeması v2–v5 göçleriyle yükselir, mevcut veri korunur).
+
 ## Oynatıcı: AVPlayer + VLCKit
 
 ```
@@ -196,10 +233,12 @@ ekip seçin veya `DEVELOPMENT_TEAM` ayarını komut satırından verin.
 ```sh
 cd apple
 # Paketler (macOS)
-(cd IPTVCore && swift test)    # 88 test
-(cd IPTVKit && swift test)     # 52 test: SQLite repo'ları (bellek içi), atomik yenileme, FTS5, motor seçimi/geri dönüş,
+(cd IPTVCore && swift test)    # 91 test
+(cd IPTVKit && swift test)     # 230 test: SQLite repo'ları (bellek içi), atomik yenileme, FTS5, motor seçimi/geri dönüş,
                                # LicenseManager geçişleri (sahte backend + ES256 imzalayıcı),
-                               # SyncManager partileri/debounce/LWW, eşleştirme, hata eşleme, resolver
+                               # SyncManager partileri/debounce/LWW, eşleştirme, hata eşleme, resolver,
+                               # Build 7: PerfTrace, ZapPrefetcher, QuickStart, ses gecikmesi, favori denetleyicisi,
+                               # numara zap, şema göçleri v2–v5 ve 50 000 kanallık performans bütçeleri
 
 # Uygulamalar
 xcodebuild -project NovaPlayer.xcodeproj -scheme NovaPlayer-iOS \
@@ -220,6 +259,8 @@ UI testleri yerel bir test listesi kullanır (uygulamada örnek liste yoktur –
 # 1) Test M3U + XMLTV'yi Mac'te sunun (simülatör Mac'e localhost ile ulaşır)
 mkdir -p /tmp/iptv-test && cd /tmp/iptv-test   # test.m3u (ör. Apple bipbop HLS) + epg.xml
 python3 -m http.server 8765 --bind 127.0.0.1
+# VLCKit / VOD / oynatıcı kontrol testleri Range destekli ikinci sunucu ister (MKV, MP4, TS…, port 8766:
+# vlc-live.m3u, vlc-movie.m3u, vod-movie.m3u); yoksa bu testler XCTSkip ile atlanır.
 # 2) Ortam değişkenleri TEST_RUNNER_ önekiyle test sürecine geçer
 TEST_RUNNER_SEED_M3U=http://localhost:8765/test.m3u \
 TEST_RUNNER_SCREENSHOT_DIR=/tmp/screens \
@@ -245,6 +286,8 @@ npx wrangler dev --port 8798 --persist-to /tmp/wstate --var DEV_MODE:true --var 
 |---|---|
 | `-uiTestReset` | Bellek içi veritabanı + bellek içi gizli depo + ayrı UserDefaults (her açılış temiz) |
 | `-seedM3U <url>` [`-seedName <ad>`] | Açılışta bir M3U kaynağı ekler |
+| `-perfOverlay` | Performans katmanını açar (Ayarlar → Gelişmiş ve tanılama → Performans katmanı ile aynı) |
+| `-pref.quickStart NO` | Hızlı başlat'ı bu açılış için kapatır (eski oturum oynatıcıyı açmasın) |
 | `-uiTrial` | StoreKit denemesi 2 gün önce başlamış gibi davranır (oynatma açık) |
 | `-uiScreen <ad>` | `paywall`, `player`, `live`, `movies`, `settings`, `addSource`, `addXtream`, `pairing`, `menu` |
 | `-backendURL <url>` | `BACKEND_BASE_URL` yerine (ör. `http://localhost:8798`) |
