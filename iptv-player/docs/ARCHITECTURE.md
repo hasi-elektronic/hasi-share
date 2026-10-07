@@ -127,7 +127,8 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
      (`SQLiteDatabase.interruptsOnCancel`, görev yerel).
    * **Öneriler:** `{title}` ve `{people}` önek eşleşmeleri, en fazla 5 (en fazla 2 kişi), 120 ms birleştirme, eski
      sorgu iptal. **Son aramalar:** `RecentSearchStore` – katalog veritabanının `kv` tablosunda (yedeklenmez), kaynak başına
-     10, kaynak silinince silinir; yalnızca "Ara" tuşu / öneri / bir sonucu açmada kaydedilir.
+     10, kaynak silinince silinir; yalnızca "Ara" tuşu / öneri / bir sonucu açmada kaydedilir. Build 11'in
+     UserDefaults kayıtları bir kez buraya taşınıp silinir.
    * **TV programı araması:** kaynak başına FTS5 `epg_fts_<rastgele>` (`title`, `detail=none`, rowid = `epg.rowid`,
      adı `kv` `epg.fts.<kaynakId>`). EPG yenilemesi staging satırlarıyla birlikte yeni tabloyu doldurur, commit
      aynı işlemde kaydeder ve eskisini **tümden DROP** eder (500k satırlık FTS silmesi yok); iptalde yeni tablo
@@ -141,9 +142,25 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    * **Okuma bağlantısı (Build 12):** `SQLiteDatabase` diskteki veritabanında iki bağlantı açar – yazıcı (tüm
      yazmalar ve bir işlemin içinden, aynı iş parçacığındaki okumalar) ve salt okunur okuyucu (diğer tüm
      okumalar). WAL'da okuyucu son commit'i görür ve yazıcıyı **hiç beklemez**: açılıştaki otomatik yenileme veya
-     arka plan dolgusu sürerken ana iş parçacığı okumaları (ana sayfa, listeler, oynatıcı, EPG) donmaz.
-     Oynatıcının ilerleme / "izlendi" yazımı yazıcı meşgulse sıralı bir arka plan kuyruğuna gider
-     (`LibraryRepository.saveProgressWithoutBlocking`). Ölçüm (`CommitLockTests`, sahip boyutu 4k canlı + 35k
+     arka plan dolgusu sürerken ana iş parçacığı okumaları (ana sayfa, listeler, oynatıcı, EPG) donmaz (okuyucu:
+     `busy_timeout` 1,5 sn, yazıcıyla aynı önbellek).
+   * **Ana iş parçacığı yazımları hiç beklemez (Build 13):** oynatıcının ilerleme / "izlendi" kaydı, favori ve son
+     aramalar yazıcı boşsa hemen, değilse tek sıralı arka plan kuyruğuna (`DeferredWrites`) gider; kuyrukta
+     bekleyen kitaplık öğesi tüm okumalarda üstte görünür (okuduğunu-gör, `LibraryOverlay`). Yazılırken
+     `updatedAt` beklediği süre kadar ilerletilir (senkron gönderimi kaçırmaz) ve bu arada daha yeni bir satır
+     geldiyse (senkron birleştirme, LWW) yazılmaz. Uygulama arka plana geçerken kuyruk boşaltılır (iOS/tvOS
+     `beginBackgroundTask`, en fazla 20 sn).
+   * **Eski dizinler (Build 13):** değiştirilen, iptal edilen, silinen kaynağın veya emekli edilen ortak tablo
+     `kv` `index.garbage` listesine girer ve 1000 satırlık işlemlerle boşaltılıp sonra DROP edilir (Apple TV'de
+     büyük bir FTS DROP'u yüzlerce ms yazıcıyı tutuyordu). Açılış bakımı (sahipsiz tabloları bulma, ortak
+     tabloyu emekli etme) **tek bir yazıcı işleminde** karar verir: Build 12'de bakım eski eşlemeyi okuyucudan
+     okuyup hemen commit edilen yeni dizini silebiliyordu ("no such table" → aramada sonuç yok). Yeni tablo
+     commit işlemi bitene kadar "yapımda" sayılır; arama tabloyu sorgu arasında değişmiş bulursa yeni adla bir
+     kez yeniden dener (EPG dahil). Ortak tablo boşalınca `search.shared.empty` işaretlenir (her açılışta
+     tarama yok). Trigram dizini sonradan kurulursa var olan sözcükler 2000'lik adımlarla eklenir; sözlük
+     farkı 1500 değişiklikli işlemlerle yazılır.
+   * **Tüm kaynaklarda arama** (`sourceId == nil`): her tablodan ilk `offset + limit` satır, `(ifade, rank)` ile
+     birleştirilip sayfa kesilir (atlama/tekrar yok). Ölçüm (`CommitLockTests`, sahip boyutu 4k canlı + 35k
      film + 9k dizi açıklamalı, disk, release, Mac): commit takası ~0,27–0,34 sn (içerik tabloları; dizin payı
      ~0 ms), sözlük farkı ~8 ms, commit sürerken okumalar en fazla ~28 ms (beklemez); v7 kopya parçası ~9 ms.
    * **Bütçeler** (`CatalogPerformanceTests`, macOS debug ölçümleri parantezde): 50k film + 10k dizi ile arama

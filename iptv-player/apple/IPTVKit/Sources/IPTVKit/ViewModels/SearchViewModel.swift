@@ -4,24 +4,35 @@ import Observation
 
 /// Last searches of a source, newest first, at most 10 (device-local, SCREENS §3.6). Kept in the catalog
 /// database's `kv` table – excluded from iCloud/device backups like the rest of the catalog (queries can be
-/// personal) – and removed with the source.
-public final class RecentSearchStore: Sendable {
+/// personal) – and removed with the source. Changes are cached in memory and written without blocking the
+/// main actor (`DeferredWrites`: at once if the writer is free, else queued behind a running commit).
+public final class RecentSearchStore: @unchecked Sendable {
     public static let limit = 10
     private let database: AppDatabase
+    private let lock = NSLock()
+    private var cache: [String: [String]] = [:]
 
     public init(database: AppDatabase) {
         self.database = database
     }
 
-    private func key(_ sourceId: String) -> String { "search.recent.\(sourceId)" }
+    static func key(_ sourceId: String) -> String { "search.recent.\(sourceId)" }
 
     public func recent(sourceId: String) -> [String] {
-        database.value(forKey: key(sourceId)).flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+        lock.lock()
+        if let cached = cache[sourceId] { lock.unlock(); return cached }
+        lock.unlock()
+        let stored = database.value(forKey: Self.key(sourceId)).flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+        lock.lock(); defer { lock.unlock() }
+        if cache[sourceId] == nil { cache[sourceId] = stored }
+        return cache[sourceId] ?? stored
     }
 
     private func store(_ list: [String], sourceId: String) {
-        let json = (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) }
-        database.setValue(list.isEmpty ? nil : json, forKey: key(sourceId))
+        lock.lock(); cache[sourceId] = list; lock.unlock()
+        let json = list.isEmpty ? nil : (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) }
+        let database = database, key = Self.key(sourceId)
+        database.deferredWrites.perform(database.db, { try? database.db.transaction { database.setValue(json, forKey: key) } })
     }
 
     /// Adds `query` on top (case/diacritics-insensitive duplicates removed). Blank queries are ignored.
@@ -44,6 +55,15 @@ public final class RecentSearchStore: Sendable {
 
     public func clear(sourceId: String) {
         store([], sourceId: sourceId)
+    }
+
+    /// Build 11 stored the list in UserDefaults (`search.recent.<id>`, backed up): moved here once, then deleted.
+    public func migrateLegacy(from kv: any KeyValueStore, sourceIds: [String]) {
+        for id in sourceIds {
+            guard let legacy = kv.value([String].self, forKey: Self.key(id)) else { continue }
+            if recent(sourceId: id).isEmpty, !legacy.isEmpty { store(Array(legacy.prefix(Self.limit)), sourceId: id) }
+            kv.set(nil, forKey: Self.key(id))
+        }
     }
 }
 
@@ -192,7 +212,8 @@ public struct SearchEngine: Sendable {
         r.people = items.filter { $0.hit.match == .person }
         r.descriptions = items.filter { $0.hit.match == .description }
         guard full else { return r }
-        r.programmes = try programmes(text, offset: 0, limit: Self.perSectionLimit, now: now).items
+        // Programmes are an extra section: an EPG problem must not blank the whole result.
+        r.programmes = (try? programmes(text, offset: 0, limit: Self.perSectionLimit, now: now).items) ?? []
         try Task.checkCancellation()
         if r.contentCount < Self.fuzzyThreshold, let corrected = (try? catalog.correction(for: text, sourceId: sourceId)) ?? nil,
            CategoryCountry.fold(corrected) != CategoryCountry.fold(text) {

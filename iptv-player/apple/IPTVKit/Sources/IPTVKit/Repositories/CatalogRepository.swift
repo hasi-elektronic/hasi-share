@@ -514,7 +514,13 @@ public final class CatalogRepository: Sendable {
     /// table once no source needs it, the trigram dictionary index if it is missing but supported.
     public func maintainSearchIndex() throws {
         try SearchIndex.maintain(db)
+        try IndexGarbage.collect(db)
         try SearchTermsIndex.ensure(db)
+    }
+
+    /// Empties and drops replaced / deleted indexes in small steps (off the main thread).
+    public func collectIndexGarbage() throws {
+        try IndexGarbage.collect(db)
     }
 
     static func tokens(_ text: String) -> [String] { SearchText.tokens(text) }
@@ -527,30 +533,56 @@ public final class CatalogRepository: Sendable {
         tokens.count > 1 ? "\"\(tokens.joined(separator: " "))\"*" : nil
     }
 
-    /// `ORDER BY` prefix that puts rows matching the phrase first (one FTS lookup, materialised once).
+    /// Sort key putting rows that match the phrase first (`0` / `1`; one FTS lookup, materialised once).
     private func phraseBoost(_ phrase: String?, table: String) -> (sql: String, args: [SQLiteValue]) {
-        guard let phrase else { return ("", []) }
-        return ("CASE WHEN rowid IN (SELECT rowid FROM \(table) WHERE \(table) MATCH ?) THEN 0 ELSE 1 END, ", [.text(phrase)])
+        guard let phrase else { return ("0", []) }
+        return ("CASE WHEN rowid IN (SELECT rowid FROM \(table) WHERE \(table) MATCH ?) THEN 0 ELSE 1 END", [.text(phrase)])
+    }
+
+    /// Runs `body` over the current index tables; once more with fresh ones when a table vanished between reading
+    /// its name and the query (a refresh swapped the index meanwhile).
+    private func overTargets<T>(_ sourceId: String?, _ body: ([SearchIndex.Target]) throws -> T) throws -> T {
+        do {
+            return try body(SearchIndex.targets(db, sourceId: sourceId))
+        } catch let error as SQLiteError where error.message.contains("no such table") {
+            return try body(SearchIndex.targets(db, sourceId: sourceId))
+        }
+    }
+
+    /// A hit with its sort keys (merging pages of several tables: all-sources search).
+    private struct Ranked {
+        var hit: SearchHit
+        var boost: Int
+        var rank: Double
+    }
+
+    private static func ordered(_ rows: [Ranked]) -> [Ranked] {
+        rows.sorted { ($0.boost, $0.rank) < ($1.boost, $1.rank) }
     }
 
     /// Titles ranked per kind with a window function (measured ~40 % faster than three `AND kind = ?`
-    /// queries, which each re-scan every match of the token at 50k+ rows).
+    /// queries, which each re-scan every match of the token at 50k+ rows). Several tables (all sources): each
+    /// table's best per kind, merged by rank and capped again.
     func searchFTS(tokens: [String], sourceId: String?, perKindLimit: Int) throws -> [SearchHit] {
         let expr = Self.ftsExpression(tokens)
-        var hits: [SearchHit] = []
-        for target in SearchIndex.targets(db, sourceId: sourceId) {
-            let t = target.table
-            let boost = phraseBoost(Self.phraseExpression(tokens).map { "{title} : \($0)" }, table: t)
-            let inner = "SELECT source_id, kind, item_id, title, ROW_NUMBER() OVER (PARTITION BY kind ORDER BY \(boost.sql)rank) AS rn "
-                + "FROM \(t) WHERE \(t) MATCH ?" + target.filter
-            let sql = "SELECT source_id, kind, item_id, title FROM (\(inner)) WHERE rn <= ? "
-                + "ORDER BY CASE kind WHEN 'live' THEN 0 WHEN 'movie' THEN 1 ELSE 2 END, rn"
-            hits += try db.query(sql, boost.args + [.text("{title} : (\(expr))")] + target.args + [.int(Int64(perKindLimit))]) {
-                SearchHit(sourceId: $0.string(0), kind: ContentKind(rawValue: $0.string(1)) ?? .live,
-                          itemId: $0.string(2), title: CatalogPeople.display($0.string(3)))
+        let rows: [Ranked] = try overTargets(sourceId) { targets in
+            try targets.flatMap { target -> [Ranked] in
+                let t = target.table
+                let boost = phraseBoost(Self.phraseExpression(tokens).map { "{title} : \($0)" }, table: t)
+                let inner = "SELECT source_id, kind, item_id, title, \(boost.sql) AS b, rank AS r, "
+                    + "ROW_NUMBER() OVER (PARTITION BY kind ORDER BY \(boost.sql), rank) AS rn "
+                    + "FROM \(t) WHERE \(t) MATCH ?" + target.filter
+                let sql = "SELECT source_id, kind, item_id, title, b, r FROM (\(inner)) WHERE rn <= ?"
+                return try db.query(sql, boost.args + boost.args + [.text("{title} : (\(expr))")] + target.args + [.int(Int64(perKindLimit))]) {
+                    Ranked(hit: SearchHit(sourceId: $0.string(0), kind: ContentKind(rawValue: $0.string(1)) ?? .live,
+                                          itemId: $0.string(2), title: CatalogPeople.display($0.string(3))),
+                           boost: $0.int(4), rank: $0.double(5))
+                }
             }
         }
-        return hits
+        return [ContentKind.live, .movie, .series].flatMap { kind in
+            Self.ordered(rows.filter { $0.hit.kind == kind }).prefix(perKindLimit).map(\.hit)
+        }
     }
 
     /// One page of a scope: MATCH expression, kind filter, phrase boost, then bm25 (`rank`, weights 10/4/1).
@@ -580,13 +612,7 @@ public final class CatalogRepository: Sendable {
             boostPhrase = phrase
         }
         let folded = tokens.map(CategoryCountry.fold)
-        var hits: [SearchHit] = []
-        for target in SearchIndex.targets(db, sourceId: sourceId) {
-            let t = target.table
-            let boost = phraseBoost(boostPhrase, table: t)
-            let sql = "SELECT source_id, kind, item_id, title, people, plot FROM \(t) WHERE \(t) MATCH ?"
-                + target.filter + kindFilter + " ORDER BY \(boost.sql)rank LIMIT ? OFFSET ?"
-            hits += try db.query(sql, [.text(match)] + target.args + kindArgs + boost.args + [.int(Int64(limit)), .int(Int64(offset))]) { r in
+        let map = { (r: SQLiteRow) -> Ranked in
             let title = CatalogPeople.display(r.string(3))
             var hit = SearchHit(sourceId: r.string(0), kind: ContentKind(rawValue: r.string(1)) ?? .movie, itemId: r.string(2), title: title)
             switch searchScope {
@@ -605,10 +631,21 @@ public final class CatalogRepository: Sendable {
                 // Words spread over title/people and no description word: the people text is the excerpt.
                 hit.snippet = snippet.matchedWords.isEmpty && !people.isEmpty ? SearchText.snippet(people, tokens: tokens) : snippet
             }
-            return hit
-            }
+            return Ranked(hit: hit, boost: r.int(6), rank: r.double(7))
         }
-        return hits
+        return try overTargets(sourceId) { targets in
+            // One table: its page. Several (all sources): the first offset+limit of each, merged by rank, then the page.
+            let single = targets.count == 1
+            let rows = try targets.flatMap { target -> [Ranked] in
+                let t = target.table
+                let boost = phraseBoost(boostPhrase, table: t)
+                let sql = "SELECT source_id, kind, item_id, title, people, plot, \(boost.sql) AS b, rank FROM \(t) WHERE \(t) MATCH ?"
+                    + target.filter + kindFilter + " ORDER BY b, rank LIMIT ? OFFSET ?"
+                let window: [SQLiteValue] = single ? [.int(Int64(limit)), .int(Int64(offset))] : [.int(Int64(offset + limit)), .int(0)]
+                return try db.query(sql, boost.args + [.text(match)] + target.args + kindArgs + window, map: map)
+            }
+            return single ? rows.map(\.hit) : Array(Self.ordered(rows).dropFirst(offset).prefix(limit)).map(\.hit)
+        }
     }
 
     /// Cast/director learned from a detail fetch (Xtream `get_vod_info` / `get_series_info`): searchable at
@@ -679,15 +716,14 @@ public final class CatalogRepository: Sendable {
         let tokens = Self.tokens(text)
         guard text.trimmingCharacters(in: .whitespaces).count >= 2, !tokens.isEmpty, limit > 0, ftsReady else { return [] }
         let expr = Self.ftsExpression(tokens)
-        let targets = SearchIndex.targets(db, sourceId: sourceId)
         let folded = tokens.map(CategoryCountry.fold)
         let queryKey = folded.joined(separator: " ")
         var seen: Set<String> = [queryKey]
         var titles: [SearchSuggestion] = []
-        let titleRows = try targets.flatMap { t in
+        let titleRows = try overTargets(sourceId) { targets in try targets.flatMap { t in
             try db.query("SELECT title FROM \(t.table) WHERE \(t.table) MATCH ?" + t.filter + " ORDER BY rank LIMIT 25",
                          [.text("{title} : (\(expr))")] + t.args, map: { $0.string(0) })
-        }
+        } }
         for raw in titleRows {
             let title = CategoryCountry.nameWithoutPrefix(CatalogPeople.display(raw)).trimmingCharacters(in: .whitespaces)
             let key = SearchText.foldedTokens(title).joined(separator: " ")
@@ -695,10 +731,10 @@ public final class CatalogRepository: Sendable {
             titles.append(SearchSuggestion(text: title, isPerson: false))
         }
         var people: [SearchSuggestion] = []
-        let peopleRows = try targets.flatMap { t in
+        let peopleRows = try overTargets(sourceId) { targets in try targets.flatMap { t in
             try db.query("SELECT people FROM \(t.table) WHERE \(t.table) MATCH ?" + t.filter + " ORDER BY rank LIMIT 25",
                          [.text("{people} : (\(expr))")] + t.args, map: { $0.string(0) })
-        }
+        } }
         for raw in peopleRows {
             for name in CatalogPeople.display(raw).split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
             where SearchText.matchesAll(name, folded: folded) {
@@ -715,7 +751,7 @@ public final class CatalogRepository: Sendable {
     /// closest title/person word of the source (edit distance ≤ 1 for ≤ 4 letters, else ≤ 2; ties → the more
     /// frequent word), found through the trigram index. nil when nothing could be corrected.
     public func correction(for text: String, sourceId: String?) throws -> String? {
-        guard db.hasTrigram, SearchTermsIndex.exists(db) else { return nil }
+        guard db.hasTrigram, SearchTermsIndex.isReady(db) else { return nil }
         let tokens = Self.tokens(text)
         guard !tokens.isEmpty else { return nil }
         var changed = false
@@ -959,7 +995,6 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         guard !finished else { return }
         finished = true
         let started = DispatchTime.now()
-        var previousIndex: String?
         try db.transaction {
             for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(sourceId)])
@@ -970,7 +1005,8 @@ public final class CatalogRefreshSession: @unchecked Sendable {
             if let searchTable {
                 // The new index becomes the source's (kv + DROP of the old one): no row is re-tokenised here.
                 // Its rows left in the shared v7 table are ignored from now on and emptied by `SearchIndex.maintain`.
-                previousIndex = try SearchIndex.register(db, sourceId: sourceId, table: searchTable)
+                try SearchIndex.register(db, sourceId: sourceId, table: searchTable)
+                CommitTestHook.catalog.run()
                 try SearchBackfill.skipSource(db, sourceId)   // a pending v7 copy must not bring the old rows back
                 // People / descriptions learned from detail pages while this refresh ran (after the snapshot in `init`).
                 for (table, column, known) in [("item_people", "people", detailPeople), ("item_plot", "plot", detailPlot)] {
@@ -999,10 +1035,13 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         // The did-you-mean dictionary follows in its own transaction (only a suggestion source; the first fill
         // after the v7 update writes ~30k words, which should not lengthen the swap's lock).
         swapMilliseconds = Self.ms(since: started)
-        if let previousIndex { try? db.transaction { try SearchIndex.dropTable(db, previousIndex) } }
+        // Only now (committed) may maintenance treat the new index like any referenced one.
+        if let searchTable { IndexTablesInFlight.shared.remove(searchTable) }
         let dictionaryStart = DispatchTime.now()
-        do { try db.transaction { try terms.replace(db, sourceId: sourceId) } } catch { SafeLog.warning("search terms update failed") }
+        do { try terms.replace(db, sourceId: sourceId) } catch { SafeLog.warning("search terms update failed") }
         dictionaryMilliseconds = Self.ms(since: dictionaryStart)
+        // The replaced index is emptied in small steps (this runs on the refresh's background task).
+        do { try IndexGarbage.collect(db) } catch { SafeLog.warning("index garbage failed") }
     }
 
     static func ms(since start: DispatchTime) -> Double { Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6 }

@@ -1,5 +1,15 @@
 import Foundation
 
+/// Test hook run inside a commit's swap transaction (reproduces maintenance racing a commit).
+final class CommitTestHook: @unchecked Sendable {
+    private let lock = NSLock()
+    private var block: (@Sendable () -> Void)?
+    func set(_ block: (@Sendable () -> Void)?) { lock.lock(); self.block = block; lock.unlock() }
+    func run() { lock.lock(); let b = block; lock.unlock(); b?() }
+    static let catalog = CommitTestHook()
+    static let epg = CommitTestHook()
+}
+
 /// Tables being built in this process (refresh sessions, backfills): never dropped as leftovers.
 final class IndexTablesInFlight: @unchecked Sendable {
     static let shared = IndexTablesInFlight()
@@ -85,56 +95,129 @@ enum SearchIndex {
         return name
     }
 
-    /// Makes `table` the source's index (inside the commit transaction). Returns the previous one, which the
-    /// caller drops after the swap (its DROP need not lengthen the swap; a kill leaves it to `maintain`).
-    @discardableResult
-    static func register(_ db: SQLiteDatabase, sourceId: String, table: String) throws -> String? {
+    /// Makes `table` the source's index (inside the commit transaction). The previous one goes to `IndexGarbage`
+    /// (emptied in small steps later, never a long DROP in the swap). The caller removes `table` from the in-flight
+    /// set only after its transaction committed – until then maintenance must keep it.
+    static func register(_ db: SQLiteDatabase, sourceId: String, table: String) throws {
         let old = string(db, key(sourceId))
         try db.run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                    [.text(key(sourceId)), .text(table)])
-        IndexTablesInFlight.shared.remove(table)
-        return old != table && old.map(isValidName) == true ? old : nil
+        if let old, old != table, isValidName(old) { try IndexGarbage.add(db, old) }
     }
 
+    static func isIndexName(_ name: String) -> Bool { isValidName(name) || EpgSearchIndex.isValidName(name) }
+
+    /// Immediate DROP (small/empty tables only); statements are evicted before and after (a reader may have
+    /// prepared one in between).
     static func dropTable(_ db: SQLiteDatabase, _ name: String) throws {
-        guard isValidName(name) || EpgSearchIndex.isValidName(name) else { return }
+        guard isIndexName(name) else { return }
         db.evictStatements(containing: name)
         try db.execute("DROP TABLE IF EXISTS \(name);")
+        db.evictStatements(containing: name)
     }
 
+    /// A refresh aborted: its partial index is garbage.
     static func discard(_ db: SQLiteDatabase, table: String) {
-        try? dropTable(db, table)
+        try? db.transaction { try IndexGarbage.add(db, table) }
         IndexTablesInFlight.shared.remove(table)
     }
 
-    /// Source content deleted: its own index goes too.
+    /// Source content deleted: its own index goes too (to the garbage, emptied in the background).
     static func drop(_ db: SQLiteDatabase, sourceId: String) throws {
         guard db.hasFTS5 else { return }
-        if let name = string(db, key(sourceId)) { try dropTable(db, name) }
+        if let name = string(db, key(sourceId)), isValidName(name) { try IndexGarbage.add(db, name) }
         try db.run("DELETE FROM kv WHERE key = ?", [.text(key(sourceId))])
     }
 
-    /// Launch maintenance (background): drops leftovers of killed refreshes and empties the shared v7 table
-    /// once every source in it has its own index and no background copy needs it.
+    static let sharedEmptyKey = "search.shared.empty"
+
+    /// Launch maintenance (background). Everything is decided **inside one writer transaction**: kv, the schema
+    /// and the in-flight set are read on the writer, so a refresh committing right now is either fully before
+    /// (its table referenced) or after (its table still in flight) – never seen half (Build 12: maintenance read
+    /// the old mapping on the reader and then dropped the freshly committed index). Unreferenced tables go to the
+    /// garbage; the shared v7 table is renamed into the garbage once no source needs it.
     static func maintain(_ db: SQLiteDatabase) throws {
         guard db.hasFTS5 else { return }
-        let referenced = Set(owned(db).map(\.table))
-        let tables = try db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'search\\_fts\\_%' ESCAPE '\\' AND sql LIKE 'CREATE VIRTUAL TABLE%'") { $0.string(0) }
-        for name in tables where isValidName(name) && !referenced.contains(name) && !IndexTablesInFlight.shared.contains(name) {
-            try dropTable(db, name)
-        }
-        guard !SearchBackfill.isPending(db) else { return }
-        let ownedSources = Set(owned(db).map(\.sourceId))
-        let sharedSources = try db.query("SELECT DISTINCT source_id FROM \(shared)") { $0.string(0) }
-        guard !sharedSources.isEmpty,
-              sharedSources.allSatisfy({ ownedSources.contains($0) || $0.hasSuffix(AppDatabase.stagingSuffix) }) else { return }
         try db.transaction {
+            let referenced = Set(owned(db).map(\.table)).union(EpgSearchIndex.referenced(db)).union(IndexGarbage.list(db))
+            let tables = try db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'search\\_fts\\_%' ESCAPE '\\' OR name LIKE 'epg\\_fts\\_%' ESCAPE '\\') AND sql LIKE 'CREATE VIRTUAL TABLE%'") { $0.string(0) }
+            for name in tables where isIndexName(name) && !referenced.contains(name) && !IndexTablesInFlight.shared.contains(name) {
+                try IndexGarbage.add(db, name)
+            }
+            guard !SearchBackfill.isPending(db), string(db, sharedEmptyKey) == nil else { return }
+            if try db.scalar("SELECT EXISTS (SELECT 1 FROM \(shared))") == 0 {
+                try db.run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, '1')", [.text(sharedEmptyKey)])
+                return
+            }
+            let ownedSources = Set(owned(db).map(\.sourceId))
+            let sharedSources = try db.query("SELECT DISTINCT source_id FROM \(shared)") { $0.string(0) }
+            guard sharedSources.allSatisfy({ ownedSources.contains($0) || $0.hasSuffix(AppDatabase.stagingSuffix) }) else { return }
+            let retired = "search_fts_" + String(format: "%012llx", UInt64.random(in: 0...0xFFFF_FFFF_FFFF))
             db.evictStatements(containing: shared)
             try db.execute("""
-                DROP TABLE \(shared);
+                ALTER TABLE \(shared) RENAME TO \(retired);
                 CREATE VIRTUAL TABLE \(shared) USING fts5(\(columns), \(tokenizer));
                 INSERT INTO \(shared) (\(shared), rank) VALUES ('rank', '\(rank)');
                 """)
+            db.evictStatements(containing: shared)
+            try IndexGarbage.add(db, retired)
+            try db.run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, '1')", [.text(sharedEmptyKey)])
         }
+    }
+}
+
+/// Index tables no longer used (replaced by a refresh, aborted, deleted source, retired shared table): emptied
+/// in small transactions with pauses and then dropped, so no single step holds the writer for long (a DROP of a
+/// 50k-row FTS table took hundreds of ms on Apple TV). Listed in kv `index.garbage`; survives a kill.
+enum IndexGarbage {
+    static let key = "index.garbage"
+
+    static func list(_ db: SQLiteDatabase) -> [String] {
+        ((try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(key)]) { $0.string(0) }) ?? nil)?
+            .split(separator: "\n").map(String.init).filter(SearchIndex.isIndexName) ?? []
+    }
+
+    static func add(_ db: SQLiteDatabase, _ name: String) throws {
+        guard SearchIndex.isIndexName(name) else { return }
+        var names = list(db)
+        guard !names.contains(name) else { return }
+        names.append(name)
+        try db.run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                   [.text(key), .text(names.joined(separator: "\n"))])
+    }
+
+    private static func remove(_ db: SQLiteDatabase, _ name: String) throws {
+        let names = list(db).filter { $0 != name }
+        if names.isEmpty {
+            try db.run("DELETE FROM kv WHERE key = ?", [.text(key)])
+        } else {
+            try db.run("UPDATE kv SET value = ? WHERE key = ?", [.text(names.joined(separator: "\n")), .text(key)])
+        }
+    }
+
+    /// Empties and drops every garbage table: `chunkSize` rows per transaction, `pause` between them. Call off the
+    /// main thread. Returns false when stopped by `maxChunks`.
+    @discardableResult
+    static func collect(_ db: SQLiteDatabase, chunkSize: Int = 1000, maxChunks: Int = .max, pause: TimeInterval = 0.01) throws -> Bool {
+        var chunks = 0
+        for name in list(db) {
+            while true {
+                guard chunks < maxChunks else { return false }
+                chunks += 1
+                let removed: Int = try db.transaction {
+                    guard try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ?", [.text(name)]) > 0 else { return 0 }
+                    return try db.run("DELETE FROM \(name) WHERE rowid IN (SELECT rowid FROM \(name) LIMIT ?)", [.int(Int64(chunkSize))])
+                }
+                if removed == 0 {
+                    try db.transaction {
+                        try SearchIndex.dropTable(db, name)
+                        try remove(db, name)
+                    }
+                    break
+                }
+                if pause > 0 { Thread.sleep(forTimeInterval: pause) }
+            }
+        }
+        return true
     }
 }

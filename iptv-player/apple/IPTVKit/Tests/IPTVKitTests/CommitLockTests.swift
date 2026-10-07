@@ -288,6 +288,7 @@ final class SearchReviewFixTests: XCTestCase {
         let aborted = try catalog.beginRefresh(sourceId: "s")
         let table = try XCTUnwrap(aborted.searchTable)
         aborted.abort()
+        try catalog.collectIndexGarbage()
         XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ?", [.text(table)]), 0)
         try catalog.deleteContent(sourceId: "s")
         XCTAssertTrue(SearchIndex.owned(db.db).isEmpty)

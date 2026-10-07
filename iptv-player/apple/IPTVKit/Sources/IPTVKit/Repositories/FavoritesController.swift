@@ -85,15 +85,16 @@ public final class FavoritesController {
         undoPriorOrder = nil
     }
 
-    /// Optimistic write: cache first, database second; a failed write restores the cache.
+    /// Optimistic write: cache first, database second – never blocking the UI: while a refresh commit holds the
+    /// database the change waits in the library's queue and overlays its reads (read-your-writes).
     @discardableResult
     private func apply(_ on: Bool, _ t: FavoriteTarget) -> Bool {
         let was = keys.contains(t.contentKey)
         if on { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
         do {
-            try library.setFavorite(on, contentKey: t.contentKey, title: t.title, kind: t.kind,
-                                    posterUrl: t.posterUrl, nowMs: now())
-        } catch {
+            try library.setFavoriteWithoutBlocking(on, contentKey: t.contentKey, title: t.title, kind: t.kind,
+                                                   posterUrl: t.posterUrl, nowMs: now())
+        } catch {   // written at once and failed: the cache shows the real state again
             if was { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
             return false
         }

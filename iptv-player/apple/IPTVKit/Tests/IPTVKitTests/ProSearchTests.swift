@@ -315,6 +315,7 @@ final class ProgrammeSearchTests: XCTestCase {
     func testRefreshSwapsIndexAndDropsOldTable() throws {
         let old = try XCTUnwrap(EpgSearchIndex.table(database.db, sourceId: "s"))
         try writeEpg([("atlas.tv", 0, "Yeni Program")])
+        try epg.collectIndexGarbage()   // SourceRefresher does this after the EPG swap
         let new = try XCTUnwrap(EpgSearchIndex.table(database.db, sourceId: "s"))
         XCTAssertNotEqual(old, new)
         XCTAssertEqual(try database.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ?", [.text(old)]) as Int, 0, "old index dropped")
@@ -324,9 +325,11 @@ final class ProgrammeSearchTests: XCTestCase {
         let session = try epg.beginRefresh(sourceId: "s")
         try session.write([EpgProgram(sourceId: "s", channelEpgId: "atlas.tv", start: now, end: now.addingTimeInterval(60), title: "Abort")])
         session.abort()
+        try epg.collectIndexGarbage()
         XCTAssertEqual(EpgSearchIndex.table(database.db, sourceId: "s"), new)
         XCTAssertEqual(try virtualTables(), [new])
         try catalog.deleteContent(sourceId: "s")
+        try catalog.collectIndexGarbage()
         XCTAssertNil(EpgSearchIndex.table(database.db, sourceId: "s"))
         XCTAssertEqual(try virtualTables(), [])
     }
@@ -441,7 +444,8 @@ final class SearchScreenModelTests: XCTestCase {
         model.query = "zebra"
         model.submit()
         env.deleteSource(id: sourceId)
-        XCTAssertTrue(store.recent(sourceId: sourceId).isEmpty, "removed with the source")
+        XCTAssertTrue(env.recentSearches.recent(sourceId: sourceId).isEmpty, "removed with the source")
+        XCTAssertNil(env.database.value(forKey: "search.recent.\(sourceId)"))
     }
 
     func testSuggestionsFollowTheLatestQuery() async throws {

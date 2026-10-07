@@ -5,6 +5,8 @@ import Foundation
 /// half-loaded list is never visible (docs/ARCHITECTURE.md §3.1).
 public final class AppDatabase: Sendable {
     public let db: SQLiteDatabase
+    /// Main-actor writes that must not wait for a running commit (progress, favorites, recent searches).
+    public let deferredWrites = DeferredWrites()
 
     /// Suffix of the staging source id used while a refresh is running.
     static let stagingSuffix = "~staging"
@@ -431,22 +433,51 @@ enum SearchBackfill {
 /// available; `ensure` creates it later (launch maintenance) if it is missing but supported, rebuilt from the
 /// dictionary rows.
 enum SearchTermsIndex {
+    static let fillKey = "search.terms.tri.fill"   // "<max rowid at creation>|<last rowid filled>"
+
     static func exists(_ db: SQLiteDatabase) -> Bool {
         ((try? db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_terms_tri'")) ?? 0) > 0
     }
 
-    static func ensure(_ db: SQLiteDatabase) throws {
-        guard db.hasTrigram, !exists(db) else { return }
-        try db.transaction {
-            try db.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS search_terms_tri USING fts5(
-              gram, content = 'search_terms', content_rowid = 'rowid', tokenize = 'trigram');
-            CREATE TRIGGER IF NOT EXISTS search_terms_ai AFTER INSERT ON search_terms BEGIN
-              INSERT INTO search_terms_tri (rowid, gram) VALUES (new.rowid, new.gram); END;
-            CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
-              INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
-            INSERT INTO search_terms_tri (search_terms_tri) VALUES ('rebuild');
-            """)
+    /// Usable: exists and, if it was created after the migration, completely filled.
+    static func isReady(_ db: SQLiteDatabase) -> Bool {
+        exists(db) && ((try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(fillKey)]) { $0.string(0) }) ?? nil) == nil
+    }
+
+    /// Creates the index if missing but supported: table + triggers at once (new words are indexed from now on),
+    /// the words that already existed then in transactions of `chunkSize` (no single long 'rebuild'). Resumable.
+    static func ensure(_ db: SQLiteDatabase, chunkSize: Int = 2000, pause: TimeInterval = 0.01) throws {
+        guard db.hasTrigram else { return }
+        if !exists(db) {
+            try db.transaction {
+                let max = try db.scalar("SELECT COALESCE(MAX(rowid), 0) FROM search_terms")
+                try db.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS search_terms_tri USING fts5(
+                  gram, content = 'search_terms', content_rowid = 'rowid', tokenize = 'trigram');
+                CREATE TRIGGER IF NOT EXISTS search_terms_ai AFTER INSERT ON search_terms BEGIN
+                  INSERT INTO search_terms_tri (rowid, gram) VALUES (new.rowid, new.gram); END;
+                CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
+                  INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
+                """)
+                if max > 0 { try db.run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", [.text(fillKey), .text("\(max)|0")]) }
+            }
+        }
+        while let state = (try db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(fillKey)]) { $0.string(0) }) {
+            let parts = state.split(separator: "|").compactMap { Int64($0) }
+            guard parts.count == 2 else { try db.run("DELETE FROM kv WHERE key = ?", [.text(fillKey)]); break }
+            let (max, at) = (parts[0], parts[1])
+            try db.transaction {
+                let last = try db.queryFirst("SELECT MAX(rowid) FROM (SELECT rowid FROM search_terms WHERE rowid > ? AND rowid <= ? ORDER BY rowid LIMIT ?)",
+                                             [.int(at), .int(max), .int(Int64(chunkSize))]) { $0.optInt64(0) } ?? nil
+                if let last {
+                    try db.run("INSERT INTO search_terms_tri (rowid, gram) SELECT rowid, gram FROM search_terms WHERE rowid > ? AND rowid <= ?",
+                               [.int(at), .int(last)])
+                    try db.run("UPDATE kv SET value = ? WHERE key = ?", [.text("\(max)|\(last)"), .text(fillKey)])
+                } else {
+                    try db.run("DELETE FROM kv WHERE key = ?", [.text(fillKey)])
+                }
+            }
+            if pause > 0 { Thread.sleep(forTimeInterval: pause) }
         }
     }
 }
@@ -476,26 +507,33 @@ struct SearchTermCounter {
     }
 
     /// Makes the dictionary of `sourceId` exactly these counts, touching only the terms that changed (a
-    /// refresh usually changes few words, so the trigram index sees little churn).
-    func replace(_ db: SQLiteDatabase, sourceId: String) throws {
+    /// refresh usually changes few words, so the trigram index sees little churn). Written in transactions of
+    /// `chunkSize` changes (the first fill after the update is ~30k words – one long transaction held the writer).
+    func replace(_ db: SQLiteDatabase, sourceId: String, chunkSize: Int = 1500) throws {
         let fresh = counts[sourceId] ?? [:]
         let existing = try db.query("SELECT rowid, term, freq FROM search_terms WHERE source_id = ?", [.text(sourceId)]) {
             (rowid: $0.int64(0), term: $0.string(1), freq: $0.int(2))
         }
+        var changes: [(String, [SQLiteValue])] = []
         var known: Set<String> = []
         for row in existing {
             known.insert(row.term)
             if let entry = fresh[row.term] {
                 if entry.count != row.freq {
-                    try db.run("UPDATE search_terms SET freq = ? WHERE rowid = ?", [.int(Int64(entry.count)), .int(row.rowid)])
+                    changes.append(("UPDATE search_terms SET freq = ? WHERE rowid = ?", [.int(Int64(entry.count)), .int(row.rowid)]))
                 }
             } else {
-                try db.run("DELETE FROM search_terms WHERE rowid = ?", [.int(row.rowid)])
+                changes.append(("DELETE FROM search_terms WHERE rowid = ?", [.int(row.rowid)]))
             }
         }
         for (term, entry) in fresh where !known.contains(term) {
-            try db.run("INSERT INTO search_terms (source_id, term, gram, display, freq) VALUES (?,?,?,?,?)",
-                       [.text(sourceId), .text(term), .text(SearchText.gram(term)), .text(entry.display), .int(Int64(entry.count))])
+            changes.append(("INSERT OR IGNORE INTO search_terms (source_id, term, gram, display, freq) VALUES (?,?,?,?,?)",
+                            [.text(sourceId), .text(term), .text(SearchText.gram(term)), .text(entry.display), .int(Int64(entry.count))]))
+        }
+        for start in stride(from: 0, to: changes.count, by: chunkSize) {
+            try db.transaction {
+                for (sql, args) in changes[start..<min(start + chunkSize, changes.count)] { try db.run(sql, args) }
+            }
         }
     }
 }

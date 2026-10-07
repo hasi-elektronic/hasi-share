@@ -1,6 +1,9 @@
 import Foundation
 import IPTVCore
 import Observation
+#if canImport(UIKit) && !os(watchOS)
+import UIKit
+#endif
 
 /// Build-time configuration (from Info.plist, which gets it from `Config/Shared.xcconfig`).
 public struct AppConfig: Sendable {
@@ -108,6 +111,8 @@ public final class AppEnvironment {
         wire()
         sourceRepository.registerSecretsForRedaction()
         reloadSources()
+        // Build 11 kept recent searches in UserDefaults (backed up): moved once into the catalog database.
+        recentSearches.migrateLegacy(from: kv, sourceIds: sources.map(\.id))
         // Search index v6/v7: older catalogs are (re-)indexed in the background, never at launch; EPG stored
         // before Build 11 gets its programme title index the same way (cheap no-op when nothing is missing).
         let catalog = self.catalog, epg = self.epg
@@ -206,7 +211,25 @@ public final class AppEnvironment {
             player.resumeAfterRelease()
         } else {
             player.release()
+            flushDeferredWrites()
         }
+    }
+
+    /// Going to the background: writes still waiting for the database (the position `release()` just saved while
+    /// a refresh held the writer, favorites, recent searches) are finished before the app may be suspended/killed.
+    private func flushDeferredWrites() {
+        let writes = database.deferredWrites
+        guard !writes.isIdle else { return }
+        #if canImport(UIKit) && !os(watchOS)
+        let task = BackgroundTaskBox()
+        task.id = UIApplication.shared.beginBackgroundTask(withName: "db-flush") { task.end() }
+        DispatchQueue.global(qos: .userInitiated).async {
+            writes.drain(timeout: 20)
+            Task { @MainActor in task.end() }
+        }
+        #else
+        DispatchQueue.global(qos: .userInitiated).async { writes.drain(timeout: 20) }
+        #endif
     }
 
     // MARK: Sources
@@ -300,6 +323,8 @@ public final class AppEnvironment {
         categoryPrefs.removeAll(sourceId: id)
         try? catalog.deleteContent(sourceId: id)
         recentSearches.clear(sourceId: id)
+        let catalog = catalog
+        Task.detached(priority: .utility) { try? catalog.collectIndexGarbage() }
         try? sourceRepository.delete(id: id)
         reloadSources()
         catalogVersion += 1
@@ -371,3 +396,16 @@ public final class AppEnvironment {
         catalogVersion += 1
     }
 }
+
+#if canImport(UIKit) && !os(watchOS)
+/// Background task identifier shared by the expiration handler and the drain completion.
+@MainActor
+final class BackgroundTaskBox {
+    var id: UIBackgroundTaskIdentifier = .invalid
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
+    }
+}
+#endif

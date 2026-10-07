@@ -95,10 +95,10 @@ public final class EpgRepository: Sendable {
                 try db.run("DELETE FROM epg WHERE source_id = ?", [.text(sourceId)])
                 try EpgSearchIndex.drop(db, sourceId: sourceId)
             } else {
-                let sources = try db.query("SELECT value FROM kv WHERE key LIKE 'epg.fts.%' AND key NOT LIKE 'epg.fts.backfill.%'") { $0.string(0) }
+                let tables = EpgSearchIndex.referenced(db)
                 try db.run("DELETE FROM epg")
                 try db.run("DELETE FROM kv WHERE key LIKE 'epg.fts.%'")
-                for table in sources where EpgSearchIndex.isValidName(table) { try SearchIndex.dropTable(db, table) }
+                for table in tables where EpgSearchIndex.isValidName(table) { try IndexGarbage.add(db, table) }
             }
         }
     }
@@ -110,6 +110,16 @@ public final class EpgRepository: Sendable {
     /// Served by the source's programme title index (`EpgSearchIndex`); empty until the source has one.
     public func searchProgrammes(_ text: String, sourceId: String, now: Date, from: Date, to: Date,
                                  offset: Int = 0, limit: Int = 60) throws -> [EpgProgramMatch] {
+        do {
+            return try searchProgrammesOnce(text, sourceId: sourceId, now: now, from: from, to: to, offset: offset, limit: limit)
+        } catch let error as SQLiteError where error.message.contains("no such table") {
+            // The index was swapped between reading its name and the query: once more with the new one.
+            return try searchProgrammesOnce(text, sourceId: sourceId, now: now, from: from, to: to, offset: offset, limit: limit)
+        }
+    }
+
+    private func searchProgrammesOnce(_ text: String, sourceId: String, now: Date, from: Date, to: Date,
+                                      offset: Int, limit: Int) throws -> [EpgProgramMatch] {
         let tokens = SearchText.tokens(text)
         guard !tokens.isEmpty, limit > 0, let table = EpgSearchIndex.table(db, sourceId: sourceId) else { return [] }
         let nowMs = SQLiteValue.from(now)
@@ -129,6 +139,11 @@ public final class EpgRepository: Sendable {
 
     /// Builds missing programme title indexes (EPG stored before Build 11) in chunks and drops leftovers of
     /// killed refreshes. Call off the main thread; resumable. Returns true when every source with EPG has one.
+    /// Empties and drops replaced programme indexes in small steps (after an EPG refresh; off the main thread).
+    public func collectIndexGarbage() throws {
+        try IndexGarbage.collect(db)
+    }
+
     @discardableResult
     public func maintainSearchIndex(chunkSize: Int = 2000, maxChunks: Int = .max, pause: TimeInterval = 0.015) throws -> Bool {
         try EpgSearchIndex.backfill(db, chunkSize: chunkSize, maxChunks: maxChunks, pause: pause)
@@ -147,15 +162,7 @@ enum EpgSearchIndex {
     static let indexedTitle = "title || CASE WHEN instr(title, 'ı') > 0 OR instr(title, 'İ') > 0 THEN ' ' || char(8291) || ' ' "
         + "|| replace(replace(title, 'ı', 'i'), 'İ', 'I') ELSE '' END"
 
-    /// Tables being built in this process (refresh sessions, backfill): never dropped as leftovers.
-    final class InFlight: @unchecked Sendable {
-        private let lock = NSLock()
-        private var names: Set<String> = []
-        func insert(_ name: String) { lock.lock(); names.insert(name); lock.unlock() }
-        func remove(_ name: String) { lock.lock(); names.remove(name); lock.unlock() }
-        func contains(_ name: String) -> Bool { lock.lock(); defer { lock.unlock() }; return names.contains(name) }
-    }
-    static let inFlight = InFlight()
+    static var inFlight: IndexTablesInFlight { IndexTablesInFlight.shared }
 
     static func isValidName(_ name: String) -> Bool {
         name.hasPrefix("epg_fts_") && name.count == 20 && name.dropFirst(8).allSatisfy { $0.isHexDigit }
@@ -185,39 +192,35 @@ enum EpgSearchIndex {
                    [.int(rowid), .text(sourceId)])
     }
 
-    /// Makes `table` the live index of the source and drops the previous one (call inside the commit transaction).
+    /// Makes `table` the live index of the source (inside the commit transaction); the previous one goes to
+    /// `IndexGarbage`. The session removes `table` from the in-flight set after its transaction.
     static func register(_ db: SQLiteDatabase, sourceId: String, table: String) throws {
         let old = string(db, key(sourceId))
         try db.run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                    [.text(key(sourceId)), .text(table)])
-        if let old, old != table, isValidName(old) { try SearchIndex.dropTable(db, old) }
-        inFlight.remove(table)
+        if let old, old != table, isValidName(old) { try IndexGarbage.add(db, old) }
     }
 
     static func discard(_ db: SQLiteDatabase, table: String) {
-        if isValidName(table) { try? SearchIndex.dropTable(db, table) }
+        if isValidName(table) { try? db.transaction { try IndexGarbage.add(db, table) } }
         inFlight.remove(table)
     }
 
-    /// Source content deleted: its index goes too.
+    /// Source content deleted: its index goes too (garbage, emptied in the background).
     static func drop(_ db: SQLiteDatabase, sourceId: String) throws {
         guard db.hasFTS5 else { return }
         for k in [key(sourceId), backfillKey(sourceId)] {
             if let value = string(db, k), let name = value.split(separator: "|").first.map(String.init), isValidName(name) {
-                try SearchIndex.dropTable(db, name)
+                try IndexGarbage.add(db, name)
             }
             try db.run("DELETE FROM kv WHERE key = ?", [.text(k)])
         }
     }
 
-    /// Drops `epg_fts_*` tables no source and no running build refers to (refresh killed before commit).
-    static func cleanup(_ db: SQLiteDatabase) throws {
-        let referenced = Set(try db.query("SELECT value FROM kv WHERE key LIKE 'epg.fts.%'") { $0.string(0) }
+    /// Index tables referenced by kv (live + backfills in progress).
+    static func referenced(_ db: SQLiteDatabase) -> Set<String> {
+        Set(((try? db.query("SELECT value FROM kv WHERE key LIKE 'epg.fts.%'") { $0.string(0) }) ?? [])
             .compactMap { $0.split(separator: "|").first.map(String.init) })
-        let tables = try db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'epg\\_fts\\_%' ESCAPE '\\' AND sql LIKE 'CREATE VIRTUAL TABLE%'") { $0.string(0) }
-        for name in tables where isValidName(name) && !referenced.contains(name) && !inFlight.contains(name) {
-            try SearchIndex.dropTable(db, name)
-        }
     }
 
     /// Indexes stored EPG of sources without an index, `chunkSize` programmes per transaction. A refresh that
@@ -225,7 +228,8 @@ enum EpgSearchIndex {
     /// ("table|last rowid").
     static func backfill(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int, pause: TimeInterval = 0) throws -> Bool {
         guard db.hasFTS5 else { return true }
-        try cleanup(db)
+        try SearchIndex.maintain(db)   // leftovers of killed refreshes → garbage (decided on the writer)
+        try IndexGarbage.collect(db, pause: pause)
         var chunks = 0
         let sources = try db.query("SELECT id FROM sources ORDER BY sort") { $0.string(0) }
         for sourceId in sources where table(db, sourceId: sourceId) == nil {
@@ -249,7 +253,7 @@ enum EpgSearchIndex {
                 chunks += 1
                 try db.transaction {
                     if table(db, sourceId: sourceId) != nil {   // a refresh registered its own index meanwhile
-                        try SearchIndex.dropTable(db, name)
+                        try IndexGarbage.add(db, name)
                         try db.run("DELETE FROM kv WHERE key = ?", [.text(backfillKey(sourceId))])
                         done = true
                         return
@@ -315,9 +319,11 @@ public final class EpgRefreshSession: @unchecked Sendable {
             try db.run("UPDATE epg SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
             if let searchTable {
                 try EpgSearchIndex.register(db, sourceId: sourceId, table: searchTable)
+                CommitTestHook.epg.run()
                 try db.run("DELETE FROM kv WHERE key = ?", [.text(EpgSearchIndex.backfillKey(sourceId))])
             }
         }
+        if let searchTable { EpgSearchIndex.inFlight.remove(searchTable) }
     }
 
     public func abort() {

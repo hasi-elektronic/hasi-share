@@ -214,7 +214,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
             readFlags |= SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION
             #endif
             reader = try? SQLiteConnection(path: self.path, flags: readFlags)
-            try? reader?.execute("PRAGMA temp_store = MEMORY;")
+            try? reader?.execute("PRAGMA temp_store = MEMORY; PRAGMA cache_size = -32000;")
+            if let handle = reader?.handle { sqlite3_busy_timeout(handle, 1500) }   // WAL recovery/checkpoint edge cases
         } else {
             reader = nil
         }
