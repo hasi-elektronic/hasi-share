@@ -132,6 +132,20 @@ public final class CatalogRepository: Sendable {
                           [.text(sourceId), .text(id)], map: Self.channel)
     }
 
+    /// Number zapping (SCREENS §3.7): the channel with this number anywhere in the source (first in list
+    /// order; indexed). Only a source without any channel numbers falls back to the n-th channel of its
+    /// list (1-based); in a numbered source a missing number is nil.
+    public func channelForNumberZap(sourceId: String, number: Int) throws -> Channel? {
+        guard number > 0 else { return nil }
+        if let match = try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND number = ? ORDER BY sort LIMIT 1",
+                                         [.text(sourceId), .int(Int64(number))], map: Self.channel) {
+            return match
+        }
+        let numbered: Int = try db.scalar("SELECT EXISTS (SELECT 1 FROM channels WHERE source_id = ? AND number IS NOT NULL)", [.text(sourceId)])
+        guard numbered == 0 else { return nil }
+        return try channels(sourceId: sourceId, offset: number - 1, limit: 1).first
+    }
+
     /// Channels by id, in the order given (favorites / recent rows).
     public func channels(sourceId: String, ids: [String]) throws -> [Channel] {
         guard !ids.isEmpty else { return [] }

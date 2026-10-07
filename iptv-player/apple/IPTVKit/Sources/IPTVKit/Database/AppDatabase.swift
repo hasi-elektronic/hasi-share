@@ -122,6 +122,13 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 3
         }
+        if db.userVersion < 4 {
+            // TV number zapping looks a channel up by its number across the whole source (SCREENS §3.7).
+            try db.transaction {
+                try db.execute("CREATE INDEX IF NOT EXISTS channels_number ON channels (source_id, number);")
+            }
+            db.userVersion = 4
+        }
     }
 
     // MARK: Key/value (small app state such as sync cursor)

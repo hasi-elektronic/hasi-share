@@ -316,6 +316,8 @@
     <string name="live_open_guide" formatted="false">Im TV-Guide zeigen</string>
     <string name="player_channels" formatted="false">Sender</string>
     <string name="zap_number">Sender %1$s</string>
+    <string name="zap_no_channel" formatted="false">Kein Sender</string>
+    <string name="player_tv_hint" formatted="false">◀▶ Werkzeuge · ▲ Info</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

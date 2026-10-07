@@ -57,6 +57,8 @@ struct PlayerView: View {
     /// after the last one.
     @State private var numberZap = NumberZap()
     @State private var zapDigits = ""
+    /// "No such channel" in the number indicator (numbered source without that number).
+    @State private var zapNoChannel = false
     @State private var numberZapTask: Task<Void, Never>?
     #endif
 
@@ -112,7 +114,7 @@ struct PlayerView: View {
             if let target = player.zapTarget { zapCard(target) }
             #if os(tvOS)
             if infoCardVisible, let channel = player.currentChannel { infoCard(channel) }
-            if !zapDigits.isEmpty { numberIndicator }
+            if !zapDigits.isEmpty || zapNoChannel { numberIndicator }
             #endif
             if channelListVisible {
                 PlayerChannelPanel(player: player) { closeChannelPanel() }
@@ -234,7 +236,7 @@ struct PlayerView: View {
         }
         // Digit keys (IR remote via HDMI-CEC / keyboard): number zapping on live.
         .onKeyPress(characters: .decimalDigits) { press in
-            guard let digit = press.characters.first?.wholeNumberValue, player.request?.isLive == true else { return .ignored }
+            guard let digit = press.characters.first?.wholeNumberValue, player.request?.isLive == true, !syncPanelVisible else { return .ignored }
             numberKey(digit)
             return .handled
         }
@@ -369,6 +371,7 @@ struct PlayerView: View {
 
     private func closeChannelPanel() {
         channelListVisible = false
+        if overlayVisible { scheduleHide() }   // e.g. Play/Pause showed it while the panel was open
         #if os(tvOS)
         surfaceFocused = true
         #endif
@@ -588,6 +591,7 @@ struct PlayerView: View {
     private static let numberZapTimeoutMs = 1500
 
     private func numberKey(_ digit: Int) {
+        zapNoChannel = false
         zapDigits = numberZap.input(digit, atMs: SystemClock.monotonicMs())
         numberZapTask?.cancel()
         numberZapTask = Task {
@@ -597,18 +601,33 @@ struct PlayerView: View {
         }
     }
 
-    /// Tunes the typed number: the channel with that number in the zap list, else the n-th one.
+    /// Tunes the typed number anywhere in the source (CatalogRepository.channelForNumberZap); a channel
+    /// outside the zap list brings its category (first 200) as the new zap list. Unknown → "No such channel".
     private func commitNumberZap() {
         let number = numberZap.commitIfDue(atMs: SystemClock.monotonicMs())
         zapDigits = ""
-        guard let number, let channel = NumberZap.channel(number: number, in: player.request?.channels ?? []) else { return }
-        if channel.id != player.currentChannel?.id { player.zap(to: channel) }
+        guard let number, let current = player.currentChannel else { return }
+        guard let channel = (try? env.catalog.channelForNumberZap(sourceId: current.sourceId, number: number)) ?? nil else {
+            zapNoChannel = true
+            numberZapTask = Task {
+                try? await Task.sleep(for: .seconds(2))
+                if !Task.isCancelled { zapNoChannel = false }
+            }
+            return
+        }
+        guard channel.id != current.id else { return }
+        if player.request?.channels.contains(where: { $0.id == channel.id }) == true {
+            player.zap(to: channel)
+        } else {
+            let category = channel.categoryId.flatMap { try? env.catalog.channels(sourceId: channel.sourceId, categoryId: $0, limit: 200) } ?? []
+            player.zap(to: channel, channels: category.contains { $0.id == channel.id } ? category : [channel])
+        }
     }
 
     /// Big digits top right while a number is typed.
     private var numberIndicator: some View {
-        Text(verbatim: zapDigits)
-            .font(.system(size: 96, weight: .heavy).monospacedDigit())
+        Text(verbatim: zapNoChannel ? L10n.t("zap_no_channel") : zapDigits)
+            .font(zapNoChannel ? Theme.title : .system(size: 96, weight: .heavy).monospacedDigit())
             .foregroundStyle(.white)
             .padding(.horizontal, 36).padding(.vertical, 12)
             .background(RoundedRectangle(cornerRadius: Theme.cardRadius).fill(.black.opacity(0.6)))
@@ -616,7 +635,7 @@ struct PlayerView: View {
             .padding(.top, Theme.safeV)
             .padding(.trailing, Theme.safeH)
             .allowsHitTesting(false)
-            .accessibilityLabel(L10n.t("zap_number", zapDigits))
+            .accessibilityLabel(zapNoChannel ? L10n.t("zap_no_channel") : L10n.t("zap_number", zapDigits))
             .accessibilityIdentifier("player_number_zap")
     }
     #endif

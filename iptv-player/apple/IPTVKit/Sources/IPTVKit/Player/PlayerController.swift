@@ -577,6 +577,12 @@ public final class PlayerController {
         zap(to: target)
     }
 
+    /// Replaces the zap list without switching the stream (the playing channel chosen in another list).
+    public func setZapList(_ channels: [Channel]) {
+        guard !channels.isEmpty, request?.isLive == true else { return }
+        request?.channels = channels
+    }
+
     /// `channels`: a new zap list (in-player channel panel, another category) – ▲▼ continue in it.
     public func zap(to channel: Channel, channels: [Channel]? = nil) {
         if let channels, !channels.isEmpty { request?.channels = channels }

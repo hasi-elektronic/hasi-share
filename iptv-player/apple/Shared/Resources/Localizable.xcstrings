@@ -7203,6 +7203,52 @@
         }
       }
     },
+    "zap_no_channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No such channel"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanal yok"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Sender"
+          }
+        }
+      }
+    },
+    "player_tv_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "◀▶ Tools · ▲ Info"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "◀▶ Araçlar · ▲ Bilgi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "◀▶ Werkzeuge · ▲ Info"
+          }
+        }
+      }
+    },
     "trial_backend_unavailable": {
       "extractionState": "manual",
       "localizations": {

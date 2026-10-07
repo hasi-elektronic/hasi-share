@@ -1568,6 +1568,16 @@
    "en": "Channel {0}",
    "tr": "Kanal {0}",
    "de": "Sender {0}"
+  },
+  "zap_no_channel": {
+   "en": "No such channel",
+   "tr": "Kanal yok",
+   "de": "Kein Sender"
+  },
+  "player_tv_hint": {
+   "en": "◀▶ Tools · ▲ Info",
+   "tr": "◀▶ Araçlar · ▲ Bilgi",
+   "de": "◀▶ Werkzeuge · ▲ Info"
   }
  }
 }

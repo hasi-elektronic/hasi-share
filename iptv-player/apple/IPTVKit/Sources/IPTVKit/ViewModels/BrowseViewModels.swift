@@ -37,6 +37,8 @@ public final class LiveTVViewModel {
     public private(set) var favoriteCount = 0
     /// Live list only: build the favorites section and the chip counts (the guide shows plain rows).
     @ObservationIgnored public var showsFavoriteSections = false
+    /// Chip counts (one GROUP BY over the source); the in-player panel does not show them.
+    @ObservationIgnored public var loadsCategoryCounts = true
     public private(set) var totalCount = 0
     public private(set) var isLoading = false
     @ObservationIgnored private let env: AppEnvironment
@@ -50,7 +52,7 @@ public final class LiveTVViewModel {
     public func reload() {
         sourceId = env.currentSource?.id
         categories = sourceId.flatMap { try? env.catalog.categories(sourceId: $0, kind: .live) } ?? []
-        if showsFavoriteSections, let sourceId {
+        if showsFavoriteSections, loadsCategoryCounts, let sourceId {
             categoryCounts = (try? env.catalog.channelCountsByCategory(sourceId: sourceId)) ?? [:]
             allCount = (try? env.catalog.channelCount(sourceId: sourceId)) ?? 0
         } else {
@@ -116,6 +118,17 @@ public final class LiveTVViewModel {
             if rows.count == before { return false }
         }
         return true
+    }
+
+    /// In-player channel panel (SCREENS §3.7): opens on `channel`'s category (else All; a hidden category
+    /// → All) and pages until the channel is loaded (≤ `maxRows`, bounded for the ≤ 100 ms open budget).
+    /// Returns whether the channel is in the rows / favorites section.
+    @discardableResult
+    public func open(on channel: Channel?, hiddenCategoryIds: Set<String> = [], maxRows: Int = 600) -> Bool {
+        let target: ChannelFilter = channel?.categoryId.flatMap { hiddenCategoryIds.contains($0) ? nil : .category($0) } ?? .all
+        if filter == target { reload() } else { filter = target }   // `filter` reloads on change
+        guard let channel else { return false }
+        return favoriteRows.contains { $0.id == channel.id } || reveal(channelId: channel.id, maxRows: maxRows)
     }
 
     public func loadMoreIfNeeded(current row: ChannelRow) {

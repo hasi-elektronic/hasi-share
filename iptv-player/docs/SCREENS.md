@@ -230,7 +230,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   yeni zapping listesi olur (▲▼ / kaydırma onda devam eder). Panel açılırken katman kapanır (kapanınca katman
   takılı kalmaz). iOS: katmandaki liste düğmesi veya **soldan kaydırma** açar; panelin yanına dokunmak ya da
   sola kaydırmak kapatır. tvOS: katman kapalıyken **OK** açar, Menü kapatır; ilk satırda ▲ kategori seçiciye,
-  oradan ▼ listeye gider. Açılış ≤ 100 ms (sayfa 120 satır; oynayan kanal en fazla 600 satır içinde aranır).
+  oradan ▼ listeye gider; tvOS başlığında tek satır ipucu "◀▶ Araçlar · ▲ Bilgi" (`player_tv_hint`). Oynayan
+  kanal başka bir kategoride seçilirse yayın yeniden açılmaz, yalnızca o liste zapping listesi olur. Açılış
+  ≤ 100 ms (kategori sayıları yüklenmez; sayfa 120 satır; oynayan kanal en fazla 600 satır içinde aranır –
+  50 000 kanalda ölçüm `PanelLoadPerformanceTests`).
 * **TV canlı – ▲ = kanal bilgisi:** katman kapalıyken ▲ altta bilgi kartını açar (logo, numara, ad, Şimdi +
   saat + ilerleme, Sonra), **⭐ odakta** (OK = favori ekle/çıkar). Kart açıkken ▲/▼ kanal değiştirir (kart yeni
   kanalı gösterir), Geri kartı kapatır; ⭐ sonrası "Geri al" kapsülü kartın **altında** (⭐'ın hizasında) durur:
@@ -239,8 +242,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Kanal değiştirme (canlı):** mobil yukarı/aşağı kaydır, TV D-pad ▼ (▲ önce bilgi kartı, kart açıkken ▲▼) / CH+/CH−. Basıldığı
   anda (< 100 ms) üstte büyük bilgi kartı: numara, logo, ad, şimdiki program; yükleme
   göstergesi kartın içinde. Ard arda basışlar 400 ms içinde birleştirilir (yalnızca son kanal
-  açılır). TV'de rakam tuşları: 1,5 sn içinde girilen numaraya geçer. "Önceki kanal" (TV: geri
-  değil, OK uzun basış menüsünde / mobil buton).
+  açılır). TV'de rakam tuşları: 1,5 sn içinde girilen numaraya geçer (aşağıda "Rakamlar").
+  **Son izlenen kanal** (bir önceki açık kanala dönüş): mobilde ve TV'de katmanın araçlarındaki
+  `arrow.uturn.backward` düğmesi (TV: üst satırın son öğesi); Geri tuşu değildir. Bilgi kartındaki ▲▼ ise
+  zapping listesinde **önceki/sonraki kanaldır**.
 * **VOD:** ◀▶ 10 sn ileri/geri (basılı tutunca hızlanır), OK oynat/duraklat. Kaldığı yerden
   devam: açılışta otomatik devam + "Baştan başla" kısa düğmesi (5 sn görünür, katmandan
   bağımsız; kayıtlı konum ≥ 10 sn ve < %95 ise).
@@ -256,7 +261,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     görünürken odak oynat/duraklat'tadır: OK oynat/duraklat, ◀▶ atlar (odak yana kaymaz);
     ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Üst satırda ◀▶ araçlar
     arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · ⭐ · canlıda Kanal listesi ·
-    Önceki kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
+    Son izlenen kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
     kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
     satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
     VOD'da duraklatır/sürdürür ve katmanı açar; **canlıda kanal panelini açar** (katman: ◀▶ veya
@@ -277,18 +282,24 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 
   | Durum | OK | ▲ | ▼ | ◀ ▶ | Oynat/Duraklat | Menü | Rakamlar |
   |---|---|---|---|---|---|---|---|
-  | Canlı, katman kapalı | Kanal paneli | Bilgi kartı | Sonraki kanal | Katmanı aç | Duraklat/sürdür + katman | Oynatıcıdan çık | Numaraya geç |
+  | Canlı, katman kapalı | Kanal paneli | Bilgi kartı | Listede sonraki kanal | Katmanı aç | Duraklat/sürdür + katman | Oynatıcıdan çık | Numaraya geç |
   | Canlı, katman açık (odak oynat/duraklat) | Duraklat/sürdür | Üst satır (kapat'ta) | – | – | Duraklat/sürdür | Katmanı kapat | Numaraya geç |
   | Üst satır (kapat + araçlar) | Seçili araç (menü / panel) | – | Oynat/duraklat'a dön | Araçlar arasında (uçlarda durur) | Duraklat/sürdür | Katmanı kapat | Numaraya geç |
-  | Bilgi kartı (⭐ odakta) | Favori ekle/çıkar | Önceki kanal (Geri al teklifinde: ⭐) | Sonraki kanal (Geri al teklifinde: Geri al) | – | Duraklat/sürdür | Kartı kapat | Numaraya geç |
+  | Bilgi kartı (⭐ odakta) | Favori ekle/çıkar | Listede önceki kanal (Geri al teklifinde: ⭐) | Listede sonraki kanal (Geri al teklifinde: Geri al) | – | Duraklat/sürdür | Kartı kapat | Numaraya geç |
   | Kanal paneli | Kanala geç, paneli kapat | Odak yukarı (ilk satırda kategori seçici) | Odak aşağı | – | Duraklat/sürdür | Paneli kapat | Numaraya geç |
-  | Senkron paneli | – | Satırlar arası | Satırlar arası | Değeri değiştir (hızlanır) | Duraklat/sürdür | Paneli kapat | – |
+  | Senkron paneli | – | Satırlar arası | Satırlar arası | Değeri değiştir (hızlanır) | Duraklat/sürdür | Paneli kapat | – (yok sayılır) |
   | VOD, katman kapalı | Duraklat/sürdür + katman | Katmanı aç | Katmanı aç | −/+10 sn (basılı: hızlanır) | Duraklat/sürdür + katman | Oynatıcıdan çık | – |
   | VOD, katman açık | Duraklat/sürdür | Üst satır | – | −/+10 sn | Duraklat/sürdür | Katmanı kapat | – |
 
+  "Üst satır" araçlarının sonu: Kanal listesi · **Son izlenen kanal** (yalnızca bir önceki kanal varsa).
+
   **Rakamlar (numara ile kanal):** IR kumanda (HDMI-CEC) / klavye rakamları canlıda sağ üstte büyük
-  gösterilir (en fazla 4 hane); son rakamdan 1,5 sn sonra zapping listesinde `number` eşleşen kanala,
-  yoksa listedeki n'inci kanala (1'den) geçilir (`NumberZap`). Siri Remote'ta rakam yoktur.
+  gösterilir (en fazla 4 hane; senkron paneli açıkken yok sayılır); son rakamdan 1,5 sn sonra numara
+  **kaynağın tüm kanallarında** aranır (`CatalogRepository.channelForNumberZap`, `(source_id, number)`
+  indeksi; aynı numara birden çoksa liste sırasında ilki). Kanal zapping listesinde değilse kendi kategorisi
+  (ilk 200) yeni zapping listesi olur. Kaynakta **hiç kanal numarası yoksa** numara listedeki sıra olarak
+  okunur (1'den); numaralı kaynakta olmayan numara → kanal değişmez, aynı yerde 2 sn "Kanal yok"
+  (`zap_no_channel`). Siri Remote'ta rakam yoktur.
 * **Görüntü oranı:** Sığdır · Doldur (kırp) · Uzat · 16:9 · 4:3 – seçim kanal başına değil,
   global hatırlanır.
 * **Ses / altyazı:** dil adıyla listelenir (`Türkçe`, `English`, bilinmiyorsa `Parça 2`),

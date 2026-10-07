@@ -80,7 +80,13 @@ struct PlayerChannelPanel: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(L10n.t("player_channels")).font(Theme.headline).foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.t("player_channels")).font(Theme.headline).foregroundStyle(.white)
+                #if os(tvOS)
+                // OK on the picture opens this panel: where the overlay and the info card are now.
+                Text(L10n.t("player_tv_hint")).font(Theme.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                #endif
+            }
             Spacer(minLength: 8)
             if let model { categoryMenu(model) }
             #if os(iOS)
@@ -136,7 +142,7 @@ struct PlayerChannelPanel: View {
 
     /// Favorites first: "All" → the favorites section, then every other channel; a category / the
     /// favorites filter → its favorite channels on top of the loaded rows.
-    private func orderedRows(_ model: LiveTVViewModel) -> [ChannelRow] {
+    private func orderedRows(_ model: LiveTVViewModel, favoriteIds: Set<String>) -> [ChannelRow] {
         let sid = env.currentSource?.id
         let rows = visibleRows(model.rows, sourceId: sid)
         if model.filter == .all {
@@ -144,12 +150,19 @@ struct PlayerChannelPanel: View {
             let ids = Set(favorites.map(\.id))
             return favorites + rows.filter { !ids.contains($0.id) }
         }
-        let isFavorite: (ChannelRow) -> Bool = { row in env.favoriteTarget(row.channel).map { env.favorites.isFavorite($0.contentKey) } ?? false }
-        return rows.filter(isFavorite) + rows.filter { !isFavorite($0) }
+        return rows.filter { favoriteIds.contains($0.id) } + rows.filter { !favoriteIds.contains($0.id) }
+    }
+
+    /// Favorite channel ids of the current source – once per render, not per row.
+    private var favoriteIds: Set<String> {
+        guard let sid = env.currentSource?.id, let fingerprint = env.fingerprint(sourceId: sid) else { return [] }
+        return Set(env.favorites.orderedKeys(kind: .live).compactMap { ContentKey.parse($0) }
+            .filter { $0.fingerprint == fingerprint }.map(\.itemId))
     }
 
     private func list(_ model: LiveTVViewModel) -> some View {
-        let rows = orderedRows(model)
+        let favoriteIds = self.favoriteIds
+        let rows = orderedRows(model, favoriteIds: favoriteIds)
         let zapList = rows.map(\.channel)
         let playingId = player.currentChannel?.id
         return ScrollViewReader { proxy in
@@ -162,7 +175,7 @@ struct PlayerChannelPanel: View {
                             .padding(Theme.isTV ? 40 : 20)
                     }
                     ForEach(rows) { row in
-                        rowButton(row, playing: row.id == playingId, zapList: zapList)
+                        rowButton(row, playing: row.id == playingId, favorite: favoriteIds.contains(row.id), zapList: zapList)
                             .id(row.id)
                             .onAppear { model.loadMoreIfNeeded(current: row) }
                     }
@@ -193,11 +206,11 @@ struct PlayerChannelPanel: View {
         }
     }
 
-    private func rowButton(_ row: ChannelRow, playing: Bool, zapList: [Channel]) -> some View {
+    private func rowButton(_ row: ChannelRow, playing: Bool, favorite: Bool, zapList: [Channel]) -> some View {
         let channel = row.channel
-        let favorite = env.favoriteTarget(channel).map { env.favorites.isFavorite($0.contentKey) } ?? false
         return Button {
-            if !playing { player.zap(to: channel, channels: zapList) }
+            // The shown list becomes the zap list either way (also for the playing channel in another category).
+            if playing { player.setZapList(zapList) } else { player.zap(to: channel, channels: zapList) }
             onClose()
         } label: {
             HStack(spacing: Theme.isTV ? 20 : 10) {
@@ -238,24 +251,14 @@ struct PlayerChannelPanel: View {
         .accessibilityAddTraits(playing ? .isSelected : [])
     }
 
-    /// Opens on the playing channel's category (else "All") with that channel loaded.
+    /// Opens on the playing channel's category (else "All") with that channel loaded – no chip counts.
     private func load() {
         guard model == nil else { return }
         let m = LiveTVViewModel(env: env)
         m.showsFavoriteSections = true
-        let current = player.currentChannel
+        m.loadsCategoryCounts = false
         let hidden = env.currentSource.map { HiddenStore.shared.hiddenCategories($0.id) } ?? []
-        if let categoryId = current?.categoryId, !hidden.contains(categoryId) {
-            m.filter = .category(categoryId)   // loads
-        } else {
-            m.reload()
-        }
-        if let current, m.filter != .favorites {
-            // Bounded: a channel deep in a huge "All" list is not paged in (open ≤ 100 ms budget).
-            if m.reveal(channelId: current.id, maxRows: 600) || m.favoriteRows.contains(where: { $0.id == current.id }) {
-                anchorId = current.id
-            }
-        }
+        if m.open(on: player.currentChannel, hiddenCategoryIds: hidden) { anchorId = player.currentChannel?.id }
         model = m
     }
 }

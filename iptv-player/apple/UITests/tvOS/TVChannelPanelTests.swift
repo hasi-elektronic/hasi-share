@@ -42,6 +42,7 @@ final class TVChannelPanelTests: XCTestCase {
         XCTAssertTrue(current.hasFocus, "focus on the playing channel")
         XCTAssertTrue(app.buttons["player_channel_category"].exists, "category picker on top")
         XCTAssertFalse(app.buttons["player_close"].exists, "no overlay under the panel")
+        XCTAssertTrue(app.staticTexts["◀▶ Tools · ▲ Info"].exists, "key hint in the panel header")
         UITestSupport.snap("channel-panel/tvos-01-open", in: self)
 
         // ▲ from the first row reaches the category picker; OK lists the categories.
@@ -57,10 +58,15 @@ final class TVChannelPanelTests: XCTestCase {
         UITestSupport.snap("channel-panel/tvos-01c-menu-closed", in: self)
         press(.down)   // back into the list
 
+        // Play/Pause twice under the panel shows the overlay; closing the panel must not leave it pinned.
+        press(.playPause, 2)
+        sleep(4)   // the overlay's 3 s hide fires while the panel is open (and must not hide then)
         // Menu closes only the panel.
         press(.menu)
         XCTAssertTrue(panel.waitForNonExistence(timeout: 3), "Menu closes the panel")
         XCTAssertTrue(app.otherElements["video_surface"].exists, "player stays")
+        sleep(5)
+        XCTAssertFalse(app.buttons["player_close"].exists, "overlay auto-hides after the panel closed")
 
         // OK again, ▼ to the next row, OK zaps: the panel closes, the player stays, the title changes.
         press(.select)

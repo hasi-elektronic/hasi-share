@@ -316,6 +316,8 @@
     <string name="live_open_guide" formatted="false">Rehberde göster</string>
     <string name="player_channels" formatted="false">Kanallar</string>
     <string name="zap_number">Kanal %1$s</string>
+    <string name="zap_no_channel" formatted="false">Kanal yok</string>
+    <string name="player_tv_hint" formatted="false">◀▶ Araçlar · ▲ Bilgi</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

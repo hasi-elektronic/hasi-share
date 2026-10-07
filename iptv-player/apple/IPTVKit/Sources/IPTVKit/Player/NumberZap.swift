@@ -1,8 +1,8 @@
 import Foundation
-import IPTVCore
 
 /// TV number zapping (SCREENS §3.7): digits typed within `timeoutMs` of each other form one channel
-/// number (max 4 digits); the number is tuned once no further digit arrives for `timeoutMs`.
+/// number (max 4 digits); the number is tuned once no further digit arrives for `timeoutMs`
+/// (target: `CatalogRepository.channelForNumberZap`).
 public struct NumberZap: Sendable {
     private let timeoutMs: Int64
     private var buffer = ""
@@ -25,12 +25,5 @@ public struct NumberZap: Sendable {
         guard !buffer.isEmpty, ms - lastMs >= timeoutMs else { return nil }
         defer { buffer = "" }
         return Int(buffer)
-    }
-
-    /// The channel to tune for a typed number: the one whose `number` matches, else the n-th of
-    /// the list (1-based) – playlists without channel numbers.
-    public static func channel(number: Int, in channels: [Channel]) -> Channel? {
-        if let match = channels.first(where: { $0.number == number }) { return match }
-        return channels.indices.contains(number - 1) ? channels[number - 1] : nil
     }
 }
