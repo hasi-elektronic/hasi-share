@@ -392,6 +392,8 @@ struct ChipBar<ID: Hashable>: View {
     var showFlags = false
     var leadingIcon: ((ID) -> String?)? = nil
     var identifierPrefix = "chip"
+    /// Accessibility id per item (default: `<identifierPrefix>_<index>`).
+    var identifier: ((ID) -> String)? = nil
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -415,7 +417,7 @@ struct ChipBar<ID: Hashable>: View {
                         .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
                     }
                     .buttonStyle(CardButtonStyle(radius: 40, scale: 1.1))
-                    .accessibilityIdentifier("\(identifierPrefix)_\(index)")
+                    .accessibilityIdentifier(identifier?(item.id) ?? "\(identifierPrefix)_\(index)")
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
@@ -505,6 +507,8 @@ struct Shelf<Content: View>: View {
     let title: String
     var spacing: CGFloat = Theme.shelfSpacing
     var seeAll: BrowseRoute? = nil
+    /// Label of the "See all" link (search sections: "Show all").
+    var seeAllTitleKey = "action_see_all"
     var identifier: String? = nil
     @ViewBuilder var content: () -> Content
 
@@ -516,7 +520,7 @@ struct Shelf<Content: View>: View {
                 #if !os(tvOS)
                 if let seeAll {
                     NavigationLink(value: seeAll) {
-                        LText("action_see_all").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.primary)
+                        LText(seeAllTitleKey).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.primary)
                     }
                     .accessibilityIdentifier("see_all_\(identifier ?? title)")
                 }
@@ -531,7 +535,7 @@ struct Shelf<Content: View>: View {
                         NavigationLink(value: seeAll) {
                             VStack(spacing: 12) {
                                 Image(systemName: "square.grid.2x2").font(.system(size: 44, weight: .semibold))
-                                LText("action_see_all").font(Theme.caption.weight(.semibold))
+                                LText(seeAllTitleKey).font(Theme.caption.weight(.semibold))
                             }
                             .foregroundStyle(Theme.textPrimary)
                             .frame(width: 220, height: 220)

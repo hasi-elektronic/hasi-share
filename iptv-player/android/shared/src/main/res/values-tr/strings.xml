@@ -339,6 +339,25 @@
     <string name="search_kind_movies" formatted="false">Filmler</string>
     <string name="search_kind_series" formatted="false">Diziler</string>
     <string name="search_kind_live" formatted="false">Canlı TV</string>
+    <string name="search_section_descriptions" formatted="false">Açıklamada geçenler</string>
+    <string name="search_section_on_tv" formatted="false">TV\'de</string>
+    <string name="search_section_similar" formatted="false">Benzer sonuçlar</string>
+    <string name="search_did_you_mean">Bunu mu demek istediniz: %1$s</string>
+    <string name="search_show_all" formatted="false">Tümünü göster</string>
+    <string name="search_filter_all" formatted="false">Tümü</string>
+    <string name="search_filter_live" formatted="false">Canlı</string>
+    <string name="search_filter_programmes" formatted="false">TV programları</string>
+    <string name="search_recent" formatted="false">Son aramalar</string>
+    <string name="search_recent_clear" formatted="false">Temizle</string>
+    <string name="search_recent_empty" formatted="false">Kanal, film, dizi, kişi, açıklama ve TV programı arayın.</string>
+    <string name="search_suggestions" formatted="false">Öneriler</string>
+    <string name="search_time_today">Bugün %1$s</string>
+    <string name="search_time_tomorrow">Yarın %1$s</string>
+    <string name="search_time_yesterday">Dün %1$s</string>
+    <string name="search_kind_movie" formatted="false">Film</string>
+    <string name="search_kind_one_series" formatted="false">Dizi</string>
+    <string name="search_kind_channel" formatted="false">Kanal</string>
+    <string name="search_list_empty" formatted="false">Başka sonuç yok.</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

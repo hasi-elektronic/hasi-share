@@ -38,6 +38,8 @@ enum BrowseRoute: Hashable {
     case grid(kind: ContentKind, categoryId: String?, title: String, sort: CatalogSort)
     /// Poster grid of every (visible) category of one country ("See all" of a country-filtered row).
     case countryGrid(kind: ContentKind, country: String, title: String, sort: CatalogSort)
+    /// Full result list of one search section ("Show all", SCREENS §3.6).
+    case searchList(SearchListKind, query: String, title: String)
 }
 
 /// App-wide navigation state shared by iOS and tvOS (section, player / paywall / settings presentation).

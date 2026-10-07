@@ -339,6 +339,25 @@
     <string name="search_kind_movies" formatted="false">Filme</string>
     <string name="search_kind_series" formatted="false">Serien</string>
     <string name="search_kind_live" formatted="false">Live-TV</string>
+    <string name="search_section_descriptions" formatted="false">In Beschreibungen</string>
+    <string name="search_section_on_tv" formatted="false">Im TV</string>
+    <string name="search_section_similar" formatted="false">Ähnliche Ergebnisse</string>
+    <string name="search_did_you_mean">Meintest du: %1$s</string>
+    <string name="search_show_all" formatted="false">Alle anzeigen</string>
+    <string name="search_filter_all" formatted="false">Alle</string>
+    <string name="search_filter_live" formatted="false">Live</string>
+    <string name="search_filter_programmes" formatted="false">TV-Sendungen</string>
+    <string name="search_recent" formatted="false">Letzte Suchen</string>
+    <string name="search_recent_clear" formatted="false">Löschen</string>
+    <string name="search_recent_empty" formatted="false">Suche nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen.</string>
+    <string name="search_suggestions" formatted="false">Vorschläge</string>
+    <string name="search_time_today">Heute %1$s</string>
+    <string name="search_time_tomorrow">Morgen %1$s</string>
+    <string name="search_time_yesterday">Gestern %1$s</string>
+    <string name="search_kind_movie" formatted="false">Film</string>
+    <string name="search_kind_one_series" formatted="false">Serie</string>
+    <string name="search_kind_channel" formatted="false">Sender</string>
+    <string name="search_list_empty" formatted="false">Keine weiteren Ergebnisse.</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

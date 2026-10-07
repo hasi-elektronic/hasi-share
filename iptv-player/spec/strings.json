@@ -1683,6 +1683,101 @@
    "en": "Live TV",
    "tr": "Canlı TV",
    "de": "Live-TV"
+  },
+  "search_section_descriptions": {
+   "en": "In descriptions",
+   "tr": "Açıklamada geçenler",
+   "de": "In Beschreibungen"
+  },
+  "search_section_on_tv": {
+   "en": "On TV",
+   "tr": "TV'de",
+   "de": "Im TV"
+  },
+  "search_section_similar": {
+   "en": "Similar results",
+   "tr": "Benzer sonuçlar",
+   "de": "Ähnliche Ergebnisse"
+  },
+  "search_did_you_mean": {
+   "en": "Did you mean: {0}",
+   "tr": "Bunu mu demek istediniz: {0}",
+   "de": "Meintest du: {0}"
+  },
+  "search_show_all": {
+   "en": "Show all",
+   "tr": "Tümünü göster",
+   "de": "Alle anzeigen"
+  },
+  "search_filter_all": {
+   "en": "All",
+   "tr": "Tümü",
+   "de": "Alle"
+  },
+  "search_filter_live": {
+   "en": "Live",
+   "tr": "Canlı",
+   "de": "Live"
+  },
+  "search_filter_programmes": {
+   "en": "TV programmes",
+   "tr": "TV programları",
+   "de": "TV-Sendungen"
+  },
+  "search_recent": {
+   "en": "Recent searches",
+   "tr": "Son aramalar",
+   "de": "Letzte Suchen"
+  },
+  "search_recent_clear": {
+   "en": "Clear",
+   "tr": "Temizle",
+   "de": "Löschen"
+  },
+  "search_recent_empty": {
+   "en": "Search for channels, movies, series, people, descriptions and TV programmes.",
+   "tr": "Kanal, film, dizi, kişi, açıklama ve TV programı arayın.",
+   "de": "Suche nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen."
+  },
+  "search_suggestions": {
+   "en": "Suggestions",
+   "tr": "Öneriler",
+   "de": "Vorschläge"
+  },
+  "search_time_today": {
+   "en": "Today {0}",
+   "tr": "Bugün {0}",
+   "de": "Heute {0}"
+  },
+  "search_time_tomorrow": {
+   "en": "Tomorrow {0}",
+   "tr": "Yarın {0}",
+   "de": "Morgen {0}"
+  },
+  "search_time_yesterday": {
+   "en": "Yesterday {0}",
+   "tr": "Dün {0}",
+   "de": "Gestern {0}"
+  },
+  "search_kind_movie": {
+   "en": "Movie",
+   "tr": "Film",
+   "de": "Film"
+  },
+  "search_kind_one_series": {
+   "en": "Series",
+   "tr": "Dizi",
+   "de": "Serie"
+  },
+  "search_kind_channel": {
+   "en": "Channel",
+   "tr": "Kanal",
+   "de": "Sender"
+  },
+  "search_list_empty": {
+   "en": "No more results.",
+   "tr": "Başka sonuç yok.",
+   "de": "Keine weiteren Ergebnisse."
   }
  }
 }

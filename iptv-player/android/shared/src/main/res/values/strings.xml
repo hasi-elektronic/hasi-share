@@ -339,6 +339,25 @@
     <string name="search_kind_movies" formatted="false">Movies</string>
     <string name="search_kind_series" formatted="false">Series</string>
     <string name="search_kind_live" formatted="false">Live TV</string>
+    <string name="search_section_descriptions" formatted="false">In descriptions</string>
+    <string name="search_section_on_tv" formatted="false">On TV</string>
+    <string name="search_section_similar" formatted="false">Similar results</string>
+    <string name="search_did_you_mean">Did you mean: %1$s</string>
+    <string name="search_show_all" formatted="false">Show all</string>
+    <string name="search_filter_all" formatted="false">All</string>
+    <string name="search_filter_live" formatted="false">Live</string>
+    <string name="search_filter_programmes" formatted="false">TV programmes</string>
+    <string name="search_recent" formatted="false">Recent searches</string>
+    <string name="search_recent_clear" formatted="false">Clear</string>
+    <string name="search_recent_empty" formatted="false">Search for channels, movies, series, people, descriptions and TV programmes.</string>
+    <string name="search_suggestions" formatted="false">Suggestions</string>
+    <string name="search_time_today">Today %1$s</string>
+    <string name="search_time_tomorrow">Tomorrow %1$s</string>
+    <string name="search_time_yesterday">Yesterday %1$s</string>
+    <string name="search_kind_movie" formatted="false">Movie</string>
+    <string name="search_kind_one_series" formatted="false">Series</string>
+    <string name="search_kind_channel" formatted="false">Channel</string>
+    <string name="search_list_empty" formatted="false">No more results.</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

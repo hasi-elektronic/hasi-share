@@ -782,13 +782,11 @@ struct CatchupSheet: View {
         }
     }
 
-    /// Xtream timeshift URL (CONTRACT §4); `nil` for M3U sources.
+    /// Xtream timeshift URL (CONTRACT §4); `nil` for M3U sources ("" = replay possible, no programme given).
     private func replayURL(for p: EpgProgram?) -> String? {
-        guard case .xtream(let secrets)? = env.secrets(for: channel.sourceId), let builder = XtreamURLBuilder(secrets: secrets) else { return nil }
+        guard case .xtream? = env.secrets(for: channel.sourceId) else { return nil }
         guard let p else { return "" }
-        let account = env.sources.first { $0.id == channel.sourceId }?.xtreamAccount
-        let ext = (account?.allowedOutputFormats.contains("m3u8") ?? true) ? "m3u8" : "ts"
-        return builder.timeshiftURL(streamId: channel.id, start: p.start, end: p.end, serverTimezone: account?.serverTimezone, ext: ext).absoluteString
+        return env.catchupURL(channel: channel, program: p)
     }
 }
 
