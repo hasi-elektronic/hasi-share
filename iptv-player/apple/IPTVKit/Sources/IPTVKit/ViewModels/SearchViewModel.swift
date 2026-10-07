@@ -310,7 +310,7 @@ public final class SearchViewModel {
             engine.hiddenLiveCategories = hiddenLiveCategories(sourceId)
             engine.hiddenMovieCategories = env.categoryPrefs.hidden(sourceId: sourceId, kind: .movie)
             engine.hiddenSeriesCategories = env.categoryPrefs.hidden(sourceId: sourceId, kind: .series)
-            if case .xtream? = env.secrets(for: sourceId) { engine.canReplay = true }
+            engine.canReplay = env.currentSource?.type == .xtream   // metadata only (no Keychain read per keystroke)
         }
         return engine
     }
@@ -376,6 +376,7 @@ public final class SearchViewModel {
         let text = query
         guard !SearchText.tokens(text).isEmpty else { return }
         rememberQuery()
+        suggestTask?.cancel()
         suggestions = []
         run(text, engine: makeEngine(), after: .zero)
     }
@@ -384,6 +385,12 @@ public final class SearchViewModel {
     public func apply(_ suggestion: SearchSuggestion) {
         query = suggestion.text
         submit()
+    }
+
+    /// Hides the suggestions (screen left) until the query changes again.
+    public func dismissSuggestions() {
+        suggestTask?.cancel()
+        suggestions = []
     }
 
     /// "Did you mean …" was tapped.

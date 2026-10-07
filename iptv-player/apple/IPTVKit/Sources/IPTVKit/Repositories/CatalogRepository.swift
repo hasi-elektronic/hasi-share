@@ -940,8 +940,10 @@ public final class CatalogRefreshSession: @unchecked Sendable {
                     }
                 }
             }
-            try terms.replace(db, sourceId: sourceId)
         }
+        // The did-you-mean dictionary follows in its own transaction (only a suggestion source; the first fill
+        // after the v7 update writes ~30k words, which should not lengthen the swap's lock).
+        do { try db.transaction { try terms.replace(db, sourceId: sourceId) } } catch { SafeLog.warning("search terms update failed") }
     }
 
     /// Discards the staged rows; live content stays untouched.

@@ -274,7 +274,9 @@ final class CatalogPerformanceTests: XCTestCase {
             Series(sourceId: "p", id: "t\(i)", name: "\(w(i + 99).capitalized) \(w(i + 7))", plot: (0..<12).map { w(i * 13 + $0) }.joined(separator: " "),
                    sort: i, cast: person(i + 1), director: nil)
         })
+        let commitStart = DispatchTime.now()
         try session.commit()
+        print("PERF refresh commit incl. term dictionary (60k items, first fill): \(Double(DispatchTime.now().uptimeNanoseconds - commitStart.uptimeNanoseconds) / 1e6) ms, terms: \(try db.db.scalar("SELECT COUNT(*) FROM search_terms") as Int)")
 
         var hits: [SearchHit] = []
         let ms = try median { hits = try repo.search("hasan can kaya", sourceId: "p") }
