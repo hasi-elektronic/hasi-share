@@ -15,6 +15,7 @@ final class IOSPeopleSearchTests: XCTestCase {
         field.tap()
         if let value = field.value as? String, !value.isEmpty, value != field.placeholderValue {
             field.buttons.firstMatch.tap()   // clear
+            field.tap()   // iPad: the toolbar field can lose focus with the clear button
         }
         field.typeText(text)
     }
