@@ -167,9 +167,54 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 6
         }
+        if db.userVersion < 7 {
+            // Professional search (Build 11): the FTS index gets a third column `plot` (description), ranked
+            // title ≫ people > plot (bm25 10/4/1, stored as the table's `rank`). FTS5 tables cannot be altered:
+            // the v6 index is renamed (`search_index_v6`, instant) and copied into the new table in the
+            // background (`SearchBackfill`, kv cursors, resumable) – the v6 people column is not stored
+            // anywhere else. Search uses the LIKE path until the copy is done. `item_plot` keeps plots known only
+            // from detail fetches across refreshes (like `item_people`). `search_terms` (+ trigram index
+            // `search_terms_tri`) is the per-source dictionary of title/person words for "did you mean".
+            try db.transaction {
+                try db.execute("""
+                CREATE TABLE IF NOT EXISTS item_plot (
+                  source_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, plot TEXT NOT NULL,
+                  PRIMARY KEY (source_id, kind, item_id));
+                CREATE TABLE IF NOT EXISTS search_terms (
+                  source_id TEXT NOT NULL, term TEXT NOT NULL, gram TEXT NOT NULL, display TEXT NOT NULL,
+                  freq INTEGER NOT NULL);
+                CREATE UNIQUE INDEX IF NOT EXISTS search_terms_key ON search_terms (source_id, term);
+                """)
+                if db.hasTrigram {
+                    try db.execute("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS search_terms_tri USING fts5(
+                      gram, content = 'search_terms', content_rowid = 'rowid', tokenize = 'trigram');
+                    CREATE TRIGGER IF NOT EXISTS search_terms_ai AFTER INSERT ON search_terms BEGIN
+                      INSERT INTO search_terms_tri (rowid, gram) VALUES (new.rowid, new.gram); END;
+                    CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
+                      INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
+                    """)
+                }
+                if db.hasFTS5 {
+                    try db.execute("DROP TABLE IF EXISTS search_index_v6;")
+                    if try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index'") > 0 {
+                        try db.execute("ALTER TABLE search_index RENAME TO search_index_v6;")
+                    }
+                    try db.execute("""
+                    CREATE VIRTUAL TABLE search_index USING fts5(
+                      title, people, plot, source_id UNINDEXED, kind UNINDEXED, item_id UNINDEXED,
+                      tokenize = 'unicode61 remove_diacritics 2');
+                    INSERT INTO search_index (search_index, rank) VALUES ('rank', 'bm25(10.0, 4.0, 1.0)');
+                    """)
+                    try SearchBackfill.scheduleCopy(db)
+                }
+            }
+            db.userVersion = 7
+        }
     }
 
-    /// True while titles of pre-v6 content are still being re-indexed (search uses the LIKE path meanwhile).
+    /// True while the search index is still being (re-)built in the background after a v6/v7 migration
+    /// (search uses the LIKE path meanwhile).
     public var searchBackfillPending: Bool { SearchBackfill.isPending(db) }
 
     // MARK: Key/value (small app state such as sync cursor)
@@ -188,19 +233,28 @@ public final class AppDatabase: Sendable {
     }
 }
 
-/// Background re-indexing of titles after the v6 search index rebuild. Per table: the highest content rowid
-/// that existed at migration time (`…max`) and the last rowid indexed (`…at`); rows created later are
-/// indexed by their own refresh. Each chunk inserts its index rows and advances the cursor in ONE
+/// Background (re-)indexing after search index rebuilds, in small transactions, resumable after a kill:
+///
+/// 1. **Copy (v7):** rows of the renamed v6 index (`search_index_v6`, title + people) up to the rowid that
+///    existed at migration time are copied into the v7 index with the description (`plot` of the content row,
+///    else `item_plot`); people learned from details (`item_people`) win. Sources refreshed or deleted while the
+///    copy runs are listed in `skipKey` and not copied (their refresh indexed them). Then the v6 table is dropped.
+/// 2. **Content (v6):** per content table the highest rowid at migration time (`…max`) and the last rowid
+///    indexed (`…at`); rows created later are indexed by their own refresh.
+///
+/// Each chunk inserts its index rows, adds their words to the term dictionary and advances the cursor in ONE
 /// transaction, so a kill loses nothing and indexes nothing twice.
 enum SearchBackfill {
     static let tables: [(table: String, kind: String)] = [("channels", "live"), ("movies", "movie"), ("series", "series")]
     static let pendingKey = "search.backfill.pending"
     static func maxKey(_ table: String) -> String { "search.backfill.\(table).max" }
     static func atKey(_ table: String) -> String { "search.backfill.\(table).at" }
-
-    /// Same indexed form as `CatalogPeople.indexed` (dotless-i variant after U+2063).
-    static let indexedTitle = "name || CASE WHEN instr(name, 'ı') > 0 OR instr(name, 'İ') > 0 THEN ' ' || char(8291) || ' ' "
-        + "|| replace(replace(name, 'ı', 'i'), 'İ', 'I') ELSE '' END"
+    static let copyMaxKey = "search.backfill.copy.max"
+    static let copyAtKey = "search.backfill.copy.at"
+    /// Sources whose v6 rows must not be copied (refreshed or deleted while the copy is pending), "\n"-joined.
+    static let skipKey = "search.backfill.copy.skip"
+    /// Descriptions are indexed up to this length (index size; snippets need only the first part).
+    static let maxPlot = 1200
 
     static func setValue(_ db: SQLiteDatabase, _ value: String?, _ key: String) throws {
         if let value {
@@ -211,11 +265,13 @@ enum SearchBackfill {
         }
     }
 
-    static func value(_ db: SQLiteDatabase, _ key: String) -> Int64? {
-        (try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(key)]) { $0.string(0) }).flatMap { $0.flatMap { Int64($0) } }
+    static func string(_ db: SQLiteDatabase, _ key: String) -> String? {
+        (try? db.queryFirst("SELECT value FROM kv WHERE key = ?", [.text(key)]) { $0.string(0) }) ?? nil
     }
 
-    /// Nothing to do for an empty catalog (new install): the flag is only set when rows exist.
+    static func value(_ db: SQLiteDatabase, _ key: String) -> Int64? { string(db, key).flatMap { Int64($0) } }
+
+    /// v6: content rows to index. Nothing to do for an empty catalog (new install): the flag is only set when rows exist.
     static func schedule(_ db: SQLiteDatabase) throws {
         var any = false
         for (table, _) in tables {
@@ -227,7 +283,38 @@ enum SearchBackfill {
         if any { try setValue(db, "1", pendingKey) }
     }
 
+    /// v7: copy of the renamed v6 index. An empty v6 table is dropped right away.
+    static func scheduleCopy(_ db: SQLiteDatabase) throws {
+        guard try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'") > 0 else { return }
+        let max = Int64(try db.scalar("SELECT COALESCE(MAX(rowid), 0) FROM search_index_v6"))
+        guard max > 0 else {
+            try db.execute("DROP TABLE search_index_v6;")
+            return
+        }
+        try setValue(db, String(max), copyMaxKey)
+        try setValue(db, "0", copyAtKey)
+        try setValue(db, nil, skipKey)
+        try setValue(db, "1", pendingKey)
+    }
+
     static func isPending(_ db: SQLiteDatabase) -> Bool { value(db, pendingKey) != nil }
+
+    /// A refresh committed / a source deleted: its v6 rows must not be copied any more.
+    static func skipSource(_ db: SQLiteDatabase, _ sourceId: String) throws {
+        guard value(db, copyMaxKey) != nil else { return }
+        var list = Set((string(db, skipKey) ?? "").split(separator: "\n").map(String.init))
+        guard list.insert(sourceId).inserted else { return }
+        try setValue(db, list.sorted().joined(separator: "\n"), skipKey)
+    }
+
+    static func contentTable(_ kind: String) -> String? {
+        switch kind {
+        case "live": return "channels"
+        case "movie": return "movies"
+        case "series": return "series"
+        default: return nil
+        }
+    }
 
     /// Indexes up to `chunkSize` rows per transaction; stops after `maxChunks` (tests simulate a kill).
     /// Returns true when everything is indexed (flag cleared).
@@ -235,24 +322,23 @@ enum SearchBackfill {
     static func run(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int) throws -> Bool {
         guard db.hasFTS5, isPending(db) else { return true }
         var chunks = 0
+        if let max = value(db, copyMaxKey) {
+            while (value(db, copyAtKey) ?? 0) < max {
+                guard chunks < maxChunks else { return false }
+                chunks += 1
+                try db.transaction { try copyChunk(db, max: max, chunkSize: chunkSize) }
+            }
+            try db.transaction {
+                try db.execute("DROP TABLE IF EXISTS search_index_v6;")
+                for key in [copyMaxKey, copyAtKey, skipKey] { try setValue(db, nil, key) }
+            }
+        }
         for (table, kind) in tables {
-            let max = value(db, maxKey(table)) ?? 0
+            guard let max = value(db, maxKey(table)) else { continue }
             while (value(db, atKey(table)) ?? 0) < max {
                 guard chunks < maxChunks else { return false }
                 chunks += 1
-                try db.transaction {
-                    let at = value(db, atKey(table)) ?? 0
-                    let last = Int64(try db.scalar("""
-                        SELECT COALESCE(MAX(rowid), ?) FROM (SELECT rowid FROM \(table) WHERE rowid > ? AND rowid <= ?
-                        ORDER BY rowid LIMIT ?)
-                        """, [.int(max), .int(at), .int(max), .int(Int64(chunkSize))]))
-                    try db.run("""
-                        INSERT INTO search_index (title, people, source_id, kind, item_id)
-                        SELECT \(indexedTitle), '', source_id, '\(kind)', id FROM \(table)
-                        WHERE rowid > ? AND rowid <= ? AND source_id NOT LIKE '%\(AppDatabase.stagingSuffix)'
-                        """, [.int(at), .int(last)])
-                    try setValue(db, String(last), atKey(table))
-                }
+                try db.transaction { try contentChunk(db, table: table, kind: kind, max: max, chunkSize: chunkSize) }
             }
         }
         try db.transaction {
@@ -263,5 +349,116 @@ enum SearchBackfill {
             try setValue(db, nil, pendingKey)
         }
         return true
+    }
+
+    /// Description of an item: the content row's, else one learned from a detail fetch.
+    static func plot(_ db: SQLiteDatabase, table: String?, sourceId: String, kind: String, itemId: String) throws -> String {
+        if let table, table != "channels",
+           let p = try db.queryFirst("SELECT plot FROM \(table) WHERE source_id = ? AND id = ?", [.text(sourceId), .text(itemId)], map: { $0.optString(0) }) ?? nil,
+           !p.isEmpty {
+            return p
+        }
+        return try db.queryFirst("SELECT plot FROM item_plot WHERE source_id = ? AND kind = ? AND item_id = ?",
+                                 [.text(sourceId), .text(kind), .text(itemId)]) { $0.string(0) } ?? ""
+    }
+
+    static func detailPeople(_ db: SQLiteDatabase, sourceId: String, kind: String, itemId: String) throws -> String? {
+        try db.queryFirst("SELECT people FROM item_people WHERE source_id = ? AND kind = ? AND item_id = ?",
+                          [.text(sourceId), .text(kind), .text(itemId)]) { $0.string(0) }
+    }
+
+    private static func copyChunk(_ db: SQLiteDatabase, max: Int64, chunkSize: Int) throws {
+        let at = value(db, copyAtKey) ?? 0
+        let skip = Set((string(db, skipKey) ?? "").split(separator: "\n").map(String.init))
+        let rows = try db.query("""
+            SELECT rowid, title, people, source_id, kind, item_id FROM search_index_v6
+            WHERE rowid > ? AND rowid <= ? ORDER BY rowid LIMIT ?
+            """, [.int(at), .int(max), .int(Int64(chunkSize))]) {
+            (rowid: $0.int64(0), title: $0.string(1), people: $0.string(2), sourceId: $0.string(3), kind: $0.string(4), itemId: $0.string(5))
+        }
+        var terms = SearchTermCounter()
+        for r in rows where !skip.contains(r.sourceId) && !r.sourceId.hasSuffix(AppDatabase.stagingSuffix) {
+            let people = try detailPeople(db, sourceId: r.sourceId, kind: r.kind, itemId: r.itemId).map(CatalogPeople.indexed) ?? r.people
+            let plot = try plot(db, table: contentTable(r.kind), sourceId: r.sourceId, kind: r.kind, itemId: r.itemId)
+            try insert(db, title: r.title, people: people, plot: plot, sourceId: r.sourceId, kind: r.kind, itemId: r.itemId, indexed: true)
+            terms.add(r.sourceId, CatalogPeople.display(r.title))
+            terms.add(r.sourceId, CatalogPeople.display(people))
+        }
+        try terms.upsert(db)
+        try setValue(db, String(rows.last?.rowid ?? max), copyAtKey)
+    }
+
+    private static func contentChunk(_ db: SQLiteDatabase, table: String, kind: String, max: Int64, chunkSize: Int) throws {
+        let at = value(db, atKey(table)) ?? 0
+        let rows = try db.query("""
+            SELECT rowid, source_id, id, name FROM \(table) WHERE rowid > ? AND rowid <= ? ORDER BY rowid LIMIT ?
+            """, [.int(at), .int(max), .int(Int64(chunkSize))]) { (rowid: $0.int64(0), sourceId: $0.string(1), id: $0.string(2), name: $0.string(3)) }
+        var terms = SearchTermCounter()
+        for r in rows where !r.sourceId.hasSuffix(AppDatabase.stagingSuffix) {
+            let people = try detailPeople(db, sourceId: r.sourceId, kind: kind, itemId: r.id) ?? ""
+            let plot = try plot(db, table: table, sourceId: r.sourceId, kind: kind, itemId: r.id)
+            try insert(db, title: r.name, people: people, plot: plot, sourceId: r.sourceId, kind: kind, itemId: r.id, indexed: false)
+            terms.add(r.sourceId, r.name)
+            terms.add(r.sourceId, people)
+        }
+        try terms.upsert(db)
+        try setValue(db, String(rows.last?.rowid ?? max), atKey(table))
+    }
+
+    /// One search index row (`indexed`: title/people already carry the dotless-i variant).
+    static func insert(_ db: SQLiteDatabase, title: String, people: String, plot: String, sourceId: String, kind: String,
+                       itemId: String, indexed: Bool) throws {
+        try db.run("INSERT INTO search_index (title, people, plot, source_id, kind, item_id) VALUES (?,?,?,?,?,?)",
+                   [.text(indexed ? title : CatalogPeople.indexed(title)), .text(indexed ? people : CatalogPeople.indexed(people)),
+                    .text(CatalogPeople.indexed(String(plot.prefix(maxPlot)))), .text(sourceId), .text(kind), .text(itemId)])
+    }
+}
+
+/// Word counts of titles and people per source → `search_terms` (did-you-mean dictionary).
+struct SearchTermCounter {
+    /// sourceId → term → (display, count)
+    private(set) var counts: [String: [String: (display: String, count: Int)]] = [:]
+
+    mutating func add(_ sourceId: String, _ text: String) {
+        guard !text.isEmpty else { return }
+        for (term, display) in SearchText.terms(text) {
+            counts[sourceId, default: [:]][term, default: (display, 0)].count += 1
+        }
+    }
+
+    /// Adds the counts to the dictionary (backfill / detail fetch).
+    func upsert(_ db: SQLiteDatabase) throws {
+        for (sourceId, terms) in counts {
+            for (term, entry) in terms {
+                try db.run("""
+                    INSERT INTO search_terms (source_id, term, gram, display, freq) VALUES (?,?,?,?,?)
+                    ON CONFLICT (source_id, term) DO UPDATE SET freq = freq + excluded.freq
+                    """, [.text(sourceId), .text(term), .text(SearchText.gram(term)), .text(entry.display), .int(Int64(entry.count))])
+            }
+        }
+    }
+
+    /// Makes the dictionary of `sourceId` exactly these counts, touching only the terms that changed (a
+    /// refresh usually changes few words, so the trigram index sees little churn).
+    func replace(_ db: SQLiteDatabase, sourceId: String) throws {
+        let fresh = counts[sourceId] ?? [:]
+        let existing = try db.query("SELECT rowid, term, freq FROM search_terms WHERE source_id = ?", [.text(sourceId)]) {
+            (rowid: $0.int64(0), term: $0.string(1), freq: $0.int(2))
+        }
+        var known: Set<String> = []
+        for row in existing {
+            known.insert(row.term)
+            if let entry = fresh[row.term] {
+                if entry.count != row.freq {
+                    try db.run("UPDATE search_terms SET freq = ? WHERE rowid = ?", [.int(Int64(entry.count)), .int(row.rowid)])
+                }
+            } else {
+                try db.run("DELETE FROM search_terms WHERE rowid = ?", [.int(row.rowid)])
+            }
+        }
+        for (term, entry) in fresh where !known.contains(term) {
+            try db.run("INSERT INTO search_terms (source_id, term, gram, display, freq) VALUES (?,?,?,?,?)",
+                       [.text(sourceId), .text(term), .text(SearchText.gram(term)), .text(entry.display), .int(Int64(entry.count))])
+        }
     }
 }

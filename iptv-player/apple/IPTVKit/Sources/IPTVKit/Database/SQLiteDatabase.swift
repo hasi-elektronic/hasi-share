@@ -68,6 +68,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public let path: String
     /// Whether the linked SQLite has FTS5 (system SQLite on iOS/tvOS/macOS does).
     public private(set) var hasFTS5 = false
+    /// Whether FTS5's `trigram` tokenizer exists (SQLite ≥ 3.34; iOS/tvOS 17 ship 3.39) – typo-tolerant search.
+    public private(set) var hasTrigram = false
 
     /// Opens (creating) a database. `path == nil` → private in-memory database (tests).
     public init(path: String?) throws {
@@ -87,6 +89,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try execute("PRAGMA foreign_keys = OFF; PRAGMA temp_store = MEMORY;")
         if path != nil { try execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;") }
         hasFTS5 = (try? execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.__fts5_probe USING fts5(x); DROP TABLE temp.__fts5_probe;")) != nil
+        hasTrigram = hasFTS5 && (try? execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS temp.__tri_probe USING fts5(x, tokenize = 'trigram'); DROP TABLE temp.__tri_probe;")) != nil
     }
 
     deinit {

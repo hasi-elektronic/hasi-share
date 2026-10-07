@@ -234,6 +234,115 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(ms3, 100 * factor, "title search \(ms3) ms")
     }
 
+    /// Deterministic word-like vocabulary (syllables), so titles/plots/names have realistic distinct terms.
+    static func vocabulary(_ count: Int, seed: UInt64) -> [String] {
+        let syllables = ["ka", "ya", "ha", "san", "mer", "lin", "tor", "de", "ni", "ze", "ro", "bu", "lu", "şe", "çi",
+                         "gü", "ö", "ran", "ter", "mo", "na", "vi", "es", "tan", "bul", "ar", "ken", "dı", "fe", "pa"]
+        var state = seed
+        func next() -> Int {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Int(truncatingIfNeeded: state >> 33)
+        }
+        var seen = Set<String>()
+        var words: [String] = []
+        while words.count < count {
+            let word = (0..<(2 + next() % 3)).map { _ in syllables[next() % syllables.count] }.joined()
+            if seen.insert(word).inserted { words.append(word) }
+        }
+        return words
+    }
+
+    /// 50 000 movies with ~150-character descriptions + 10 000 series, titles/people/plots from a 30k-word
+    /// vocabulary: description search (overview: titles, people, descriptions) and the did-you-mean correction
+    /// (trigram dictionary of ~30k title/person words) with the search of the corrected query.
+    func testDescriptionAndFuzzySearchUnderBudget() throws {
+        let db = try AppDatabase.inMemory()
+        let repo = CatalogRepository(database: db)
+        let words = Self.vocabulary(30_000, seed: 7)
+        let names = Self.vocabulary(3_000, seed: 11).map { $0.capitalized }
+        func w(_ i: Int) -> String { words[(i &* 7919) % words.count] }
+        func person(_ i: Int) -> String { "\(names[i % names.count]) \(names[(i / 7 + 13) % names.count])" }
+        let session = try repo.beginRefresh(sourceId: "p")
+        for chunk in stride(from: 0, to: Self.n, by: 1000) {
+            try session.write(movies: (chunk..<(chunk + 1000)).map { i in
+                let plot = (0..<18).map { w(i * 31 + $0 * 17) }.joined(separator: " ") + (i % 500 == 0 ? " Hasan Can Kaya konuk." : "") + " Film anlatıyor."
+                return Movie(sourceId: "p", id: "m\(i)", name: "\(w(i).capitalized) \(w(i + 1))", plot: plot, sort: i,
+                             cast: "\(person(i)), \(person(i + 3))", director: person(i + 5))
+            })
+        }
+        try session.write(series: (0..<10_000).map { i in
+            Series(sourceId: "p", id: "t\(i)", name: "\(w(i + 99).capitalized) \(w(i + 7))", plot: (0..<12).map { w(i * 13 + $0) }.joined(separator: " "),
+                   sort: i, cast: person(i + 1), director: nil)
+        })
+        try session.commit()
+
+        var hits: [SearchHit] = []
+        let ms = try median { hits = try repo.search("hasan can kaya", sourceId: "p") }
+        report("description phrase search 'hasan can kaya' (50k movies with plots + 10k series)", ms, budget: 100)
+        XCTAssertEqual(hits.filter { $0.match == .description }.count, 30)
+        XCTAssertTrue(hits.filter { $0.match == .description }.allSatisfy { $0.snippet?.matchedWords == ["Hasan", "Can", "Kaya"] })
+        XCTAssertLessThan(ms, 100 * factor, "description search \(ms) ms")
+
+        // A word of every description (50 000 description matches to rank).
+        let ms2 = try median { hits = try repo.search("anlatiyor", sourceId: "p") }
+        report("search 'anlatiyor' (in all 50k descriptions)", ms2, budget: 100)
+        XCTAssertEqual(hits.filter { $0.match == .description }.count, 30)
+        XCTAssertLessThan(ms2, 100 * factor, "search \(ms2) ms")
+
+        guard db.db.hasTrigram else { return }
+        // "Did you mean": two typos in a title word + a person name.
+        let target = w(1234)
+        var letters = Array(target)
+        letters.swapAt(1, 2)
+        let typo = String(letters) + " " + String(names[42].lowercased().dropFirst())
+        var corrected: String?
+        let ms3 = try median {
+            corrected = try repo.correction(for: typo, sourceId: "p")
+            if let corrected { hits = try repo.search(corrected, sourceId: "p", perKindLimit: 10) }
+        }
+        report("did-you-mean '\(typo)' → '\(corrected ?? "-")' + search (~30k dictionary words)", ms3, budget: 150)
+        XCTAssertNotNil(corrected)
+        XCTAssertLessThan(ms3, 150 * factor, "fuzzy \(ms3) ms")
+        let ms4 = try median { _ = try repo.completions(String(target.prefix(4)), sourceId: "p") }
+        report("suggestions '\(target.prefix(4))'", ms4, budget: 100)
+        XCTAssertLessThan(ms4, 100 * factor, "suggestions \(ms4) ms")
+    }
+
+    /// TV programme search over ~500 000 EPG rows (10 000 channels x 50 programmes): the per-source title index
+    /// + the time window stay within 100 ms for a word in every 10th programme.
+    func testProgrammeSearchUnderBudget() throws {
+        let (db, repo) = try makeCatalog()
+        try db.db.run("INSERT INTO sources (id, sort, json) VALUES ('s', 0, '{}')")
+        let now = Date()
+        let epg = EpgRepository(database: db)
+        let titles = ["Haberler", "Spor Merkezi", "Akşam Filmi", "Belgesel Kuşağı", "Çocuk Saati", "Derby Day", "Müzik Listesi",
+                      "Hava Durumu", "Gece Haberleri", "Sabah Programı"]
+        let session = try epg.beginRefresh(sourceId: "s")
+        for chunk in stride(from: 0, to: 10_000, by: 500) {
+            var programs: [EpgProgram] = []
+            for c in chunk..<(chunk + 500) {
+                for p in 0..<50 {
+                    let start = now.addingTimeInterval(Double(p - 20) * 3600 + Double(c % 60) * 60)
+                    programs.append(EpgProgram(sourceId: "s", channelEpgId: "e\(c)", start: start, end: start.addingTimeInterval(3600),
+                                               title: "\(titles[(c + p) % titles.count]) \(p)"))
+                }
+            }
+            try session.write(programs)
+        }
+        try session.commit()
+        XCTAssertEqual(try epg.programCount(sourceId: "s"), 500_000)
+        let engine = SearchEngine(catalog: repo, epg: epg, sourceId: "s")
+        var page: (items: [ProgrammeHit], consumed: Int, end: Bool) = ([], 0, true)
+        let ms = try median { page = try engine.programmes("derby", offset: 0, limit: 30, now: now) }
+        report("programme search 'derby' (500k EPG rows, window -2 h…+48 h)", ms, budget: 100)
+        XCTAssertEqual(page.items.count, 30)
+        XCTAssertEqual(page.items.first?.state, .live)
+        XCTAssertLessThan(ms, 100 * factor, "programme search \(ms) ms")
+        let ms2 = try median { page = try engine.programmes("haberleri", offset: 0, limit: 30, now: now) }
+        report("programme search 'haberleri' (prefix, 500k rows)", ms2, budget: 100)
+        XCTAssertLessThan(ms2, 100 * factor, "programme search \(ms2) ms")
+    }
+
     /// The repository's real EPG SQL must be served by the `epg_lookup_lc` expression index (deterministic
     /// guard that does not depend on machine speed).
     func testEpgQueriesUseChannelIndex() throws {

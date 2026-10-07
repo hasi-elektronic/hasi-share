@@ -49,6 +49,8 @@ public final class AppEnvironment {
     public let favorites: FavoritesController
     /// Movies/Series category navigation: country, pinned, recent, hidden (per source + kind, device-local).
     public let categoryPrefs: CategoryPreferences
+    /// Last searches per source (device-local, SCREENS §3.6).
+    @ObservationIgnored public let recentSearches: RecentSearchStore
     @ObservationIgnored public let secureStore: any SecureStore
     public let settings: AppSettings
     public let store: StoreManager
@@ -82,6 +84,7 @@ public final class AppEnvironment {
         library = LibraryRepository(database: database)
         favorites = FavoritesController(library: library, kv: kv, now: { Int64(Date().timeIntervalSince1970 * 1000) })
         categoryPrefs = CategoryPreferences(kv: kv)
+        recentSearches = RecentSearchStore(kv: kv)
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
@@ -105,12 +108,12 @@ public final class AppEnvironment {
         wire()
         sourceRepository.registerSecretsForRedaction()
         reloadSources()
-        // Search index v6: titles of older catalogs are re-indexed in the background, never at launch.
-        if database.searchBackfillPending {
-            let catalog = self.catalog
-            Task.detached(priority: .utility) {
-                do { try catalog.backfillSearchIndex() } catch { SafeLog.warning("search backfill failed") }
-            }
+        // Search index v6/v7: older catalogs are (re-)indexed in the background, never at launch; EPG stored
+        // before Build 11 gets its programme title index the same way (cheap no-op when nothing is missing).
+        let catalog = self.catalog, epg = self.epg
+        Task.detached(priority: .utility) {
+            do { try catalog.backfillSearchIndex() } catch { SafeLog.warning("search backfill failed") }
+            do { try epg.maintainSearchIndex() } catch { SafeLog.warning("epg search index failed") }
         }
     }
 

@@ -207,10 +207,11 @@ public final class MoviesViewModel {
         guard case .xtream(let secrets)? = env.secrets(for: movie.sourceId),
               let client = XtreamClient(sourceId: movie.sourceId, secrets: secrets) else { return nil }
         let info = try? await client.vodInfo(vodId: movie.id)
-        if let info {   // cast/director become searchable (people search, SCREENS §3.6); off the main actor
+        if let info {   // cast/director + description become searchable (SCREENS §3.6); off the main actor
             let catalog = env.catalog
             Task.detached(priority: .utility) {
-                try? catalog.updatePeople(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast, director: info.director)
+                try? catalog.updateDetails(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast,
+                                           director: info.director, plot: info.plot)
             }
         }
         return info
@@ -299,8 +300,9 @@ public final class SeriesDetailViewModel {
                 try? env.catalog.replaceEpisodes(sourceId: series.sourceId, seriesId: series.id, episodes: episodes)
                 let catalog = env.catalog, item = series, details = info.details
                 Task.detached(priority: .utility) {
-                    try? catalog.updatePeople(sourceId: item.sourceId, kind: .series, itemId: item.id,
-                                              cast: details.cast ?? item.cast, director: details.director ?? item.director)
+                    try? catalog.updateDetails(sourceId: item.sourceId, kind: .series, itemId: item.id,
+                                               cast: details.cast ?? item.cast, director: details.director ?? item.director,
+                                               plot: details.plot)
                 }
             }
         }
@@ -442,61 +444,6 @@ extension Array {
         for index in offsets.sorted(by: >) where indices.contains(index) { remove(at: index) }
         insert(contentsOf: moving, at: Swift.min(Swift.max(destination - removedBefore, 0), count))
     }
-}
-
-/// Search with 250 ms debounce over FTS5.
-@MainActor
-@Observable
-public final class SearchViewModel {
-    public var query = "" { didSet { schedule() } }
-    /// Title hits per kind (live → movie → series), then person hits (`matchedPerson` set).
-    public private(set) var hits: [SearchHit] = []
-    /// Matching categories (movie, series, live; hidden ones left out), at most 12 – shown first.
-    public private(set) var categories: [CategoryInfo] = []
-    /// Hidden live categories of a source (Live TV's local hidden list lives in the app layer).
-    @ObservationIgnored public var hiddenLiveCategories: (String) -> Set<String> = { _ in [] }
-    @ObservationIgnored private let env: AppEnvironment
-    @ObservationIgnored private var task: Task<Void, Never>?
-
-    public init(env: AppEnvironment) {
-        self.env = env
-    }
-
-    public var titleHits: [SearchHit] { hits.filter { !$0.isPersonMatch } }
-    public var personHits: [SearchHit] { hits.filter(\.isPersonMatch) }
-    public var isEmpty: Bool { hits.isEmpty && categories.isEmpty }
-
-    private func schedule() {
-        task?.cancel()
-        let text = query
-        task = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled, let self else { return }
-            let sourceId = env.currentSource?.id
-            hits = (try? env.catalog.search(text, sourceId: sourceId)) ?? []
-            guard let sourceId else { categories = []; return }
-            let prefs = env.categoryPrefs
-            let hiddenLive = hiddenLiveCategories(sourceId)
-            categories = CatalogRepository.matchCategories(text, infos: categoryInfos(sourceId: sourceId)) { kind in
-                kind == .live ? hiddenLive : prefs.hidden(sourceId: sourceId, kind: kind)
-            }
-        }
-    }
-
-    /// Category lists per source, cached until the catalog changes (not three GROUP BY queries per keystroke).
-    @ObservationIgnored private var categoryCache: (key: String, infos: [CategoryInfo])?
-
-    private func categoryInfos(sourceId: String) -> [CategoryInfo] {
-        let key = "\(sourceId)|\(env.catalogVersion)"
-        if let categoryCache, categoryCache.key == key { return categoryCache.infos }
-        let infos = [CategoryKind.movie, .series, .live].flatMap { (try? env.catalog.categoryInfos(sourceId: sourceId, kind: $0)) ?? [] }
-        categoryCache = (key, infos)
-        return infos
-    }
-
-    public func channel(_ hit: SearchHit) -> Channel? { (try? env.catalog.channel(sourceId: hit.sourceId, id: hit.itemId)) ?? nil }
-    public func movie(_ hit: SearchHit) -> Movie? { (try? env.catalog.movie(sourceId: hit.sourceId, id: hit.itemId)) ?? nil }
-    public func series(_ hit: SearchHit) -> Series? { (try? env.catalog.seriesItem(sourceId: hit.sourceId, id: hit.itemId)) ?? nil }
 }
 
 /// EPG grid (time axis, 30 min = fixed width, "now" line).

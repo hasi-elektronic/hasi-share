@@ -39,7 +39,7 @@ final class DatabaseMigrationTests: XCTestCase {
 
         // Reopen with the current code.
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 6)
+        XCTAssertEqual(db.db.userVersion, 7)
         XCTAssertEqual(db.value(forKey: "k"), "kept")
         XCTAssertEqual(try CatalogRepository(database: db).channelCount(sourceId: "s"), 1)
         let epg = EpgRepository(database: db)
@@ -62,7 +62,7 @@ final class DatabaseMigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         _ = try AppDatabase(db: SQLiteDatabase(path: path))
         let again = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(again.db.userVersion, 6)
+        XCTAssertEqual(again.db.userVersion, 7)
     }
 
     /// A v2 database (no `item_categories`) keeps its category lists: v3 backfills memberships from `category_id`.
@@ -82,7 +82,7 @@ final class DatabaseMigrationTests: XCTestCase {
             db.db.userVersion = 2
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 6)
+        XCTAssertEqual(db.db.userVersion, 7)
         let catalog = CatalogRepository(database: db)
         XCTAssertEqual(try catalog.channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
         XCTAssertEqual(try catalog.channelCount(sourceId: "s", categoryId: "de"), 1)
@@ -107,7 +107,7 @@ final class DatabaseMigrationTests: XCTestCase {
             db.db.userVersion = 4
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 6)
+        XCTAssertEqual(db.db.userVersion, 7)
         let indexes = try db.db.query("SELECT name FROM sqlite_master WHERE type = 'index'") { $0.string(0) }
         for name in ["channels_cat", "movies_cat", "series_cat"] { XCTAssertFalse(indexes.contains(name), name) }
         XCTAssertTrue(indexes.contains("item_categories_sort"))

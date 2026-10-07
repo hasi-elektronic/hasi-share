@@ -34,7 +34,7 @@ final class SearchViewModelTests: XCTestCase {
         XCTAssertEqual(model.hits.filter { $0.kind == .movie }.count, 30)
         XCTAssertEqual(model.hits.filter { $0.kind == .series }.count, 20)
         XCTAssertEqual(model.hits.first?.kind, .live, "channels group first")
-        XCTAssertNotNil(model.channel(try XCTUnwrap(model.hits.first)))
+        XCTAssertNotNil(model.results.channels.first, "resolved to a channel")
 
         model.query = "trt"
         try await Task.sleep(for: .milliseconds(600))
