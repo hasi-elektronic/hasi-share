@@ -58,39 +58,21 @@ public struct SQLiteRow {
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-/// Thin, thread-safe wrapper over the system SQLite3 library. All calls are serialized by a
-/// recursive lock (so `transaction` bodies may call `run`/`query`); callers keep work off the
-/// main thread for large writes (refresh), small paged reads are cheap.
-public final class SQLiteDatabase: @unchecked Sendable {
-    private var handle: OpaquePointer?
-    private let lock = NSRecursiveLock()
+/// One SQLite connection: handle, recursive lock, statement cache.
+final class SQLiteConnection: @unchecked Sendable {
+    fileprivate var handle: OpaquePointer?
+    let lock = NSRecursiveLock()
     private var statementCache: [String: OpaquePointer] = [:]
-    public let path: String
-    /// Whether the linked SQLite has FTS5 (system SQLite on iOS/tvOS/macOS does).
-    public private(set) var hasFTS5 = false
-    /// Whether FTS5's `trigram` tokenizer exists (SQLite ≥ 3.34; iOS/tvOS 17 ship 3.39) – typo-tolerant search.
-    public private(set) var hasTrigram = false
 
-    /// Opens (creating) a database. `path == nil` → private in-memory database (tests).
-    public init(path: String?) throws {
-        self.path = path ?? ":memory:"
-        var flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
-        #if os(iOS) || os(tvOS)
-        if path != nil { flags |= SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION }
-        #endif
+    init(path: String, flags: Int32) throws {
         var db: OpaquePointer?
-        let rc = sqlite3_open_v2(self.path, &db, flags, nil)
+        let rc = sqlite3_open_v2(path, &db, flags, nil)
         guard rc == SQLITE_OK, let db else {
             let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "open failed"
             sqlite3_close(db)
             throw SQLiteError(code: rc, message: msg)
         }
         handle = db
-        try execute("PRAGMA foreign_keys = OFF; PRAGMA temp_store = MEMORY;")
-        if path != nil { try execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;") }
-        hasFTS5 = (try? execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.__fts5_probe USING fts5(x); DROP TABLE temp.__fts5_probe;")) != nil
-        hasTrigram = hasFTS5 && (try? execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS temp.__tri_probe USING fts5(x, tokenize = 'trigram'); DROP TABLE temp.__tri_probe;")) != nil
     }
 
     deinit {
@@ -98,12 +80,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
         sqlite3_close_v2(handle)
     }
 
-    private func error(_ rc: Int32) -> SQLiteError {
+    func error(_ rc: Int32) -> SQLiteError {
         SQLiteError(code: rc, message: handle.map { String(cString: sqlite3_errmsg($0)) } ?? "closed")
     }
 
-    /// Executes one or more statements without parameters.
-    public func execute(_ sql: String) throws {
+    func execute(_ sql: String) throws {
         lock.lock(); defer { lock.unlock() }
         var err: UnsafeMutablePointer<CChar>?
         let rc = sqlite3_exec(handle, sql, nil, nil, &err)
@@ -127,6 +108,15 @@ public final class SQLiteDatabase: @unchecked Sendable {
         return stmt
     }
 
+    /// Finalizes cached statements whose SQL mentions `fragment` (a dropped per-source table).
+    func evictStatements(containing fragment: String) {
+        lock.lock(); defer { lock.unlock() }
+        for (sql, stmt) in statementCache where sql.contains(fragment) {
+            sqlite3_finalize(stmt)
+            statementCache[sql] = nil
+        }
+    }
+
     private func bind(_ stmt: OpaquePointer, _ args: [SQLiteValue]) throws {
         for (i, value) in args.enumerated() {
             let idx = Int32(i + 1)
@@ -143,9 +133,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
-    /// Runs a write statement; returns the number of changed rows.
-    @discardableResult
-    public func run(_ sql: String, _ args: [SQLiteValue] = []) throws -> Int {
+    func run(_ sql: String, _ args: [SQLiteValue]) throws -> Int {
         lock.lock(); defer { lock.unlock() }
         let stmt = try statement(sql)
         defer { sqlite3_reset(stmt) }
@@ -156,9 +144,12 @@ public final class SQLiteDatabase: @unchecked Sendable {
         return Int(sqlite3_changes(handle))
     }
 
-    /// Runs a query and maps every row.
-    public func query<T>(_ sql: String, _ args: [SQLiteValue] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
+    func query<T>(_ sql: String, _ args: [SQLiteValue], map: (SQLiteRow) throws -> T) throws -> [T] {
         lock.lock(); defer { lock.unlock() }
+        // Stale searches: a cancelled task interrupts its statement (SQLITE_INTERRUPT) instead of running on.
+        let interruptible = SQLiteDatabase.interruptsOnCancel
+        if interruptible { sqlite3_progress_handler(handle, 1000, sqliteCancelCheck, nil) }
+        defer { if interruptible { sqlite3_progress_handler(handle, 0, nil, nil) } }
         let stmt = try statement(sql)
         defer { sqlite3_reset(stmt) }
         try bind(stmt, args)
@@ -175,6 +166,86 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
         return out
     }
+}
+
+/// Progress handler: non-zero interrupts the running statement when the current task is cancelled.
+private func sqliteCancelCheck(_: UnsafeMutableRawPointer?) -> Int32 {
+    withUnsafeCurrentTask { $0?.isCancelled == true } ? 1 : 0
+}
+
+/// Thread-safe wrapper over the system SQLite3 library: one **writer** connection (all writes, and every
+/// read made inside a transaction on the thread that holds it) and – for an on-disk database – one
+/// **read-only** connection for all other reads. In WAL mode the reader sees the last committed state and is
+/// never blocked by a writer, so a catalog refresh or a background re-index never freezes main-actor reads
+/// (ARCHITECTURE §3.1). Each connection is serialized by a recursive lock (`transaction` bodies may call
+/// `run`/`query`).
+public final class SQLiteDatabase: @unchecked Sendable {
+    private let writer: SQLiteConnection
+    private let reader: SQLiteConnection?
+    /// Thread currently inside `transaction` on the writer (its reads must see its own uncommitted writes).
+    private var transactionOwner: pthread_t?
+    private var transactionDepth = 0
+    /// Guards `transactionOwner` only (never the writer lock: a read must not wait for a running transaction).
+    private let ownerLock = NSLock()
+    public let path: String
+    /// Whether the linked SQLite has FTS5 (system SQLite on iOS/tvOS/macOS does).
+    public private(set) var hasFTS5 = false
+    /// Whether FTS5's `trigram` tokenizer exists (SQLite ≥ 3.34; iOS/tvOS 17 ship 3.39) – typo-tolerant search.
+    public private(set) var hasTrigram = false
+    /// True when reads use their own connection (on-disk database).
+    public var hasReadConnection: Bool { reader != nil }
+
+    /// Reads in a task with this set are interrupted when the task is cancelled (stale searches).
+    @TaskLocal public static var interruptsOnCancel = false
+
+    /// Opens (creating) a database. `path == nil` → private in-memory database (tests; no read connection).
+    public init(path: String?) throws {
+        self.path = path ?? ":memory:"
+        var flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
+        #if os(iOS) || os(tvOS)
+        if path != nil { flags |= SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION }
+        #endif
+        writer = try SQLiteConnection(path: self.path, flags: flags)
+        try writer.execute("PRAGMA foreign_keys = OFF; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -32000;")
+        if path != nil { try writer.execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;") }
+        if path != nil {
+            var readFlags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+            #if os(iOS) || os(tvOS)
+            readFlags |= SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION
+            #endif
+            reader = try? SQLiteConnection(path: self.path, flags: readFlags)
+            try? reader?.execute("PRAGMA temp_store = MEMORY;")
+        } else {
+            reader = nil
+        }
+        hasFTS5 = (try? writer.execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.__fts5_probe USING fts5(x); DROP TABLE temp.__fts5_probe;")) != nil
+        hasTrigram = hasFTS5 && (try? writer.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS temp.__tri_probe USING fts5(x, tokenize = 'trigram'); DROP TABLE temp.__tri_probe;")) != nil
+    }
+
+    /// Connection for a read: the writer inside this thread's transaction, else the reader.
+    private var readConnection: SQLiteConnection {
+        guard let reader else { return writer }
+        ownerLock.lock(); defer { ownerLock.unlock() }
+        if let owner = transactionOwner, pthread_equal(owner, pthread_self()) != 0 { return writer }
+        return reader
+    }
+
+    /// Executes one or more statements without parameters (writer).
+    public func execute(_ sql: String) throws {
+        try writer.execute(sql)
+    }
+
+    /// Runs a write statement; returns the number of changed rows.
+    @discardableResult
+    public func run(_ sql: String, _ args: [SQLiteValue] = []) throws -> Int {
+        try writer.run(sql, args)
+    }
+
+    /// Runs a query and maps every row.
+    public func query<T>(_ sql: String, _ args: [SQLiteValue] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
+        try readConnection.query(sql, args, map: map)
+    }
 
     /// First row of a query, if any.
     public func queryFirst<T>(_ sql: String, _ args: [SQLiteValue] = [], map: (SQLiteRow) throws -> T) throws -> T? {
@@ -186,24 +257,50 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try queryFirst(sql, args) { $0.int(0) } ?? 0
     }
 
-    /// Runs `body` in a transaction (nested calls join the outer one via savepoints).
+    /// Forgets cached statements that mention `fragment` on both connections (a dropped table).
+    public func evictStatements(containing fragment: String) {
+        writer.evictStatements(containing: fragment)
+        reader?.evictStatements(containing: fragment)
+    }
+
+    /// Runs `body` in a transaction on the writer (nested calls join the outer one via savepoints). Reads of the
+    /// calling thread inside `body` go to the writer and see the uncommitted changes; other threads keep
+    /// reading the last committed state from the reader without waiting.
     public func transaction<T>(_ body: () throws -> T) throws -> T {
-        lock.lock(); defer { lock.unlock() }
+        writer.lock.lock(); defer { writer.lock.unlock() }
+        ownerLock.lock()
+        if transactionDepth == 0 { transactionOwner = pthread_self() }
+        transactionDepth += 1
+        ownerLock.unlock()
+        defer {
+            ownerLock.lock()
+            transactionDepth -= 1
+            if transactionDepth == 0 { transactionOwner = nil }
+            ownerLock.unlock()
+        }
         let name = "sp\(UInt32.random(in: 0...UInt32.max))"
-        try execute("SAVEPOINT \(name)")
+        try writer.execute("SAVEPOINT \(name)")
         do {
             let result = try body()
-            try execute("RELEASE \(name)")
+            try writer.execute("RELEASE \(name)")
             return result
         } catch {
-            try? execute("ROLLBACK TO \(name); RELEASE \(name)")
+            try? writer.execute("ROLLBACK TO \(name); RELEASE \(name)")
             throw error
         }
     }
 
-    /// `PRAGMA user_version`.
+    /// Runs `body` with the writer lock if it is free right now (or already held by this thread); nil when
+    /// another thread is writing (a refresh commit) – the caller can defer the write instead of blocking.
+    public func ifWriterFree<T>(_ body: () throws -> T) rethrows -> T? {
+        guard writer.lock.try() else { return nil }
+        defer { writer.lock.unlock() }
+        return try body()
+    }
+
+    /// `PRAGMA user_version` (writer: the migration's own view).
     public var userVersion: Int {
-        get { (try? scalar("PRAGMA user_version")) ?? 0 }
-        set { try? execute("PRAGMA user_version = \(newValue)") }
+        get { (try? writer.query("PRAGMA user_version", []) { $0.int(0) }.first) ?? 0 }
+        set { try? writer.execute("PRAGMA user_version = \(newValue)") }
     }
 }

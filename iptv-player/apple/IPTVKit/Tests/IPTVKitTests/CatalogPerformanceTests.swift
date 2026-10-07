@@ -291,6 +291,16 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertEqual(hits.filter { $0.match == .description }.count, 30)
         XCTAssertLessThan(ms2, 100 * factor, "search \(ms2) ms")
 
+        // Typing the first letters: titles only (Build 12 review: 342 ms for "k" in Build 11).
+        let engine = SearchEngine(catalog: repo, epg: EpgRepository(database: db), sourceId: "p")
+        for q in ["k", "a", "ka"] {
+            var r = SearchResults()
+            let msShort = try median { r = try engine.overview(q, infos: []) }
+            report("overview short query '\(q)' (60k items)", msShort, budget: 100)
+            XCTAssertFalse(r.movies.isEmpty)
+            XCTAssertLessThan(msShort, 100 * factor, "short query \(q) \(msShort) ms")
+        }
+
         guard db.db.hasTrigram else { return }
         // "Did you mean": two typos in a title word + a person name.
         let target = w(1234)
@@ -331,7 +341,9 @@ final class CatalogPerformanceTests: XCTestCase {
             }
             try session.write(programs)
         }
+        let commitStart = DispatchTime.now()
         try session.commit()
+        print("PERF epg refresh commit (500k rows, in memory): \(String(format: "%.0f", CatalogRefreshSession.ms(since: commitStart))) ms")
         XCTAssertEqual(try epg.programCount(sourceId: "s"), 500_000)
         let engine = SearchEngine(catalog: repo, epg: epg, sourceId: "s")
         var page: (items: [ProgrammeHit], consumed: Int, end: Bool) = ([], 0, true)

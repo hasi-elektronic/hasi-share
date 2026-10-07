@@ -939,9 +939,8 @@ public final class PlayerController {
 
     private func recordLiveWatch() {
         guard let request, request.isLive, let key = request.contentKey, let library else { return }
-        _ = try? library.saveProgress(contentKey: key, title: request.title, kind: .live, positionMs: 0, durationMs: 0,
-                                      posterUrl: request.posterUrl, nowMs: nowMs())
-        onLibraryChange?()
+        library.saveProgressWithoutBlocking(contentKey: key, title: request.title, kind: .live, positionMs: 0, durationMs: 0,
+                                            posterUrl: request.posterUrl, nowMs: nowMs()) { [weak self] in self?.onLibraryChange?() }
     }
 
     /// Progress save interval while playing (SCREENS §3.7: every 10 s + on pause/exit).
@@ -960,9 +959,10 @@ public final class PlayerController {
         if case .episode(let e, _) = request.item, let fp = request.sourceFingerprint {
             seriesKey = ContentKey.make(fingerprint: fp, kind: .series, itemId: e.seriesId)
         }
-        _ = try? library.saveProgress(contentKey: key, title: request.title, kind: request.contentKind,
-                                      positionMs: Int64(currentTime * 1000), durationMs: Int64(max(0, duration) * 1000),
-                                      posterUrl: request.posterUrl, seriesKey: seriesKey, nowMs: nowMs())
-        onLibraryChange?()
+        library.saveProgressWithoutBlocking(contentKey: key, title: request.title, kind: request.contentKind,
+                                            positionMs: Int64(currentTime * 1000), durationMs: Int64(max(0, duration) * 1000),
+                                            posterUrl: request.posterUrl, seriesKey: seriesKey, nowMs: nowMs()) { [weak self] in
+            self?.onLibraryChange?()
+        }
     }
 }

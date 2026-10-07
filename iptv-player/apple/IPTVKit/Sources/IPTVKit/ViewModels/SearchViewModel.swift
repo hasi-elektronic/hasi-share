@@ -2,19 +2,26 @@ import Foundation
 import IPTVCore
 import Observation
 
-/// Last searches of a source, newest first, at most 10 (device-local, SCREENS §3.6).
+/// Last searches of a source, newest first, at most 10 (device-local, SCREENS §3.6). Kept in the catalog
+/// database's `kv` table – excluded from iCloud/device backups like the rest of the catalog (queries can be
+/// personal) – and removed with the source.
 public final class RecentSearchStore: Sendable {
     public static let limit = 10
-    private let kv: any KeyValueStore
+    private let database: AppDatabase
 
-    public init(kv: any KeyValueStore) {
-        self.kv = kv
+    public init(database: AppDatabase) {
+        self.database = database
     }
 
     private func key(_ sourceId: String) -> String { "search.recent.\(sourceId)" }
 
     public func recent(sourceId: String) -> [String] {
-        kv.value([String].self, forKey: key(sourceId)) ?? []
+        database.value(forKey: key(sourceId)).flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+    }
+
+    private func store(_ list: [String], sourceId: String) {
+        let json = (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) }
+        database.setValue(list.isEmpty ? nil : json, forKey: key(sourceId))
     }
 
     /// Adds `query` on top (case/diacritics-insensitive duplicates removed). Blank queries are ignored.
@@ -24,19 +31,19 @@ public final class RecentSearchStore: Sendable {
         guard !trimmed.isEmpty else { return recent(sourceId: sourceId) }
         let folded = CategoryCountry.fold(trimmed)
         let list = Array(([trimmed] + recent(sourceId: sourceId).filter { CategoryCountry.fold($0) != folded }).prefix(Self.limit))
-        kv.setValue(list, forKey: key(sourceId))
+        store(list, sourceId: sourceId)
         return list
     }
 
     @discardableResult
     public func remove(_ query: String, sourceId: String) -> [String] {
         let list = recent(sourceId: sourceId).filter { $0 != query }
-        kv.setValue(list, forKey: key(sourceId))
+        store(list, sourceId: sourceId)
         return list
     }
 
     public func clear(sourceId: String) {
-        kv.setValue([String](), forKey: key(sourceId))
+        store([], sourceId: sourceId)
     }
 }
 
@@ -84,12 +91,15 @@ public struct ProgrammeHit: Identifiable, Sendable, Hashable {
     public var program: EpgProgram
     public var channel: Channel
     public var state: State
-    public var id: String { "\(channel.id)|\(Int(program.start.timeIntervalSince1970))|\(program.title)" }
+    /// `epg.rowid` – unique even when the XMLTV lists a programme twice (stable tvOS focus identity).
+    public var rowid: Int64
+    public var id: String { "\(rowid)|\(channel.id)" }
 
-    public init(program: EpgProgram, channel: Channel, state: State) {
+    public init(program: EpgProgram, channel: Channel, state: State, rowid: Int64 = 0) {
         self.program = program
         self.channel = channel
         self.state = state
+        self.rowid = rowid
     }
 }
 
@@ -169,7 +179,11 @@ public struct SearchEngine: Sendable {
         r.query = text
         guard !SearchText.tokens(text).isEmpty else { return r }
         r.categories = sourceId == nil ? [] : categories(text, infos: infos)
-        let hits = try catalog.search(text, sourceId: sourceId, perKindLimit: Self.perSectionLimit)
+        // 1–2 letters match a large part of the catalog: titles only (people, descriptions, programmes and the
+        // correction start at 3 letters).
+        let full = Self.isFullQuery(text)
+        let hits = full ? try catalog.search(text, sourceId: sourceId, perKindLimit: Self.perSectionLimit)
+            : try catalog.searchTitles(text, sourceId: sourceId, perKindLimit: Self.perSectionLimit)
         try Task.checkCancellation()
         let items = try resolve(hits, now: now)
         r.channels = items.filter { $0.hit.match == .title && $0.hit.kind == .live }
@@ -177,9 +191,10 @@ public struct SearchEngine: Sendable {
         r.series = items.filter { $0.hit.match == .title && $0.hit.kind == .series }
         r.people = items.filter { $0.hit.match == .person }
         r.descriptions = items.filter { $0.hit.match == .description }
+        guard full else { return r }
         r.programmes = try programmes(text, offset: 0, limit: Self.perSectionLimit, now: now).items
         try Task.checkCancellation()
-        if r.contentCount < Self.fuzzyThreshold, let corrected = try catalog.correction(for: text, sourceId: sourceId),
+        if r.contentCount < Self.fuzzyThreshold, let corrected = (try? catalog.correction(for: text, sourceId: sourceId)) ?? nil,
            CategoryCountry.fold(corrected) != CategoryCountry.fold(text) {
             let shown = Set(items.map(\.hit.id))
             let similar = try resolve(try catalog.search(corrected, sourceId: sourceId, perKindLimit: 10), now: now)
@@ -190,6 +205,9 @@ public struct SearchEngine: Sendable {
         }
         return r
     }
+
+    /// At least 3 letters/digits: people, descriptions, programmes and did-you-mean are searched too.
+    public static func isFullQuery(_ text: String) -> Bool { SearchText.tokens(text).joined().count >= 3 }
 
     /// Hits → items, in hit order; channels with now/next, hidden channels left out.
     public func resolve(_ hits: [SearchHit], now: Date = Date()) throws -> [SearchItem] {
@@ -231,7 +249,7 @@ public struct SearchEngine: Sendable {
         let fetch = limit * 2
         let rows = try epg.searchProgrammes(text, sourceId: sourceId, now: now, from: now.addingTimeInterval(-Self.pastWindow),
                                             to: now.addingTimeInterval(Self.futureWindow), offset: offset, limit: fetch)
-        let channels = try catalog.channels(sourceId: sourceId, epgIds: rows.map(\.channelEpgId))
+        let channels = try catalog.channels(sourceId: sourceId, epgIds: rows.map(\.program.channelEpgId))
         var byEpg: [String: Channel] = [:]
         for c in channels where !isHidden(c) {
             guard let id = c.epgId.map(EpgRepository.sqliteLower), byEpg[id] == nil else { continue }
@@ -239,7 +257,8 @@ public struct SearchEngine: Sendable {
         }
         var out: [ProgrammeHit] = []
         var consumed = 0
-        for p in rows {
+        for row in rows {
+            let p = row.program
             guard out.count < limit else { break }
             consumed += 1
             guard let channel = byEpg[EpgRepository.sqliteLower(p.channelEpgId)] else { continue }
@@ -254,7 +273,7 @@ public struct SearchEngine: Sendable {
                 guard canReplay, channel.catchup.isAvailable, p.start >= now.addingTimeInterval(-Double(days) * 86_400) else { continue }
                 state = .archive
             }
-            out.append(ProgrammeHit(program: p, channel: channel, state: state))
+            out.append(ProgrammeHit(program: p, channel: channel, state: state, rowid: row.rowid))
         }
         return (out, consumed, consumed == rows.count && rows.count < fetch)
     }
@@ -333,9 +352,12 @@ public final class SearchViewModel {
         suggestTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
-            let found = await Task.detached(priority: .userInitiated) {
-                (try? engine.catalog.completions(text, sourceId: engine.sourceId)) ?? []
-            }.value
+            let work = Task.detached(priority: .userInitiated) {
+                SQLiteDatabase.$interruptsOnCancel.withValue(true) {
+                    (try? engine.catalog.completions(text, sourceId: engine.sourceId)) ?? []
+                }
+            }
+            let found = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard !Task.isCancelled, let self, self.query == text else { return }
             self.suggestions = found
         }
@@ -350,6 +372,8 @@ public final class SearchViewModel {
             if delay > .zero { try? await Task.sleep(for: delay) }
             guard !Task.isCancelled else { return }
             let work = Task.detached(priority: .userInitiated) { () -> (SearchResults, [CategoryInfo])? in
+              // A newer query cancels this task; its running SQLite statement is interrupted right away.
+              SQLiteDatabase.$interruptsOnCancel.withValue(true) { () -> (SearchResults, [CategoryInfo])? in
                 let infos: [CategoryInfo]
                 if let cached, cached.key == "\(engine.sourceId ?? "")|\(version)" {
                     infos = cached.infos
@@ -360,9 +384,20 @@ public final class SearchViewModel {
                 }
                 guard let results = try? engine.overview(text, infos: infos) else { return nil }
                 return (results, infos)
+              }
             }
             let output = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
-            guard !Task.isCancelled, let self, self.query == text, let (results, infos) = output else { return }
+            guard !Task.isCancelled, let self, self.query == text else { return }
+            guard let (results, infos) = output else {
+                // The search failed (not cancelled): empty state instead of an endless "searching".
+                var empty = SearchResults()
+                empty.query = text
+                self.results = empty
+                self.lists = [:]
+                self.filter = .all
+                self.isSearching = false
+                return
+            }
             self.categoryCache = ("\(engine.sourceId ?? "")|\(version)", infos)
             self.lists = [:]
             self.results = results
@@ -468,6 +503,8 @@ public final class SearchListModel {
     @ObservationIgnored private let engine: SearchEngine
     @ObservationIgnored private var offset = 0
     @ObservationIgnored private let categoryInfos: [CategoryInfo]
+    /// One "now" for every page (programme window/order and now/next stay consistent while paging).
+    @ObservationIgnored private let now = Date()
 
     public init(engine: SearchEngine, kind: SearchListKind, query: String, categoryInfos: [CategoryInfo] = []) {
         self.engine = engine
@@ -491,7 +528,7 @@ public final class SearchListModel {
     public func loadMore() {
         guard !isLoading, !reachedEnd else { return }
         isLoading = true
-        let engine = engine, kind = kind, query = query, offset = offset, infos = categoryInfos
+        let engine = engine, kind = kind, query = query, offset = offset, infos = categoryInfos, now = now
         let limit = Self.pageSize
         Task { [weak self] in
             let page = await Task.detached(priority: .userInitiated) { () -> (items: [SearchItem], programmes: [ProgrammeHit], categories: [CategoryInfo], consumed: Int, end: Bool) in
@@ -503,11 +540,11 @@ public final class SearchListModel {
                     }
                     return ([], [], engine.categories(query, infos: infos, limit: 1000), 0, true)
                 case .programmes:
-                    let r = (try? engine.programmes(query, offset: offset, limit: limit)) ?? (items: [], consumed: 0, end: true)
+                    let r = (try? engine.programmes(query, offset: offset, limit: limit, now: now)) ?? (items: [], consumed: 0, end: true)
                     return ([], r.items, [], r.consumed, r.end)
                 case .scope(let scope):
                     let hits = (try? engine.catalog.search(query, scope: scope, sourceId: engine.sourceId, offset: offset, limit: limit)) ?? []
-                    let items = (try? engine.resolve(hits)) ?? []
+                    let items = (try? engine.resolve(hits, now: now)) ?? []
                     return (items, [], [], hits.count, hits.count < limit)
                 }
             }.value

@@ -77,6 +77,18 @@ public enum CatalogPeople {
         return text + " \(variantMark) " + text.replacingOccurrences(of: "ı", with: "i").replacingOccurrences(of: "İ", with: "I")
     }
 
+    /// Indexed form of a long text (description): only the words with "ı"/"İ" get their "i" variant, once each,
+    /// after `variantMark` – appending the whole text again would double long descriptions and skew bm25.
+    public static func indexedWords(_ text: String) -> String {
+        guard text.contains("ı") || text.contains("İ") else { return text }
+        var seen = Set<String>()
+        let variants = text.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.contains("ı") || $0.contains("İ") }
+            .map { $0.replacingOccurrences(of: "ı", with: "i").replacingOccurrences(of: "İ", with: "I") }
+            .filter { seen.insert($0.lowercased()).inserted }
+        return text + " \(variantMark) " + variants.joined(separator: " ")
+    }
+
     /// Display part of an indexed text (variant removed).
     static func display(_ indexed: String) -> String {
         guard let range = indexed.range(of: variantMark) else { return indexed }
@@ -161,6 +173,7 @@ public final class CatalogRepository: Sendable {
                 try db.run("DELETE FROM search_index WHERE source_id = ? OR source_id = ?",
                            [.text(sourceId), .text(sourceId + AppDatabase.stagingSuffix)])
                 try SearchBackfill.skipSource(db, sourceId)
+                try SearchIndex.drop(db, sourceId: sourceId)
             }
             try EpgSearchIndex.drop(db, sourceId: sourceId)
         }
@@ -464,6 +477,14 @@ public final class CatalogRepository: Sendable {
             + searchPage(.descriptions, tokens: tokens, sourceId: sourceId, offset: 0, limit: perKindLimit)
     }
 
+    /// Title hits only, per kind (short queries: 1–2 letters).
+    public func searchTitles(_ text: String, sourceId: String? = nil, perKindLimit: Int = 30) throws -> [SearchHit] {
+        let tokens = Self.tokens(text)
+        guard !tokens.isEmpty, perKindLimit > 0 else { return [] }
+        guard ftsReady else { return try searchLike(tokens: tokens, sourceId: sourceId, perKindLimit: perKindLimit) }
+        return try searchFTS(tokens: tokens, sourceId: sourceId, perKindLimit: perKindLimit)
+    }
+
     /// One page of a search list (offset paging; SCREENS §3.6 "See all" and filter chips).
     public func search(_ text: String, scope: SearchScope, sourceId: String? = nil, offset: Int = 0, limit: Int = 60) throws -> [SearchHit] {
         let tokens = Self.tokens(text)
@@ -485,8 +506,15 @@ public final class CatalogRepository: Sendable {
     /// (Re-)indexes the search index after a v6/v7 migration (`SearchBackfill`), in transactions of
     /// `chunkSize` rows; resumable after a kill. Call off the main thread. Returns true when done.
     @discardableResult
-    public func backfillSearchIndex(chunkSize: Int = 2000, maxChunks: Int = .max) throws -> Bool {
-        try SearchBackfill.run(db, chunkSize: chunkSize, maxChunks: maxChunks)
+    public func backfillSearchIndex(chunkSize: Int = 300, maxChunks: Int = .max, pause: TimeInterval = 0.015) throws -> Bool {
+        try SearchBackfill.run(db, chunkSize: chunkSize, maxChunks: maxChunks, pause: pause)
+    }
+
+    /// Launch maintenance, off the main thread: leftover per-source indexes of killed refreshes, the shared v7
+    /// table once no source needs it, the trigram dictionary index if it is missing but supported.
+    public func maintainSearchIndex() throws {
+        try SearchIndex.maintain(db)
+        try SearchTermsIndex.ensure(db)
     }
 
     static func tokens(_ text: String) -> [String] { SearchText.tokens(text) }
@@ -499,31 +527,30 @@ public final class CatalogRepository: Sendable {
         tokens.count > 1 ? "\"\(tokens.joined(separator: " "))\"*" : nil
     }
 
-    private func scope(_ sourceId: String?) -> (sql: String, args: [SQLiteValue]) {
-        if let sourceId { return (" AND source_id = ?", [.text(sourceId)]) }
-        return (" AND source_id NOT LIKE '%\(AppDatabase.stagingSuffix)'", [])
-    }
-
     /// `ORDER BY` prefix that puts rows matching the phrase first (one FTS lookup, materialised once).
-    private func phraseBoost(_ phrase: String?) -> (sql: String, args: [SQLiteValue]) {
+    private func phraseBoost(_ phrase: String?, table: String) -> (sql: String, args: [SQLiteValue]) {
         guard let phrase else { return ("", []) }
-        return ("CASE WHEN rowid IN (SELECT rowid FROM search_index WHERE search_index MATCH ?) THEN 0 ELSE 1 END, ", [.text(phrase)])
+        return ("CASE WHEN rowid IN (SELECT rowid FROM \(table) WHERE \(table) MATCH ?) THEN 0 ELSE 1 END, ", [.text(phrase)])
     }
 
     /// Titles ranked per kind with a window function (measured ~40 % faster than three `AND kind = ?`
     /// queries, which each re-scan every match of the token at 50k+ rows).
     func searchFTS(tokens: [String], sourceId: String?, perKindLimit: Int) throws -> [SearchHit] {
         let expr = Self.ftsExpression(tokens)
-        let scope = scope(sourceId)
-        let boost = phraseBoost(Self.phraseExpression(tokens).map { "{title} : \($0)" })
-        let inner = "SELECT source_id, kind, item_id, title, ROW_NUMBER() OVER (PARTITION BY kind ORDER BY \(boost.sql)rank) AS rn "
-            + "FROM search_index WHERE search_index MATCH ?" + scope.sql
-        let sql = "SELECT source_id, kind, item_id, title FROM (\(inner)) WHERE rn <= ? "
-            + "ORDER BY CASE kind WHEN 'live' THEN 0 WHEN 'movie' THEN 1 ELSE 2 END, rn"
-        return try db.query(sql, boost.args + [.text("{title} : (\(expr))")] + scope.args + [.int(Int64(perKindLimit))]) {
-            SearchHit(sourceId: $0.string(0), kind: ContentKind(rawValue: $0.string(1)) ?? .live,
-                      itemId: $0.string(2), title: CatalogPeople.display($0.string(3)))
+        var hits: [SearchHit] = []
+        for target in SearchIndex.targets(db, sourceId: sourceId) {
+            let t = target.table
+            let boost = phraseBoost(Self.phraseExpression(tokens).map { "{title} : \($0)" }, table: t)
+            let inner = "SELECT source_id, kind, item_id, title, ROW_NUMBER() OVER (PARTITION BY kind ORDER BY \(boost.sql)rank) AS rn "
+                + "FROM \(t) WHERE \(t) MATCH ?" + target.filter
+            let sql = "SELECT source_id, kind, item_id, title FROM (\(inner)) WHERE rn <= ? "
+                + "ORDER BY CASE kind WHEN 'live' THEN 0 WHEN 'movie' THEN 1 ELSE 2 END, rn"
+            hits += try db.query(sql, boost.args + [.text("{title} : (\(expr))")] + target.args + [.int(Int64(perKindLimit))]) {
+                SearchHit(sourceId: $0.string(0), kind: ContentKind(rawValue: $0.string(1)) ?? .live,
+                          itemId: $0.string(2), title: CatalogPeople.display($0.string(3)))
+            }
         }
+        return hits
     }
 
     /// One page of a scope: MATCH expression, kind filter, phrase boost, then bm25 (`rank`, weights 10/4/1).
@@ -552,12 +579,14 @@ public final class CatalogRepository: Sendable {
             kindArgs = [.text(kind.rawValue)]
             boostPhrase = phrase
         }
-        let scope = scope(sourceId)
-        let boost = phraseBoost(boostPhrase)
-        let sql = "SELECT source_id, kind, item_id, title, people, plot FROM search_index WHERE search_index MATCH ?"
-            + scope.sql + kindFilter + " ORDER BY \(boost.sql)rank LIMIT ? OFFSET ?"
         let folded = tokens.map(CategoryCountry.fold)
-        return try db.query(sql, [.text(match)] + scope.args + kindArgs + boost.args + [.int(Int64(limit)), .int(Int64(offset))]) { r in
+        var hits: [SearchHit] = []
+        for target in SearchIndex.targets(db, sourceId: sourceId) {
+            let t = target.table
+            let boost = phraseBoost(boostPhrase, table: t)
+            let sql = "SELECT source_id, kind, item_id, title, people, plot FROM \(t) WHERE \(t) MATCH ?"
+                + target.filter + kindFilter + " ORDER BY \(boost.sql)rank LIMIT ? OFFSET ?"
+            hits += try db.query(sql, [.text(match)] + target.args + kindArgs + boost.args + [.int(Int64(limit)), .int(Int64(offset))]) { r in
             let title = CatalogPeople.display(r.string(3))
             var hit = SearchHit(sourceId: r.string(0), kind: ContentKind(rawValue: r.string(1)) ?? .movie, itemId: r.string(2), title: title)
             switch searchScope {
@@ -577,7 +606,9 @@ public final class CatalogRepository: Sendable {
                 hit.snippet = snippet.matchedWords.isEmpty && !people.isEmpty ? SearchText.snippet(people, tokens: tokens) : snippet
             }
             return hit
+            }
         }
+        return hits
     }
 
     /// Cast/director learned from a detail fetch (Xtream `get_vod_info` / `get_series_info`): searchable at
@@ -611,7 +642,7 @@ public final class CatalogRepository: Sendable {
             try db.run("INSERT OR REPLACE INTO item_plot (source_id, kind, item_id, plot) VALUES (?,?,?,?)", key + [.text(plot)])
             try db.run("UPDATE \(table) SET plot = ? WHERE source_id = ? AND id = ?", [.text(plot), .text(sourceId), .text(itemId)])
             try Self.setIndexColumn(db: db, "plot", sourceId: sourceId, kind: kind, itemId: itemId,
-                                    value: CatalogPeople.indexed(String(plot.prefix(SearchBackfill.maxPlot))))
+                                    value: CatalogPeople.indexedWords(String(plot.prefix(SearchBackfill.maxPlot))))
         }
     }
 
@@ -627,15 +658,16 @@ public final class CatalogRepository: Sendable {
         let scope: [SQLiteValue] = [.text(sourceId), .text(kind.rawValue), .text(itemId)]
         let rowids: [Int64]
         let titleTokens = name.map(tokens) ?? []
+        let t = SearchIndex.tableForWrites(db, sourceId: sourceId)
         if titleTokens.isEmpty {
-            rowids = try db.query("SELECT rowid FROM search_index WHERE source_id = ? AND kind = ? AND item_id = ?", scope) { $0.int64(0) }
+            rowids = try db.query("SELECT rowid FROM \(t) WHERE source_id = ? AND kind = ? AND item_id = ?", scope) { $0.int64(0) }
         } else {
             let match = "{title} : (" + titleTokens.map { "\"\($0)\"" }.joined(separator: " ") + ")"
-            rowids = try db.query("SELECT rowid FROM search_index WHERE search_index MATCH ? AND source_id = ? AND kind = ? AND item_id = ?",
+            rowids = try db.query("SELECT rowid FROM \(t) WHERE \(t) MATCH ? AND source_id = ? AND kind = ? AND item_id = ?",
                                   [.text(match)] + scope) { $0.int64(0) }
         }
         for rowid in rowids {
-            try db.run("UPDATE search_index SET \(column) = ? WHERE rowid = ?", [.text(value), .int(rowid)])
+            try db.run("UPDATE \(t) SET \(column) = ? WHERE rowid = ?", [.text(value), .int(rowid)])
         }
     }
 
@@ -647,21 +679,27 @@ public final class CatalogRepository: Sendable {
         let tokens = Self.tokens(text)
         guard text.trimmingCharacters(in: .whitespaces).count >= 2, !tokens.isEmpty, limit > 0, ftsReady else { return [] }
         let expr = Self.ftsExpression(tokens)
-        let scope = scope(sourceId)
+        let targets = SearchIndex.targets(db, sourceId: sourceId)
         let folded = tokens.map(CategoryCountry.fold)
         let queryKey = folded.joined(separator: " ")
         var seen: Set<String> = [queryKey]
         var titles: [SearchSuggestion] = []
-        for raw in try db.query("SELECT title FROM search_index WHERE search_index MATCH ?" + scope.sql + " ORDER BY rank LIMIT 25",
-                                [.text("{title} : (\(expr))")] + scope.args, map: { $0.string(0) }) {
+        let titleRows = try targets.flatMap { t in
+            try db.query("SELECT title FROM \(t.table) WHERE \(t.table) MATCH ?" + t.filter + " ORDER BY rank LIMIT 25",
+                         [.text("{title} : (\(expr))")] + t.args, map: { $0.string(0) })
+        }
+        for raw in titleRows {
             let title = CategoryCountry.nameWithoutPrefix(CatalogPeople.display(raw)).trimmingCharacters(in: .whitespaces)
             let key = SearchText.foldedTokens(title).joined(separator: " ")
             guard !title.isEmpty, seen.insert(key).inserted else { continue }
             titles.append(SearchSuggestion(text: title, isPerson: false))
         }
         var people: [SearchSuggestion] = []
-        for raw in try db.query("SELECT people FROM search_index WHERE search_index MATCH ?" + scope.sql + " ORDER BY rank LIMIT 25",
-                                [.text("{people} : (\(expr))")] + scope.args, map: { $0.string(0) }) {
+        let peopleRows = try targets.flatMap { t in
+            try db.query("SELECT people FROM \(t.table) WHERE \(t.table) MATCH ?" + t.filter + " ORDER BY rank LIMIT 25",
+                         [.text("{people} : (\(expr))")] + t.args, map: { $0.string(0) })
+        }
+        for raw in peopleRows {
             for name in CatalogPeople.display(raw).split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
             where SearchText.matchesAll(name, folded: folded) {
                 let key = SearchText.foldedTokens(name).joined(separator: " ")
@@ -677,7 +715,7 @@ public final class CatalogRepository: Sendable {
     /// closest title/person word of the source (edit distance ≤ 1 for ≤ 4 letters, else ≤ 2; ties → the more
     /// frequent word), found through the trigram index. nil when nothing could be corrected.
     public func correction(for text: String, sourceId: String?) throws -> String? {
-        guard db.hasTrigram else { return nil }
+        guard db.hasTrigram, SearchTermsIndex.exists(db) else { return nil }
         let tokens = Self.tokens(text)
         guard !tokens.isEmpty else { return nil }
         var changed = false
@@ -707,10 +745,12 @@ public final class CatalogRepository: Sendable {
 
     private func closestTerm(_ token: String, sourceId: String?) throws -> String? {
         guard let query = SearchText.trigramQuery(token) else { return nil }
-        var sql = "SELECT term, display, freq FROM search_terms WHERE rowid IN "
-            + "(SELECT rowid FROM search_terms_tri WHERE search_terms_tri MATCH ? ORDER BY rank LIMIT 300)"
+        // The source filter comes before the candidate limit (other sources' words must not take the 300 slots).
+        var sql = "SELECT s.term, s.display, s.freq FROM search_terms_tri f JOIN search_terms s ON s.rowid = f.rowid "
+            + "WHERE search_terms_tri MATCH ?"
         var args: [SQLiteValue] = [.text(query)]
-        if let sourceId { sql += " AND source_id = ?"; args.append(.text(sourceId)) }
+        if let sourceId { sql += " AND s.source_id = ?"; args.append(.text(sourceId)) }
+        sql += " ORDER BY f.rank LIMIT 300"
         let limit = SearchText.maxTypos(token.count)
         var best: (distance: Int, prefixOnly: Bool, freq: Int, display: String)?
         for row in try db.query(sql, args, map: { (term: $0.string(0), display: $0.string(1), freq: $0.int(2)) }) {
@@ -772,10 +812,12 @@ public final class CatalogRepository: Sendable {
 
     func searchLike(tokens: [String], sourceId: String?, kinds: [ContentKind], offset: Int, limit: Int) throws -> [SearchHit] {
         var hits: [SearchHit] = []
+        // Tokens carry "ı/İ → i"; the name gets the same folding, so "kızılcık" finds "Kızılcık" here too.
         let pattern = "%" + tokens.joined(separator: "%") + "%"
         for kind in kinds {
             guard let table = SearchBackfill.contentTable(kind.rawValue) else { continue }
-            var sql = "SELECT source_id, id, name FROM \(table) WHERE name LIKE ? AND source_id NOT LIKE '%\(AppDatabase.stagingSuffix)'"
+            var sql = "SELECT source_id, id, name FROM \(table) WHERE replace(replace(name, 'ı', 'i'), 'İ', 'i') LIKE ? "
+                + "AND source_id NOT LIKE '%\(AppDatabase.stagingSuffix)'"
             var args: [SQLiteValue] = [.text(pattern)]
             if let sourceId { sql += " AND source_id = ?"; args.append(.text(sourceId)) }
             sql += " ORDER BY sort LIMIT ? OFFSET ?"
@@ -800,6 +842,8 @@ public final class CatalogRefreshSession: @unchecked Sendable {
     private let detailPlot: [String: String]
     /// Words of the written titles and people (did-you-mean dictionary, replaced on commit).
     private var terms = SearchTermCounter()
+    /// The source's new search index (`SearchIndex`), filled with the batches and swapped in on commit.
+    let searchTable: String?
 
     init(db: SQLiteDatabase, sourceId: String) throws {
         self.db = db
@@ -807,6 +851,7 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         self.stagingId = sourceId + AppDatabase.stagingSuffix
         detailPeople = try Self.details(db, "item_people", "people", sourceId)
         detailPlot = try Self.details(db, "item_plot", "plot", sourceId)
+        searchTable = db.hasFTS5 ? try SearchIndex.create(db) : nil
         try clearStaging()
     }
 
@@ -831,7 +876,6 @@ public final class CatalogRefreshSession: @unchecked Sendable {
             for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(stagingId)])
             }
-            if db.hasFTS5 { try db.run("DELETE FROM search_index WHERE source_id = ?", [.text(stagingId)]) }
         }
     }
 
@@ -899,23 +943,34 @@ public final class CatalogRefreshSession: @unchecked Sendable {
     private func index(title: String, people: String, plot: String?, kind: ContentKind, itemId: String) throws {
         terms.add(sourceId, title)
         terms.add(sourceId, people)
-        guard db.hasFTS5 else { return }
-        try SearchBackfill.insert(db, title: title, people: people, plot: plot ?? "", sourceId: stagingId, kind: kind.rawValue,
-                                  itemId: itemId, indexed: false)
+        guard let searchTable else { return }
+        try SearchBackfill.insert(db, table: searchTable, title: title, people: people, plot: plot ?? "", sourceId: sourceId,
+                                  kind: kind.rawValue, itemId: itemId, indexed: false)
     }
+
+    /// Milliseconds the last `commit()` held the writer: the atomic swap, its search-index part (re-pointing +
+    /// dropping the old index + detail merges) and the dictionary update after it.
+    public private(set) var swapMilliseconds = 0.0
+    public private(set) var indexMilliseconds = 0.0
+    public private(set) var dictionaryMilliseconds = 0.0
 
     /// Makes the staged rows the live content of the source (atomic swap).
     public func commit() throws {
         guard !finished else { return }
         finished = true
+        let started = DispatchTime.now()
+        var previousIndex: String?
         try db.transaction {
             for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(sourceId)])
                 try db.run("UPDATE \(table) SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
             }
-            if db.hasFTS5 {
-                try db.run("DELETE FROM search_index WHERE source_id = ?", [.text(sourceId)])
-                try db.run("UPDATE search_index SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
+            let indexStart = DispatchTime.now()
+            defer { indexMilliseconds = Self.ms(since: indexStart) }
+            if let searchTable {
+                // The new index becomes the source's (kv + DROP of the old one): no row is re-tokenised here.
+                // Its rows left in the shared v7 table are ignored from now on and emptied by `SearchIndex.maintain`.
+                previousIndex = try SearchIndex.register(db, sourceId: sourceId, table: searchTable)
                 try SearchBackfill.skipSource(db, sourceId)   // a pending v7 copy must not bring the old rows back
                 // People / descriptions learned from detail pages while this refresh ran (after the snapshot in `init`).
                 for (table, column, known) in [("item_people", "people", detailPeople), ("item_plot", "plot", detailPlot)] {
@@ -935,7 +990,7 @@ public final class CatalogRefreshSession: @unchecked Sendable {
                             try db.run("UPDATE \(contentTable) SET plot = ? WHERE source_id = ? AND id = ?",
                                        [.text(row.value), .text(sourceId), .text(row.itemId)])
                             try CatalogRepository.setIndexColumn(db: db, "plot", sourceId: sourceId, kind: kind, itemId: row.itemId,
-                                                                 value: CatalogPeople.indexed(String(row.value.prefix(SearchBackfill.maxPlot))))
+                                                                 value: CatalogPeople.indexedWords(String(row.value.prefix(SearchBackfill.maxPlot))))
                         }
                     }
                 }
@@ -943,13 +998,20 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         }
         // The did-you-mean dictionary follows in its own transaction (only a suggestion source; the first fill
         // after the v7 update writes ~30k words, which should not lengthen the swap's lock).
+        swapMilliseconds = Self.ms(since: started)
+        if let previousIndex { try? db.transaction { try SearchIndex.dropTable(db, previousIndex) } }
+        let dictionaryStart = DispatchTime.now()
         do { try db.transaction { try terms.replace(db, sourceId: sourceId) } } catch { SafeLog.warning("search terms update failed") }
+        dictionaryMilliseconds = Self.ms(since: dictionaryStart)
     }
+
+    static func ms(since start: DispatchTime) -> Double { Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6 }
 
     /// Discards the staged rows; live content stays untouched.
     public func abort() {
         guard !finished else { return }
         finished = true
         try? clearStaging()
+        if let searchTable { SearchIndex.discard(db, table: searchTable) }
     }
 }

@@ -72,7 +72,7 @@ final class PeopleSearchTests: XCTestCase {
         try catalog.updatePeople(sourceId: "s", kind: .movie, itemId: "m2", cast: "Cillian Murphy", director: nil)
         try session.commit()
         XCTAssertEqual(try catalog.search("cillian", sourceId: "s").map(\.itemId), ["m2"])
-        XCTAssertEqual(try database.db.scalar("SELECT COUNT(*) FROM search_index WHERE item_id = 'm2'") as Int, 1, "one index row")
+        XCTAssertEqual(try searchIndexCount(database, itemId: "m2"), 1, "one index row")
         try catalog.updatePeople(sourceId: "s", kind: .movie, itemId: "m2", cast: "Cillian Murphy", director: nil)   // no-op
         XCTAssertEqual(try catalog.search("cillian", sourceId: "s").map(\.itemId), ["m2"])
     }
@@ -129,15 +129,15 @@ final class SearchIndexMigrationTests: XCTestCase {
         let catalog = CatalogRepository(database: db)
         // The migration does not index titles itself (launch stays fast): pending → LIKE path meanwhile.
         XCTAssertTrue(db.searchBackfillPending)
-        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 0)
+        XCTAssertEqual(try searchIndexCount(db), 0)
         XCTAssertEqual(try catalog.search("trt", sourceId: "s").map(\.itemId), ["c1"], "LIKE fallback")
         // Killed after two chunks of one row: resumes where it stopped, nothing indexed twice.
         XCTAssertFalse(try catalog.backfillSearchIndex(chunkSize: 1, maxChunks: 2))
-        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 2)
+        XCTAssertEqual(try searchIndexCount(db), 2)
         let reopened = CatalogRepository(database: try AppDatabase(db: SQLiteDatabase(path: path)))
         XCTAssertTrue(try reopened.backfillSearchIndex(chunkSize: 1))
         XCTAssertFalse(db.searchBackfillPending)
-        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 4, "every row once")
+        XCTAssertEqual(try searchIndexCount(db), 4, "every row once")
         XCTAssertEqual(try catalog.search("trt", sourceId: "s").map(\.itemId), ["c1"])
         XCTAssertEqual(try catalog.search("konusanlar", sourceId: "s").map(\.itemId), ["k"], "titles re-indexed from content tables")
         XCTAssertEqual(try catalog.search("ayla", sourceId: "s").map(\.kind), [.movie])
@@ -169,7 +169,7 @@ final class SearchIndexMigrationTests: XCTestCase {
         try session.write(movies: [Movie(sourceId: "s", id: "m1", name: "Ayla", sort: 0), Movie(sourceId: "s", id: "m2", name: "Ayla 2", sort: 1)])
         try session.commit()
         XCTAssertTrue(try catalog.backfillSearchIndex())
-        XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM search_index") as Int, 3, "m1, m2 (refresh) + x1 (backfill)")
+        XCTAssertEqual(try searchIndexCount(db), 3, "m1, m2 (refresh) + x1 (backfill)")
         XCTAssertEqual(Set(try catalog.search("ayla", sourceId: "s").map(\.itemId)), ["m1", "m2"])
     }
 }

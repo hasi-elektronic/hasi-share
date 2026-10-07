@@ -84,7 +84,7 @@ public final class AppEnvironment {
         library = LibraryRepository(database: database)
         favorites = FavoritesController(library: library, kv: kv, now: { Int64(Date().timeIntervalSince1970 * 1000) })
         categoryPrefs = CategoryPreferences(kv: kv)
-        recentSearches = RecentSearchStore(kv: kv)
+        recentSearches = RecentSearchStore(database: database)
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
@@ -113,6 +113,7 @@ public final class AppEnvironment {
         let catalog = self.catalog, epg = self.epg
         Task.detached(priority: .utility) {
             do { try catalog.backfillSearchIndex() } catch { SafeLog.warning("search backfill failed") }
+            do { try catalog.maintainSearchIndex() } catch { SafeLog.warning("search index maintenance failed") }
             do { try epg.maintainSearchIndex() } catch { SafeLog.warning("epg search index failed") }
         }
     }
@@ -298,6 +299,7 @@ public final class AppEnvironment {
         refresher.clearCatalogFormat(sourceId: id)
         categoryPrefs.removeAll(sourceId: id)
         try? catalog.deleteContent(sourceId: id)
+        recentSearches.clear(sourceId: id)
         try? sourceRepository.delete(id: id)
         reloadSources()
         catalogVersion += 1

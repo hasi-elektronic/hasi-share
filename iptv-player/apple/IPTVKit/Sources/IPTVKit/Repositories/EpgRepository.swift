@@ -1,6 +1,12 @@
 import Foundation
 import IPTVCore
 
+/// A programme search result with its row id (stable identity even for duplicate XMLTV entries).
+public struct EpgProgramMatch: Sendable, Hashable {
+    public var rowid: Int64
+    public var program: EpgProgram
+}
+
 /// Now/next programmes of a channel.
 public struct NowNext: Sendable, Hashable {
     public var now: EpgProgram?
@@ -92,7 +98,7 @@ public final class EpgRepository: Sendable {
                 let sources = try db.query("SELECT value FROM kv WHERE key LIKE 'epg.fts.%' AND key NOT LIKE 'epg.fts.backfill.%'") { $0.string(0) }
                 try db.run("DELETE FROM epg")
                 try db.run("DELETE FROM kv WHERE key LIKE 'epg.fts.%'")
-                for table in sources where EpgSearchIndex.isValidName(table) { try db.execute("DROP TABLE IF EXISTS \(table);") }
+                for table in sources where EpgSearchIndex.isValidName(table) { try SearchIndex.dropTable(db, table) }
             }
         }
     }
@@ -103,12 +109,12 @@ public final class EpgRepository: Sendable {
     /// and that overlap `[from, to)`: running ones first, then upcoming by start, then ended ones (newest first).
     /// Served by the source's programme title index (`EpgSearchIndex`); empty until the source has one.
     public func searchProgrammes(_ text: String, sourceId: String, now: Date, from: Date, to: Date,
-                                 offset: Int = 0, limit: Int = 60) throws -> [EpgProgram] {
+                                 offset: Int = 0, limit: Int = 60) throws -> [EpgProgramMatch] {
         let tokens = SearchText.tokens(text)
         guard !tokens.isEmpty, limit > 0, let table = EpgSearchIndex.table(db, sourceId: sourceId) else { return [] }
         let nowMs = SQLiteValue.from(now)
         let sql = """
-            SELECT e.source_id, e.channel_epg_id, e.start, e.end, e.title, e.description, e.category
+            SELECT e.source_id, e.channel_epg_id, e.start, e.end, e.title, e.description, e.category, e.rowid
             FROM \(table) f JOIN epg e ON e.rowid = f.rowid
             WHERE \(table) MATCH ? AND e.source_id = ? AND e.end > ? AND e.start < ?
             ORDER BY CASE WHEN e.start <= ? AND e.end > ? THEN 0 WHEN e.start > ? THEN 1 ELSE 2 END,
@@ -116,14 +122,16 @@ public final class EpgRepository: Sendable {
             LIMIT ? OFFSET ?
             """
         return try db.query(sql, [.text(CatalogRepository.ftsExpression(tokens)), .text(sourceId), .from(from), .from(to),
-                                  nowMs, nowMs, nowMs, nowMs, .int(Int64(limit)), .int(Int64(offset))], map: Self.program)
+                                  nowMs, nowMs, nowMs, nowMs, .int(Int64(limit)), .int(Int64(offset))]) {
+            EpgProgramMatch(rowid: $0.int64(7), program: Self.program($0))
+        }
     }
 
     /// Builds missing programme title indexes (EPG stored before Build 11) in chunks and drops leftovers of
     /// killed refreshes. Call off the main thread; resumable. Returns true when every source with EPG has one.
     @discardableResult
-    public func maintainSearchIndex(chunkSize: Int = 5000, maxChunks: Int = .max) throws -> Bool {
-        try EpgSearchIndex.backfill(db, chunkSize: chunkSize, maxChunks: maxChunks)
+    public func maintainSearchIndex(chunkSize: Int = 2000, maxChunks: Int = .max, pause: TimeInterval = 0.015) throws -> Bool {
+        try EpgSearchIndex.backfill(db, chunkSize: chunkSize, maxChunks: maxChunks, pause: pause)
     }
 }
 
@@ -182,12 +190,12 @@ enum EpgSearchIndex {
         let old = string(db, key(sourceId))
         try db.run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                    [.text(key(sourceId)), .text(table)])
-        if let old, old != table, isValidName(old) { try db.execute("DROP TABLE IF EXISTS \(old);") }
+        if let old, old != table, isValidName(old) { try SearchIndex.dropTable(db, old) }
         inFlight.remove(table)
     }
 
     static func discard(_ db: SQLiteDatabase, table: String) {
-        if isValidName(table) { try? db.execute("DROP TABLE IF EXISTS \(table);") }
+        if isValidName(table) { try? SearchIndex.dropTable(db, table) }
         inFlight.remove(table)
     }
 
@@ -196,7 +204,7 @@ enum EpgSearchIndex {
         guard db.hasFTS5 else { return }
         for k in [key(sourceId), backfillKey(sourceId)] {
             if let value = string(db, k), let name = value.split(separator: "|").first.map(String.init), isValidName(name) {
-                try db.execute("DROP TABLE IF EXISTS \(name);")
+                try SearchIndex.dropTable(db, name)
             }
             try db.run("DELETE FROM kv WHERE key = ?", [.text(k)])
         }
@@ -208,14 +216,14 @@ enum EpgSearchIndex {
             .compactMap { $0.split(separator: "|").first.map(String.init) })
         let tables = try db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'epg\\_fts\\_%' ESCAPE '\\' AND sql LIKE 'CREATE VIRTUAL TABLE%'") { $0.string(0) }
         for name in tables where isValidName(name) && !referenced.contains(name) && !inFlight.contains(name) {
-            try db.execute("DROP TABLE IF EXISTS \(name);")
+            try SearchIndex.dropTable(db, name)
         }
     }
 
     /// Indexes stored EPG of sources without an index, `chunkSize` programmes per transaction. A refresh that
     /// registers its own index meanwhile wins (the partial one is dropped). Progress in kv `epg.fts.backfill.<id>`
     /// ("table|last rowid").
-    static func backfill(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int) throws -> Bool {
+    static func backfill(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int, pause: TimeInterval = 0) throws -> Bool {
         guard db.hasFTS5 else { return true }
         try cleanup(db)
         var chunks = 0
@@ -241,7 +249,7 @@ enum EpgSearchIndex {
                 chunks += 1
                 try db.transaction {
                     if table(db, sourceId: sourceId) != nil {   // a refresh registered its own index meanwhile
-                        try db.execute("DROP TABLE IF EXISTS \(name);")
+                        try SearchIndex.dropTable(db, name)
                         try db.run("DELETE FROM kv WHERE key = ?", [.text(backfillKey(sourceId))])
                         done = true
                         return
@@ -260,6 +268,7 @@ enum EpgSearchIndex {
                         done = true
                     }
                 }
+                if pause > 0, !done { Thread.sleep(forTimeInterval: pause) }
             }
         }
         return true

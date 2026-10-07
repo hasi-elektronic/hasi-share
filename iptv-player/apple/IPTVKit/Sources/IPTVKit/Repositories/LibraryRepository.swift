@@ -95,6 +95,33 @@ public final class LibraryRepository: Sendable {
         return item
     }
 
+    /// Progress / "watched" from the player (main actor): written at once when the database is free; while a
+    /// refresh commit holds the writer it goes to a serial background queue instead of blocking the main thread
+    /// (zapping during the launch refresh). Later saves queue behind earlier ones, so the order is kept.
+    /// `onDone` runs on the main actor after the write (synchronously when written at once).
+    @MainActor
+    public func saveProgressWithoutBlocking(contentKey: String, title: String, kind: ContentKind, positionMs: Int64, durationMs: Int64,
+                                            posterUrl: String?, seriesKey: String? = nil, nowMs: Int64,
+                                            onDone: @escaping @MainActor @Sendable () -> Void) {
+        let write: @Sendable () -> Void = { [self] in
+            _ = try? saveProgress(contentKey: contentKey, title: title, kind: kind, positionMs: positionMs, durationMs: durationMs,
+                                  posterUrl: posterUrl, seriesKey: seriesKey, nowMs: nowMs)
+        }
+        if deferred.isEmpty, db.ifWriterFree(write) != nil {
+            onDone()
+            return
+        }
+        deferred.increment()
+        Self.writeQueue.async { [deferred] in
+            write()
+            deferred.decrement()
+            Task { @MainActor in onDone() }
+        }
+    }
+
+    private static let writeQueue = DispatchQueue(label: "library.deferred-writes", qos: .userInitiated)
+    private let deferred = DeferredCount()
+
     /// Items changed after `ms` (for sync push), oldest first.
     public func changed(after ms: Int64, limit: Int = 500) throws -> [SyncItem] {
         try db.query("SELECT \(Self.columns) FROM library WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?",
@@ -108,4 +135,13 @@ public final class LibraryRepository: Sendable {
     public func deleteAll() throws {
         try db.run("DELETE FROM library")
     }
+}
+
+/// Number of library writes waiting on the background queue.
+final class DeferredCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var isEmpty: Bool { lock.lock(); defer { lock.unlock() }; return count == 0 }
+    func increment() { lock.lock(); count += 1; lock.unlock() }
+    func decrement() { lock.lock(); count -= 1; lock.unlock() }
 }

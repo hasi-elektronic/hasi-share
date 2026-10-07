@@ -85,3 +85,13 @@ enum TestData {
                 url: url, sort: sort)
     }
 }
+
+/// Live search index rows (shared v7 table + per-source tables), optionally of one source / item.
+func searchIndexCount(_ database: AppDatabase, sourceId: String? = nil, itemId: String? = nil) throws -> Int {
+    try SearchIndex.targets(database.db, sourceId: sourceId).reduce(0) { sum, t in
+        var sql = "SELECT COUNT(*) FROM \(t.table) WHERE 1 = 1" + t.filter
+        var args = t.args
+        if let itemId { sql += " AND item_id = ?"; args.append(.text(itemId)) }
+        return sum + (try database.db.scalar(sql, args))
+    }
+}

@@ -85,8 +85,8 @@ public final class AppDatabase: Sendable {
                       tokenize = 'unicode61 remove_diacritics 2');
                     """)
                 }
+                try db.execute("PRAGMA user_version = 1")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 1
         }
         if db.userVersion < 2 {
             // v1 looked EPG programmes up with `lower(channel_epg_id)` / COLLATE NOCASE, which the plain
@@ -98,8 +98,8 @@ public final class AppDatabase: Sendable {
                 CREATE INDEX IF NOT EXISTS epg_lookup_lc ON epg (source_id, lower(channel_epg_id), start);
                 DROP INDEX IF EXISTS epg_lookup;
                 """)
+                try db.execute("PRAGMA user_version = 2")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 2
         }
         if db.userVersion < 3 {
             // Xtream panels (XUI.one …) put one item into several categories (`category_ids`); `category_id` is
@@ -119,15 +119,15 @@ public final class AppDatabase: Sendable {
                 INSERT OR IGNORE INTO item_categories (source_id, kind, category_id, item_id, sort)
                   SELECT source_id, 'series', category_id, id, sort FROM series WHERE category_id IS NOT NULL;
                 """)
+                try db.execute("PRAGMA user_version = 3")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 3
         }
         if db.userVersion < 4 {
             // TV number zapping looks a channel up by its number across the whole source (SCREENS §3.7).
             try db.transaction {
                 try db.execute("CREATE INDEX IF NOT EXISTS channels_number ON channels (source_id, number);")
+                try db.execute("PRAGMA user_version = 4")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 4
         }
         if db.userVersion < 5 {
             // Category lists read `item_categories` since v3; the v1 `category_id` indexes serve no query any
@@ -138,8 +138,8 @@ public final class AppDatabase: Sendable {
                 DROP INDEX IF EXISTS movies_cat;
                 DROP INDEX IF EXISTS series_cat;
                 """)
+                try db.execute("PRAGMA user_version = 5")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 5
         }
         if db.userVersion < 6 {
             // People search (Build 10): the FTS index gets a second searchable column `people` (cast + director).
@@ -164,8 +164,8 @@ public final class AppDatabase: Sendable {
                     """)
                     try SearchBackfill.schedule(db)
                 }
+                try db.execute("PRAGMA user_version = 6")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 6
         }
         if db.userVersion < 7 {
             // Professional search (Build 11): the FTS index gets a third column `plot` (description), ranked
@@ -195,7 +195,10 @@ public final class AppDatabase: Sendable {
                       INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
                     """)
                 }
-                if db.hasFTS5 {
+                // Build 11 set the version after this transaction: a kill in between left a v7 schema at version 6.
+                // Then the copy state is intact – re-running would drop the renamed v6 table (and its people).
+                let alreadyV7 = try db.scalar("SELECT COUNT(*) FROM pragma_table_info('search_index') WHERE name = 'plot'") > 0
+                if db.hasFTS5, !alreadyV7 {
                     try db.execute("DROP TABLE IF EXISTS search_index_v6;")
                     if try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index'") > 0 {
                         try db.execute("ALTER TABLE search_index RENAME TO search_index_v6;")
@@ -208,8 +211,8 @@ public final class AppDatabase: Sendable {
                     """)
                     try SearchBackfill.scheduleCopy(db)
                 }
+                try db.execute("PRAGMA user_version = 7")   // with the schema change: a kill cannot re-run it
             }
-            db.userVersion = 7
         }
     }
 
@@ -285,10 +288,14 @@ enum SearchBackfill {
 
     /// v7: copy of the renamed v6 index. An empty v6 table is dropped right away.
     static func scheduleCopy(_ db: SQLiteDatabase) throws {
-        guard try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'") > 0 else { return }
+        guard try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'") > 0 else {
+            for key in [copyMaxKey, copyAtKey, skipKey] { try setValue(db, nil, key) }
+            return
+        }
         let max = Int64(try db.scalar("SELECT COALESCE(MAX(rowid), 0) FROM search_index_v6"))
         guard max > 0 else {
             try db.execute("DROP TABLE search_index_v6;")
+            for key in [copyMaxKey, copyAtKey, skipKey] { try setValue(db, nil, key) }
             return
         }
         try setValue(db, String(max), copyMaxKey)
@@ -318,15 +325,20 @@ enum SearchBackfill {
 
     /// Indexes up to `chunkSize` rows per transaction; stops after `maxChunks` (tests simulate a kill).
     /// Returns true when everything is indexed (flag cleared).
+    /// `pause`: sleep between chunks so other writers (favorites, refreshes) get the writer lock in between.
     @discardableResult
-    static func run(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int) throws -> Bool {
+    static func run(_ db: SQLiteDatabase, chunkSize: Int, maxChunks: Int, pause: TimeInterval = 0) throws -> Bool {
         guard db.hasFTS5, isPending(db) else { return true }
         var chunks = 0
+        func breathe() { if pause > 0 { Thread.sleep(forTimeInterval: pause) } }
         if let max = value(db, copyMaxKey) {
-            while (value(db, copyAtKey) ?? 0) < max {
+            // The renamed v6 table is gone (state of an interrupted Build 11 migration): nothing left to copy.
+            let hasV6 = try db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'") > 0
+            while hasV6, (value(db, copyAtKey) ?? 0) < max {
                 guard chunks < maxChunks else { return false }
                 chunks += 1
                 try db.transaction { try copyChunk(db, max: max, chunkSize: chunkSize) }
+                breathe()
             }
             try db.transaction {
                 try db.execute("DROP TABLE IF EXISTS search_index_v6;")
@@ -339,6 +351,7 @@ enum SearchBackfill {
                 guard chunks < maxChunks else { return false }
                 chunks += 1
                 try db.transaction { try contentChunk(db, table: table, kind: kind, max: max, chunkSize: chunkSize) }
+                breathe()
             }
         }
         try db.transaction {
@@ -406,11 +419,35 @@ enum SearchBackfill {
     }
 
     /// One search index row (`indexed`: title/people already carry the dotless-i variant).
-    static func insert(_ db: SQLiteDatabase, title: String, people: String, plot: String, sourceId: String, kind: String,
-                       itemId: String, indexed: Bool) throws {
-        try db.run("INSERT INTO search_index (title, people, plot, source_id, kind, item_id) VALUES (?,?,?,?,?,?)",
+    static func insert(_ db: SQLiteDatabase, table: String = SearchIndex.shared, title: String, people: String, plot: String,
+                       sourceId: String, kind: String, itemId: String, indexed: Bool) throws {
+        try db.run("INSERT INTO \(table) (title, people, plot, source_id, kind, item_id) VALUES (?,?,?,?,?,?)",
                    [.text(indexed ? title : CatalogPeople.indexed(title)), .text(indexed ? people : CatalogPeople.indexed(people)),
-                    .text(CatalogPeople.indexed(String(plot.prefix(maxPlot)))), .text(sourceId), .text(kind), .text(itemId)])
+                    .text(CatalogPeople.indexedWords(String(plot.prefix(maxPlot)))), .text(sourceId), .text(kind), .text(itemId)])
+    }
+}
+
+/// The trigram index of the term dictionary (did-you-mean). Created by the v7 migration when the tokenizer is
+/// available; `ensure` creates it later (launch maintenance) if it is missing but supported, rebuilt from the
+/// dictionary rows.
+enum SearchTermsIndex {
+    static func exists(_ db: SQLiteDatabase) -> Bool {
+        ((try? db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_terms_tri'")) ?? 0) > 0
+    }
+
+    static func ensure(_ db: SQLiteDatabase) throws {
+        guard db.hasTrigram, !exists(db) else { return }
+        try db.transaction {
+            try db.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS search_terms_tri USING fts5(
+              gram, content = 'search_terms', content_rowid = 'rowid', tokenize = 'trigram');
+            CREATE TRIGGER IF NOT EXISTS search_terms_ai AFTER INSERT ON search_terms BEGIN
+              INSERT INTO search_terms_tri (rowid, gram) VALUES (new.rowid, new.gram); END;
+            CREATE TRIGGER IF NOT EXISTS search_terms_ad AFTER DELETE ON search_terms BEGIN
+              INSERT INTO search_terms_tri (search_terms_tri, rowid, gram) VALUES ('delete', old.rowid, old.gram); END;
+            INSERT INTO search_terms_tri (search_terms_tri) VALUES ('rebuild');
+            """)
+        }
     }
 }
 
