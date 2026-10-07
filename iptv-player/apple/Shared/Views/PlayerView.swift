@@ -213,7 +213,9 @@ struct PlayerView: View {
             if isVOD {
                 ZStack {
                     TVHoldSeek { direction, heldMs in
-                        if seekInputAllowed { tvSeek(direction, heldMs: heldMs) }
+                        guard seekInputAllowed else { return false }
+                        tvSeek(direction, heldMs: heldMs)
+                        return true
                     }
                     // Siri Remote touch surface: a horizontal swipe moves the seek target.
                     TVTouchScrub(enabled: seekInputAllowed,
@@ -227,6 +229,7 @@ struct PlayerView: View {
         .focused($surfaceFocused)
         .onMoveCommand { direction in
             if syncPanelVisible { return }   // its rows handle ◀▶ themselves
+            if TVHoldSeek.consumesRelease(direction) { return }   // a held ◀▶ already stepped
             if infoCardVisible {
                 infoCardMove(direction)
                 return
@@ -1396,13 +1399,38 @@ private struct PlayerScrubber: View {
 #endif
 
 #if os(tvOS)
-/// Press-and-hold ◀▶ on the Siri Remote: SwiftUI's `onMoveCommand` fires once per press (no
-/// repeat while held), so long-press recognizers for the arrow presses on the window repeat the
-/// step every 0.3 s while the button stays down (10 s, 30 s once held for 1 s). A short press
-/// fails them and reaches `onMoveCommand` as usual. Also used by the audio delay stepper.
+/// Press-and-hold ◀▶ on the Siri Remote: SwiftUI's `onMoveCommand` fires once per press, on release
+/// (no repeat while held). A press observer on the window starts repeating the step 0.4 s after the
+/// arrow went down and every 0.3 s after that, until it comes up (`heldMs` drives the acceleration).
+///
+/// Not a `UILongPressGestureRecognizer`: the focus engine's own directional press recognizer (its
+/// hold-to-repeat) and SwiftUI's press recognizer compete for the same press, and whichever passes
+/// its threshold first wins the exclusive recognition – the long press then never began and the
+/// hold became one 10 s step. The observer never recognizes, so it can neither be prevented nor
+/// prevent anything; it sees every press. When a hold was handled (`onStep` returned true), the
+/// `onMoveCommand` SwiftUI still sends on release is swallowed via `consumesRelease`. A short
+/// press reaches `onMoveCommand` as usual. Also used by the audio delay stepper.
 struct TVHoldSeek: UIViewRepresentable {
-    /// (direction, ms since the button went down)
-    let onStep: @MainActor (Int, Int64) -> Void
+    /// (direction, ms since the button went down) → whether the step was handled (only then is the
+    /// release's `onMoveCommand` swallowed).
+    let onStep: @MainActor (Int, Int64) -> Bool
+
+    /// Last handled hold: its direction and when the arrow came up.
+    @MainActor private static var lastHoldRelease: (direction: Int, at: TimeInterval)?
+
+    /// `onMoveCommand` arriving right after a handled hold of the same arrow is that hold's release
+    /// (it follows the press-up within milliseconds): true once, then the hold is forgotten.
+    @MainActor static func consumesRelease(_ direction: MoveCommandDirection) -> Bool {
+        let value: Int
+        switch direction {
+        case .left: value = -1
+        case .right: value = 1
+        default: return false
+        }
+        guard let last = lastHoldRelease else { return false }
+        lastHoldRelease = nil
+        return last.direction == value && ProcessInfo.processInfo.systemUptime - last.at < 0.25
+    }
 
     func makeUIView(context: Context) -> HoldView {
         let view = HoldView()
@@ -1415,10 +1443,12 @@ struct TVHoldSeek: UIViewRepresentable {
     static func dismantleUIView(_ view: HoldView, coordinator: ()) { view.detach() }
 
     final class HoldView: UIView {
-        var onStep: (@MainActor (Int, Int64) -> Void)?
-        private static let minimumPress: TimeInterval = 0.4
-        private var recognizers: [UILongPressGestureRecognizer] = []
+        var onStep: (@MainActor (Int, Int64) -> Bool)?
+        private static let minimumPressMs = 400
+        private static let repeatMs = 300
+        private var observer: ArrowPressObserver?
         private var repeatTask: Task<Void, Never>?
+        private var handledHold = false
         private weak var attachedWindow: UIWindow?
 
         override func didMoveToWindow() {
@@ -1429,39 +1459,98 @@ struct TVHoldSeek: UIViewRepresentable {
         private func attach() {
             guard let window, attachedWindow !== window else { return }
             detach()
-            for type in [UIPress.PressType.leftArrow, .rightArrow] {
-                let r = UILongPressGestureRecognizer(target: self, action: #selector(held(_:)))
-                r.allowedPressTypes = [NSNumber(value: type.rawValue)]
-                r.minimumPressDuration = Self.minimumPress
-                window.addGestureRecognizer(r)
-                recognizers.append(r)
-            }
+            let observer = ArrowPressObserver()
+            observer.onDown = { [weak self] direction in self?.pressDown(direction) }
+            observer.onUp = { [weak self] direction in self?.pressUp(direction) }
+            window.addGestureRecognizer(observer)
+            self.observer = observer
             attachedWindow = window
         }
 
         func detach() {
             repeatTask?.cancel()
-            for r in recognizers { r.view?.removeGestureRecognizer(r) }
-            recognizers.removeAll()
+            repeatTask = nil
+            handledHold = false
+            if let observer { observer.view?.removeGestureRecognizer(observer) }
+            observer = nil
             attachedWindow = nil
         }
 
-        @objc private func held(_ recognizer: UILongPressGestureRecognizer) {
-            let direction = recognizer.allowedPressTypes.first?.intValue == UIPress.PressType.leftArrow.rawValue ? -1 : 1
-            switch recognizer.state {
-            case .began:
-                repeatTask?.cancel()
-                let pressedAt = Date().addingTimeInterval(-Self.minimumPress)
-                repeatTask = Task { @MainActor [weak self] in
-                    while !Task.isCancelled {
-                        self?.onStep?(direction, Int64(Date().timeIntervalSince(pressedAt) * 1000))
-                        try? await Task.sleep(for: .milliseconds(300))
-                    }
+        private func pressDown(_ direction: Int) {
+            repeatTask?.cancel()
+            handledHold = false
+            let pressedAt = ProcessInfo.processInfo.systemUptime
+            repeatTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(Self.minimumPressMs))
+                while !Task.isCancelled, let self {
+                    let heldMs = Int64((ProcessInfo.processInfo.systemUptime - pressedAt) * 1000)
+                    if self.onStep?(direction, heldMs) == true { self.handledHold = true }
+                    try? await Task.sleep(for: .milliseconds(Self.repeatMs))
                 }
-            case .ended, .cancelled, .failed:
-                repeatTask?.cancel()
-            default:
-                break
+            }
+        }
+
+        private func pressUp(_ direction: Int) {
+            repeatTask?.cancel()
+            repeatTask = nil
+            if handledHold {
+                TVHoldSeek.lastHoldRelease = (direction, ProcessInfo.processInfo.systemUptime)
+            }
+            handledHold = false
+        }
+    }
+
+    /// Reports ◀▶ press down/up as the window sees them. Never recognizes: it cannot be prevented by
+    /// (nor prevent) the focus engine's or SwiftUI's press recognizers, and delays nothing.
+    final class ArrowPressObserver: UIGestureRecognizer {
+        var onDown: ((Int) -> Void)?
+        var onUp: ((Int) -> Void)?
+        private var down: (press: UIPress, direction: Int)?
+
+        init() {
+            super.init(target: nil, action: nil)
+            allowedPressTypes = [UIPress.PressType.leftArrow, .rightArrow].map { NSNumber(value: $0.rawValue) }
+            allowedTouchTypes = []
+            cancelsTouchesInView = false
+            delaysTouchesBegan = false
+            delaysTouchesEnded = false
+        }
+
+        override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+        override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+
+        private static func direction(of press: UIPress) -> Int? {
+            switch press.type {
+            case .leftArrow: -1
+            case .rightArrow: 1
+            default: nil
+            }
+        }
+
+        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent) {
+            guard let press = presses.first(where: { Self.direction(of: $0) != nil }),
+                  let direction = Self.direction(of: press) else { return }
+            if let previous = down { onUp?(previous.direction) }   // a second arrow replaces the first
+            down = (press, direction)
+            onDown?(direction)
+        }
+
+        override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent) { finish(presses) }
+        override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent) { finish(presses) }
+
+        private func finish(_ presses: Set<UIPress>) {
+            if let current = down, presses.contains(current.press) {
+                down = nil
+                onUp?(current.direction)
+            }
+            if down == nil { state = .failed }   // back to .possible for the next press
+        }
+
+        override func reset() {
+            super.reset()
+            if let current = down {
+                down = nil
+                onUp?(current.direction)
             }
         }
     }
