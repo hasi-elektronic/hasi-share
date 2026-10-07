@@ -221,6 +221,11 @@
     <string name="audio_sync_unavailable" formatted="false">Sync ist bei diesem Stream nicht möglich</string>
     <string name="settings_device_audio_delay" formatted="false">Audioverzögerung (TV/Soundbar)</string>
     <string name="about_version">Version %1$s</string>
+    <string name="about_title" formatted="false">Über</string>
+    <string name="about_version_build">Version %1$s (Build %2$s)</string>
+    <string name="about_developed_by" formatted="false">Entwickelt von</string>
+    <string name="about_website" formatted="false">Website</string>
+    <string name="about_email" formatted="false">E-Mail</string>
     <string name="about_licenses" formatted="false">Open-Source-Lizenzen</string>
     <string name="format_test_result_ok" formatted="false">Wird abgespielt ✓</string>
     <string name="format_test_result_expected_error">Erwarteter Fehler ✓ (%1$s)</string>

@@ -448,8 +448,14 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 **Üst düzey yalnızca kullanıcının sık değiştirdikleri** (tek grup, kaydırmasız):
 **Kaynaklar** (sayı ile → Kaynaklar ekranı) · **Uygulama dili** · **Ses dili** · **Altyazı dili** ·
 **Hızlı başlat** · **Ses gecikmesi (TV/soundbar)** (§3.7 – TV'deki dudak senkronu düzeltmesi, bu yüzden üstte);
-alt bilgide Hızlı başlat açıklaması ve gecikme yön ipucu. Altında tek satır **Gelişmiş ve tanılama** →
-geri kalan her şey.
+alt bilgide Hızlı başlat açıklaması ve gecikme yön ipucu. Altında **Gelişmiş ve tanılama** → geri kalan her
+şey; son satır **Hakkında** (Apple, Build 14).
+* **Hakkında ekranı (iOS/iPadOS/tvOS):** uygulama simgesi + adı (`CFBundleDisplayName`) + "Sürüm 1.0.0 (Derleme N)"
+  (paketten okunur) · **Geliştiren:** Hasi Elektronic logosu (`HasiLogo`, iOS ≈200 pt, tvOS ≈360 pt), "Hamdi
+  Güncavdı" (Hasi mavisi #3ABADF – yalnızca bu blokta), Hasi Elektronic, Grabenstraße 18, 71665 Vaihingen/Enz,
+  web sitesi hasi-elektronic.de ve e-posta info@hasi-elektronic.de (iOS: bağlantı / mailto; tvOS: düz metin,
+  tarayıcı yok) · **Açık kaynak lisansları** satırı (VLCKit LGPL-2.1 → lisans ekranı) · alt bilgi
+  "© 2026 Hasi Elektronic". tvOS: satır başına tek odaklanabilir öğe, liste odakla kayar.
 * **Kaynaklar ekranı:** liste (ad, tür, host, son yenileme, durum rozeti, hesap bitiş tarihi) →
   detay: Yenile · Düzenle · EPG URL · EPG saat kaydırma (−12..+12 saat, 15 dk adım) ·
   Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "Kaynak ekle": **+ M3U** · **+ Xtream** ·

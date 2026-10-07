@@ -11,6 +11,7 @@ enum SettingsRoute: Hashable {
     case formatTest
     case paywall
     case licenses
+    case about
 }
 
 /// Settings (SCREENS §3.9) – always reachable, also when locked. Top level: only what users change
@@ -70,6 +71,10 @@ struct SettingsView: View {
                     Label(L10n.t("settings_advanced"), systemImage: "slider.horizontal.3")
                 }
                 .accessibilityIdentifier("settings_advanced")
+                NavigationLink(value: SettingsRoute.about) {
+                    Label(L10n.t("about_title"), systemImage: "info.circle")
+                }
+                .accessibilityIdentifier("settings_about")
             }
         }
         .hiddenListBackground()
@@ -87,6 +92,7 @@ struct SettingsView: View {
             case .formatTest: FormatTestView()
             case .paywall: PaywallView()
             case .licenses: LicensesView()
+            case .about: AboutView()
             }
         }
     }

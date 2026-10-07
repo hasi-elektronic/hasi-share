@@ -1094,6 +1094,31 @@
    "tr": "Sürüm {0}",
    "de": "Version {0}"
   },
+  "about_title": {
+   "en": "About",
+   "tr": "Hakkında",
+   "de": "Über"
+  },
+  "about_version_build": {
+   "en": "Version {0} (Build {1})",
+   "tr": "Sürüm {0} (Derleme {1})",
+   "de": "Version {0} (Build {1})"
+  },
+  "about_developed_by": {
+   "en": "Developed by",
+   "tr": "Geliştiren",
+   "de": "Entwickelt von"
+  },
+  "about_website": {
+   "en": "Website",
+   "tr": "Web sitesi",
+   "de": "Website"
+  },
+  "about_email": {
+   "en": "E-mail",
+   "tr": "E-posta",
+   "de": "E-Mail"
+  },
   "about_licenses": {
    "en": "Open-source licenses",
    "tr": "Açık kaynak lisansları",

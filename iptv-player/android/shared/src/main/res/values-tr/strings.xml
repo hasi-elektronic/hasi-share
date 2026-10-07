@@ -221,6 +221,11 @@
     <string name="audio_sync_unavailable" formatted="false">Senkron bu yayında uygulanamadı</string>
     <string name="settings_device_audio_delay" formatted="false">Ses gecikmesi (TV/soundbar)</string>
     <string name="about_version">Sürüm %1$s</string>
+    <string name="about_title" formatted="false">Hakkında</string>
+    <string name="about_version_build">Sürüm %1$s (Derleme %2$s)</string>
+    <string name="about_developed_by" formatted="false">Geliştiren</string>
+    <string name="about_website" formatted="false">Web sitesi</string>
+    <string name="about_email" formatted="false">E-posta</string>
     <string name="about_licenses" formatted="false">Açık kaynak lisansları</string>
     <string name="format_test_result_ok" formatted="false">Oynatılıyor ✓</string>
     <string name="format_test_result_expected_error">Beklenen hata ✓ (%1$s)</string>

@@ -221,6 +221,11 @@
     <string name="audio_sync_unavailable" formatted="false">Sync can\'t be applied to this stream</string>
     <string name="settings_device_audio_delay" formatted="false">Audio delay (TV/soundbar)</string>
     <string name="about_version">Version %1$s</string>
+    <string name="about_title" formatted="false">About</string>
+    <string name="about_version_build">Version %1$s (Build %2$s)</string>
+    <string name="about_developed_by" formatted="false">Developed by</string>
+    <string name="about_website" formatted="false">Website</string>
+    <string name="about_email" formatted="false">E-mail</string>
     <string name="about_licenses" formatted="false">Open-source licenses</string>
     <string name="format_test_result_ok" formatted="false">Playing ✓</string>
     <string name="format_test_result_expected_error">Expected error ✓ (%1$s)</string>
