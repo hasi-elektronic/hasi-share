@@ -16,8 +16,9 @@ public enum RefreshProgress: Sendable, Hashable {
 /// refresh), so every source whose stored version is older – or missing – is refreshed once in the
 /// background on launch (`AppEnvironment.refreshDueSources`). Bump rule: docs/ARCHITECTURE.md §3.1.
 public enum CatalogFormat {
-    /// 1 = up to Build 6 (implicit, never stored); 2 = `item_categories` from Xtream `category_ids`.
-    public static let current = 2
+    /// 1 = up to Build 6 (implicit, never stored); 2 = `item_categories` from Xtream `category_ids`;
+    /// 3 = search index v6 with the `people` column (cast + director, Build 10).
+    public static let current = 3
 
     static func key(_ sourceId: String) -> String { "catalog.format.\(sourceId)" }
 }

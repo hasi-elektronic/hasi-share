@@ -122,6 +122,9 @@ class XtreamVectorsTest {
         put("year", num(m.year))
         put("containerExt", str(m.containerExt))
         put("addedAt", secs(m.addedAtMs))
+        put("cast", str(m.cast))
+        put("director", str(m.director))
+        put("genre", str(m.genre))
     }
 
     @Test
@@ -138,6 +141,9 @@ class XtreamVectorsTest {
         put("plot", str(s.plot))
         put("rating", num(s.rating))
         put("year", num(s.year))
+        put("cast", str(s.cast))
+        put("director", str(s.director))
+        put("genre", str(s.genre))
     }
 
     @Test

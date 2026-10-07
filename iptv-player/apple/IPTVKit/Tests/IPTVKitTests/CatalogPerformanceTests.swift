@@ -194,6 +194,46 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(msTop, 100 * factor, "country top 10 \(msTop) ms")
     }
 
+    /// People search (Build 10): 50 000 movies + 10 000 series with cast/director; a common first name matches
+    /// thousands of people rows – both FTS queries (titles, then people NOT titles) stay within 100 ms.
+    func testPeopleSearchUnderBudget() throws {
+        let db = try AppDatabase.inMemory()
+        let repo = CatalogRepository(database: db)
+        let session = try repo.beginRefresh(sourceId: "p")
+        let first = ["Hasan", "Ayşe", "Mehmet", "Anna", "Thomas", "Maria", "John", "Emma"]
+        let last = ["Kaya", "Yılmaz", "Müller", "Schmidt", "Smith", "Demir", "Weber", "Brown"]
+        func person(_ i: Int) -> String { "\(first[i % 8]) \(last[(i / 8) % 8]) \(i % 97)" }
+        for chunk in stride(from: 0, to: Self.n, by: 1000) {
+            try session.write(movies: (chunk..<(chunk + 1000)).map {
+                Movie(sourceId: "p", id: "m\($0)", name: "Film \($0) \(Self.words[$0 % 4])", sort: $0,
+                      cast: "\(person($0)), \(person($0 + 3))", director: person($0 + 5))
+            })
+        }
+        try session.write(series: (0..<10_000).map {
+            Series(sourceId: "p", id: "t\($0)", name: "Serie \($0)", sort: $0, cast: person($0 + 1), director: nil)
+        })
+        try session.commit()
+
+        var hits: [SearchHit] = []
+        let ms = try median { hits = try repo.search("hasan", sourceId: "p") }
+        report("people search 'hasan' (50k movies + 10k series)", ms, budget: 100)
+        XCTAssertEqual(hits.filter(\.isPersonMatch).count, 30)
+        XCTAssertTrue(hits.filter(\.isPersonMatch).allSatisfy { $0.matchedPerson?.hasPrefix("Hasan") == true })
+        XCTAssertLessThan(ms, 100 * factor, "people search \(ms) ms")
+
+        var two: [SearchHit] = []
+        let ms2 = try median { two = try repo.search("hasan kaya", sourceId: "p") }
+        report("people search 'hasan kaya'", ms2, budget: 100)
+        XCTAssertFalse(two.isEmpty)
+        XCTAssertLessThan(ms2, 100 * factor, "people search \(ms2) ms")
+
+        var mixed: [SearchHit] = []
+        let ms3 = try median { mixed = try repo.search("sport", sourceId: "p") }
+        report("title search with people column 'sport'", ms3, budget: 100)
+        XCTAssertEqual(mixed.filter { $0.kind == .movie && !$0.isPersonMatch }.count, 30)
+        XCTAssertLessThan(ms3, 100 * factor, "title search \(ms3) ms")
+    }
+
     /// The repository's real EPG SQL must be served by the `epg_lookup_lc` expression index (deterministic
     /// guard that does not depend on machine speed).
     func testEpgQueriesUseChannelIndex() throws {

@@ -263,7 +263,18 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Sıralama ("Taşı"):** sağ üstte (TV: segmentin yanında) "Taşı" → seçili segment liste olur. iOS: tutamaçla
   sürükle-bırak; TV: öğeyi seç → ▲▼ ile taşı → tekrar seç bırakır (taşınırken diğer satırlar odak almaz).
   "Bitti" çıkar. Sıra cihazda saklanır, diğer kaynakların favorileri yerinde kalır.
-* Arama: tek alan, sonuçlar satır olarak (Kanallar kartları · Filmler · Diziler posterleri).
+* Arama: tek alan, sonuçlar satır olarak, sırayla:
+  1. **Kategoriler** (en üstte, en fazla 12): adında (büyük/küçük harf ve aksan duyarsız, grup kodu dahil —
+     kategori sayfasındaki arama gibi) **her** kelime geçen film, dizi ve canlı kategorileri; kartta bayrak /
+     kod rozeti, ad, tür ve içerik (canlıda kanal) sayısı. Gizlenen kategoriler (film/dizi: kaynak + tür,
+     canlı: `HiddenStore`) gösterilmez. Film/dizi kategorisi → o kategorinin grid'i; canlı kategori → Canlı TV
+     o kategoriyle açılır.
+  2. Başlığa göre **Kanallar** kartları · **Filmler** · **Diziler** posterleri (tür başına en fazla 30).
+  3. **Kişiler**: başlığı eşleşmeyen ama oyuncu/yönetmeni (Xtream `cast` / `director`) her kelimeyle
+     eşleşen filmler ve diziler (önek eşleşmesi, ör. "Hasan" → Hasan Can Kaya'nın programı); posterin altında
+     eşleşen kişinin adı. Film oyuncuları listede yoksa film detayı bir kez açıldığında aranabilir olur.
+     M3U kaynaklarında kişi bilgisi yoktur. Türkçe "ı" ile "i" aynı aranır ("kizilcik" → "Kızılcık").
+  tvOS'ta bölümler raf olarak, kart başına tek odak hedefi.
 
 ### 3.7 Oynatıcı
 * Tam ekran, sistem çubukları gizli, ekran açık kalır.

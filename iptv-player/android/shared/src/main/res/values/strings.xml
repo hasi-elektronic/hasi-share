@@ -333,6 +333,12 @@
     <string name="catnav_discover" formatted="false">Discover</string>
     <string name="catnav_no_match" formatted="false">No matching categories</string>
     <string name="catnav_items">%1$s titles</string>
+    <string name="search_section_categories" formatted="false">Categories</string>
+    <string name="search_section_people" formatted="false">People</string>
+    <string name="search_category_channels">%1$s channels</string>
+    <string name="search_kind_movies" formatted="false">Movies</string>
+    <string name="search_kind_series" formatted="false">Series</string>
+    <string name="search_kind_live" formatted="false">Live TV</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

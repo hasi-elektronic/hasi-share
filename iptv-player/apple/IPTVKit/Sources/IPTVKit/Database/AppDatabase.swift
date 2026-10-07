@@ -141,6 +141,36 @@ public final class AppDatabase: Sendable {
             }
             db.userVersion = 5
         }
+        if db.userVersion < 6 {
+            // People search (Build 10): the FTS index gets a second searchable column `people` (cast + director).
+            // FTS5 tables cannot be altered → drop and recreate; titles are re-indexed from the content tables
+            // right away (search keeps working), `people` is filled by the next catalog refresh
+            // (`CatalogFormat` 3 triggers one per source) and by detail fetches. `item_people` keeps people
+            // known only from details (Xtream `get_vod_info` / `get_series_info`) across refreshes.
+            try db.transaction {
+                try db.execute("""
+                CREATE TABLE IF NOT EXISTS item_people (
+                  source_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, people TEXT NOT NULL,
+                  PRIMARY KEY (source_id, kind, item_id));
+                """)
+                if db.hasFTS5 {
+                    try db.execute("""
+                    DROP TABLE IF EXISTS search_index;
+                    CREATE VIRTUAL TABLE search_index USING fts5(
+                      title, people, source_id UNINDEXED, kind UNINDEXED, item_id UNINDEXED,
+                      tokenize = 'unicode61 remove_diacritics 2');
+                    """)
+                    // Same indexed form as `CatalogPeople.indexed` (dotless-i variant after U+2063).
+                    let indexed = "name || CASE WHEN instr(name, 'ı') > 0 OR instr(name, 'İ') > 0 THEN ' ' || char(8291) || ' ' "
+                        + "|| replace(replace(name, 'ı', 'i'), 'İ', 'I') ELSE '' END"
+                    for (table, kind) in [("channels", "live"), ("movies", "movie"), ("series", "series")] {
+                        try db.execute("INSERT INTO search_index (title, people, source_id, kind, item_id) "
+                                       + "SELECT \(indexed), '', source_id, '\(kind)', id FROM \(table);")
+                    }
+                }
+            }
+            db.userVersion = 6
+        }
     }
 
     // MARK: Key/value (small app state such as sync cursor)

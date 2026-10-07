@@ -122,7 +122,19 @@ public object XtreamMapper {
             containerExt = XtreamJson.trimmed(item["container_extension"]),
             addedAtMs = epochMs(item["added"]),
             sort = sort,
+            cast = text(item["cast"]),
+            director = text(item["director"]),
+            genre = text(item["genre"]),
         )
+    }
+
+    /**
+     * `cast` / `director` / `genre`: a string trimmed, or an array of strings joined with ", " (empty/null
+     * entries dropped); missing, null, "" or nothing left → null (test-vectors/README.md).
+     */
+    public fun text(e: JsonElement?): String? = when (e) {
+        is JsonArray -> e.mapNotNull { XtreamJson.trimmed(it) }.joinToString(", ").takeIf { it.isNotEmpty() }
+        else -> XtreamJson.trimmed(e)
     }
 
     /** `get_vod_streams` → movies. */
@@ -144,6 +156,9 @@ public object XtreamMapper {
             year = year(item),
             sort = sort,
             lastModifiedMs = epochMs(item["last_modified"]),
+            cast = text(item["cast"]),
+            director = text(item["director"]),
+            genre = text(item["genre"]),
         )
     }
 

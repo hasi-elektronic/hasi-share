@@ -627,7 +627,43 @@ struct FavoritesView: View {
 
 // MARK: - Search
 
-/// Global search over channels, movies and series (FTS5, 250 ms debounce); results as rows.
+/// Search result card of a category (SCREENS §3.6).
+private struct SearchCategoryCard: View {
+    let info: CategoryInfo
+
+    private var kindLine: String {
+        let kind: String
+        switch info.category.kind {
+        case .movie: kind = L10n.t("search_kind_movies")
+        case .series: kind = L10n.t("search_kind_series")
+        case .live: kind = L10n.t("search_kind_live")
+        }
+        let count = info.category.kind == .live ? L10n.t("search_category_channels", String(info.itemCount))
+            : L10n.t("catnav_items", String(info.itemCount))
+        return "\(kind) · \(count)"
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.isTV ? 16 : 10) {
+            CategoryLeadingMark(code: info.countryCode)
+            VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 2) {
+                Text(categoryTitle(info)).font(Theme.isTV ? Theme.caption.weight(.semibold) : .subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                Text(kindLine).font(Theme.isTV ? .system(size: 22) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.isTV ? 24 : 14).padding(.vertical, Theme.isTV ? 18 : 10)
+        .frame(width: Theme.isTV ? 420 : 230, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: Theme.cardRadius).fill(Theme.surface))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).stroke(Theme.stroke, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(categoryAccessibilityLabel(info)), \(kindLine)")
+    }
+}
+
+/// Global search (SCREENS §3.6): categories first, then channels, movies and series by title (FTS5, 250 ms
+/// debounce), then people (cast/director matches).
 struct SearchView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
@@ -635,6 +671,8 @@ struct SearchView: View {
     @State private var channels: [ChannelRow] = []
     @State private var movies: [Movie] = []
     @State private var series: [Series] = []
+    /// Person matches (cast/director): the item + the matched person.
+    @State private var people: [(item: CatalogItem, person: String)] = []
     @State private var searchPresented = true
 
     var body: some View {
@@ -642,9 +680,14 @@ struct SearchView: View {
             if let model {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.rowSpacing) {
-                        if model.hits.isEmpty, !model.query.isEmpty {
+                        if model.isEmpty, !model.query.isEmpty {
                             LText("search_no_results", model.query).font(Theme.body).foregroundStyle(Theme.textSecondary)
                                 .padding(.horizontal, Theme.safeH).padding(.top, 20)
+                        }
+                        if !model.categories.isEmpty {
+                            Shelf(title: L10n.t("search_section_categories"), spacing: Theme.isTV ? 30 : 10, identifier: "search_categories") {
+                                ForEach(model.categories) { info in categoryCard(info) }
+                            }
                         }
                         if !channels.isEmpty {
                             Shelf(title: L10n.t("favorites_channels")) {
@@ -676,6 +719,17 @@ struct SearchView: View {
                                 }
                             }
                         }
+                        if !people.isEmpty {
+                            // Cast / director matches whose title does not match (SCREENS §3.6).
+                            Shelf(title: L10n.t("search_section_people"), identifier: "search_people") {
+                                ForEach(people, id: \.item.id) { entry in
+                                    FavoritePosterLink(value: entry.item, target: env.favoriteTarget(entry.item),
+                                                       identifier: "search_person_\(entry.item.id)") {
+                                        PosterCard(title: entry.item.title, url: entry.item.posterUrl, subtitle: entry.person)
+                                    }
+                                }
+                            }
+                        }
                     }
                     .padding(.vertical, Theme.isTV ? 30 : 12)
                 }
@@ -695,10 +749,41 @@ struct SearchView: View {
         #if !os(tvOS)
         .toolbar(.visible, for: .navigationBar)
         #endif
-        .onAppear { if model == nil { model = SearchViewModel(env: env) } }
+        .onAppear {
+            guard model == nil else { return }
+            let m = SearchViewModel(env: env)
+            m.hiddenLiveCategories = { HiddenStore.shared.hiddenCategories($0) }
+            model = m
+        }
+    }
+
+    /// Category result: flag/badge + name, kind · item count. Movies/series open the category grid, live
+    /// categories open Live TV filtered to them.
+    @ViewBuilder
+    private func categoryCard(_ info: CategoryInfo) -> some View {
+        let label = SearchCategoryCard(info: info)
+        let identifier = "search_category_\(info.category.kind.rawValue)_\(info.id)"
+        if info.category.kind == .live {
+            Button { router.showLiveCategory(info.id) } label: { label }
+                .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
+                .accessibilityIdentifier(identifier)
+        } else {
+            NavigationLink(value: BrowseRoute.grid(kind: info.category.kind.contentKind, categoryId: info.id,
+                                                   title: CountryFlag.displayTitle(info.category.name), sort: .added)) { label }
+                .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
+                .accessibilityIdentifier(identifier)
+        }
     }
 
     private func resolve(_ hits: [SearchHit], _ model: SearchViewModel) {
+        people = model.personHits.compactMap { hit in
+            switch hit.kind {
+            case .movie: return model.movie(hit).map { (CatalogItem.movie($0), hit.matchedPerson ?? "") }
+            case .series: return model.series(hit).map { (CatalogItem.series($0), hit.matchedPerson ?? "") }
+            default: return nil
+            }
+        }
+        let hits = model.titleHits
         let liveHits = hits.filter { $0.kind == .live }
         let found = liveHits.compactMap { model.channel($0) }
         var rows = found.map { ChannelRow(channel: $0, nowNext: nil) }

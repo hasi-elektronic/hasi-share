@@ -111,7 +111,8 @@ public enum XtreamMapper {
                              posterUrl: item["stream_icon"]?.stringValue, categoryId: categories.first,
                              rating: item["rating"]?.doubleValue, year: item["year"]?.intValue,
                              plot: item["plot"]?.stringValue, containerExt: item["container_extension"]?.stringValue,
-                             addedAt: epochDate(item["added"]), sort: out.count, categoryIds: categories))
+                             addedAt: epochDate(item["added"]), sort: out.count, categoryIds: categories,
+                             cast: text(item["cast"]), director: text(item["director"]), genre: text(item["genre"])))
         }
         return out
     }
@@ -124,9 +125,21 @@ public enum XtreamMapper {
             out.append(Series(sourceId: sourceId, id: id, name: item["name"]?.stringValue ?? "",
                               posterUrl: item["cover"]?.stringValue, categoryId: categories.first,
                               plot: item["plot"]?.stringValue, rating: item["rating"]?.doubleValue,
-                              year: year(item), sort: out.count, categoryIds: categories))
+                              year: year(item), sort: out.count, categoryIds: categories,
+                              cast: text(item["cast"]), director: text(item["director"]), genre: text(item["genre"])))
         }
         return out
+    }
+
+    /// `cast` / `director` / `genre`: a string trimmed, or an array of strings joined with ", " (empty/null
+    /// entries dropped); missing, null, "" or nothing left → nil (test-vectors/README.md).
+    public static func text(_ value: JSONValue?) -> String? {
+        if let array = value?.arrayValue {
+            let parts = array.compactMap { $0.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: ", ")
+        }
+        let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
     }
 
     /// All categories of a list item (CONTRACT §4.3): `category_id` first, then the entries of
@@ -198,8 +211,8 @@ public enum XtreamMapper {
     public static func seriesDetails(_ json: JSONValue) -> XtreamSeriesDetails {
         let info = json["info"] ?? .null
         return XtreamSeriesDetails(name: info["name"]?.stringValue, posterUrl: info["cover"]?.stringValue,
-                                   plot: info["plot"]?.stringValue, genre: info["genre"]?.stringValue,
-                                   cast: info["cast"]?.stringValue, director: info["director"]?.stringValue,
+                                   plot: info["plot"]?.stringValue, genre: text(info["genre"]),
+                                   cast: text(info["cast"]), director: text(info["director"]),
                                    rating: info["rating"]?.doubleValue, year: year(info),
                                    backdropUrl: firstString(info["backdrop_path"]),
                                    categoryId: info["category_id"]?.stringValue)
@@ -211,8 +224,8 @@ public enum XtreamMapper {
         let movie = json["movie_data"] ?? .null
         return XtreamVodInfo(name: info["name"]?.stringValue ?? movie["name"]?.stringValue,
                              plot: info["plot"]?.stringValue ?? info["description"]?.stringValue,
-                             genre: info["genre"]?.stringValue, cast: info["cast"]?.stringValue ?? info["actors"]?.stringValue,
-                             director: info["director"]?.stringValue, rating: info["rating"]?.doubleValue,
+                             genre: text(info["genre"]), cast: text(info["cast"]) ?? text(info["actors"]),
+                             director: text(info["director"]), rating: info["rating"]?.doubleValue,
                              year: year(info) ?? year(movie),
                              durationSec: info["duration_secs"]?.intValue ?? info["duration"]?.stringValue.flatMap(parseClock),
                              posterUrl: info["movie_image"]?.stringValue ?? info["cover_big"]?.stringValue,

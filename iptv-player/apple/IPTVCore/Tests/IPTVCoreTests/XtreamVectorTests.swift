@@ -126,7 +126,8 @@ final class XtreamVectorTests: XCTestCase {
         let movies = XtreamMapper.movies(try json("vod_streams.json"), sourceId: "s")
         let actual = movies.map { m -> [String: Any] in
             ["id": m.id, "name": m.name, "posterUrl": j(m.posterUrl), "categoryId": j(m.categoryId), "rating": j(m.rating),
-             "year": j(m.year), "containerExt": j(m.containerExt), "addedAt": epoch(m.addedAt)]
+             "year": j(m.year), "containerExt": j(m.containerExt), "addedAt": epoch(m.addedAt),
+             "cast": j(m.cast), "director": j(m.director), "genre": j(m.genre)]
         }
         assertJSONEqual(try Vectors.json("xtream/vod_streams.expected.json"), actual)
     }
@@ -135,7 +136,7 @@ final class XtreamVectorTests: XCTestCase {
         let series = XtreamMapper.series(try json("series.json"), sourceId: "s")
         let actual = series.map { s -> [String: Any] in
             ["id": s.id, "name": s.name, "posterUrl": j(s.posterUrl), "categoryId": j(s.categoryId), "plot": j(s.plot),
-             "rating": j(s.rating), "year": j(s.year)]
+             "rating": j(s.rating), "year": j(s.year), "cast": j(s.cast), "director": j(s.director), "genre": j(s.genre)]
         }
         assertJSONEqual(try Vectors.json("xtream/series.expected.json"), actual)
     }
@@ -291,7 +292,7 @@ final class XtreamVectorTests: XCTestCase {
         let catalog = try await client.fetchCatalog(now: Date(timeIntervalSince1970: 1_759_570_000))
         XCTAssertEqual(catalog.channels.count, 3)
         XCTAssertEqual(catalog.movies.count, 2)
-        XCTAssertEqual(catalog.series.count, 2)
+        XCTAssertEqual(catalog.series.count, 3)
         XCTAssertEqual(catalog.status.liveCount, 3)
         XCTAssertEqual(client.fingerprint, "d11e55fa87364ff0")
 

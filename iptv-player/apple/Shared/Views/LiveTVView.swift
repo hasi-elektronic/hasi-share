@@ -73,10 +73,19 @@ struct LiveTVView: View {
                 model = m
                 m.reload()
             }
+            applyLiveCategory()
         }
+        .onChange(of: router.liveCategory) { applyLiveCategory() }
         .onChange(of: env.catalogVersion) { model?.reload() }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
         .onChange(of: model?.filter) { selection.channel = nil }
+    }
+
+    /// Search → live category (SCREENS §3.6): show that category.
+    private func applyLiveCategory() {
+        guard let id = router.liveCategory, let model else { return }
+        router.liveCategory = nil
+        model.filter = .category(id)
     }
 
     @ViewBuilder

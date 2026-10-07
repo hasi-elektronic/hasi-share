@@ -333,6 +333,12 @@
     <string name="catnav_discover" formatted="false">Entdecken</string>
     <string name="catnav_no_match" formatted="false">Keine passenden Kategorien</string>
     <string name="catnav_items">%1$s Titel</string>
+    <string name="search_section_categories" formatted="false">Kategorien</string>
+    <string name="search_section_people" formatted="false">Personen</string>
+    <string name="search_category_channels">%1$s Sender</string>
+    <string name="search_kind_movies" formatted="false">Filme</string>
+    <string name="search_kind_series" formatted="false">Serien</string>
+    <string name="search_kind_live" formatted="false">Live-TV</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

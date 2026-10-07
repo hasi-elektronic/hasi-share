@@ -85,6 +85,17 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    değişikliği mevcut kataloğun **yeniden içe aktarılmasını** gerektiriyorsa `CatalogFormat.current` bir
    artırılır (salt şema göçüyle — `AppDatabase` v1…v5 gibi — veriden türetilebilen değişiklikler için
    artırılmaz). Yalnızca okuma/arayüz değişikliği artırmaz.
+   **Sürüm geçmişi:** 1 = Build 6'ya kadar (yazılmazdı) · 2 = Xtream `category_ids` üyelikleri (Build 9) ·
+   3 = arama dizini v6, `people` sütunu (oyuncu + yönetmen, Build 10).
+8. **Arama dizini (Apple, `AppDatabase` v6):** FTS5 `search_index(title, people, source_id, kind, item_id)`,
+   `unicode61 remove_diacritics 2`. `people` = Xtream `cast` + `director` (", " ile); listede yoksa
+   detaydan (`get_vod_info` / `get_series_info`) öğrenilen kişiler `item_people` tablosunda tutulur ve
+   sonraki yenilemelerde de dizine yazılır. Türkçe noktasız "ı" / noktalı "İ" FTS'de aksan sayılmadığından
+   bu harfleri içeren başlık/kişi metinlerine görünmez bir ayraçtan (U+2063) sonra "ı → i" varyantı eklenir
+   ("yilmaz" → "Yılmaz"). Sorgu: iki FTS sorgusu — önce `{title}` (tür başına ilk 30, pencere fonksiyonu),
+   sonra `{people} : … NOT {title} : …` (başlığı eşleşmeyen kişi eşleşmeleri, en fazla 30). v6 göçü tabloyu
+   yeniden kurar ve başlıkları içerik tablolarından hemen yeniden dizinler; `people` için CatalogFormat 3
+   her kaynağı bir kez yeniler. Bütçe: 50k film + 10k dizi ile ≤ 100 ms (`CatalogPerformanceTests`).
 
 ### 3.2 Oynatma
 `PlayerController` (her iki platformda aynı sorumluluklar):

@@ -333,6 +333,12 @@
     <string name="catnav_discover" formatted="false">Keşfet</string>
     <string name="catnav_no_match" formatted="false">Eşleşen kategori yok</string>
     <string name="catnav_items">%1$s içerik</string>
+    <string name="search_section_categories" formatted="false">Kategoriler</string>
+    <string name="search_section_people" formatted="false">Kişiler</string>
+    <string name="search_category_channels">%1$s kanal</string>
+    <string name="search_kind_movies" formatted="false">Filmler</string>
+    <string name="search_kind_series" formatted="false">Diziler</string>
+    <string name="search_kind_live" formatted="false">Canlı TV</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

@@ -1653,6 +1653,36 @@
    "en": "{0} titles",
    "tr": "{0} içerik",
    "de": "{0} Titel"
+  },
+  "search_section_categories": {
+   "en": "Categories",
+   "tr": "Kategoriler",
+   "de": "Kategorien"
+  },
+  "search_section_people": {
+   "en": "People",
+   "tr": "Kişiler",
+   "de": "Personen"
+  },
+  "search_category_channels": {
+   "en": "{0} channels",
+   "tr": "{0} kanal",
+   "de": "{0} Sender"
+  },
+  "search_kind_movies": {
+   "en": "Movies",
+   "tr": "Filmler",
+   "de": "Filme"
+  },
+  "search_kind_series": {
+   "en": "Series",
+   "tr": "Diziler",
+   "de": "Serien"
+  },
+  "search_kind_live": {
+   "en": "Live TV",
+   "tr": "Canlı TV",
+   "de": "Live-TV"
   }
  }
 }

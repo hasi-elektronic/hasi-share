@@ -214,6 +214,11 @@ Expected-output schema: see `test-vectors/m3u/README.md`.
   `null`, `""` or only the first of them. `categoryIds` = `category_id` (if non-empty) followed by
   the `category_ids` entries, `null`/`""` skipped, duplicates removed, order kept;
   `categoryId` = first of `categoryIds` (null if none). Vectors: `category_ids.json`.
+* People fields (search by cast/director): `get_series` and `get_vod_streams` items (when the panel sends
+  them) and `get_vod_info.info` / `get_series_info.info` carry `cast`, `director`, `genre` as a string or
+  an array of strings. Mapping: string → trimmed; array → entries trimmed, `null`/`""` dropped, joined with
+  `", "`; missing / `null` / `""` / nothing left → null. `get_vod_info` also accepts `actors` when `cast`
+  is missing. Vectors: `series.json`, `vod_streams.json`.
 
 ### 4.4 Account classification (from `player_api.php` without action)
 | Condition (first match) | Result |

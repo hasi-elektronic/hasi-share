@@ -63,6 +63,17 @@ final class Router {
         guideFocus = channel
         section = .guide
     }
+
+    /// Search → live category: Live TV opens filtered to this category.
+    var liveCategory: String?
+
+    func showLiveCategory(_ categoryId: String) {
+        liveCategory = categoryId
+        #if !os(tvOS)
+        path = NavigationPath()   // leave the pushed search screen
+        #endif
+        section = .live
+    }
     /// Keeps the onboarding flow (welcome → add source → summary) on screen until "Continue".
     var onboarding = false
     /// Screen opened by a debug launch argument (`-uiScreen paywall`…), UI tests & screenshots.
@@ -257,6 +268,11 @@ enum AppBootstrap {
         }
         if let m3u = argument("-seedM3U"), env.sources.isEmpty {
             _ = try? await env.addSource(name: argument("-seedName") ?? "Demo", secrets: .m3u(M3USecrets(url: m3u))) { _ in }
+        }
+        // `-seedXtream <server>`: the fake panel of the UI tests (UITests/Fixtures/xtream, range_server.py).
+        if let server = argument("-seedXtream"), env.sources.isEmpty {
+            _ = try? await env.addSource(name: argument("-seedName") ?? "Panel",
+                                         secrets: .xtream(XtreamSecrets(serverUrl: server, username: "demo", password: "demo"))) { _ in }
         }
         if arguments.contains("-uiSeedLibrary") { seedLibrary(env: env) }
         // UI tests: a longer ⭐ undo window, so multi-step undo checks do not race the 4 s.

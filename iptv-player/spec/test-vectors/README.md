@@ -48,6 +48,9 @@ Error files: `{"error": "InvalidFormat" | "Empty"}`.
   `year` ← `year` field only; `addedAt` ← `added` (epoch seconds string).
 * Series: `posterUrl` ← `cover`; `year` ← `year`, else first 4 digits of `releaseDate`
   or `release_date`.
+* Movie + series `cast`, `director`, `genre` (people search, CONTRACT §4.3): a string is trimmed; an
+  array of strings is joined with `", "` after trimming and dropping empty/null entries; missing, null,
+  `""` or an empty result → null.
 * Episode: `number` ← `episode_num`; `season` ← `season` (fallback: object key, or
   array index + 1); `durationSec` ← `info.duration_secs`; `plot` ← `info.plot`;
   `posterUrl` ← `info.movie_image`.

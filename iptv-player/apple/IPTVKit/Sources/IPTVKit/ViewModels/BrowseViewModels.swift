@@ -206,7 +206,11 @@ public final class MoviesViewModel {
     public func details(for movie: Movie) async -> XtreamVodInfo? {
         guard case .xtream(let secrets)? = env.secrets(for: movie.sourceId),
               let client = XtreamClient(sourceId: movie.sourceId, secrets: secrets) else { return nil }
-        return try? await client.vodInfo(vodId: movie.id)
+        let info = try? await client.vodInfo(vodId: movie.id)
+        if let info {   // cast/director become searchable (people search, SCREENS §3.6)
+            try? env.catalog.updatePeople(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast, director: info.director)
+        }
+        return info
     }
 }
 
@@ -290,6 +294,8 @@ public final class SeriesDetailViewModel {
                 episodes = info.episodes.sorted { ($0.season, $0.number) < ($1.season, $1.number) }
                 if plot == nil { plot = info.details.plot }
                 try? env.catalog.replaceEpisodes(sourceId: series.sourceId, seriesId: series.id, episodes: episodes)
+                try? env.catalog.updatePeople(sourceId: series.sourceId, kind: .series, itemId: series.id,
+                                              cast: info.details.cast ?? series.cast, director: info.details.director ?? series.director)
             }
         }
         if let next = continueEpisode { season = next.season } else if let first = seasons.first { season = first }
@@ -437,7 +443,12 @@ extension Array {
 @Observable
 public final class SearchViewModel {
     public var query = "" { didSet { schedule() } }
+    /// Title hits per kind (live → movie → series), then person hits (`matchedPerson` set).
     public private(set) var hits: [SearchHit] = []
+    /// Matching categories (movie, series, live; hidden ones left out), at most 12 – shown first.
+    public private(set) var categories: [CategoryInfo] = []
+    /// Hidden live categories of a source (Live TV's local hidden list lives in the app layer).
+    @ObservationIgnored public var hiddenLiveCategories: (String) -> Set<String> = { _ in [] }
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private var task: Task<Void, Never>?
 
@@ -445,13 +456,24 @@ public final class SearchViewModel {
         self.env = env
     }
 
+    public var titleHits: [SearchHit] { hits.filter { !$0.isPersonMatch } }
+    public var personHits: [SearchHit] { hits.filter(\.isPersonMatch) }
+    public var isEmpty: Bool { hits.isEmpty && categories.isEmpty }
+
     private func schedule() {
         task?.cancel()
         let text = query
         task = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, let self else { return }
-            hits = (try? env.catalog.search(text, sourceId: env.currentSource?.id)) ?? []
+            let sourceId = env.currentSource?.id
+            hits = (try? env.catalog.search(text, sourceId: sourceId)) ?? []
+            guard let sourceId else { categories = []; return }
+            let prefs = env.categoryPrefs
+            let hiddenLive = hiddenLiveCategories(sourceId)
+            categories = (try? env.catalog.searchCategories(text, sourceId: sourceId) { kind in
+                kind == .live ? hiddenLive : prefs.hidden(sourceId: sourceId, kind: kind)
+            }) ?? []
         }
     }
 

@@ -259,6 +259,9 @@ UI testleri yerel bir test listesi kullanır (uygulamada örnek liste yoktur –
 # 1) Test M3U + XMLTV'yi Mac'te sunun (simülatör Mac'e localhost ile ulaşır)
 mkdir -p /tmp/iptv-test && cd /tmp/iptv-test   # test.m3u (ör. Apple bipbop HLS) + epg.xml
 python3 -m http.server 8765 --bind 127.0.0.1
+# Kişi/kategori arama testi (IOSPeopleSearchTests) 8766 sunucusunda sahte Xtream paneli ister:
+# UITests/Fixtures/range_server.py, /player_api.php?action=X → xtream/X.json (UITests/Fixtures/xtream/
+# dosyalarını sunucu klasöründe xtream/ altına kopyalayın; yoksa test XCTSkip ile atlanır).
 # Kategori gezintisi testleri (IOS/TVSeriesCategoriesTests) aynı klasörde series-cats.m3u ister
 # (kopyası: UITests/Fixtures/series-cats.m3u; yoksa test XCTSkip ile atlanır).
 # VLCKit / VOD / oynatıcı kontrol testleri Range destekli ikinci sunucu ister (MKV, MP4, TS…, port 8766:

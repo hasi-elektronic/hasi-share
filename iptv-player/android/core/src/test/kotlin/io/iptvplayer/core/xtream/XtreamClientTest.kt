@@ -72,7 +72,7 @@ class XtreamClientTest {
         assertEquals(listOf("1", "2"), catalog.liveCategories.map { it.id })
         assertEquals(listOf("1001", "1002", "2001"), catalog.channels.map { it.id })
         assertEquals(listOf("5001", "5002"), catalog.movies.map { it.id })
-        assertEquals(listOf("7000", "7100"), catalog.series.map { it.id })
+        assertEquals(listOf("7000", "7100", "7200"), catalog.series.map { it.id })
         assertEquals(3, catalog.status.liveCount)
         // Credentials percent-encoded with the unreserved-only rule (space → %20, never '+').
         val first = server.takeRequest()

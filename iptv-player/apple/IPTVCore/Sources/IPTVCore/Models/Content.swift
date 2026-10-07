@@ -135,11 +135,16 @@ public struct Movie: Codable, Sendable, Hashable, Identifiable {
     public var addedAt: Date?
     /// Position in the source list (stable ordering for "added"/default sorting).
     public var sort: Int
+    /// Xtream `cast` / `director` / `genre` when the panel sends them (people search, CONTRACT §4.3).
+    public var cast: String?
+    public var director: String?
+    public var genre: String?
 
     public init(sourceId: String, id: String, name: String, posterUrl: String? = nil,
                 categoryId: String? = nil, rating: Double? = nil, year: Int? = nil,
                 plot: String? = nil, containerExt: String? = nil, url: String? = nil,
-                addedAt: Date? = nil, sort: Int = 0, categoryIds: [String]? = nil) {
+                addedAt: Date? = nil, sort: Int = 0, categoryIds: [String]? = nil,
+                cast: String? = nil, director: String? = nil, genre: String? = nil) {
         self.sourceId = sourceId
         self.id = id
         self.name = name
@@ -153,6 +158,9 @@ public struct Movie: Codable, Sendable, Hashable, Identifiable {
         self.url = url
         self.addedAt = addedAt
         self.sort = sort
+        self.cast = cast
+        self.director = director
+        self.genre = genre
     }
 }
 
@@ -171,10 +179,15 @@ public struct Series: Codable, Sendable, Hashable, Identifiable {
     public var rating: Double?
     public var year: Int?
     public var sort: Int
+    /// Xtream `cast` / `director` / `genre` (people search, CONTRACT §4.3).
+    public var cast: String?
+    public var director: String?
+    public var genre: String?
 
     public init(sourceId: String, id: String, name: String, posterUrl: String? = nil,
                 categoryId: String? = nil, plot: String? = nil, rating: Double? = nil,
-                year: Int? = nil, sort: Int = 0, categoryIds: [String]? = nil) {
+                year: Int? = nil, sort: Int = 0, categoryIds: [String]? = nil,
+                cast: String? = nil, director: String? = nil, genre: String? = nil) {
         self.sourceId = sourceId
         self.id = id
         self.name = name
@@ -185,6 +198,9 @@ public struct Series: Codable, Sendable, Hashable, Identifiable {
         self.rating = rating
         self.year = year
         self.sort = sort
+        self.cast = cast
+        self.director = director
+        self.genre = genre
     }
 }
 
@@ -214,7 +230,9 @@ extension Movie {
                   plot: try c.decodeIfPresent(String.self, forKey: .plot),
                   containerExt: try c.decodeIfPresent(String.self, forKey: .containerExt),
                   url: try c.decodeIfPresent(String.self, forKey: .url), addedAt: try c.decodeIfPresent(Date.self, forKey: .addedAt),
-                  sort: try c.decode(Int.self, forKey: .sort), categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds))
+                  sort: try c.decode(Int.self, forKey: .sort), categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds),
+                  cast: try c.decodeIfPresent(String.self, forKey: .cast), director: try c.decodeIfPresent(String.self, forKey: .director),
+                  genre: try c.decodeIfPresent(String.self, forKey: .genre))
     }
 }
 
@@ -226,7 +244,9 @@ extension Series {
                   categoryId: try c.decodeIfPresent(String.self, forKey: .categoryId),
                   plot: try c.decodeIfPresent(String.self, forKey: .plot), rating: try c.decodeIfPresent(Double.self, forKey: .rating),
                   year: try c.decodeIfPresent(Int.self, forKey: .year), sort: try c.decode(Int.self, forKey: .sort),
-                  categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds))
+                  categoryIds: try c.decodeIfPresent([String].self, forKey: .categoryIds),
+                  cast: try c.decodeIfPresent(String.self, forKey: .cast), director: try c.decodeIfPresent(String.self, forKey: .director),
+                  genre: try c.decodeIfPresent(String.self, forKey: .genre))
     }
 }
 

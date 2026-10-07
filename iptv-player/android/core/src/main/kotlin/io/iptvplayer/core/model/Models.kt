@@ -276,6 +276,10 @@ public data class Movie(
     val sort: Int = 0,
     /** Every category of the item, primary ([categoryId]) first (CONTRACT §4.3: Xtream `category_ids`). */
     val categoryIds: List<String> = listOfNotNull(categoryId),
+    /** Xtream `cast` / `director` / `genre` when the panel sends them (people search, CONTRACT §4.3). */
+    val cast: String? = null,
+    val director: String? = null,
+    val genre: String? = null,
 )
 
 /** A series (CONTRACT §1). */
@@ -294,6 +298,10 @@ public data class Series(
     val lastModifiedMs: Long? = null,
     /** Every category of the item, primary ([categoryId]) first (CONTRACT §4.3: Xtream `category_ids`). */
     val categoryIds: List<String> = listOfNotNull(categoryId),
+    /** Xtream `cast` / `director` / `genre` (people search, CONTRACT §4.3). */
+    val cast: String? = null,
+    val director: String? = null,
+    val genre: String? = null,
 )
 
 /** An episode of a series (CONTRACT §1). */
