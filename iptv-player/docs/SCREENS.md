@@ -275,8 +275,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   eder. iOS'ta klavyedeki "Ara" tuşu sorguyu hemen çalıştırır, sonuçları kaydırmak klavyeyi kapatır.
   * **Alan boşken – Son aramalar:** kaynağa göre cihazda son 10 arama (en yeni üstte, büyük/küçük harf ve aksan
     farkı tekrar sayılmaz). Dokun = yeniden ara; iOS'ta sola kaydır veya uzun bas → Sil, başlıkta "Temizle";
-    tvOS'ta liste (uzun bas → Sil, son satır "Temizle"). Sorgu; "Ara" tuşu, öneri / "Bunu mu demek
-    istediniz" seçimi, bir sonucu açma ya da ekrandan çıkışta kaydedilir. Hiç arama yoksa kısa açıklama.
+    tvOS'ta liste (uzun bas → Sil, son satır "Temizle"). Sorgu yalnızca "Ara" tuşu, öneri / "Bunu mu demek
+    istediniz" seçimi ya da bir sonucu açınca kaydedilir (yarım yazılmış sorgu kaydedilmez); yedeklenmez, kaynak
+    silinince silinir. Hiç arama yoksa kısa açıklama.
   * **Öneriler (≥ 2 karakter, 120 ms):** en fazla 5 – başlık tamamlamaları, sonra en fazla 2 kişi adı. iOS'ta
     alanın altında satırlar (sonuçlar altında görünmeye devam eder), tvOS'ta klavyenin altındaki sistem satırı.
     Dokunmak sorguyu doldurur ve çalıştırır.
@@ -311,6 +312,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
        her kelime kaynağın başlık/kişi sözlüğündeki en yakın kelimeyle değiştirilir ("hasn can kya" → "hasan can
        kaya", "konuşanlr" → "konuşanlar"); çip düzeltilmiş sorguyu çalıştırır. Düzeltme sonuç vermezse ikisi de
        gösterilmez.
+  * **1–2 harf:** yalnızca başlıklar (2 harften itibaren kategoriler); kişiler, açıklamalar, TV programları ve
+    düzeltme 3 harften itibaren (yazarken akıcı kalır).
   * Türkçe "ı" ile "i" her yerde aynı aranır ("kizilcik" → "Kızılcık", "haberlerı" → "Haberleri").
   * **tvOS:** bölümler raf, kart/satır başına tek odak hedefi; çipler yatay odak satırı; geri tuşu kuralları §2.
   * Bir sonuç açılıp geri dönülünce sorgu, sonuçlar ve alan yerinde kalır (iOS 26: arama `.automatic`

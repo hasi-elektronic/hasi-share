@@ -82,6 +82,11 @@ struct TVRootView: View {
                     paths[router.section, default: NavigationPath()].append(item)
                     router.tvPushRequest = nil
                 }
+                .onChange(of: router.tvRoutePushRequest) { _, route in
+                    guard let route else { return }
+                    paths[router.section, default: NavigationPath()].append(route)
+                    router.tvRoutePushRequest = nil
+                }
             }
         }
         // ⭐ undo (4 s) over every screen; the player shows its own above the video.

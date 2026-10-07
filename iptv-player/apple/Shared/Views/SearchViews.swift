@@ -26,8 +26,10 @@ struct SearchView: View {
         #endif
         .onAppear {
             if let model {
-                // Back from a result / "Show all": the search bar would otherwise stay hidden (iOS 26).
+                // Back on the screen: recent searches may have changed (a result was opened); with an empty field
+                // the search is activated again (after "Cancel" it stayed inactive).
                 model.reloadRecent()
+                if model.query.isEmpty { searchPresented = true }
                 return
             }
             let m = SearchViewModel(env: env)
@@ -35,11 +37,8 @@ struct SearchView: View {
             m.hiddenChannels = { HiddenStore.shared.hiddenChannels($0) }
             model = m
         }
-        // Leaving the screen (a result opened, back, another tab): the query becomes a recent search.
-        .onDisappear {
-            model?.rememberQuery()
-            model?.dismissSuggestions()
-        }
+        // Recent searches are saved only on "Search" and when a result is opened – not for half-typed queries.
+        .onDisappear { model?.dismissSuggestions() }
     }
 
     @ViewBuilder
@@ -201,7 +200,7 @@ private struct SearchOverview: View {
         if !r.categories.isEmpty {
             Shelf(title: L10n.t("search_section_categories"), spacing: Theme.isTV ? 30 : 10,
                   seeAll: seeAll(.categories, "search_section_categories"), seeAllTitleKey: "search_show_all", identifier: "search_categories") {
-                ForEach(r.categories) { info in SearchCategoryLink(info: info) }
+                ForEach(r.categories) { info in SearchCategoryLink(info: info, onOpen: model.rememberQuery) }
             }
         }
         if !r.channels.isEmpty {
@@ -301,11 +300,17 @@ private struct SearchItemCard: View {
             .contextMenu { ChannelMenuItems(channel: row.channel) }
             .accessibilityIdentifier("\(identifierPrefix)_channel_\(row.channel.id)")
         case .movie(let m):
-            FavoritePosterLink(value: m, target: env.favoriteTarget(m), identifier: identifier("movie", m.id)) {
+            FavoritePosterButton(target: env.favoriteTarget(m), identifier: identifier("movie", m.id)) {
+                onOpen()
+                router.open(.movie(m))
+            } label: {
                 PosterCard(title: MediaTags.clean(m.name).title, url: m.posterUrl, subtitle: subtitle(m.year))
             }
         case .series(let s):
-            FavoritePosterLink(value: s, target: env.favoriteTarget(s), identifier: identifier("series", s.id)) {
+            FavoritePosterButton(target: env.favoriteTarget(s), identifier: identifier("series", s.id)) {
+                onOpen()
+                router.open(.series(s))
+            } label: {
                 PosterCard(title: MediaTags.clean(s.name).title, url: s.posterUrl, subtitle: subtitle(s.year))
             }
         }
@@ -378,12 +383,16 @@ private struct SearchSnippetCard: View {
 }
 
 private struct SearchSnippetLink: View {
+    @Environment(Router.self) private var router
     let item: SearchItem
     let onOpen: () -> Void
 
     var body: some View {
         if let catalogItem = item.catalogItem {
-            NavigationLink(value: catalogItem) { SearchSnippetCard(item: item) }
+            Button {
+                onOpen()
+                router.open(catalogItem)
+            } label: { SearchSnippetCard(item: item) }
                 .buttonStyle(CardButtonStyle(scale: 1.05))
                 .accessibilityIdentifier("search_description_\(item.hit.kind.rawValue)_\(item.hit.itemId)")
         }
@@ -396,20 +405,62 @@ private struct SearchCategoryLink: View {
     @Environment(Router.self) private var router
     let info: CategoryInfo
     var fullWidth = false
+    var onOpen: () -> Void = {}
 
     var body: some View {
-        let label = SearchCategoryCard(info: info, fullWidth: fullWidth)
-        let identifier = "search_category_\(info.category.kind.rawValue)_\(info.id)"
-        if info.category.kind == .live {
-            Button { router.showLiveCategory(info.id) } label: { label }
-                .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
-                .accessibilityIdentifier(identifier)
-        } else {
-            NavigationLink(value: BrowseRoute.grid(kind: info.category.kind.contentKind, categoryId: info.id,
-                                                   title: CountryFlag.displayTitle(info.category.name), sort: .added)) { label }
-                .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
-                .accessibilityIdentifier(identifier)
-        }
+        Button {
+            onOpen()
+            if info.category.kind == .live {
+                router.showLiveCategory(info.id)
+            } else {
+                router.open(BrowseRoute.grid(kind: info.category.kind.contentKind, categoryId: info.id,
+                                             title: CountryFlag.displayTitle(info.category.name), sort: .added))
+            }
+        } label: { SearchCategoryCard(info: info, fullWidth: fullWidth) }
+        .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
+        .accessibilityIdentifier("search_category_\(info.category.kind.rawValue)_\(info.id)")
+    }
+}
+
+/// A poster result: a button (the query is remembered before the detail opens) with the iOS corner ⭐ and the
+/// long-press favorite menu, like `FavoritePosterLink`.
+private struct FavoritePosterButton<Label: View>: View {
+    let target: FavoriteTarget?
+    let identifier: String
+    let action: () -> Void
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button(action: action, label: label)
+            .buttonStyle(ArtworkButtonStyle())
+            .contextMenu { if let target { FavoriteMenuItem(target: target) } }
+            .accessibilityIdentifier(identifier)
+            #if os(iOS)
+            .overlay(alignment: .topTrailing) {
+                if let target {
+                    FavoriteButton(target: target).buttonStyle(FavoriteBadgeButtonStyle())
+                }
+            }
+            #endif
+    }
+}
+
+extension Router {
+    /// Pushes a search result onto the current stack (iOS path, tvOS current tab).
+    func open(_ item: CatalogItem) {
+        #if os(tvOS)
+        tvPushRequest = item
+        #else
+        path.append(item)
+        #endif
+    }
+
+    func open(_ route: BrowseRoute) {
+        #if os(tvOS)
+        tvRoutePushRequest = route
+        #else
+        path.append(route)
+        #endif
     }
 }
 
@@ -554,7 +605,7 @@ struct SearchListRows: View {
             switch list.kind {
             case .categories:
                 ForEach(list.categories) { info in
-                    SearchCategoryLink(info: info, fullWidth: true).padding(.horizontal, Theme.safeH)
+                    SearchCategoryLink(info: info, fullWidth: true, onOpen: onOpen).padding(.horizontal, Theme.safeH)
                 }
             case .programmes:
                 ForEach(list.programmes) { hit in
@@ -596,7 +647,10 @@ struct SearchListRows: View {
             .contextMenu { ChannelMenuItems(channel: channel) }
             .accessibilityIdentifier(id)
         } else if let catalogItem = item.catalogItem {
-            NavigationLink(value: catalogItem) { SearchResultRow(item: item) }
+            Button {
+                onOpen()
+                router.open(catalogItem)
+            } label: { SearchResultRow(item: item) }
                 .buttonStyle(CardButtonStyle(scale: 1.02))
                 .contextMenu { if let target = env.favoriteTarget(catalogItem) { FavoriteMenuItem(target: target) } }
                 .accessibilityIdentifier(id)

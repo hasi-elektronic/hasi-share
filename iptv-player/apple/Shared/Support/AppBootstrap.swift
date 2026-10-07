@@ -58,6 +58,8 @@ final class Router {
     var headerSolid = false
     /// TV: detail to push onto the current tab's stack (hero "Info" without a NavigationLink).
     var tvPushRequest: CatalogItem?
+    /// TV: browse route (search "Show all" → category grid) to push onto the current tab's stack.
+    var tvRoutePushRequest: BrowseRoute?
     /// Live "Show in TV guide": the guide opens on this channel (its category, scrolled to, in the panel).
     var guideFocus: Channel?
 

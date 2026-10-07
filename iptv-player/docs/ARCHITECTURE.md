@@ -88,8 +88,14 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    **Sürüm geçmişi:** 1 = Build 6'ya kadar (yazılmazdı) · 2 = Xtream `category_ids` üyelikleri (Build 9) ·
    3 = arama dizini v6, `people` sütunu (oyuncu + yönetmen, Build 10). Build 11'in arama dizini v7'si (açıklama,
    sözlük, EPG dizini) artırmaz – veriden türetilir (bkz. 8).
-8. **Arama dizini (Apple, `AppDatabase` v7):** FTS5 `search_index(title, people, plot, source_id, kind, item_id)`,
-   `unicode61 remove_diacritics 2`, tablo `rank`'i `bm25(10, 4, 1)` (başlık ≫ kişi > açıklama). `people` = Xtream
+8. **Arama dizini (Apple, `AppDatabase` v7 + Build 12 kaynak başına tablolar):** FTS5 sütunları
+   `(title, people, plot, source_id, kind, item_id)`, `unicode61 remove_diacritics 2`, `rank` = `bm25(10, 4, 1)`
+   (başlık ≫ kişi > açıklama). **Build 12:** her kaynağın kendi dizini var – `search_fts_<rastgele>` (adı `kv`
+   `search.fts.<kaynakId>`, `prefix = '1 2'`). Yenileme yeni tabloyu staging satırlarıyla birlikte doldurur; commit
+   yalnızca `kv` işaretçisini değiştirir, eski tablo takastan **sonra** ayrı işlemde DROP edilir (Build 11'de commit
+   her dizin satırını `UPDATE … SET source_id` ile yeniden belirteçliyordu: sahip boyutunda 1–3 sn kilit). Build 11'den
+   kalan ortak `search_index` yalnızca henüz yenilenmemiş kaynaklar için okunur; hiçbir kaynak ona ihtiyaç
+   duymayınca açılış bakımında (`SearchIndex.maintain`) boşaltılır, ölü kalan tablolar silinir. `people` = Xtream
    `cast` + `director` (", " ile); `plot` = içerik satırının açıklaması (en fazla 1200 karakter dizinlenir).
    Listede olmayan kişiler / açıklamalar detaydan (`get_vod_info` / `get_series_info`) öğrenilir, `item_people` /
    `item_plot` tablolarında tutulur, hemen dizine (satır başlık sözcükleriyle FTS üzerinden bulunur, rowid ile
@@ -116,8 +122,12 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
      sözlüğü yalnız değişen sözcüklerle günceller (fark), dolgu ve detaylar sayıları ekler. Sorgunun ön eki
      sözlükte olmayan her kelimesi için trigram OR sorgusuyla 300 aday, Swift'te OSA mesafesi (≤ 4 harf: 1, sonra 2;
      eşitlikte sık kelime). Yalnızca ana sonuç < 5 iken çalışır.
+   * **Kısa sorgular:** 1–2 harfte yalnızca başlıklar (+ 2 harften kategoriler); kişi, açıklama, TV programı ve
+     düzeltme ≥ 3 harf. Eski sorgu iptal edilince çalışan SQLite ifadesi `sqlite3_progress_handler` ile kesilir
+     (`SQLiteDatabase.interruptsOnCancel`, görev yerel).
    * **Öneriler:** `{title}` ve `{people}` önek eşleşmeleri, en fazla 5 (en fazla 2 kişi), 120 ms birleştirme, eski
-     sorgu iptal. **Son aramalar:** `RecentSearchStore` (cihaz `KeyValueStore`, kaynak başına 10).
+     sorgu iptal. **Son aramalar:** `RecentSearchStore` – katalog veritabanının `kv` tablosunda (yedeklenmez), kaynak başına
+     10, kaynak silinince silinir; yalnızca "Ara" tuşu / öneri / bir sonucu açmada kaydedilir.
    * **TV programı araması:** kaynak başına FTS5 `epg_fts_<rastgele>` (`title`, `detail=none`, rowid = `epg.rowid`,
      adı `kv` `epg.fts.<kaynakId>`). EPG yenilemesi staging satırlarıyla birlikte yeni tabloyu doldurur, commit
      aynı işlemde kaydeder ve eskisini **tümden DROP** eder (500k satırlık FTS silmesi yok); iptalde yeni tablo
@@ -128,6 +138,14 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
      gününde ve Xtream'de (timeshift URL'si).
    * **Ekran modeli:** `SearchViewModel` (+ `SearchEngine`, `Sendable`) tüm SQL'i ana aktör dışında çalıştırır,
      sonuçları toplu sorgularla kanal/film/diziye çevirir; yeni sorgu eski görevi iptal eder.
+   * **Okuma bağlantısı (Build 12):** `SQLiteDatabase` diskteki veritabanında iki bağlantı açar – yazıcı (tüm
+     yazmalar ve bir işlemin içinden, aynı iş parçacığındaki okumalar) ve salt okunur okuyucu (diğer tüm
+     okumalar). WAL'da okuyucu son commit'i görür ve yazıcıyı **hiç beklemez**: açılıştaki otomatik yenileme veya
+     arka plan dolgusu sürerken ana iş parçacığı okumaları (ana sayfa, listeler, oynatıcı, EPG) donmaz.
+     Oynatıcının ilerleme / "izlendi" yazımı yazıcı meşgulse sıralı bir arka plan kuyruğuna gider
+     (`LibraryRepository.saveProgressWithoutBlocking`). Ölçüm (`CommitLockTests`, sahip boyutu 4k canlı + 35k
+     film + 9k dizi açıklamalı, disk, release, Mac): commit takası ~0,27–0,34 sn (içerik tabloları; dizin payı
+     ~0 ms), sözlük farkı ~8 ms, commit sürerken okumalar en fazla ~28 ms (beklemez); v7 kopya parçası ~9 ms.
    * **Bütçeler** (`CatalogPerformanceTests`, macOS debug ölçümleri parantezde): 50k film + 10k dizi ile arama
      ≤ 100 ms (açıklama ifadesi ~6 ms, tüm açıklamalarda geçen kelime ~47 ms), düzeltme + düzeltilmiş arama
      ≤ 150 ms (~14 ms, ~30k sözcük), öneriler ~1 ms; 500k EPG satırında program araması ≤ 100 ms (~18 ms).
