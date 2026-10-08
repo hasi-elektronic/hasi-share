@@ -195,7 +195,7 @@ final class SearchReviewFixTests: XCTestCase {
             db.db.userVersion = 6   // the kill: schema is v7, version still 6
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 8)
+        XCTAssertEqual(db.db.userVersion, 9)
         XCTAssertEqual(try db.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'search_index_v6'"), 1, "v6 kept")
         let catalog = CatalogRepository(database: db)
         XCTAssertTrue(try catalog.backfillSearchIndex(pause: 0))

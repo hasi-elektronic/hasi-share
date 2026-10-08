@@ -125,7 +125,7 @@ final class SearchIndexMigrationTests: XCTestCase {
             db.db.userVersion = 5
         }
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 8)
+        XCTAssertEqual(db.db.userVersion, 9)
         let catalog = CatalogRepository(database: db)
         // The migration does not index titles itself (launch stays fast): pending → LIKE path meanwhile.
         XCTAssertTrue(db.searchBackfillPending)
@@ -148,7 +148,7 @@ final class SearchIndexMigrationTests: XCTestCase {
         try catalog.updatePeople(sourceId: "s", kind: .series, itemId: "k", cast: "Hasan Can Kaya", director: nil)
         XCTAssertEqual(try catalog.search("hasan", sourceId: "s").first?.matchedPerson, "Hasan Can Kaya")
         // Idempotent.
-        XCTAssertEqual(try AppDatabase(db: SQLiteDatabase(path: path)).db.userVersion, 8)
+        XCTAssertEqual(try AppDatabase(db: SQLiteDatabase(path: path)).db.userVersion, 9)
     }
 
     /// A refresh committed while the backfill is pending indexes its own rows; the backfill then skips them.

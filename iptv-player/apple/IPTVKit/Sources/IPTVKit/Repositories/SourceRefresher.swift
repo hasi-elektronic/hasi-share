@@ -82,6 +82,10 @@ public final class SourceRefresher: Sendable {
             SafeLog.warning("refresh failed: \(mapped.code)")
             throw mapped
         }
+        // The EPG state of the previous load stays until the next EPG load reports.
+        status.epgProgramCount = source.lastRefreshResult?.epgProgramCount
+        status.epgError = source.lastRefreshResult?.epgError
+        status.epgLoadedAt = source.lastRefreshResult?.epgLoadedAt
         source.lastRefreshAt = now
         source.lastRefreshResult = status
         try sources.save(source)
@@ -91,9 +95,13 @@ public final class SourceRefresher: Sendable {
             onProgress(.epg)
             do {
                 status.epgProgramCount = try await loadEpg(source: source, url: epgURL, userAgent: secrets.userAgent, now: now)
+                status.epgError = nil
+                status.epgLoadedAt = now
             } catch {
-                // EPG is optional: the catalog stays usable (UI shows "TV guide could not be loaded").
-                SafeLog.warning("epg failed: \(ErrorClassifier.sourceError(from: error).code)")
+                // EPG is optional: the catalog stays usable (source management shows "TV guide could not be loaded").
+                let mapped = ErrorClassifier.sourceError(from: error)
+                SafeLog.warning("epg failed: \(mapped.code)")
+                if mapped != .cancelled { status.epgError = mapped }
             }
             source.lastRefreshResult = status
             try sources.save(source)
@@ -134,18 +142,26 @@ public final class SourceRefresher: Sendable {
     /// catalog stays usable without a guide.
     @discardableResult
     public func refreshEpg(sourceId: String, now: Date = Date()) async -> Int? {
-        guard var source = try? sources.source(id: sourceId), let url = epgURL(sourceId: sourceId) else { return nil }
+        guard let source = try? sources.source(id: sourceId), let url = epgURL(sourceId: sourceId) else { return nil }
         do {
             let count = try await loadEpg(source: source, url: url, userAgent: sources.secrets(id: sourceId)?.userAgent, now: now)
-            var status = source.lastRefreshResult ?? SourceStatus()
-            status.epgProgramCount = count
-            source.lastRefreshResult = status
-            try? sources.save(source)
+            recordEpg(sourceId: sourceId) { $0.epgProgramCount = count; $0.epgError = nil; $0.epgLoadedAt = now }
             return count
         } catch {
-            SafeLog.warning("epg failed: \(ErrorClassifier.sourceError(from: error).code)")
+            let mapped = ErrorClassifier.sourceError(from: error)
+            SafeLog.warning("epg failed: \(mapped.code)")
+            if mapped != .cancelled { recordEpg(sourceId: sourceId) { $0.epgError = mapped } }
             return nil
         }
+    }
+
+    /// Updates the EPG part of the stored status (re-read: a catalog refresh may have saved meanwhile).
+    private func recordEpg(sourceId: String, _ change: (inout SourceStatus) -> Void) {
+        guard var source = try? sources.source(id: sourceId) else { return }
+        var status = source.lastRefreshResult ?? SourceStatus()
+        change(&status)
+        source.lastRefreshResult = status
+        try? sources.save(source)
     }
 
     private func loadM3U(sourceId: String, secrets: M3USecrets,

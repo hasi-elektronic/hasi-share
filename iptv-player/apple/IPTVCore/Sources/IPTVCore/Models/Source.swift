@@ -37,14 +37,21 @@ public struct SourceStatus: Codable, Sendable, Hashable {
     public var movieCount: Int
     public var seriesCount: Int
     public var epgProgramCount: Int?
+    /// The last EPG (XMLTV) load failed (nil after a successful one). Shown in source management – the catalog
+    /// stays usable without a guide.
+    public var epgError: SourceError?
+    /// Time of the last successful EPG load.
+    public var epgLoadedAt: Date?
 
     public init(error: SourceError? = nil, liveCount: Int = 0, movieCount: Int = 0,
-                seriesCount: Int = 0, epgProgramCount: Int? = nil) {
+                seriesCount: Int = 0, epgProgramCount: Int? = nil, epgError: SourceError? = nil, epgLoadedAt: Date? = nil) {
         self.error = error
         self.liveCount = liveCount
         self.movieCount = movieCount
         self.seriesCount = seriesCount
         self.epgProgramCount = epgProgramCount
+        self.epgError = epgError
+        self.epgLoadedAt = epgLoadedAt
     }
 
     public var isOK: Bool { error == nil }

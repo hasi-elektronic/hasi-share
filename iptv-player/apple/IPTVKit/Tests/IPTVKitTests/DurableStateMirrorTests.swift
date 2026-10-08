@@ -285,7 +285,7 @@ final class DurableStateMirrorTests: XCTestCase {
         let opened = AppDatabase.open(primary: dir, caches: tempDir())
         XCTAssertEqual(opened.location, .applicationSupport)
         XCTAssertTrue(opened.recreatedCorruptFile)
-        XCTAssertEqual(opened.database.db.userVersion, 8, "fresh schema")
+        XCTAssertEqual(opened.database.db.userVersion, 9, "fresh schema")
     }
 
     func testOpenFallsBackToCachesThenMemory() throws {

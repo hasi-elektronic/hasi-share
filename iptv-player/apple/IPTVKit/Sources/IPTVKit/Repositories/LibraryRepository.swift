@@ -101,6 +101,23 @@ public final class LibraryRepository: Sendable {
         try item(key: SyncItem.progressKey(contentKey)).flatMap { $0.deleted ? nil : $0 }
     }
 
+    /// Progress of many items at once, by content key (series detail: one query per page instead of one per
+    /// episode and render – daily series have 600–1500 episodes). Pending local changes included.
+    public func progress(contentKeys: [String]) throws -> [String: SyncItem] {
+        var out: [String: SyncItem] = [:]
+        let keys = contentKeys.map(SyncItem.progressKey)
+        for start in stride(from: 0, to: keys.count, by: 500) {
+            let chunk = Array(keys[start..<min(start + 500, keys.count)])
+            let sql = "SELECT \(Self.columns) FROM library WHERE key IN (\(CatalogRepository.placeholders(chunk.count))) AND deleted = 0"
+            for item in try db.query(sql, chunk.map(SQLiteValue.text), map: Self.item) { out[item.contentKey] = item }
+        }
+        let wanted = Set(keys)
+        for pending in overlay.all() where pending.kind == .progress && wanted.contains(pending.key) {
+            out[pending.contentKey] = pending.deleted ? nil : pending
+        }
+        return out
+    }
+
     @discardableResult
     public func saveProgress(contentKey: String, title: String, kind: ContentKind, positionMs: Int64, durationMs: Int64,
                              posterUrl: String?, seriesKey: String? = nil, nowMs: Int64) throws -> SyncItem {
@@ -211,6 +228,39 @@ public final class LibraryRepository: Sendable {
                           .from(item.data.durationMs), .from(item.data.seriesKey), .int(item.updatedAt), .from(item.deleted)])
             }
             return count
+        }
+    }
+
+    /// The provider's host / user name of a source changed (source edit): its favorites and progress move to the
+    /// new fingerprint – a new item per key (synced like a local change) and a tombstone for the old one.
+    /// Returns the new items.
+    @discardableResult
+    public func rekey(fromFingerprint old: String, toFingerprint new: String, nowMs: Int64) throws -> [SyncItem] {
+        guard old != new else { return [] }
+        if !overlay.isEmpty { database.deferredWrites.drain(timeout: 2) }
+        let prefix = old + ":"
+        func moved(_ key: String?) -> String? {
+            guard let key, key.hasPrefix(prefix) else { return key }
+            return new + ":" + key.dropFirst(prefix.count)
+        }
+        return try db.transaction {
+            var out: [SyncItem] = []
+            for item in try all() where !item.deleted && item.contentKey.hasPrefix(prefix) {
+                let newContentKey = new + ":" + item.contentKey.dropFirst(prefix.count)
+                var copy = item
+                copy.key = item.kind == .favorite ? SyncItem.favoriteKey(newContentKey) : SyncItem.progressKey(newContentKey)
+                copy.data.seriesKey = moved(item.data.seriesKey)
+                copy.updatedAt = max(nowMs, item.updatedAt + 1)
+                copy.seq = nil
+                if let existing = try storedItem(key: copy.key), existing.updatedAt >= copy.updatedAt { continue }
+                try put(copy)
+                var tombstone = item
+                tombstone.deleted = true
+                tombstone.updatedAt = copy.updatedAt
+                try put(tombstone)
+                out.append(copy)
+            }
+            return out
         }
     }
 
