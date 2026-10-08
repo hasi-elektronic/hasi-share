@@ -13,9 +13,7 @@ final class TVAudioSyncTests: XCTestCase {
     func testCalibrationWithRemote() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 30))
-        let entry = calibrationEntry(app)
-        XCTAssertTrue(entry.waitForExistence(timeout: 10))
-        XCTAssertTrue(focus(entry, pressing: .down, limit: 20), "calibration row focusable")
+        XCTAssertTrue(focusCalibrationEntry(app), "calibration row focusable")
         press(.select)
         let row = app.descendants(matching: .any)["avsync_value"]
         XCTAssertTrue(row.waitForExistence(timeout: 10), "calibration screen")
@@ -39,14 +37,25 @@ final class TVAudioSyncTests: XCTestCase {
         press(.select)
         XCTAssertTrue(app.staticTexts["avsync_saved"].waitForExistence(timeout: 3), "saved")
         press(.menu)
-        XCTAssertTrue(entry.waitForExistence(timeout: 5), "back in Settings")
+        let entry = calibrationEntry(app)
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "back in Settings, the row focused again")
         XCTAssertTrue(entry.label.contains("-10 ms"), "row shows the saved value: \(entry.label)")
     }
 
-    /// Settings row "Calibrate audio sync" (a NavigationLink cell: its focusable element carries the label).
+    /// Settings row "Calibrate audio sync": tvOS reports the focus on the list cell (the row's label), not on the
+    /// identified link inside it – this is the focused cell (exists only while focused).
     @MainActor
     private func calibrationEntry(_ app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calibrate audio sync'")).firstMatch
+        app.descendants(matching: .any).matching(NSPredicate(format: "hasFocus == true AND label BEGINSWITH 'Calibrate audio sync'")).firstMatch
+    }
+
+    /// ▼ until the calibration row has the focus.
+    @MainActor
+    private func focusCalibrationEntry(_ app: XCUIApplication) -> Bool {
+        XCTAssertTrue(app.buttons["settings_avsync_calibration"].firstMatch.waitForExistence(timeout: 30))
+        sleep(1)
+        for _ in 0..<20 where !calibrationEntry(app).exists { remote.press(.down); usleep(500_000) }
+        return calibrationEntry(app).exists
     }
 
     /// "+1300 ms · audio later" → 1300.
@@ -70,9 +79,7 @@ final class TVAudioSyncTests: XCTestCase {
     func testStepperAccelerates() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 30))
-        let entry = calibrationEntry(app)
-        XCTAssertTrue(entry.waitForExistence(timeout: 10))
-        XCTAssertTrue(focus(entry, pressing: .down, limit: 20), "calibration row focusable")
+        XCTAssertTrue(focusCalibrationEntry(app), "calibration row focusable")
         press(.select)
         let row = app.descendants(matching: .any)["avsync_value"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))

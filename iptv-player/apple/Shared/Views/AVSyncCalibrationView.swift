@@ -25,7 +25,9 @@ struct AVSyncCalibrationView: View {
     var body: some View {
         content
             .screenBackground()
+            #if os(iOS)
             .navigationTitle(L10n.t("avsync_calibrate"))
+            #endif
             .onAppear {
                 value = env.player.vlcCalibrationMs
                 savedValue = value
@@ -39,7 +41,7 @@ struct AVSyncCalibrationView: View {
                 model.stop()
             }
             #if os(tvOS)
-            .onExitCommand { onClose?() }   // over the player: Menu closes (in Settings the stack pops)
+            .onExitCommand(perform: onClose)   // over the player: Menu closes; nil in Settings → the stack pops
             #endif
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("avsync_calibration")
@@ -48,15 +50,18 @@ struct AVSyncCalibrationView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.isTV ? 28 : 14) {
-                if let onClose {
+                // tvOS: own title (the large navigation title would sit behind the scrolled video).
+                if onClose != nil || Theme.isTV {
                     HStack {
                         Text(L10n.t("avsync_calibrate")).font(Theme.title)
                         Spacer()
-                        Button(L10n.t("action_close"), action: onClose)
-                            #if os(tvOS)
-                            .buttonStyle(SecondaryButtonStyle())
-                            #endif
-                            .accessibilityIdentifier("avsync_close")
+                        if let onClose {
+                            Button(L10n.t("action_close"), action: onClose)
+                                #if os(tvOS)
+                                .buttonStyle(SecondaryButtonStyle())
+                                #endif
+                                .accessibilityIdentifier("avsync_close")
+                        }
                     }
                 }
                 video
@@ -88,7 +93,7 @@ struct AVSyncCalibrationView: View {
         ZStack(alignment: .topLeading) {
             EngineVideoSurface(engine: model.engine, aspect: .fit)
                 .aspectRatio(16 / 9, contentMode: .fit)
-                .frame(maxWidth: Theme.isTV ? 1100 : .infinity)
+                .frame(maxWidth: Theme.isTV ? 860 : .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.isTV ? 16 : 10))
                 .accessibilityHidden(true)
             Text(model.mode == .vlc ? "VLCKit" : "AVPlayer")

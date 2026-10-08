@@ -215,7 +215,11 @@ final class TVPlayerControlsTests: XCTestCase {
         XCTAssertTrue(bubble.waitForNonExistence(timeout: 6))
         sleep(1)
         XCTAssertEqual(Self.seekCount(app), seeks + 3, "one seek for the whole hold")
-        XCTAssertEqual(Self.state(app).time, target, accuracy: 2)
+        // B-19 (Build 16): the idle commit stops 10 s before the end (a hold into the end must not finish the movie).
+        let afterHold = Self.state(app)
+        let duration = Self.seconds(app.staticTexts["player_duration"].label) ?? 0
+        let landed = duration > 0 ? min(target, duration - 10) : target
+        XCTAssertEqual(afterHold.time, landed, accuracy: 2)
 
         // Play/Pause while seeking: jumps to the target and resumes (it was paused).
         remote.press(.left)

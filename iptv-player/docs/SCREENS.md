@@ -406,7 +406,7 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     görünürken odak oynat/duraklat'tadır: OK oynat/duraklat (önizleme varken: atla), ◀▶ hedefi taşır (odak yana kaymaz);
     ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Üst satırda ◀▶ araçlar
     arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · Uyku zamanlayıcısı · ⭐ · canlıda Kanal listesi ·
-    Son izlenen kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
+    Son izlenen kanal; uçlarda durur; Build 16: odaktaki aracın adı simgenin altında küçük bir etiketle görünür, U-04); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
     kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
     satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
     VOD'da duraklatır/sürdürür ve katmanı açar; **canlıda kanal panelini açar** (katman: ◀▶ veya

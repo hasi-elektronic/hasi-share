@@ -106,6 +106,10 @@ struct PlayerView: View {
     }
 
     var body: some View {
+        build16Handlers(layers)
+    }
+
+    private var mainLayers: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             video
@@ -150,19 +154,51 @@ struct PlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if syncNoticeVisible { syncNotice }
-            if let state = player.sleepTimer, overlayVisible || sleepTimerEndsSoon(state) {
-                SleepTimerIndicator(state: state)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.top, Theme.safeV + (Theme.isTV ? 130 : (toolsBelowTitle ? 110 : 64)))
-                    .padding(.trailing, Theme.safeH)
-            }
-            if sleepNoticeVisible { sleepNotice }
-            if let upNext = player.upNext, !channelListVisible, !syncPanelVisible { upNextCard(upNext) }
+            watchingPackLayers
             // Undo of a ⭐ toggle (4 s), above the bottom bar; independent of the overlay.
             UndoToast(undoFocus: undoFocusBinding)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toastAlignment)
                 .padding(.bottom, Theme.safeV + toastLift)
         }
+    }
+
+    /// Build 16 layers: sleep-timer pill + notice, next-episode card.
+    @ViewBuilder
+    private var watchingPackLayers: some View {
+        if let state = player.sleepTimer, overlayVisible || sleepTimerEndsSoon(state) {
+            SleepTimerIndicator(state: state)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, Theme.safeV + (Theme.isTV ? 130 : (toolsBelowTitle ? 110 : 64)))
+                .padding(.trailing, Theme.safeH)
+        }
+        if sleepNoticeVisible { sleepNotice }
+        if let upNext = player.upNext, !channelListVisible, !syncPanelVisible { upNextCard(upNext) }
+    }
+
+    /// Build 16 handlers (kept out of `body` – one long modifier chain is too much for the type checker).
+    private func build16Handlers<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: player.sleepTimerFiredCount) {
+                sleepNoticeVisible = true
+                sleepNoticeTask?.cancel()
+                sleepNoticeTask = Task {
+                    try? await Task.sleep(for: .seconds(4))
+                    if !Task.isCancelled { sleepNoticeVisible = false }
+                }
+            }
+            #if os(tvOS)
+            .onChange(of: player.upNext != nil) { _, shown in
+                // The card takes the focus ("Play now"); when it goes the picture gets it back.
+                if shown { Task { @MainActor in upNextPlayFocused = true } } else { surfaceFocused = !overlayVisible }
+            }
+            #endif
+            .fullScreenCover(isPresented: $calibrationPresented, onDismiss: { player.resumeAfterRelease() }) {
+                AVSyncCalibrationView(onClose: { calibrationPresented = false }).environment(env)
+            }
+    }
+
+    private var layers: some View {
+        mainLayers
         .animation(.easeInOut(duration: 0.18), value: overlayVisible)
         .animation(.easeInOut(duration: 0.2), value: resumeChipVisible)
         .animation(.easeInOut(duration: 0.2), value: channelListVisible)
@@ -205,20 +241,6 @@ struct PlayerView: View {
             if ms != nil { showResumeChip() } else { resumeChipVisible = false }
         }
         .animation(.easeInOut(duration: 0.2), value: syncPanelVisible)
-        .onChange(of: player.sleepTimerFiredCount) {
-            sleepNoticeVisible = true
-            sleepNoticeTask?.cancel()
-            sleepNoticeTask = Task {
-                try? await Task.sleep(for: .seconds(4))
-                if !Task.isCancelled { sleepNoticeVisible = false }
-            }
-        }
-        #if os(tvOS)
-        .onChange(of: player.upNext != nil) { _, shown in
-            // The card takes the focus ("Play now"); when it goes the picture gets it back.
-            if shown { Task { @MainActor in upNextPlayFocused = true } } else { surfaceFocused = !overlayVisible }
-        }
-        #endif
         .onChange(of: player.audioSyncUnavailable) { _, unavailable in
             guard unavailable else { return }
             syncNoticeVisible = true
@@ -229,9 +251,6 @@ struct PlayerView: View {
             }
         }
         .task(id: player.request?.id) { loadEpisodeSeries() }
-        .fullScreenCover(isPresented: $calibrationPresented, onDismiss: { player.resumeAfterRelease() }) {
-            AVSyncCalibrationView(onClose: { calibrationPresented = false }).environment(env)
-        }
         #if os(iOS)
         .statusBarHidden()
         .gesture(DragGesture(minimumDistance: 40).onEnded { value in
