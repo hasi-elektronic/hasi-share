@@ -92,6 +92,9 @@ struct SearchView: View {
             .scrollClipDisabled()
             #else
             .scrollDismissesKeyboard(.immediately)
+            // The floating search capsule (iOS 26, bottom) must not cover the last results: they scroll above it
+            // (iPhone landscape: it sat on the first poster row, IOS-26).
+            .contentMargins(.bottom, 80, for: .scrollContent)
             #endif
         }
     }

@@ -60,6 +60,13 @@ struct AddSourceView: View {
                 }
             }
             .padding(Theme.safeH)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("add_source_error")
+            #if os(tvOS)
+            // Menu on the error card = "cancel" of a dialog (SCREENS §2 rule 5): back to the filled form, never
+            // pop the page and lose what was typed on the on-screen keyboard (B-04).
+            .onExitCommand { model.backToForm() }
+            #endif
         }
     }
 
