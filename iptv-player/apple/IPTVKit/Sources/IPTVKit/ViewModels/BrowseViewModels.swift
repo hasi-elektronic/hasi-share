@@ -287,6 +287,10 @@ public final class SeriesDetailViewModel {
     public var season: Int = 1
     public private(set) var isLoading = false
     public private(set) var plot: String?
+    /// Progress per episode id (see `reloadProgress`).
+    public private(set) var progressByEpisode: [String: SyncItem] = [:]
+    /// "Continue S02E05" target, nil when nothing of the series was watched.
+    public private(set) var continueEpisode: Episode?
     @ObservationIgnored private let env: AppEnvironment
 
     public init(env: AppEnvironment, series: Series) {
@@ -316,18 +320,34 @@ public final class SeriesDetailViewModel {
                 }
             }
         }
+        reloadProgress()
         if let next = continueEpisode { season = next.season } else if let first = seasons.first { season = first }
     }
 
-    public func progress(of episode: Episode) -> SyncItem? {
-        env.contentKey(sourceId: episode.sourceId, kind: .episode, itemId: episode.id).flatMap { try? env.library.progress(contentKey: $0) }
+    /// Re-reads the progress of every episode (after `load` and whenever the library changes, e.g. an episode
+    /// was played while this detail stayed in the navigation stack). One read per episode per change, not per
+    /// render (long daily series have 600–1500 episodes).
+    public func reloadProgress() {
+        var map: [String: SyncItem] = [:]
+        for e in episodes {
+            if let key = env.contentKey(sourceId: e.sourceId, kind: .episode, itemId: e.id),
+               let item = try? env.library.progress(contentKey: key) {
+                map[e.id] = item
+            }
+        }
+        progressByEpisode = map
+        continueEpisode = Self.continueEpisode(in: episodes, progress: map)
     }
 
-    /// "Continue S02E05": last watched episode, or the next one if it was completed.
-    public var continueEpisode: Episode? {
+    public func progress(of episode: Episode) -> SyncItem? {
+        progressByEpisode[episode.id]
+    }
+
+    /// "Continue S02E05": last watched episode (any position, also under 5 %), or the next one if it was completed.
+    static func continueEpisode(in episodes: [Episode], progress: [String: SyncItem]) -> Episode? {
         var latest: (Episode, SyncItem)?
         for e in episodes {
-            if let p = progress(of: e), latest == nil || p.updatedAt > latest!.1.updatedAt { latest = (e, p) }
+            if let p = progress[e.id], latest == nil || p.updatedAt > latest!.1.updatedAt { latest = (e, p) }
         }
         guard let (episode, item) = latest else { return nil }
         if let pos = item.data.positionMs, let dur = item.data.durationMs, WatchHistory.isCompleted(positionMs: pos, durationMs: dur),
