@@ -21,6 +21,20 @@ final class SeekPreviewTests: XCTestCase {
         XCTAssertEqual(p.fraction ?? -1, 120.0 / 3_600, accuracy: 1e-9)
     }
 
+    /// B-19: a hold that runs into the end commits 10 s before it on idle; OK may still go to the end.
+    func testAutoCommitStopsBeforeTheEnd() {
+        var p = SeekPreview(origin: 45, duration: 180, nowMs: 0)
+        for heldMs in stride(from: Int64(400), through: 3_100, by: 300) { p.step(direction: 1, heldMs: heldMs, nowMs: heldMs) }
+        XCTAssertEqual(p.target, 180, "the target itself reaches the end")
+        XCTAssertEqual(p.autoCommitTarget, 170)
+        let near = SeekPreview(origin: 30, duration: 180, nowMs: 0)
+        XCTAssertEqual(near.autoCommitTarget, 30, "targets before the margin are unchanged")
+        let unknown = SeekPreview(origin: 500, duration: 0, nowMs: 0)
+        XCTAssertEqual(unknown.autoCommitTarget, 500)
+        let short = SeekPreview(origin: 2, duration: 5, nowMs: 0)
+        XCTAssertEqual(short.autoCommitTarget, 0, "never negative")
+    }
+
     func testHeldStepsAccelerate() {
         var p = SeekPreview(origin: 0, duration: 10_000, nowMs: 0)
         // TVHoldSeek: first repeat at 0.4 s, then every 0.3 s.

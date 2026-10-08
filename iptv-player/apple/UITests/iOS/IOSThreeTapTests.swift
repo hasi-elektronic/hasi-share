@@ -71,7 +71,7 @@ final class IOSThreeTapTests: XCTestCase {
         for id in ["settings_sources", "settings_app_language", "settings_audio_language", "settings_subtitle_language", "settings_quick_start"] {
             XCTAssertTrue(app.descendants(matching: .any)[id].exists, "\(id) on the top level")
         }
-        XCTAssertTrue(app.descendants(matching: .any)["settings_device_audio_delay"].exists, "TV/soundbar delay on the top level")
+        XCTAssertTrue(app.descendants(matching: .any)["settings_avsync_calibration"].exists, "audio sync calibration on the top level")
         XCTAssertFalse(app.buttons["settings_licenses"].exists, "licenses moved to Advanced")
         UITestSupport.snap("three-tap/ios-settings-top", in: self)
         app.buttons["settings_advanced"].tap()

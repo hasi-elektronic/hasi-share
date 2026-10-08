@@ -96,7 +96,8 @@ final class TVEngineOverrideTests: XCTestCase {
         UITestSupport.snap("engine-override/tvos-vlc-hls", in: self)
     }
 
-    /// Automatic: ◀▶ set a channel + device delay (HLS moves to VLCKit), ▼ to "Reset sync", OK → all 0.
+    /// Automatic: ◀▶ set a channel delay (HLS moves to VLCKit) + the VLC calibration, ▼ to "Reset sync", OK →
+    /// channel delays 0, the calibration stays (Build 16).
     @MainActor
     func testResetSyncInPanel() throws {
         let app = UITestSupport.launch(["-uiScreen", "player", "-perfOverlay"])
@@ -104,17 +105,17 @@ final class TVEngineOverrideTests: XCTestCase {
         XCTAssertTrue(waitPerf(app, contains: ["AVPlayer", "Buffer: ok"], timeout: 40), perf(app))
         openSyncPanel(app)
         let content = app.descendants(matching: .any)["player_audio_sync_delay"]
-        let device = app.descendants(matching: .any)["player_device_audio_delay"]
+        let device = app.descendants(matching: .any)["player_vlc_calibration"]
         XCTAssertTrue(content.waitForExistence(timeout: 5))
         XCTAssertTrue(content.hasFocus, "content row focused")
         press(.right, 2)
         sleep(1)
         XCTAssertEqual(content.value as? String, "+100 ms · audio later")
         press(.down)
-        XCTAssertTrue(device.hasFocus, "▼ device row")
+        XCTAssertTrue(device.hasFocus, "▼ calibration row")
         press(.left)
-        XCTAssertEqual(device.value as? String, "-50 ms · audio earlier")
-        XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Audio delay: +50 ms (device -50 ms, channel +100 ms)"], timeout: 30),
+        XCTAssertEqual(device.value as? String, "-10 ms · audio earlier")
+        XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Audio delay: +90 ms (device -10 ms, channel +100 ms)"], timeout: 30),
                       "delay on VLCKit: \(perf(app))")
         press(.down)
         let reset = app.buttons["audio_sync_reset"]
@@ -122,11 +123,11 @@ final class TVEngineOverrideTests: XCTestCase {
         press(.select)
         XCTAssertTrue(app.staticTexts["audio_sync_reset_done"].waitForExistence(timeout: 2), "confirmation")
         XCTAssertEqual(content.value as? String, "0 ms")
-        XCTAssertEqual(device.value as? String, "0 ms")
-        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: 0 ms (device 0 ms, channel 0 ms)"], timeout: 5), perf(app))
+        XCTAssertEqual(device.value as? String, "-10 ms · audio earlier", "calibration kept")
+        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: -10 ms (device -10 ms, channel 0 ms)"], timeout: 5), perf(app))
         UITestSupport.snap("engine-override/tvos-reset-sync", in: self)
         press(.up)
-        XCTAssertTrue(device.hasFocus, "▲ back to the device row")
+        XCTAssertTrue(device.hasFocus, "▲ back to the calibration row")
         press(.menu)
         XCTAssertTrue(content.waitForNonExistence(timeout: 3), "Menu closes the panel")
     }

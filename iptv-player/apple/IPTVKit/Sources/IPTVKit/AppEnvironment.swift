@@ -123,6 +123,7 @@ public final class AppEnvironment {
                                           },
                                           fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()
+        installPlayerExtras(kv: kv)   // Build 16: next-episode autoplay, subtitle style (NextEpisode.swift)
         // A database without sources (tvOS purged it, corrupt file, new file in Caches/memory): put the mirrored
         // sources and user state back BEFORE anything reads or mirrors the empty state.
         restore = mirror.restoreIfNeeded(sources: sourceRepository, library: library, database: database)

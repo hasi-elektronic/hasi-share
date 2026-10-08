@@ -18,6 +18,9 @@ struct AudioDelayControl: View {
     /// swallows unhandled moves, so the panel moves the focus itself; nil = focus engine (Settings).
     var onVerticalMove: ((Int) -> Void)?
     #endif
+    /// Value range and base step (content delay: ±2000 / 50 ms; VLC calibration: ±500 / 10 ms).
+    var range: ClosedRange<Int> = AudioDelayStore.range
+    var stepMs: Int = AudioDelayStore.step
     let onChange: (Int) -> Void
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -34,14 +37,14 @@ struct AudioDelayControl: View {
     }
 
     private func set(_ delta: Int) {
-        let range = AudioDelayStore.range
+        let range = self.range
         onChange(min(range.upperBound, max(range.lowerBound, value + delta)))
     }
 
     var body: some View {
         #if os(tvOS)
         TVAudioDelayStepper(title: title, value: value, identifier: identifier, externalFocus: focus,
-                            onVerticalMove: onVerticalMove, step: set)
+                            onVerticalMove: onVerticalMove, baseStep: stepMs, step: set)
         #else
         if verticalSizeClass == .compact {
             // Landscape iPhone: one line per control when it fits (the slider keeps ≥ 140 pt),
@@ -49,9 +52,9 @@ struct AudioDelayControl: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 6) {
                     Text(title).lineLimit(1).minimumScaleFactor(0.8).frame(minWidth: 130, maxWidth: 200, alignment: .leading)
-                    stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
+                    stepButton("minus", delta: -stepMs, id: "\(identifier)_minus")
                     slider.frame(minWidth: 140)
-                    stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
+                    stepButton("plus", delta: stepMs, id: "\(identifier)_plus")
                     valueText.minimumScaleFactor(0.8).frame(minWidth: 150, maxWidth: 190, alignment: .trailing)
                 }
                 twoLines
@@ -72,9 +75,9 @@ struct AudioDelayControl: View {
                 valueText
             }
             HStack(spacing: 12) {
-                stepButton("minus", delta: -AudioDelayStore.step, id: "\(identifier)_minus")
+                stepButton("minus", delta: -stepMs, id: "\(identifier)_minus")
                 slider
-                stepButton("plus", delta: AudioDelayStore.step, id: "\(identifier)_plus")
+                stepButton("plus", delta: stepMs, id: "\(identifier)_plus")
             }
         }
     }
@@ -91,8 +94,8 @@ struct AudioDelayControl: View {
 
     private var slider: some View {
         Slider(value: Binding(get: { Double(value) }, set: { onChange(Int($0.rounded())) }),
-               in: Double(AudioDelayStore.range.lowerBound)...Double(AudioDelayStore.range.upperBound),
-               step: Double(AudioDelayStore.step))
+               in: Double(range.lowerBound)...Double(range.upperBound),
+               step: Double(stepMs))
             .accessibilityLabel(title)
             .accessibilityValue(Self.label(value))
             .accessibilityIdentifier(identifier)
@@ -120,6 +123,8 @@ private struct TVAudioDelayStepper: View {
     let identifier: String
     let externalFocus: FocusState<Bool>.Binding?
     let onVerticalMove: ((Int) -> Void)?
+    /// Smallest step in ms (50: content delay, 10: VLC calibration); the accelerated steps scale with it.
+    let baseStep: Int
     let step: (Int) -> Void
     @FocusState private var ownFocus: Bool
     private var focused: Bool { externalFocus?.wrappedValue ?? ownFocus }
@@ -130,7 +135,7 @@ private struct TVAudioDelayStepper: View {
         var count = 0
         if let run, run.direction == direction, now.timeIntervalSince(run.at) < 0.4 { count = run.count + 1 }
         run = (direction, count, now)
-        step(direction * AudioDelayStore.stepSize(repeatCount: count))
+        step(direction * AudioDelayStore.stepSize(repeatCount: count) * baseStep / AudioDelayStore.step)
     }
 
     var body: some View {
@@ -154,7 +159,7 @@ private struct TVAudioDelayStepper: View {
         .background {
             if focused {
                 TVHoldSeek { direction, heldMs in
-                    step(direction * (heldMs < 1500 ? 100 : 250))
+                    step(direction * (heldMs < 1500 ? 100 : 250) * baseStep / AudioDelayStore.step)
                     return true
                 }
             }
@@ -176,8 +181,8 @@ private struct TVAudioDelayStepper: View {
         .accessibilityValue(AudioDelayControl.label(value))
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: step(AudioDelayStore.step)
-            case .decrement: step(-AudioDelayStore.step)
+            case .increment: step(baseStep)
+            case .decrement: step(-baseStep)
             @unknown default: break
             }
         }
@@ -194,11 +199,14 @@ private struct TVAudioDelayStepper: View {
 struct AudioSyncPanel: View {
     let player: PlayerController
     let onClose: () -> Void
+    /// "Calibrate audio sync" (VLC calibration screen); nil hides the button.
+    var onCalibrate: (() -> Void)?
     @State private var resetDone = false
     @State private var resetTask: Task<Void, Never>?
     #if os(tvOS)
     @FocusState private var contentFocused: Bool
     @FocusState private var deviceFocused: Bool
+    @FocusState private var calibrateFocused: Bool
     @FocusState private var resetFocused: Bool
     #endif
     #if os(iOS)
@@ -236,16 +244,18 @@ struct AudioSyncPanel: View {
                 AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
                                   identifier: "player_audio_sync_delay", focus: $contentFocused,
                                   onVerticalMove: { if $0 > 0 { deviceFocused = true } }) { player.setAudioDelay($0) }
-                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
-                                  identifier: "player_device_audio_delay", focus: $deviceFocused,
-                                  onVerticalMove: { if $0 < 0 { contentFocused = true } else { resetFocused = true } }) {
-                    player.setDeviceAudioDelay($0)
+                AudioDelayControl(title: L10n.t("avsync_calibration_value"), value: player.vlcCalibrationMs,
+                                  identifier: "player_vlc_calibration", focus: $deviceFocused,
+                                  onVerticalMove: { if $0 < 0 { contentFocused = true } else { resetFocused = true } },
+                                  range: AudioDelayStore.calibrationRange, stepMs: AudioDelayStore.calibrationStep) {
+                    player.setVLCCalibration($0)
                 }
                 #else
                 AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
                                   identifier: "player_audio_sync_delay") { player.setAudioDelay($0) }
-                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
-                                  identifier: "player_device_audio_delay") { player.setDeviceAudioDelay($0) }
+                AudioDelayControl(title: L10n.t("avsync_calibration_value"), value: player.vlcCalibrationMs,
+                                  identifier: "player_vlc_calibration", range: AudioDelayStore.calibrationRange,
+                                  stepMs: AudioDelayStore.calibrationStep) { player.setVLCCalibration($0) }
                 #endif
                 Text(L10n.t("audio_sync_hint"))
                     .font(Theme.caption)
@@ -264,6 +274,7 @@ struct AudioSyncPanel: View {
             }
             HStack(spacing: Theme.isTV ? 24 : 12) {
                 resetButton
+                if let onCalibrate { calibrateButton(onCalibrate) }
                 if resetDone {
                     Text(L10n.t("audio_sync_reset_done"))
                         .font(Theme.caption.weight(.semibold))
@@ -309,11 +320,31 @@ struct AudioSyncPanel: View {
         .onMoveCommand { direction in
             // The player's root swallows unhandled moves: ▲ back to the device row.
             if direction == .up, !appleEngine { deviceFocused = true }
+            if direction == .right, onCalibrate != nil { calibrateFocused = true }
         }
         #else
         .buttonStyle(.bordered)
         .font(.subheadline)
         #endif
         .accessibilityIdentifier("audio_sync_reset")
+    }
+
+    /// Opens "Calibrate audio sync" (the VLC calibration test clip) over the player.
+    private func calibrateButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(L10n.t("avsync_calibrate"), systemImage: "waveform.badge.magnifyingglass")
+        }
+        #if os(tvOS)
+        .buttonStyle(SecondaryButtonStyle())
+        .focused($calibrateFocused)
+        .onMoveCommand { direction in
+            if direction == .left { resetFocused = true }
+            if direction == .up, !appleEngine { deviceFocused = true }
+        }
+        #else
+        .buttonStyle(.bordered)
+        .font(.subheadline)
+        #endif
+        .accessibilityIdentifier("audio_sync_calibrate")
     }
 }

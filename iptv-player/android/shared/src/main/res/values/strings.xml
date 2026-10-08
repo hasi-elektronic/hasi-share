@@ -386,4 +386,37 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server not reachable (%1$s)</string>
     <string name="account_not_configured" formatted="false">Accounts are not available in this build (no backend configured).</string>
+    <string name="avsync_calibrate" formatted="false">Calibrate audio sync</string>
+    <string name="avsync_calibration_value" formatted="false">VLC calibration (this device)</string>
+    <string name="avsync_intro" formatted="false">Every second the picture flashes white and you hear a short beep. Change the value until the beep comes exactly with the flash. Beep after the flash? Use −. Beep before the flash? Use +.</string>
+    <string name="avsync_calibration_hint" formatted="false">Applies to every stream played with the VLC engine (MKV, TS, …) on this device. Streams on the Apple engine stay on it. \"Reset sync\" keeps this value.</string>
+    <string name="avsync_reference_apple" formatted="false">Reference (Apple)</string>
+    <string name="avsync_test_vlc" formatted="false">Test (VLC)</string>
+    <string name="avsync_saved">Saved: %1$s</string>
+    <string name="next_episode" formatted="false">Next episode</string>
+    <string name="action_play_now" formatted="false">Play now</string>
+    <string name="settings_autoplay_next" formatted="false">Play next episode automatically</string>
+    <string name="sleep_timer" formatted="false">Sleep timer</string>
+    <string name="sleep_timer_minutes">%1$s min</string>
+    <string name="sleep_timer_end_episode" formatted="false">End of episode</string>
+    <string name="sleep_timer_end_movie" formatted="false">End of movie</string>
+    <string name="sleep_timer_remaining">Sleep in %1$s</string>
+    <string name="sleep_timer_at_end" formatted="false">Sleep at the end</string>
+    <string name="sleep_timer_fired" formatted="false">Sleep timer: playback stopped</string>
+    <string name="subtitle_style" formatted="false">Style</string>
+    <string name="subtitle_size" formatted="false">Size</string>
+    <string name="subtitle_size_small" formatted="false">Small</string>
+    <string name="subtitle_size_medium" formatted="false">Medium</string>
+    <string name="subtitle_size_large" formatted="false">Large</string>
+    <string name="subtitle_size_extraLarge" formatted="false">Extra large</string>
+    <string name="subtitle_color" formatted="false">Colour</string>
+    <string name="subtitle_color_white" formatted="false">White</string>
+    <string name="subtitle_color_yellow" formatted="false">Yellow</string>
+    <string name="subtitle_background" formatted="false">Background</string>
+    <string name="subtitle_background_none" formatted="false">None</string>
+    <string name="subtitle_background_semi" formatted="false">Semi-transparent</string>
+    <string name="subtitle_background_solid" formatted="false">Solid</string>
+    <string name="subtitle_delay" formatted="false">Delay</string>
+    <string name="perf_launch" formatted="false">Launch</string>
+    <string name="perf_vlc_calibration" formatted="false">VLC calibration</string>
 </resources>

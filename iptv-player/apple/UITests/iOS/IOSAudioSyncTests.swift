@@ -58,18 +58,19 @@ final class IOSAudioSyncTests: XCTestCase {
         let plus = app.buttons["player_audio_sync_delay_plus"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5), "sync panel")
         XCTAssertTrue(app.staticTexts["audio_sync_vlc_note"].exists, "AVPlayer note")
-        XCTAssertTrue(app.buttons["player_device_audio_delay_plus"].exists, "device (TV/soundbar) row in the panel")
+        XCTAssertTrue(app.buttons["player_vlc_calibration_plus"].exists, "VLC calibration row in the panel")
         XCTAssertTrue(app.otherElements["video_surface"].exists, "non-modal: the picture stays")
         for _ in 0..<4 { plus.tap() }
         XCTAssertEqual(app.staticTexts["player_audio_sync_delay_value"].label, "+200 ms · audio later")
         XCTAssertTrue(waitPerf(app, contains: ["VLCKit"], timeout: 5), "switched to VLCKit within 5 s: \(perf(app))")
         XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Buffer: ok", "Audio delay: +200 ms"], timeout: 30),
                       "VLCKit plays with the delay applied: \(perf(app))")
-        // Device delay from the same panel adds live: 200 + (−100) applied by libVLC.
-        app.buttons["player_device_audio_delay_minus"].tap()
-        app.buttons["player_device_audio_delay_minus"].tap()
-        XCTAssertEqual(app.staticTexts["player_device_audio_delay_value"].label, "-100 ms · audio earlier")
-        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: +100 ms"], timeout: 5), "content + device: \(perf(app))")
+        // The VLC calibration from the same panel adds live (10 ms steps): 200 + (−20) applied by libVLC.
+        app.buttons["player_vlc_calibration_minus"].tap()
+        app.buttons["player_vlc_calibration_minus"].tap()
+        XCTAssertEqual(app.staticTexts["player_vlc_calibration_value"].label, "-20 ms · audio earlier")
+        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: +180 ms", "VLC calibration: -20 ms"], timeout: 5),
+                      "content + calibration: \(perf(app))")
         UITestSupport.snap("ios-portrait-sync-panel", in: self)
 
         // iPhone landscape: the panel stays low – most of the picture remains visible.
@@ -86,8 +87,8 @@ final class IOSAudioSyncTests: XCTestCase {
         UITestSupport.snap(phone <= 700 ? "ios-landscape-sync-panel-\(phone)pt" : "ios-landscape-sync-panel", in: self)
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
-        app.buttons["player_device_audio_delay_plus"].tap()
-        app.buttons["player_device_audio_delay_plus"].tap()   // device delay back to 0 for the next checks
+        app.buttons["player_vlc_calibration_plus"].tap()
+        app.buttons["player_vlc_calibration_plus"].tap()   // calibration back to 0 for the next checks
         XCTAssertTrue(app.buttons["audio_sync_close"].exists, "close button")
         // A tap on the picture closes the panel and does not put the overlay over it.
         app.otherElements["video_surface"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()

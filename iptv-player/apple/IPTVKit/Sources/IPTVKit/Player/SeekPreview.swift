@@ -35,6 +35,16 @@ public struct SeekPreview: Equatable, Sendable {
     /// Target − origin (seconds, signed).
     public var delta: Double { target - origin }
 
+    /// Keeps an automatic (idle) commit this far before the end (B-19: a held ▶ ran into the end and the movie
+    /// counted as watched); only an explicit OK / Play may jump to the very end.
+    public static let autoCommitEndMarginSeconds: Double = 10
+
+    /// Target of the idle commit: never within `autoCommitEndMarginSeconds` of a known end.
+    public var autoCommitTarget: Double {
+        guard duration > 0 else { return target }
+        return min(target, max(0, duration - Self.autoCommitEndMarginSeconds))
+    }
+
     /// Target as 0…1 of the duration; nil while the duration is unknown.
     public var fraction: Double? { duration > 0 ? target / duration : nil }
 

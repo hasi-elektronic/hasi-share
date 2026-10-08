@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings (top level) → device/soundbar delay on tvOS (SCREENS §3.7/§3.9): ONE focusable row,
-/// ◀▶ on the remote change the value in 50 ms steps.
+/// Settings (top level) → "Calibrate audio sync" on tvOS (Build 16, SCREENS §3.9): the test clip plays in
+/// VLCKit; the calibration is ONE focusable row, ◀▶ on the remote change it in 10 ms steps; Save persists it.
 final class TVAudioSyncTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 
@@ -10,34 +10,43 @@ final class TVAudioSyncTests: XCTestCase {
     }
 
     @MainActor
-    func testDeviceDelayStepperWithRemote() throws {
+    func testCalibrationWithRemote() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 30))
-        let row = app.descendants(matching: .any)["settings_device_audio_delay"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        var focused = false
-        for _ in 0..<20 {
-            if row.hasFocus { focused = true; break }
-            remote.press(.down)
-            usleep(500_000)
-        }
-        XCTAssertTrue(focused, "device delay row focusable")
+        let entry = calibrationEntry(app)
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
+        XCTAssertTrue(focus(entry, pressing: .down, limit: 20), "calibration row focusable")
+        press(.select)
+        let row = app.descendants(matching: .any)["avsync_value"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "calibration screen")
+        let engine = app.descendants(matching: .any)["avsync_engine"]
+        XCTAssertEqual(engine.label, "VLCKit")
+        expectation(for: NSPredicate(format: "value == 'playing'"), evaluatedWith: engine)
+        waitForExpectations(timeout: 15)
+        sleep(1)
+        XCTAssertTrue(row.hasFocus, "the stepper has the focus")
         XCTAssertEqual(row.value as? String, "0 ms")
-        remote.press(.right)
-        remote.press(.right)
+        press(.right, 2)
         sleep(1)
-        XCTAssertEqual(row.value as? String, "+100 ms · audio later")
+        XCTAssertEqual(row.value as? String, "+20 ms · audio later")
         XCTAssertTrue(row.hasFocus, "◀▶ change the value, focus stays on the row")
-        for _ in 0..<3 { remote.press(.left) }
+        press(.left, 3)
         sleep(1)
-        XCTAssertEqual(row.value as? String, "-50 ms · audio earlier")
-        remote.press(.down)
-        sleep(1)
-        XCTAssertFalse(row.hasFocus, "▼ leaves the row (no focus trap)")
-        remote.press(.up)
-        sleep(1)
-        XCTAssertTrue(row.hasFocus, "▲ comes back")
-        UITestSupport.snap("tvos-audio-delay-settings", in: self)
+        XCTAssertEqual(row.value as? String, "-10 ms · audio earlier")
+        UITestSupport.snap("tvos-avsync-calibration", in: self)
+        let save = app.buttons["avsync_save"]
+        XCTAssertTrue(focus(save, pressing: .down, limit: 4) || focus(save, pressing: .right, limit: 3), "▼ to the buttons, Save")
+        press(.select)
+        XCTAssertTrue(app.staticTexts["avsync_saved"].waitForExistence(timeout: 3), "saved")
+        press(.menu)
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "back in Settings")
+        XCTAssertTrue(entry.label.contains("-10 ms"), "row shows the saved value: \(entry.label)")
+    }
+
+    /// Settings row "Calibrate audio sync" (a NavigationLink cell: its focusable element carries the label).
+    @MainActor
+    private func calibrationEntry(_ app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calibrate audio sync'")).firstMatch
     }
 
     /// "+1300 ms · audio later" → 1300.
@@ -61,19 +70,23 @@ final class TVAudioSyncTests: XCTestCase {
     func testStepperAccelerates() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 30))
-        let row = app.descendants(matching: .any)["settings_device_audio_delay"]
+        let entry = calibrationEntry(app)
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
+        XCTAssertTrue(focus(entry, pressing: .down, limit: 20), "calibration row focusable")
+        press(.select)
+        let row = app.descendants(matching: .any)["avsync_value"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
-        XCTAssertTrue(focus(row, pressing: .down, limit: 20), "device delay row focusable")
+        XCTAssertTrue(focus(row, pressing: .up, limit: 3), "stepper focused")
         for _ in 0..<12 { remote.press(.right) }
         sleep(1)
         let quick = Self.ms(row.value)
         print("ACCEL quick 12 presses → \(quick) ms")
-        XCTAssertGreaterThan(quick, 12 * 50, "12 quick presses accelerate past 600 ms (got \(quick))")
+        XCTAssertGreaterThan(quick, 12 * 10, "12 quick presses accelerate past 120 ms (got \(quick))")
         // (A held ◀▶ repeats via TVHoldSeek; `XCUIRemote.press(_:forDuration:)` does not trigger the
         // long-press recognizers in the simulator, so it is not asserted here.)
         for _ in 0..<12 { remote.press(.left) }
         sleep(1)
-        XCTAssertLessThan(Self.ms(row.value), quick - 12 * 50, "quick ◀ presses accelerate too")
+        XCTAssertLessThan(Self.ms(row.value), quick - 12 * 10, "quick ◀ presses accelerate too")
     }
 
     // MARK: Player, remote only
@@ -100,7 +113,7 @@ final class TVAudioSyncTests: XCTestCase {
     }
 
     /// Top row (focus on close) → ▶ Audio → OK → the menu lists VLCKit's tracks and Sync → Sync →
-    /// panel: ▼ device row, ◀◀ −100 ms, ▶▶ back to 0, Menu closes only the panel.
+    /// panel: ▼ VLC calibration row, ◀◀ −20 ms, ▶▶ back to 0, Menu closes only the panel.
     @MainActor
     private func audioMenuToSyncPanel(_ app: XCUIApplication, expectTracks: Bool, context: String) {
         press(.right)   // close → Audio
@@ -118,13 +131,13 @@ final class TVAudioSyncTests: XCTestCase {
         press(.select)
 
         let content = app.descendants(matching: .any)["player_audio_sync_delay"]
-        let device = app.descendants(matching: .any)["player_device_audio_delay"]
+        let device = app.descendants(matching: .any)["player_vlc_calibration"]
         XCTAssertTrue(content.waitForExistence(timeout: 5), "\(context): sync panel")
         XCTAssertTrue(content.hasFocus, "\(context): content row focused")
         press(.down)
-        XCTAssertTrue(device.hasFocus, "\(context): ▼ to the device row")
+        XCTAssertTrue(device.hasFocus, "\(context): ▼ to the calibration row")
         press(.left, 2)
-        XCTAssertEqual(device.value as? String, "-100 ms · audio earlier", "\(context)")
+        XCTAssertEqual(device.value as? String, "-20 ms · audio earlier", "\(context)")
         UITestSupport.snap("tvos-\(context)-sync-panel", in: self)
         press(.right, 2)
         XCTAssertEqual(device.value as? String, "0 ms", "\(context)")

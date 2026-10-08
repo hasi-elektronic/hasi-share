@@ -34,7 +34,7 @@ struct NovaPlayerTVApp: App {
                 }
         }
         .onChange(of: scenePhase) { _, phase in
-            env.scenePhaseChanged(isActive: phase == .active)
+            env.scenePhaseChanged(AppScenePhase(phase))   // B4: .inactive keeps the player
         }
     }
 }
@@ -56,6 +56,8 @@ struct TVRootView: View {
         Group {
             if env.sources.isEmpty || router.onboarding {
                 WelcomeView()
+            } else if router.browseDeferred {
+                Color.black.ignoresSafeArea()   // IOS-06: early QuickStart – browse is built when the player closes
             } else {
                 TabView(selection: $router.section) {
                     ForEach(AppSection.allCases, id: \.self) { section in

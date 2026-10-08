@@ -87,6 +87,7 @@ public final class AVPlayerEngine: PlaybackEngine {
         if !stream.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = stream.headers }
         let asset = AVURLAsset(url: stream.url, options: options)
         let item = AVPlayerItem(asset: asset)
+        item.textStyleRules = Self.textStyleRules(subtitleStyle)
         item.preferredForwardBufferDuration = tuning.forwardBufferSeconds
         player.automaticallyWaitsToMinimizeStalling = tuning.waitToMinimizeStallingAfter == 0
         if let cap = tuning.initialPeakBitRate { item.preferredPeakBitRate = cap }
@@ -402,6 +403,30 @@ public final class AVPlayerEngine: PlaybackEngine {
     }
 
     public func setAspect(_ mode: AspectMode) { aspect = mode }
+
+    // MARK: Build 16 – volume (sleep timer), subtitle style
+
+    public func setVolume(_ volume: Float) { player.volume = max(0, min(1, volume)) }
+
+    private var subtitleStyle = SubtitleStyle()
+
+    /// `AVPlayerItem.textStyleRules` (legible output of `AVPlayerLayer`): size, colour, background box.
+    public func applySubtitleStyle(_ style: SubtitleStyle) {
+        subtitleStyle = style
+        player.currentItem?.textStyleRules = Self.textStyleRules(style)
+    }
+
+    static func textStyleRules(_ style: SubtitleStyle) -> [AVTextStyleRule]? {
+        guard !style.isDefault else { return nil }
+        var attributes: [String: Any] = [
+            kCMTextMarkupAttribute_RelativeFontSize as String: SubtitleStyleMapping.relativeFontSizePercent(style.size),
+            kCMTextMarkupAttribute_ForegroundColorARGB as String: SubtitleStyleMapping.foregroundARGB(style.color),
+        ]
+        if let background = SubtitleStyleMapping.backgroundARGB(style.background) {
+            attributes[kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String] = background
+        }
+        return AVTextStyleRule(textMarkupAttributes: attributes).map { [$0] }
+    }
 
     /// AVPlayer has no audio delay; `PlayerController` moves a delayed stream to VLCKit (CONTRACT §6.1).
     public func setAudioDelay(ms: Int) {}

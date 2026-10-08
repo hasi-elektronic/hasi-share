@@ -12,6 +12,8 @@ enum SettingsRoute: Hashable {
     case paywall
     case licenses
     case about
+    /// Build 16: "Calibrate audio sync" (VLC calibration test clip).
+    case avSyncCalibration
 }
 
 /// Settings (SCREENS §3.9) – always reachable, also when locked. Top level: only what users change
@@ -56,14 +58,12 @@ struct SettingsView: View {
                 .onChange(of: settings.subtitleLanguage) { env.applyLanguagePreferences() }
                 Toggle(L10n.t("settings_quick_start"), isOn: $settings.quickStart)
                     .accessibilityIdentifier("settings_quick_start")
-                // Constant A/V offset of this TV/soundbar (SCREENS §3.9) – the user's lip-sync fix,
-                // so it stays on the top level; ≠ 0 plays through VLCKit.
-                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: env.player.deviceAudioDelay,
-                                  identifier: "settings_device_audio_delay") { env.player.setDeviceAudioDelay($0) }
+                AutoplayNextEpisodeToggle()   // Build 16 (PlayerExtrasViews.swift)
+                // Build 16: the device's lip-sync fix is the VLC calibration (test clip; never changes the engine).
+                AVSyncCalibrationRow()
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L10n.t("settings_quick_start_hint"))
-                    Text(L10n.t("audio_sync_hint"))   // direction of the device delay row
                 }
             }
             Section {
@@ -93,6 +93,7 @@ struct SettingsView: View {
             case .paywall: PaywallView()
             case .licenses: LicensesView()
             case .about: AboutView()
+            case .avSyncCalibration: AVSyncCalibrationView()
             }
         }
     }
@@ -193,6 +194,7 @@ struct AdvancedSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings_reset_sync")
+                AVSyncCalibrationRow()
                 NavigationLink(value: SettingsRoute.formatTest) { LText("diagnostics_format_test") }
                 Toggle(L10n.t("perf_overlay"), isOn: $settings.showPerfOverlay)
                     .accessibilityIdentifier("settings_perf_overlay")

@@ -1,0 +1,170 @@
+{
+ "_note": "Build 16 player strings (team B): A/V sync calibration, next-episode autoplay, sleep timer, subtitle style. Merged with strings.json by spec/tools/gen-strings.mjs.",
+ "strings": {
+  "avsync_calibrate": {
+   "en": "Calibrate audio sync",
+   "tr": "Ses senkronunu ayarla",
+   "de": "Audio-Sync kalibrieren"
+  },
+  "avsync_calibration_value": {
+   "en": "VLC calibration (this device)",
+   "tr": "VLC kalibrasyonu (bu cihaz)",
+   "de": "VLC-Kalibrierung (dieses Gerät)"
+  },
+  "avsync_intro": {
+   "en": "Every second the picture flashes white and you hear a short beep. Change the value until the beep comes exactly with the flash. Beep after the flash? Use −. Beep before the flash? Use +.",
+   "tr": "Her saniye görüntü beyaz yanıp söner ve kısa bir bip sesi duyulur. Bip, yanıp sönmeyle tam aynı anda gelene kadar değeri değiştirin. Bip yanıp sönmeden sonra mı? − kullanın. Önce mi? + kullanın.",
+   "de": "Jede Sekunde blitzt das Bild weiß auf und Sie hören einen kurzen Piepton. Ändern Sie den Wert, bis der Piepton genau mit dem Blitz kommt. Piepton nach dem Blitz? − wählen. Piepton vor dem Blitz? + wählen."
+  },
+  "avsync_calibration_hint": {
+   "en": "Applies to every stream played with the VLC engine (MKV, TS, …) on this device. Streams on the Apple engine stay on it. \"Reset sync\" keeps this value.",
+   "tr": "Bu cihazda VLC motoruyla oynatılan her yayına uygulanır (MKV, TS, …). Apple motorundaki yayınlar orada kalır. \"Senkronu sıfırla\" bu değeri değiştirmez.",
+   "de": "Gilt auf diesem Gerät für jeden Stream mit der VLC-Engine (MKV, TS, …). Streams mit der Apple-Engine bleiben dort. „Sync zurücksetzen“ behält diesen Wert."
+  },
+  "avsync_reference_apple": {
+   "en": "Reference (Apple)",
+   "tr": "Referans (Apple)",
+   "de": "Referenz (Apple)"
+  },
+  "avsync_test_vlc": {
+   "en": "Test (VLC)",
+   "tr": "Test (VLC)",
+   "de": "Test (VLC)"
+  },
+  "avsync_saved": {
+   "en": "Saved: {0}",
+   "tr": "Kaydedildi: {0}",
+   "de": "Gespeichert: {0}"
+  },
+  "next_episode": {
+   "en": "Next episode",
+   "tr": "Sonraki bölüm",
+   "de": "Nächste Folge"
+  },
+  "action_play_now": {
+   "en": "Play now",
+   "tr": "Şimdi oynat",
+   "de": "Jetzt abspielen"
+  },
+  "settings_autoplay_next": {
+   "en": "Play next episode automatically",
+   "tr": "Sonraki bölümü otomatik oynat",
+   "de": "Nächste Folge automatisch abspielen"
+  },
+  "sleep_timer": {
+   "en": "Sleep timer",
+   "tr": "Uyku zamanlayıcısı",
+   "de": "Schlaf-Timer"
+  },
+  "sleep_timer_minutes": {
+   "en": "{0} min",
+   "tr": "{0} dk",
+   "de": "{0} Min."
+  },
+  "sleep_timer_end_episode": {
+   "en": "End of episode",
+   "tr": "Bölüm sonunda",
+   "de": "Ende der Folge"
+  },
+  "sleep_timer_end_movie": {
+   "en": "End of movie",
+   "tr": "Film sonunda",
+   "de": "Ende des Films"
+  },
+  "sleep_timer_remaining": {
+   "en": "Sleep in {0}",
+   "tr": "{0} sonra uyku",
+   "de": "Schlaf-Timer: {0}"
+  },
+  "sleep_timer_at_end": {
+   "en": "Sleep at the end",
+   "tr": "Sonunda uyku",
+   "de": "Schlaf-Timer: am Ende"
+  },
+  "sleep_timer_fired": {
+   "en": "Sleep timer: playback stopped",
+   "tr": "Uyku zamanlayıcısı: oynatma durduruldu",
+   "de": "Schlaf-Timer: Wiedergabe gestoppt"
+  },
+  "subtitle_style": {
+   "en": "Style",
+   "tr": "Stil",
+   "de": "Stil"
+  },
+  "subtitle_size": {
+   "en": "Size",
+   "tr": "Boyut",
+   "de": "Größe"
+  },
+  "subtitle_size_small": {
+   "en": "Small",
+   "tr": "Küçük",
+   "de": "Klein"
+  },
+  "subtitle_size_medium": {
+   "en": "Medium",
+   "tr": "Orta",
+   "de": "Mittel"
+  },
+  "subtitle_size_large": {
+   "en": "Large",
+   "tr": "Büyük",
+   "de": "Groß"
+  },
+  "subtitle_size_extraLarge": {
+   "en": "Extra large",
+   "tr": "Çok büyük",
+   "de": "Sehr groß"
+  },
+  "subtitle_color": {
+   "en": "Colour",
+   "tr": "Renk",
+   "de": "Farbe"
+  },
+  "subtitle_color_white": {
+   "en": "White",
+   "tr": "Beyaz",
+   "de": "Weiß"
+  },
+  "subtitle_color_yellow": {
+   "en": "Yellow",
+   "tr": "Sarı",
+   "de": "Gelb"
+  },
+  "subtitle_background": {
+   "en": "Background",
+   "tr": "Arka plan",
+   "de": "Hintergrund"
+  },
+  "subtitle_background_none": {
+   "en": "None",
+   "tr": "Yok",
+   "de": "Ohne"
+  },
+  "subtitle_background_semi": {
+   "en": "Semi-transparent",
+   "tr": "Yarı saydam",
+   "de": "Halbtransparent"
+  },
+  "subtitle_background_solid": {
+   "en": "Solid",
+   "tr": "Dolu",
+   "de": "Deckend"
+  },
+  "subtitle_delay": {
+   "en": "Delay",
+   "tr": "Gecikme",
+   "de": "Verzögerung"
+  },
+  "perf_launch": {
+   "en": "Launch",
+   "tr": "Açılış",
+   "de": "Start"
+  },
+  "perf_vlc_calibration": {
+   "en": "VLC calibration",
+   "tr": "VLC kalibrasyonu",
+   "de": "VLC-Kalibrierung"
+  }
+ }
+}

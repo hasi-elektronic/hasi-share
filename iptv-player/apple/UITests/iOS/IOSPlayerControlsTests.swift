@@ -190,6 +190,76 @@ final class IOSPlayerControlsTests: XCTestCase {
         XCTAssertEqual(Self.time(app), duration / 2, accuracy: 2, "seeked on release (from \(before))")
     }
 
+    /// IOS-01 (Build 16): the live overlay in iPhone portrait stays inside the screen – close, title, tools and
+    /// the LIVE row – at the default text size and at an accessibility size.
+    @MainActor
+    func testLiveOverlayFitsPortraitScreen() throws {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"]] {
+            let app = UITestSupport.launch(["-uiScreen", "player"] + extra)
+            XCTAssertTrue(app.otherElements["video_surface"].waitForExistence(timeout: 30))
+            Self.freshOverlay(app)
+            let window = app.windows.firstMatch.frame
+            let context = extra.isEmpty ? "default size" : "AX-XL"
+            for id in ["player_close", "action_channel_list", "player_play_pause"] {
+                let element = app.buttons[id].firstMatch
+                XCTAssertTrue(element.exists, "\(context): \(id)")
+                XCTAssertGreaterThanOrEqual(element.frame.minX, window.minX, "\(context): \(id) starts on screen (\(element.frame))")
+                XCTAssertLessThanOrEqual(element.frame.maxX, window.maxX + 0.5, "\(context): \(id) ends on screen (\(element.frame))")
+            }
+            let title = app.staticTexts["player_title"].firstMatch
+            XCTAssertTrue(title.exists, "\(context): channel title shown")
+            XCTAssertGreaterThan(title.frame.width, 40, "\(context): title has room (\(title.frame))")
+            XCTAssertGreaterThanOrEqual(title.frame.minX, window.minX)
+            UITestSupport.snap("ios01-live-overlay-\(extra.isEmpty ? "default" : "axxl")", in: self)
+            app.terminate()
+        }
+    }
+
+    /// IOS-02 (Build 16): a slow drag with a hold while an MKV plays in VLCKit must seek once on release and keep
+    /// playing there – it used to send playback to the very end ("ended", frozen last frame).
+    @MainActor
+    func testScrubWhilePlayingMKVKeepsPlaying() throws {
+        let app = try Self.launchMovie(VLCTestSupport.movieM3U)
+        Self.playFromDetail(app)
+        XCTAssertTrue(Self.waitPlaying(app, after: 3), "MKV plays")
+        let duration = Self.duration(app)
+        XCTAssertGreaterThan(duration, 60, "duration known")
+        // As in the QA run: the movie resumes (VLCKit `:start-time`) at ~40 % before the drag.
+        Self.freshOverlay(app)
+        let scrubber = app.descendants(matching: .any)["player_scrubber"]
+        scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)).tap()
+        sleep(2)
+        app.buttons["player_close"].firstMatch.tap()
+        XCTAssertTrue(app.otherElements["video_surface"].waitForNonExistence(timeout: 5))
+        Self.playFromDetail(app)
+        XCTAssertTrue(Self.waitPlaying(app, after: duration * 0.4, timeout: 30), "resumed MKV plays")
+        // QA chose the Turkish subtitles right before the drag.
+        Self.freshOverlay(app)
+        app.buttons["Subtitles"].tap()
+        let turkish = app.buttons["Turkish"]
+        XCTAssertTrue(turkish.waitForExistence(timeout: 3), "subtitle menu")
+        turkish.tap()
+        sleep(3)
+        UITestSupport.snap("scrub-mkv-after-subtitle", in: self)
+        Self.freshOverlay(app)
+        XCTAssertTrue(scrubber.exists)
+        scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+            .press(forDuration: 0.2, thenDragTo: scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)),
+                   withVelocity: .slow, thenHoldForDuration: 1)
+        let target = duration * 0.6
+        // IOS-15: the bubble's jump is relative to where the drag began (~40 % → 60 %: "+0:3x"), not the time left.
+        let bubble = app.descendants(matching: .any)["player_seek_bubble"]
+        if bubble.waitForExistence(timeout: 1) {
+            XCTAssertTrue(bubble.label.contains(", +0:"), "jump from the drag start: \(bubble.label)")
+        }
+        sleep(3)
+        UITestSupport.snap("scrub-mkv-after-drag", in: self)
+        let (time, value) = Self.state(app)
+        XCTAssertEqual(value, "Playing", "still playing after the scrub (not ended)")
+        XCTAssertEqual(time, target, accuracy: 6, "landed near the target")
+        XCTAssertTrue(Self.waitPlaying(app, after: target + 2, timeout: 20), "playback continues past the target")
+    }
+
     @MainActor
     private func runVODControls(_ app: XCUIApplication, name: String) throws {
         Self.playFromDetail(app)

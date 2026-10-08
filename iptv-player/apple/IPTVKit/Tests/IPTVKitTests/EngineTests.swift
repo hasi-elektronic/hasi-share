@@ -35,6 +35,14 @@ final class FakeEngine: PlaybackEngine {
     func setAudioDelay(ms: Int) { audioDelays.append(ms) }
     func stop() { stops += 1; isPlaying = false }
     func emit(_ event: EngineEvent) { onEvent?(event) }
+    // Build 16
+    private(set) var volumes: [Float] = []
+    private(set) var subtitleStyles: [SubtitleStyle] = []
+    private(set) var subtitleDelays: [Int] = []
+    var supportsSubtitleDelay: Bool { kind == .vlcKit }
+    func setVolume(_ volume: Float) { volumes.append(volume) }
+    func applySubtitleStyle(_ style: SubtitleStyle) { subtitleStyles.append(style) }
+    func setSubtitleDelay(ms: Int) { subtitleDelays.append(ms) }
 }
 
 @MainActor

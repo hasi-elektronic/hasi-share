@@ -339,9 +339,15 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
    * `vlc` ⇒ **VLCKit** for everything VLCKit supports (no HLS twin probe, no fallback); without VLCKit
      the AVPlayer column.
    * `auto` ⇒ rules 0–3.
-0. `audioDelayMs ≠ 0` (effective user audio delay = content + device, −2000…+2000 ms in 50 ms
+0. `audioDelayMs ≠ 0` (the content's own audio delay – per channel/title, −2000…+2000 ms in 50 ms
    steps) and VLCKit available and supports it ⇒ **VLCKit** (AVPlayer cannot delay audio).
-   Without VLCKit the delay is ignored.
+   Without VLCKit the delay is ignored. **Build 16:** the per-device **VLC calibration** (Settings →
+   Advanced → "Calibrate audio sync", −500…+500 ms in 10 ms steps, measured with the bundled flash/beep
+   test clip) is added to every item VLCKit plays and **never changes the engine**: AVPlayer content stays
+   on AVPlayer (AVPlayer compensates the output latency itself). The former device ("TV/soundbar") delay,
+   which was added to every content and so forced every stream into VLCKit, is migrated once into the
+   calibration (clamped to ±500 ms) and no longer exists. VLCKit applies content + calibration + the
+   automatic latency term below.
 1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
 2. else VLCKit supports it ⇒ **VLCKit**.
 3. else ⇒ `UnsupportedFormat(container)` before playback.
@@ -372,9 +378,10 @@ never played ⇒ `UnsupportedCodec`, played then dropped (or a live stream "ende
 `Network` (reconnect policy). AVPlayer: an error without a usable reason before the first
 frame, or an item still not ready after 8 s, is classified with the same probe (2xx/3xx →
 keep the original error / keep waiting).
-"Reset sync" (Sync panel and Settings → Advanced) sets the device delay and every per-content delay to 0
-(all `audioDelay.*` keys removed); a stream on VLCKit gets 0 at once, rule 0 no longer applies from the next
-open.
+"Reset sync" (Sync panel and Settings → Advanced) sets every per-content delay to 0
+(all `audioDelay.*` keys removed); a stream on VLCKit gets the content 0 at once (the VLC calibration stays –
+it is a measurement of the device, changed only on the calibration screen / its Sync panel row), rule 0 no
+longer applies from the next open.
 Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audioDelay, override, fallback}`;
 `stream-samples.json` → `expect.apple`.
 

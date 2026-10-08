@@ -66,10 +66,22 @@ public protocol PlaybackEngine: AnyObject {
     func setAudioDelay(ms: Int)
     /// Stops and frees the current item (the engine instance stays reusable).
     func stop()
+    // Build 16 (defaults below): sleep-timer fade, subtitle style and delay.
+    func setVolume(_ volume: Float)
+    func applySubtitleStyle(_ style: SubtitleStyle)
+    var supportsSubtitleDelay: Bool { get }
+    func setSubtitleDelay(ms: Int)
 }
 
 public extension PlaybackEngine {
     var canPause: Bool { true }
+    /// Output volume 0…1 (sleep timer fade-out); default no-op.
+    func setVolume(_ volume: Float) {}
+    /// Subtitle look for the current and every later item (`SubtitleStyleMapping`); default no-op.
+    func applySubtitleStyle(_ style: SubtitleStyle) {}
+    /// Subtitle delay in ms (+ = subtitles later). Only VLCKit can (`currentVideoSubTitleDelay`); AVPlayer cannot.
+    var supportsSubtitleDelay: Bool { false }
+    func setSubtitleDelay(ms: Int) {}
 }
 
 /// Engine factories handed to `PlayerController`. `vlc` is nil for builds without VLCKit

@@ -386,4 +386,37 @@
     <string name="source_status_ok" formatted="false">Tamam</string>
     <string name="error_backend_generic">Sunucuya ulaşılamıyor (%1$s)</string>
     <string name="account_not_configured" formatted="false">Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).</string>
+    <string name="avsync_calibrate" formatted="false">Ses senkronunu ayarla</string>
+    <string name="avsync_calibration_value" formatted="false">VLC kalibrasyonu (bu cihaz)</string>
+    <string name="avsync_intro" formatted="false">Her saniye görüntü beyaz yanıp söner ve kısa bir bip sesi duyulur. Bip, yanıp sönmeyle tam aynı anda gelene kadar değeri değiştirin. Bip yanıp sönmeden sonra mı? − kullanın. Önce mi? + kullanın.</string>
+    <string name="avsync_calibration_hint" formatted="false">Bu cihazda VLC motoruyla oynatılan her yayına uygulanır (MKV, TS, …). Apple motorundaki yayınlar orada kalır. \"Senkronu sıfırla\" bu değeri değiştirmez.</string>
+    <string name="avsync_reference_apple" formatted="false">Referans (Apple)</string>
+    <string name="avsync_test_vlc" formatted="false">Test (VLC)</string>
+    <string name="avsync_saved">Kaydedildi: %1$s</string>
+    <string name="next_episode" formatted="false">Sonraki bölüm</string>
+    <string name="action_play_now" formatted="false">Şimdi oynat</string>
+    <string name="settings_autoplay_next" formatted="false">Sonraki bölümü otomatik oynat</string>
+    <string name="sleep_timer" formatted="false">Uyku zamanlayıcısı</string>
+    <string name="sleep_timer_minutes">%1$s dk</string>
+    <string name="sleep_timer_end_episode" formatted="false">Bölüm sonunda</string>
+    <string name="sleep_timer_end_movie" formatted="false">Film sonunda</string>
+    <string name="sleep_timer_remaining">%1$s sonra uyku</string>
+    <string name="sleep_timer_at_end" formatted="false">Sonunda uyku</string>
+    <string name="sleep_timer_fired" formatted="false">Uyku zamanlayıcısı: oynatma durduruldu</string>
+    <string name="subtitle_style" formatted="false">Stil</string>
+    <string name="subtitle_size" formatted="false">Boyut</string>
+    <string name="subtitle_size_small" formatted="false">Küçük</string>
+    <string name="subtitle_size_medium" formatted="false">Orta</string>
+    <string name="subtitle_size_large" formatted="false">Büyük</string>
+    <string name="subtitle_size_extraLarge" formatted="false">Çok büyük</string>
+    <string name="subtitle_color" formatted="false">Renk</string>
+    <string name="subtitle_color_white" formatted="false">Beyaz</string>
+    <string name="subtitle_color_yellow" formatted="false">Sarı</string>
+    <string name="subtitle_background" formatted="false">Arka plan</string>
+    <string name="subtitle_background_none" formatted="false">Yok</string>
+    <string name="subtitle_background_semi" formatted="false">Yarı saydam</string>
+    <string name="subtitle_background_solid" formatted="false">Dolu</string>
+    <string name="subtitle_delay" formatted="false">Gecikme</string>
+    <string name="perf_launch" formatted="false">Açılış</string>
+    <string name="perf_vlc_calibration" formatted="false">VLC kalibrasyonu</string>
 </resources>

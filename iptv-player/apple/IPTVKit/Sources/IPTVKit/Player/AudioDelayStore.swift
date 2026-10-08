@@ -1,9 +1,14 @@
 import Foundation
 
 /// User audio delay (docs/SCREENS.md §3.7, docs/ARCHITECTURE.md §3.2): one value per content
-/// (channel / movie / episode content key) plus one device value (Settings → Playback, e.g. a
-/// soundbar). Milliseconds, −2000…+2000 in 50 ms steps; positive = audio later. Device-local.
-/// An effective delay ≠ 0 plays through VLCKit (CONTRACT §6.1) – AVPlayer cannot delay audio.
+/// (channel / movie / episode content key), −2000…+2000 ms in 50 ms steps, positive = audio later –
+/// a content delay ≠ 0 plays through VLCKit (CONTRACT §6.1 rule 0, AVPlayer cannot delay audio) – plus
+/// the per-device **VLC calibration** (Build 16, Settings → Advanced → "Calibrate audio sync"),
+/// −500…+500 ms in 10 ms steps: added to every VLCKit item only, it never changes the engine
+/// (AVPlayer compensates the output latency itself). Device-local.
+///
+/// The former device ("TV/soundbar") delay, which was added to every content and so forced every stream
+/// into VLCKit, is migrated once into the calibration (`migrateDeviceDelayIfNeeded`).
 public struct AudioDelayStore: Sendable {
     private let kv: any KeyValueStore
     public static let range: ClosedRange<Int> = -2000...2000
@@ -38,16 +43,42 @@ public struct AudioDelayStore: Sendable {
         if v == 0 { kv.set(nil, forKey: key(contentKey)) } else { kv.setValue(v, forKey: key(contentKey)) }
     }
 
-    /// Delay of this device's audio output (soundbar, TV), added to every content.
-    public var deviceDelay: Int { kv.value(Int.self, forKey: "audioDelay.device") ?? 0 }
+    // MARK: VLC calibration (per device)
 
-    public func setDeviceDelay(_ ms: Int) { kv.setValue(Self.normalize(ms), forKey: "audioDelay.device") }
+    public static let calibrationRange: ClosedRange<Int> = -500...500
+    public static let calibrationStep = 10
+    static let calibrationKey = "vlcCalibration.ms"
+    /// Build ≤ 15 device ("TV/soundbar") delay – only read by the migration.
+    static let legacyDeviceKey = "audioDelay.device"
 
-    /// "Reset sync": the device delay and every per-content delay back to 0 (keys removed).
+    /// Clamped to `calibrationRange` and rounded to `calibrationStep`.
+    public static func normalizeCalibration(_ ms: Int) -> Int {
+        let c = min(max(ms, calibrationRange.lowerBound), calibrationRange.upperBound)
+        return Int((Double(c) / Double(calibrationStep)).rounded()) * calibrationStep
+    }
+
+    /// Per-device VLCKit A/V offset (ms, + = audio later), added to every VLCKit item; never routes.
+    public var vlcCalibration: Int { kv.value(Int.self, forKey: Self.calibrationKey) ?? 0 }
+
+    public func setVLCCalibration(_ ms: Int) { kv.setValue(Self.normalizeCalibration(ms), forKey: Self.calibrationKey) }
+
+    /// Moves the old device delay into the calibration once (an existing calibration wins) and removes it, so
+    /// it no longer forces AVPlayer content into VLCKit. True when a value was migrated.
+    @discardableResult
+    public func migrateDeviceDelayIfNeeded() -> Bool {
+        guard let legacy = kv.value(Int.self, forKey: Self.legacyDeviceKey) else { return false }
+        kv.set(nil, forKey: Self.legacyDeviceKey)
+        guard kv.data(forKey: Self.calibrationKey) == nil, legacy != 0 else { return false }
+        setVLCCalibration(legacy)
+        return true
+    }
+
+    /// "Reset sync": every per-content delay back to 0 (keys removed). The VLC calibration is a measurement of
+    /// this device and stays (it is changed on the calibration screen / its row).
     public func resetAll() {
         for key in kv.keys(withPrefix: "audioDelay.") { kv.set(nil, forKey: key) }
     }
 
-    /// clamp(content + device).
-    public func effectiveDelay(_ contentKey: String) -> Int { Self.normalize(contentDelay(contentKey) + deviceDelay) }
+    /// Delay that decides the engine (CONTRACT §6.1 rule 0): the content's own delay only.
+    public func effectiveDelay(_ contentKey: String) -> Int { contentDelay(contentKey) }
 }
