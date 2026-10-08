@@ -26,6 +26,8 @@ public final class AddSourceViewModel {
     public var password = ""
     public var showPassword = false
     public private(set) var phase: Phase = .editing
+    /// Edit mode (Settings → source → Edit): the source whose connection data the form changes.
+    public let editingSourceId: String?
 
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -33,6 +35,58 @@ public final class AddSourceViewModel {
     public init(env: AppEnvironment, kind: Kind = .m3u) {
         self.env = env
         self.kind = kind
+        editingSourceId = nil
+    }
+
+    /// Edit form, prefilled from the source and its Keychain secrets.
+    public init(env: AppEnvironment, editing source: Source) {
+        self.env = env
+        editingSourceId = source.id
+        kind = source.type == .xtream ? .xtream : .m3u
+        name = source.name
+        switch env.secrets(for: source.id) {
+        case .m3u(let m3u)?:
+            m3uURL = m3u.url
+            epgURL = m3u.epgUrl ?? ""
+            userAgent = m3u.userAgent ?? ""
+        case .xtream(let x)?:
+            server = x.serverUrl
+            username = x.username
+            password = x.password
+            epgURL = x.epgUrl ?? ""
+        case nil:
+            break
+        }
+    }
+
+    public var isEditing: Bool { editingSourceId != nil }
+
+    /// EPG URL used when the field stays empty, shown without credentials ("panel.example.com/xmltv.php"):
+    /// Xtream `xmltv.php` of the panel, M3U the playlist's `x-tvg-url` (known after the first load).
+    public var defaultEpgHint: String? {
+        let url: URL?
+        switch kind {
+        case .xtream:
+            url = XtreamURLBuilder(secrets: XtreamSecrets(serverUrl: server, username: username, password: password))?.xmltvURL()
+        case .m3u:
+            url = editingSourceId.flatMap { env.refresher.headerEpgURL(sourceId: $0) }
+        }
+        return url.flatMap(Self.displayURL)
+    }
+
+    /// Host + path of a URL – never its query (credentials) or user info.
+    public static func displayURL(_ url: URL) -> String? {
+        guard let host = url.host, !host.isEmpty else { return nil }
+        let port = url.port.map { ":\($0)" } ?? ""
+        return host + port + url.path
+    }
+
+    /// Error-card actions inside the add / edit form (IOS-21): every error can go back to the form ("Edit"), and
+    /// "Delete source" is never offered – nothing was saved (add) or the source is kept (edit).
+    public static func formErrorActions(_ actions: [ErrorAction]) -> [ErrorAction] {
+        var out = actions.filter { $0 != .deleteSource }
+        if !out.contains(.edit) { out.append(.edit) }
+        return out
     }
 
     /// Prefills from a pairing payload (TV QR flow).
@@ -97,13 +151,19 @@ public final class AddSourceViewModel {
         phase = .connecting(.connecting)
         let secrets = self.secrets
         let name = self.name
+        let editing = editingSourceId
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                let source = try await env.addSource(name: name, secrets: secrets) { progress in
+                let onProgress: @Sendable (RefreshProgress) -> Void = { progress in
                     Task { @MainActor [weak self] in
                         if case .connecting = self?.phase { self?.phase = .connecting(progress) }
                     }
+                }
+                let source = if let editing {
+                    try await env.editSource(id: editing, name: name, secrets: secrets, onProgress: onProgress)
+                } else {
+                    try await env.addSource(name: name, secrets: secrets, onProgress: onProgress)
                 }
                 phase = .success(source)
             } catch {

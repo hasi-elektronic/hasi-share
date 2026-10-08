@@ -6,6 +6,7 @@ enum SettingsRoute: Hashable {
     case sources
     case advanced
     case source(String)
+    case edit(String)
     case add(AddSourceRoute)
     case account
     case formatTest
@@ -85,6 +86,7 @@ struct SettingsView: View {
             case .sources: SourcesView()
             case .advanced: AdvancedSettingsView()
             case .source(let id): SourceDetailView(sourceId: id)
+            case .edit(let id): EditSourceView(sourceId: id)
             case .add(.m3u): AddSourceView(kind: .m3u)
             case .add(.xtream): AddSourceView(kind: .xtream)
             case .add(.pairing): PairingView()
@@ -97,7 +99,9 @@ struct SettingsView: View {
         }
     }
 
-    static let languages = ["tr", "en", "de", "fr", "es", "ar", "ru"]
+    /// Audio / subtitle preference (L5): every ISO 639-1 language, the common IPTV ones first, then by name in the UI
+    /// language (cached per UI language).
+    static var languages: [String] { LanguageList.codes(for: L10n.languageCode) }
     /// Endonyms for the app-language picker (always in their own language).
     static let languageNames = ["de": "Deutsch", "tr": "Türkçe", "en": "English"]
 }
@@ -105,14 +109,21 @@ struct SettingsView: View {
 /// Settings → Sources: list (→ detail) and "+ add" rows (M3U, Xtream, tvOS: phone/QR).
 struct SourcesView: View {
     @Environment(AppEnvironment.self) private var env
+    #if os(iOS)
+    @State private var reordering = false
+    #endif
 
     var body: some View {
         Form {
             Section {
                 ForEach(env.sources) { source in
-                    NavigationLink(value: SettingsRoute.source(source.id)) { SourceSummaryRow(source: source) }
-                        .accessibilityIdentifier("settings_source_\(source.name)")
+                    NavigationLink(value: SettingsRoute.source(source.id)) {
+                        SourceSummaryRow(source: source, isActive: env.sources.count > 1 && source.id == env.currentSource?.id)
+                    }
+                    .accessibilityIdentifier("settings_source_\(source.name)")
                 }
+                // IOS-23: drag to reorder (tvOS: Move up / Move down in the source detail).
+                .onMove { env.moveSources(from: $0, to: $1) }
             }
             Section(L10n.t("add_source")) {
                 NavigationLink(value: SettingsRoute.add(.m3u)) { Label(L10n.t("add_source_m3u"), systemImage: "plus") }
@@ -120,13 +131,26 @@ struct SourcesView: View {
                 NavigationLink(value: SettingsRoute.add(.xtream)) { Label(L10n.t("add_source_xtream"), systemImage: "plus") }
                     .accessibilityIdentifier("settings_add_xtream")
                 #if os(tvOS)
-                NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
+                if env.accountsEnabled {
+                    NavigationLink(value: SettingsRoute.add(.pairing)) { Label(L10n.t("add_source_qr"), systemImage: "qrcode") }
+                }
                 #endif
             }
         }
         .hiddenListBackground()
         .screenBackground()
         .navigationTitle(L10n.t("settings_sources"))
+        #if os(iOS)
+        .environment(\.editMode, .constant(reordering ? .active : .inactive))
+        .toolbar {
+            if env.sources.count > 1 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.t(reordering ? "fav_move_done" : "fav_move")) { reordering.toggle() }
+                        .accessibilityIdentifier(reordering ? "sources_move_done" : "sources_move")
+                }
+            }
+        }
+        #endif
     }
 }
 
@@ -149,23 +173,28 @@ struct AdvancedSettingsView: View {
                     Text(L10n.t("buffer_large")).tag(true)
                 }
                 .onChange(of: settings.largeBuffer) { env.player.largeBuffer = settings.largeBuffer }
-                #if os(tvOS)
-                Toggle(L10n.t("pref_tv_preview"), isOn: $settings.tvPreview)
-                #endif
             }
             Section(L10n.t("settings_appearance")) {
-                Picker(L10n.t("pref_epg_timezone"), selection: $settings.epgTimeZone) {
-                    Text(L10n.t("timezone_device")).tag("")
-                    ForEach(["UTC", "Europe/Istanbul", "Europe/Berlin", "Europe/London"], id: \.self) { Text($0).tag($0) }
+                // U4: device zone or any IANA zone (searchable list).
+                NavigationLink {
+                    TimeZonePickerView(selection: $settings.epgTimeZone)
+                } label: {
+                    LabeledContent(L10n.t("pref_epg_timezone"), value: TimeZonePickerView.title(settings.epgTimeZone))
                 }
-                Toggle(L10n.t("pref_24h"), isOn: Binding(get: { settings.use24Hour ?? true }, set: { settings.use24Hour = $0 }))
+                .accessibilityIdentifier("settings_epg_timezone")
+                // L4: without a choice the clock follows the UI language's locale (de/tr 24 h, en_US 12 h).
+                Toggle(L10n.t("pref_24h"), isOn: Binding(get: { settings.use24Hour ?? Self.localeUses24Hour },
+                                                         set: { settings.use24Hour = $0 }))
+                    .accessibilityIdentifier("settings_24h")
             }
-            Section(L10n.t("settings_account")) {
-                NavigationLink(value: SettingsRoute.account) {
-                    if let account = env.account.account {
-                        LText("account_signed_in_as", account.email)
-                    } else {
-                        LText(Theme.isTV ? "account_sign_in_tv" : "account_sign_in")
+            if env.accountsEnabled {
+                Section(L10n.t("settings_account")) {
+                    NavigationLink(value: SettingsRoute.account) {
+                        if let account = env.account.account {
+                            LText("account_signed_in_as", account.email)
+                        } else {
+                            LText(Theme.isTV ? "account_sign_in_tv" : "account_sign_in")
+                        }
                     }
                 }
             }
@@ -181,16 +210,17 @@ struct AdvancedSettingsView: View {
                 }
                 .accessibilityIdentifier("settings_player_engine")
                 .onChange(of: settings.playerEngine) { env.player.setEngineOverride(settings.playerEngine) }
-                // The confirmation sits in the same row (one focusable on tvOS, visible without scrolling).
+                // The confirmation is a second line of the same row (one focusable on tvOS; never truncated, IOS-17).
                 Button { resetSync() } label: {
-                    HStack {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.t("audio_sync_reset"))
-                        Spacer()
                         if syncResetDone {
-                            Text(L10n.t("audio_sync_reset_done")).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                            Text(L10n.t("audio_sync_reset_done")).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settings_reset_sync_done")
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .accessibilityIdentifier("settings_reset_sync")
                 NavigationLink(value: SettingsRoute.formatTest) { LText("diagnostics_format_test") }
@@ -201,7 +231,7 @@ struct AdvancedSettingsView: View {
                 LText("about_version", env.config.appVersion).foregroundStyle(Theme.textSecondary)
                 NavigationLink(value: SettingsRoute.licenses) { LText("about_licenses") }
                     .accessibilityIdentifier("settings_licenses")
-                LText("privacy").foregroundStyle(Theme.textSecondary)
+                LegalLinksRows()
             } header: {
                 Text(L10n.t("settings_advanced"))
             } footer: {
@@ -212,6 +242,11 @@ struct AdvancedSettingsView: View {
         .screenBackground()
         .navigationTitle(L10n.t("settings_advanced"))
         .onDisappear { syncResetTask?.cancel() }
+    }
+
+    /// 24 h clock of the UI language's locale (the toggle's state while the user has not chosen).
+    static var localeUses24Hour: Bool {
+        !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: L10n.locale) ?? "H").contains("a")
     }
 
     /// "Reset sync": every audio delay (device + all channels/titles) back to 0, confirmed for 2.5 s.
@@ -243,12 +278,21 @@ private struct PurchaseStatusRow: View {
 struct SourceSummaryRow: View {
     @Environment(AppEnvironment.self) private var env
     let source: Source
+    /// IOS-08: the source in use (shown only when there are several).
+    var isActive = false
 
     var body: some View {
         HStack(spacing: 12) {
             Circle().fill(color).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(source.name).font(Theme.body.weight(.semibold))
+                HStack(spacing: 8) {
+                    Text(source.name).font(Theme.body.weight(.semibold))
+                    if isActive {
+                        Label(L10n.t("source_active"), systemImage: "checkmark.circle.fill")
+                            .font(Theme.caption.weight(.semibold)).foregroundStyle(Theme.success)
+                            .accessibilityIdentifier("source_active_badge")
+                    }
+                }
                 Text("\(source.type == .xtream ? "Xtream" : "M3U") · \(source.displayHost)").font(Theme.caption).foregroundStyle(Theme.textSecondary)
                 if let last = source.lastRefreshAt {
                     LText("source_last_refresh", L10n.date(last, date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(Theme.textSecondary)
@@ -269,7 +313,8 @@ struct SourceSummaryRow: View {
     }
 }
 
-/// Source detail: refresh, EPG shift, auto refresh, delete (confirmed).
+/// Source detail (SCREENS §3.9): status (catalog + EPG), refresh, use, edit, EPG URL, EPG shift, auto refresh,
+/// order (tvOS), delete (confirmed).
 struct SourceDetailView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
@@ -280,7 +325,7 @@ struct SourceDetailView: View {
     var body: some View {
         Form {
             if let source = env.sources.first(where: { $0.id == sourceId }) {
-                Section { SourceSummaryRow(source: source) }
+                Section { SourceSummaryRow(source: source, isActive: env.sources.count > 1 && source.id == env.currentSource?.id).tvFocusableRow() }
                 if let result = source.lastRefreshResult {
                     Section {
                         if let error = result.error {
@@ -288,7 +333,20 @@ struct SourceDetailView: View {
                             Text(text.title).foregroundStyle(Theme.error)
                             Text(text.body).font(Theme.caption)
                         } else {
-                            LText("source_summary", "\(result.liveCount)", "\(result.movieCount)", "\(result.seriesCount)")
+                            LText("source_summary", L10n.number(result.liveCount), L10n.number(result.movieCount), L10n.number(result.seriesCount))
+                                .tvFocusableRow()
+                        }
+                        // B6: the guide's own status – a failed XMLTV is never silent.
+                        if let epgError = result.epgError {
+                            Label(L10n.t("err_epg_failed", L10n.error(epgError.presentation()).title), systemImage: "exclamationmark.triangle.fill")
+                                .font(Theme.caption).foregroundStyle(Theme.warning)
+                                .accessibilityIdentifier("source_epg_status")
+                                .tvFocusableRow()
+                        } else if let count = result.epgProgramCount {
+                            Text(epgLoadedText(count: count, at: result.epgLoadedAt))
+                                .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("source_epg_status")
+                                .tvFocusableRow()
                         }
                     }
                 }
@@ -297,31 +355,40 @@ struct SourceDetailView: View {
                         Task { lastError = await env.refreshSource(id: sourceId) }
                     }
                     .disabled(env.refreshing.contains(sourceId))
-                    #if os(tvOS)
-                    // tvOS rows focus a single control → one picker instead of −/+ buttons.
-                    Picker(L10n.t("source_epg_shift"), selection: Binding(get: { source.epgShiftMinutes }, set: { v in
-                        shift(source, by: v - source.epgShiftMinutes)
-                    })) {
-                        ForEach(Array(stride(from: -720, through: 720, by: 15)), id: \.self) { Text(Self.shiftText($0)).tag($0) }
+                    .accessibilityIdentifier("source_refresh")
+                    if env.sources.count > 1, env.currentSource?.id != sourceId {
+                        Button(L10n.t("source_use")) { env.selectSource(sourceId) }
+                            .accessibilityIdentifier("source_use")
                     }
-                    #else
-                    HStack {
-                        Text("\(L10n.t("source_epg_shift")): \(Self.shiftText(source.epgShiftMinutes))")
-                        Spacer()
-                        Button { shift(source, by: -15) } label: { Image(systemName: "minus.circle") }
-                            .disabled(source.epgShiftMinutes <= -720)
-                        Button { shift(source, by: 15) } label: { Image(systemName: "plus.circle") }
-                            .disabled(source.epgShiftMinutes >= 720)
+                    NavigationLink(value: SettingsRoute.edit(sourceId)) { LText("action_edit") }
+                        .accessibilityIdentifier("source_edit")
+                    NavigationLink(value: SettingsRoute.edit(sourceId)) {
+                        LabeledContent(L10n.t("source_epg_url"), value: epgURLText(source))
                     }
-                    .buttonStyle(.borderless)
-                    #endif
+                    .accessibilityIdentifier("source_epg_url")
+                    epgShiftRows(source)
                     Picker(L10n.t("source_auto_refresh"), selection: Binding(get: { source.autoRefreshHours }, set: { v in
-                        var s = source; s.autoRefreshHours = v; env.updateSource(s)
+                        env.updateSource(id: sourceId) { $0.autoRefreshHours = v }
                     })) {
                         Text(L10n.t("off")).tag(0)
                         ForEach([6, 12, 24], id: \.self) { Text(L10n.t("every_n_hours", String($0))).tag($0) }
                     }
                 }
+                #if os(tvOS)
+                if env.sources.count > 1, let index = env.sources.firstIndex(where: { $0.id == sourceId }) {
+                    // IOS-23 on tvOS: one focusable row per direction.
+                    Section {
+                        if index > 0 {
+                            Button(L10n.t("source_move_up")) { env.moveSources(from: IndexSet(integer: index), to: index - 1) }
+                                .accessibilityIdentifier("source_move_up")
+                        }
+                        if index < env.sources.count - 1 {
+                            Button(L10n.t("source_move_down")) { env.moveSources(from: IndexSet(integer: index), to: index + 2) }
+                                .accessibilityIdentifier("source_move_down")
+                        }
+                    }
+                }
+                #endif
                 Section {
                     Button(L10n.t("action_delete"), role: .destructive) { confirmDelete = true }
                         .accessibilityIdentifier("source_delete")
@@ -341,16 +408,170 @@ struct SourceDetailView: View {
         .navigationTitle(env.sources.first(where: { $0.id == sourceId })?.name ?? "")
     }
 
+    private func epgLoadedText(count: Int, at date: Date?) -> String {
+        L10n.t("epg_status_loaded", L10n.number(count), date.map { L10n.date($0, date: .abbreviated, time: .shortened) } ?? "–")
+    }
+
+    /// Override (host + path only, never credentials) or the default with "Default:".
+    private func epgURLText(_ source: Source) -> String {
+        let display = env.refresher.epgURL(sourceId: source.id).flatMap(AddSourceViewModel.displayURL)
+        guard let display else { return L10n.t("source_epg_none") }
+        return source.epgUrlOverride ? display : L10n.t("source_epg_default", display)
+    }
+
+    /// IOS-24: presets −12…+12 h in 30-min steps (+ the current value when the fine buttons left the grid);
+    /// iOS keeps the ±15 min buttons (L3: with VoiceOver labels).
+    @ViewBuilder
+    private func epgShiftRows(_ source: Source) -> some View {
+        let values = Array(Set(Self.shiftPresets + [source.epgShiftMinutes])).sorted()
+        Picker(L10n.t("source_epg_shift"), selection: Binding(get: { source.epgShiftMinutes }, set: { v in
+            shift(source, by: v - source.epgShiftMinutes)
+        })) {
+            ForEach(values, id: \.self) { Text(Self.shiftText($0)).tag($0) }
+        }
+        .accessibilityIdentifier("source_epg_shift")
+        #if !os(tvOS)
+        HStack {
+            Spacer()
+            Button { shift(source, by: -15) } label: { Image(systemName: "minus.circle") }
+                .disabled(source.epgShiftMinutes <= -720)
+                .accessibilityLabel(L10n.t("epg_shift_earlier"))
+                .accessibilityIdentifier("source_epg_shift_minus")
+            Button { shift(source, by: 15) } label: { Image(systemName: "plus.circle") }
+                .disabled(source.epgShiftMinutes >= 720)
+                .accessibilityLabel(L10n.t("epg_shift_later"))
+                .accessibilityIdentifier("source_epg_shift_plus")
+        }
+        .buttonStyle(.borderless)
+        #endif
+    }
+
+    static let shiftPresets = Array(stride(from: -720, through: 720, by: 30))
+
     private func shift(_ source: Source, by delta: Int) {
-        var s = source
-        s.epgShiftMinutes = min(720, max(-720, s.epgShiftMinutes + delta))
-        env.updateSource(s)
+        env.updateSource(id: source.id) { $0.epgShiftMinutes = min(720, max(-720, $0.epgShiftMinutes + delta)) }
     }
 
     static func shiftText(_ minutes: Int) -> String {
         let sign = minutes < 0 ? "−" : "+"
         let m = abs(minutes)
         return String(format: "%@%d:%02d", sign, m / 60, m % 60)
+    }
+}
+
+/// Settings → source → Edit (IOS-03/U2): the add form prefilled from the source; saving re-validates and reloads.
+struct EditSourceView: View {
+    @Environment(AppEnvironment.self) private var env
+    let sourceId: String
+
+    var body: some View {
+        if let source = env.sources.first(where: { $0.id == sourceId }) {
+            AddSourceView(kind: source.type == .xtream ? .xtream : .m3u, editing: source)
+        }
+    }
+}
+
+/// U4: EPG time zone – "Device" or any IANA zone, searchable.
+struct TimeZonePickerView: View {
+    @Binding var selection: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    static func title(_ id: String) -> String {
+        guard !id.isEmpty, let zone = TimeZone(identifier: id) else { return L10n.t("timezone_device") }
+        return "\(id.replacingOccurrences(of: "_", with: " ")) (\(offset(zone)))"
+    }
+
+    static func offset(_ zone: TimeZone, at date: Date = Date()) -> String {
+        let seconds = zone.secondsFromGMT(for: date)
+        let sign = seconds < 0 ? "−" : "+"
+        let m = abs(seconds) / 60
+        return String(format: "UTC%@%d:%02d", sign, m / 60, m % 60)
+    }
+
+    private var zones: [String] {
+        let all = TimeZone.knownTimeZoneIdentifiers
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "_")
+        guard !q.isEmpty else { return all }
+        return all.filter { $0.lowercased().contains(q) || Self.offset(TimeZone(identifier: $0) ?? .gmt).lowercased().contains(q) }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                row(id: "", title: L10n.t("timezone_device"))
+            }
+            Section {
+                ForEach(zones, id: \.self) { id in row(id: id, title: Self.title(id)) }
+            }
+        }
+        .searchable(text: $query, prompt: L10n.t("timezone_search"))
+        .hiddenListBackground()
+        .screenBackground()
+        .navigationTitle(L10n.t("pref_epg_timezone"))
+    }
+
+    private func row(id: String, title: String) -> some View {
+        Button {
+            selection = id
+            dismiss()
+        } label: {
+            HStack {
+                Text(title).foregroundStyle(Theme.textPrimary)
+                Spacer()
+                if selection == id { Image(systemName: "checkmark").foregroundStyle(Theme.primary) }
+            }
+        }
+        .accessibilityIdentifier(id.isEmpty ? "timezone_device" : "timezone_\(id)")
+        .accessibilityAddTraits(selection == id ? .isSelected : [])
+    }
+}
+
+/// S1 / IOS-19: privacy policy and terms – links on iOS; on tvOS (no browser) one focusable row each that shows
+/// a QR code with the URL.
+struct LegalLinksRows: View {
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        link("privacy", env.config.privacyURL, id: "legal_privacy")
+        link("terms", env.config.termsURL, id: "legal_terms")
+    }
+
+    @ViewBuilder
+    private func link(_ key: String, _ url: URL, id: String) -> some View {
+        #if os(tvOS)
+        NavigationLink {
+            LegalQRView(titleKey: key, url: url)
+        } label: {
+            LText(key)
+        }
+        .accessibilityIdentifier(id)
+        #else
+        Link(destination: url) {
+            Label(L10n.t(key), systemImage: "arrow.up.right.square")
+        }
+        .accessibilityIdentifier(id)
+        #endif
+    }
+}
+
+/// tvOS: a legal page as QR code + readable URL.
+struct LegalQRView: View {
+    let titleKey: String
+    let url: URL
+
+    var body: some View {
+        VStack(spacing: 30) {
+            LText(titleKey).font(Theme.title).foregroundStyle(Theme.textPrimary)
+            QRCodeView(text: url.absoluteString).frame(width: 360, height: 360)
+            LText("legal_open_on_phone", url.absoluteString).font(Theme.body).foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("legal_url")
+        }
+        .padding(Theme.safeH)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .screenBackground()
+        .focusable()
     }
 }
 
@@ -569,5 +790,24 @@ struct LicensesView: View {
         .hiddenListBackground()
         .screenBackground()
         .navigationTitle(L10n.t("about_licenses"))
+    }
+}
+
+/// ISO 639-1 languages for the audio / subtitle preferences (L5).
+enum LanguageList {
+    /// Shown first: the languages of the owner's panels.
+    static let common = ["tr", "de", "en", "ar", "ku", "fr", "es", "it", "ru", "pl", "nl"]
+    @MainActor private static var cache: (lang: String, codes: [String])?
+
+    @MainActor
+    static func codes(for uiLanguage: String) -> [String] {
+        if let cache, cache.lang == uiLanguage { return cache.codes }
+        let locale = L10n.locale
+        let all = Set(Locale.LanguageCode.isoLanguageCodes.map(\.identifier).filter { $0.count == 2 })
+        let rest = all.subtracting(common).filter { locale.localizedString(forLanguageCode: $0) != nil }
+            .sorted { (locale.localizedString(forLanguageCode: $0) ?? $0).localizedCompare(locale.localizedString(forLanguageCode: $1) ?? $1) == .orderedAscending }
+        let codes = common.filter(all.contains) + rest
+        cache = (uiLanguage, codes)
+        return codes
     }
 }

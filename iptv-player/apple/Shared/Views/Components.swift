@@ -19,6 +19,7 @@ struct RemoteImage: View {
                 Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: contentMode)
             } else if let placeholder {
                 Image(systemName: placeholder).font(Theme.isTV ? .largeTitle : .title2).foregroundStyle(Theme.textSecondary.opacity(0.5))
+                    .accessibilityHidden(true)   // IOS-18: no "Fernseher" / "Film" for a missing logo
             }
         }
         .task(id: url) {
@@ -158,7 +159,9 @@ struct ChannelCard: View {
                 .overlay(alignment: .topTrailing) {
                     VStack(spacing: 4) {
                         if let q = MediaTags.quality(in: row.channel.name) { CornerBadge(text: q) }
-                        if row.channel.catchup.isAvailable { CornerBadge(icon: "clock.arrow.circlepath") }
+                        if row.channel.catchup.isAvailable {
+                            CornerBadge(icon: "clock.arrow.circlepath").accessibilityLabel(L10n.t("epg_catchup_available"))
+                        }
                         if isFavorite { CornerBadge(icon: "star.fill", color: Theme.warning.opacity(0.9)) }
                     }
                     .padding(Theme.isTV ? 10 : 6)
@@ -679,9 +682,10 @@ struct EmptyStateView: View {
 }
 
 extension AppEnvironment {
-    /// EPG time formatter honouring the settings (time zone, 24 h).
+    /// EPG time formatter honouring the settings (time zone, 24 h) – one cached instance (P1: no two
+    /// `DateFormatter`s per row / EPG block), rebuilt when the zone, language or clock setting changes.
     var timeFormatter: EpgTimeFormatter {
-        EpgTimeFormatter(timeZone: settings.timeZone, locale: L10n.locale, use24Hour: settings.use24Hour)
+        EpgTimeFormatter.cached(timeZone: settings.timeZone, locale: L10n.locale, use24Hour: settings.use24Hour)
     }
 
     /// Category name for a catalog item (shown as genre line).

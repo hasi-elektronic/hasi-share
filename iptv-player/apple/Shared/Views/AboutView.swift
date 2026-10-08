@@ -78,6 +78,10 @@ struct AboutView: View {
             }
 
             Section {
+                LegalLinksRows()
+            }
+
+            Section {
                 NavigationLink(value: SettingsRoute.licenses) {
                     VStack(alignment: .leading, spacing: 4) {
                         LText("about_licenses")

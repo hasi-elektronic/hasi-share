@@ -144,6 +144,36 @@ final class SourceManagementTests: XCTestCase {
         XCTAssertNotNil(env.sources.first?.lastRefreshResult?.epgLoadedAt)
     }
 
+    /// A settings change and an EPG result written while a catalog refresh downloads are kept (atomic
+    /// read-modify-write of the stored source instead of the refresh's stale copy).
+    func testChangesDuringARefreshAreNotLost() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let blocking = BlockingFlag()
+        let playlist = try Data(contentsOf: vectorURL("m3u/valid_basic.m3u"))
+        let transport = FakeTransport { request in
+            let url = request.url.absoluteString
+            if url.hasSuffix(".m3u") {
+                if blocking.isOn { gate.wait() }
+                return HTTPResponse(statusCode: 200, body: playlist)
+            }
+            return HTTPResponse(statusCode: 404)   // EPG fails
+        }
+        let env = try makeEnvironment(transport)
+        let source = try await env.addSource(name: "A", secrets: m3u("a")) { _ in }
+        blocking.isOn = true
+        let refresher = env.refresher
+        let refresh = Task.detached { try await refresher.refresh(sourceId: source.id, includeEpg: false) }
+        try await Task.sleep(for: .milliseconds(100))   // the refresh is waiting for its download
+        env.updateSource(id: source.id) { $0.autoRefreshHours = 6 }
+        _ = await refresher.refreshEpg(sourceId: source.id)
+        gate.signal()
+        _ = try await refresh.value
+        let stored = try XCTUnwrap(env.sourceRepository.source(id: source.id))
+        XCTAssertEqual(stored.autoRefreshHours, 6, "the user's change survives the refresh")
+        XCTAssertNotNil(stored.lastRefreshResult?.epgError, "the EPG result survives the refresh")
+        XCTAssertTrue(stored.lastRefreshResult?.isOK ?? false)
+    }
+
     func testResumeRefreshesDueSourcesOnly() async throws {
         let transport = try Server().transport()
         let env = try makeEnvironment(transport)
@@ -173,6 +203,32 @@ final class SourceManagementTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(env.sources.first { $0.id == source.id }?.lastRefreshAt), Date().addingTimeInterval(-60))
     }
 
+    func testEditFormIsPrefilledAndHidesCredentialsInTheDefaultEpgHint() async throws {
+        let env = try makeEnvironment(try Server().transport())
+        let panel = XtreamSecrets(serverUrl: "http://panel.example.com:8080", username: "demo", password: "s3cret")
+        let source = try await env.addSource(name: "Panel", secrets: .xtream(panel)) { _ in }
+        let form = AddSourceViewModel(env: env, editing: try XCTUnwrap(env.sources.first { $0.id == source.id }))
+        XCTAssertTrue(form.isEditing)
+        XCTAssertEqual(form.kind, .xtream)
+        XCTAssertEqual(form.name, "Panel")
+        XCTAssertEqual(form.server, "http://panel.example.com:8080")
+        XCTAssertEqual(form.username, "demo")
+        XCTAssertEqual(form.password, "s3cret")
+        XCTAssertEqual(form.defaultEpgHint, "panel.example.com:8080/xmltv.php", "host + path only – no user / password")
+
+        let m3u = try await env.addSource(name: "List", secrets: m3u("a")) { _ in }
+        let m3uForm = AddSourceViewModel(env: env, editing: try XCTUnwrap(env.sources.first { $0.id == m3u.id }))
+        XCTAssertEqual(m3uForm.epgURL, "http://epg.example.com/a-guide.xml")
+        XCTAssertEqual(m3uForm.defaultEpgHint, "epg.example.com/guide.xml.gz", "the playlist's x-tvg-url")
+    }
+
+    /// IOS-21: inside the add/edit form every error offers "Edit"; "Delete source" never appears there.
+    func testFormErrorActions() {
+        XCTAssertEqual(AddSourceViewModel.formErrorActions([.refresh]), [.refresh, .edit])
+        XCTAssertEqual(AddSourceViewModel.formErrorActions([.edit, .deleteSource]), [.edit])
+        XCTAssertEqual(AddSourceViewModel.formErrorActions([.retry, .edit]), [.retry, .edit])
+    }
+
     func testPlaceholderBackendIsNeverCalled() async throws {
         let transport = try Server().transport()
         let env = try makeEnvironment(transport, accounts: true)
@@ -189,6 +245,15 @@ final class SourceManagementTests: XCTestCase {
         XCTAssertFalse(configured.accountsEnabled, "ACCOUNTS_ENABLED = NO hides accounts")
         XCTAssertFalse(AppConfigProbe.configured("https://invalid.example"))
         XCTAssertTrue(AppConfigProbe.configured("https://backend.hasi-elektronic.de"))
+    }
+}
+
+private final class BlockingFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var on = false
+    var isOn: Bool {
+        get { lock.withLock { on } }
+        set { lock.withLock { on = newValue } }
     }
 }
 

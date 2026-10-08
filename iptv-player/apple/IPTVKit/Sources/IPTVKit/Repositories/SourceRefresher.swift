@@ -52,12 +52,13 @@ public final class SourceRefresher: Sendable {
     @discardableResult
     public func refresh(sourceId: String, now: Date = Date(), includeEpg: Bool = true,
                         onProgress: @escaping @Sendable (RefreshProgress) -> Void = { _ in }) async throws -> Source {
-        guard var source = try sources.source(id: sourceId), let secrets = sources.secrets(id: sourceId) else {
+        guard let initial = try sources.source(id: sourceId), let secrets = sources.secrets(id: sourceId) else {
             throw SourceError.notFound
         }
         onProgress(.connecting)
         var status: SourceStatus
         var epgURL: URL?
+        var account: XtreamAccountInfo?
         do {
             switch secrets {
             case .m3u(let m3u):
@@ -69,26 +70,29 @@ public final class SourceRefresher: Sendable {
                 onProgress(.authenticating)
                 let result = try await loadXtream(sourceId: sourceId, secrets: xtream, now: now, onProgress: onProgress)
                 status = result.0
-                source.xtreamAccount = result.1
+                account = result.1
                 epgURL = xtream.epgUrl.flatMap { URL(string: $0) } ?? XtreamURLBuilder(secrets: xtream)?.xmltvURL()
             }
         } catch {
             let mapped = ErrorClassifier.sourceError(from: error)
             if mapped != .cancelled {
-                source.lastRefreshAt = now
-                source.lastRefreshResult = SourceStatus(error: mapped)
-                try? sources.save(source)
+                _ = try? sources.update(id: sourceId) { source in
+                    source.lastRefreshAt = now
+                    source.lastRefreshResult = Self.keepingEpg(SourceStatus(error: mapped), of: source)
+                }
             }
             SafeLog.warning("refresh failed: \(mapped.code)")
             throw mapped
         }
-        // The EPG state of the previous load stays until the next EPG load reports.
-        status.epgProgramCount = source.lastRefreshResult?.epgProgramCount
-        status.epgError = source.lastRefreshResult?.epgError
-        status.epgLoadedAt = source.lastRefreshResult?.epgLoadedAt
-        source.lastRefreshAt = now
-        source.lastRefreshResult = status
-        try sources.save(source)
+        // Read-modify-write in one transaction: an EPG load or a settings change (name, shift, auto refresh) made
+        // while the lists downloaded is kept; the EPG state stays until the next EPG load reports.
+        let catalogStatus = status
+        var source = try sources.update(id: sourceId) { source in
+            source.lastRefreshAt = now
+            source.lastRefreshResult = Self.keepingEpg(catalogStatus, of: source)
+            if let account { source.xtreamAccount = account }
+        } ?? initial
+        status = source.lastRefreshResult ?? status
         database.setValue(String(CatalogFormat.current), forKey: CatalogFormat.key(sourceId))
 
         if includeEpg, let epgURL {
@@ -103,10 +107,25 @@ public final class SourceRefresher: Sendable {
                 SafeLog.warning("epg failed: \(mapped.code)")
                 if mapped != .cancelled { status.epgError = mapped }
             }
-            source.lastRefreshResult = status
-            try sources.save(source)
+            let epgStatus = status
+            source = try sources.update(id: sourceId) { source in
+                var current = source.lastRefreshResult ?? SourceStatus()
+                current.epgProgramCount = epgStatus.epgProgramCount
+                current.epgError = epgStatus.epgError
+                current.epgLoadedAt = epgStatus.epgLoadedAt
+                source.lastRefreshResult = current
+            } ?? source
         }
         return source
+    }
+
+    /// `status` with the EPG part of the source's stored status.
+    static func keepingEpg(_ status: SourceStatus, of source: Source) -> SourceStatus {
+        var out = status
+        out.epgProgramCount = source.lastRefreshResult?.epgProgramCount
+        out.epgError = source.lastRefreshResult?.epgError
+        out.epgLoadedAt = source.lastRefreshResult?.epgLoadedAt
+        return out
     }
 
     static func headerEpgKey(_ sourceId: String) -> String { "epg.header.\(sourceId)" }
@@ -124,6 +143,11 @@ public final class SourceRefresher: Sendable {
     /// Forgets the stored format (source deleted).
     public func clearCatalogFormat(sourceId: String) {
         database.setValue(nil, forKey: CatalogFormat.key(sourceId))
+    }
+
+    /// EPG URL announced by the playlist header (`url-tvg` / `x-tvg-url`) at the last M3U load.
+    public func headerEpgURL(sourceId: String) -> URL? {
+        database.value(forKey: Self.headerEpgKey(sourceId)).flatMap { URL(string: $0.trimmingCharacters(in: .whitespaces)) }
     }
 
     /// EPG URL of a source: override, else playlist header (`url-tvg`) / Xtream `xmltv.php`.
@@ -155,13 +179,13 @@ public final class SourceRefresher: Sendable {
         }
     }
 
-    /// Updates the EPG part of the stored status (re-read: a catalog refresh may have saved meanwhile).
-    private func recordEpg(sourceId: String, _ change: (inout SourceStatus) -> Void) {
-        guard var source = try? sources.source(id: sourceId) else { return }
-        var status = source.lastRefreshResult ?? SourceStatus()
-        change(&status)
-        source.lastRefreshResult = status
-        try? sources.save(source)
+    /// Updates the EPG part of the stored status (atomic read-modify-write: a catalog refresh may save meanwhile).
+    private func recordEpg(sourceId: String, _ change: @escaping (inout SourceStatus) -> Void) {
+        _ = try? sources.update(id: sourceId) { source in
+            var status = source.lastRefreshResult ?? SourceStatus()
+            change(&status)
+            source.lastRefreshResult = status
+        }
     }
 
     private func loadM3U(sourceId: String, secrets: M3USecrets,

@@ -226,23 +226,60 @@ private struct DetailActions<Round: View>: View {
     }
 }
 
+/// Cast / director lines and the trailer action of a detail page (IOS-09, provider metadata).
+private struct DetailPeople: View {
+    let details: ItemDetails?
+
+    var body: some View {
+        if let cast = details?.cast {
+            Text(L10n.t("cast_value", cast)).font(Theme.isTV ? Theme.caption : .footnote).foregroundStyle(Theme.textSecondary)
+                .lineLimit(Theme.isTV ? 1 : 3)
+                .accessibilityIdentifier("detail_cast")
+        }
+        if let director = details?.director {
+            Text(L10n.t("director_value", director)).font(Theme.isTV ? Theme.caption : .footnote).foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("detail_director")
+        }
+    }
+}
+
+/// Trailer (YouTube) – iOS opens the YouTube app or the web page; tvOS has no browser and no YouTube player in the
+/// app, so the button is not shown there.
+private struct TrailerButton: View {
+    let url: URL?
+
+    var body: some View {
+        #if !os(tvOS)
+        if let url {
+            Link(destination: url) { Image(systemName: "film.stack") }
+                .buttonStyle(RoundIconButtonStyle(size: 38))
+                .accessibilityLabel(L10n.t("action_trailer"))
+                .accessibilityIdentifier("detail_trailer")
+        }
+        #endif
+    }
+}
+
 /// Movie detail: hero, ★ Play / Resume (01:12:30), favorite, restart (SCREENS §3.5).
 struct MovieDetailView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     let movie: Movie
-    @State private var info: XtreamVodInfo?
+    @State private var model: MovieDetailViewModel?
     @State private var progress: SyncItem?
 
     var body: some View {
         // Same rule as the request the Play button builds (AppEnvironment.request → ResumePolicy).
         let resumeMs = ResumePolicy.startPositionMs(positionMs: progress?.data.positionMs, durationMs: progress?.data.durationMs) ?? 0
         let canResume = resumeMs > 0
+        let info = model?.details
         let duration = info?.durationSec ?? progress?.data.durationMs.map { Int($0 / 1000) }
         let clean = MediaTags.clean(movie.name)
+        // IOS-09: the provider's genre – never the category name ("Neu im Kino" is not a genre).
         DetailScaffold(title: clean.title, imageURL: movie.posterUrl,
                        meta: DetailMetaRow(rating: movie.rating ?? info?.rating, year: movie.year ?? info?.year ?? clean.year, durationSec: duration),
-                       genres: env.categoryName(sourceId: movie.sourceId, kind: .movie, id: movie.categoryId).map(CountryFlag.genreName),
+                       genres: info?.genre ?? movie.genre,
                        plot: info?.plot ?? movie.plot, onPlay: { router.play(.movie(movie)) }) {
             DetailActions(primaryTitle: canResume ? L10n.t("action_resume_at", L10n.clock(Double(resumeMs) / 1000)) : L10n.t("action_play"),
                           primaryAction: { router.play(.movie(movie)) },
@@ -256,13 +293,16 @@ struct MovieDetailView: View {
                         .accessibilityLabel(L10n.t("action_play_from_start"))
                         .accessibilityIdentifier("detail_restart")
                 }
+                TrailerButton(url: info?.trailerURL)
             }
         } below: {
-            EmptyView()
+            DetailPeople(details: info).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
         }
         .task {
             progress = env.contentKey(sourceId: movie.sourceId, kind: .movie, itemId: movie.id).flatMap { try? env.library.progress(contentKey: $0) }
-            if movie.url == nil { info = await MoviesViewModel(env: env).details(for: movie) }
+            let m = model ?? MovieDetailViewModel(env: env, movie: movie)
+            model = m
+            await m.load()
         }
         .onChange(of: env.libraryVersion) {
             progress = env.contentKey(sourceId: movie.sourceId, kind: .movie, itemId: movie.id).flatMap { try? env.library.progress(contentKey: $0) }
@@ -325,31 +365,46 @@ struct SeriesDetailView: View {
         }()
         let play = { if let next { router.play(.episode(next, seriesTitle: series.name)) } }
         let clean = MediaTags.clean(series.name)
+        let details = model?.details
         DetailScaffold(title: clean.title, imageURL: series.posterUrl,
-                       meta: DetailMetaRow(rating: series.rating, year: series.year ?? clean.year, durationSec: nil,
+                       meta: DetailMetaRow(rating: series.rating ?? details?.rating, year: series.year ?? details?.year ?? clean.year, durationSec: nil,
                                            extra: model.flatMap { $0.seasons.isEmpty ? nil : L10n.t("seasons_value", String($0.seasons.count)) }),
-                       genres: env.categoryName(sourceId: series.sourceId, kind: .series, id: series.categoryId).map(CountryFlag.genreName),
+                       genres: details?.genre ?? series.genre,
                        plot: model?.plot ?? series.plot, onPlay: play) {
             DetailActions(primaryTitle: primaryTitle, primaryAction: play,
                           format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) {
                 if let target = env.favoriteTarget(series) {
                     FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
                 }
+                TrailerButton(url: details?.trailerURL)
             }
         } below: {
-            if let model { episodes(model) }
+            VStack(alignment: .leading, spacing: Theme.isTV ? 16 : 8) {
+                DetailPeople(details: details).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+                if let model { episodes(model) }
+            }
         }
         .task {
             let m = SeriesDetailViewModel(env: env, series: series)
             model = m
             await m.load()
         }
+        // Back from the player (or a sync): progress, "Continue S01E03" and the season follow at once.
+        .onChange(of: env.libraryVersion) { model?.reloadProgress() }
     }
 
     @ViewBuilder
     private func episodes(_ model: SeriesDetailViewModel) -> some View {
         VStack(alignment: .leading, spacing: Theme.isTV ? 10 : 12) {
             if model.isLoading { ProgressView() }
+            // B7: get_series_info failed and nothing is cached – say so, with Retry (never an empty page).
+            if let error = model.loadError {
+                ErrorCardView(presentation: Self.retryPresentation(error)) { _ in
+                    Task { await model.retry() }
+                }
+                .padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+                .accessibilityIdentifier("series_load_error")
+            }
             if !model.seasons.isEmpty {
                 SeasonTabs(seasons: model.seasons, selection: Binding(get: { model.season }, set: { model.season = $0 }))
             }
@@ -384,6 +439,12 @@ struct SeriesDetailView: View {
             }
             #endif
         }
+    }
+
+    static func retryPresentation(_ error: SourceError) -> ErrorPresentation {
+        var presentation = error.presentation()
+        presentation.actions = [.retry]
+        return presentation
     }
 
     private func episodeTitle(_ e: Episode) -> String { MediaTags.episodeTitle(e.title, seriesName: series.name) }

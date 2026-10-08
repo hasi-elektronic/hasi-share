@@ -96,6 +96,15 @@ final class Router {
             paywallPresented = true
             return
         }
+        // "Continue watching" may know an Xtream episode only by id (no cached row): complete it first (B1).
+        if case .episode(let episode, let seriesTitle) = item, episode.url == nil, episode.containerExt == nil {
+            Task {
+                let playable = await env.playableEpisode(episode)
+                env.player.open(env.request(for: .episode(playable, seriesTitle: seriesTitle), channels: channels, fromStart: fromStart))
+                playerPresented = true
+            }
+            return
+        }
         env.player.open(env.request(for: item, channels: channels, fromStart: fromStart))
         playerPresented = true
     }
@@ -156,7 +165,10 @@ enum AppBootstrap {
                                appVersion: version,
                                backendBaseURL: URL(string: backendOverride ?? info("BACKEND_BASE_URL")) ?? URL(string: "https://invalid.example")!,
                                productIDs: ProductIDs(lifetime: info("PRODUCT_LIFETIME"), trial: info("PRODUCT_TRIAL")),
-                               licenseKeysJSON: licenseKeys(), platform: platform, rawDeviceId: deviceId, deviceName: deviceName)
+                               licenseKeysJSON: licenseKeys(), platform: platform, rawDeviceId: deviceId, deviceName: deviceName,
+                               accountsEnabled: info("ACCOUNTS_ENABLED").uppercased() == "YES",
+                               privacyURL: URL(string: info("PRIVACY_URL")).flatMap { $0.host == nil ? nil : $0 } ?? AppConfig.defaultPrivacyURL,
+                               termsURL: URL(string: info("TERMS_URL")).flatMap { $0.host == nil ? nil : $0 } ?? AppConfig.defaultTermsURL)
         let secretsService = (Bundle.main.bundleIdentifier ?? "app") + ".secrets" + (sandbox.map { ".uisandbox.\($0)" } ?? "")
         let fileName = sandbox.map { "uisandbox-\($0).sqlite" } ?? "catalog.sqlite"
         #if DEBUG

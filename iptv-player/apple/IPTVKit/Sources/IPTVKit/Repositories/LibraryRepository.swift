@@ -87,7 +87,7 @@ public final class LibraryRepository: Sendable {
         var sql = "SELECT \(Self.columns) FROM library WHERE kind = 'favorite' AND deleted = 0"
         var args: [SQLiteValue] = []
         if let kind { sql += " AND content_kind = ?"; args.append(.text(kind.rawValue)) }
-        sql += " ORDER BY updated_at DESC"
+        sql += " ORDER BY updated_at DESC, rowid DESC"   // same-millisecond toggles: the later one first
         return overlaid(try db.query(sql, args, map: Self.item), kind: .favorite, contentKind: kind)
     }
 

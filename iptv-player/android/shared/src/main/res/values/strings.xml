@@ -175,6 +175,23 @@
     <string name="source_last_refresh">Last refresh %1$s</string>
     <string name="catalog_restoring" formatted="false">Reloading catalog…</string>
     <string name="source_never_refreshed" formatted="false">Never refreshed</string>
+    <string name="source_edit_title" formatted="false">Edit source</string>
+    <string name="source_saved_title" formatted="false">Source saved</string>
+    <string name="source_active" formatted="false">Active</string>
+    <string name="source_use" formatted="false">Use this source</string>
+    <string name="source_move_up" formatted="false">Move up</string>
+    <string name="source_move_down" formatted="false">Move down</string>
+    <string name="source_epg_url" formatted="false">EPG URL</string>
+    <string name="source_epg_default">Default: %1$s</string>
+    <string name="source_epg_none" formatted="false">No EPG URL</string>
+    <string name="epg_status_loaded">TV guide: %1$s programmes · %2$s</string>
+    <string name="epg_shift_earlier" formatted="false">15 minutes earlier</string>
+    <string name="epg_shift_later" formatted="false">15 minutes later</string>
+    <string name="timezone_search" formatted="false">Search time zone</string>
+    <string name="action_trailer" formatted="false">Trailer</string>
+    <string name="cast_value">Cast: %1$s</string>
+    <string name="director_value">Director: %1$s</string>
+    <string name="legal_open_on_phone">Scan the code or open on your phone: %1$s</string>
     <string name="source_epg_shift" formatted="false">EPG time shift</string>
     <string name="source_auto_refresh" formatted="false">Auto refresh</string>
     <string name="every_n_hours">Every %1$s h</string>

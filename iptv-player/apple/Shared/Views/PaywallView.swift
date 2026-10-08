@@ -33,11 +33,11 @@ struct PaywallView: View {
                         .font(Theme.body).foregroundStyle(message.isError ? Theme.error : Theme.success)
                         .accessibilityIdentifier("paywall_message")
                 }
-                LText("paywall_other_platform").font(Theme.caption).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
-                HStack(spacing: 24) {
-                    LText("terms").font(Theme.caption).foregroundStyle(Theme.primary)
-                    LText("privacy").font(Theme.caption).foregroundStyle(Theme.primary)
+                // Account section only while accounts exist (ACCOUNTS_ENABLED + a real backend).
+                if env.accountsEnabled {
+                    LText("paywall_other_platform").font(Theme.caption).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
                 }
+                PaywallLegalLinks()
             }
             .padding(.horizontal, Theme.safeH)
             .padding(.vertical, Theme.safeV + 10)
@@ -101,5 +101,39 @@ struct PaywallView: View {
                 .accessibilityIdentifier("purchase_restore")
             if model?.busy == true { ProgressView() }
         }
+    }
+}
+
+/// S1: terms of use + privacy policy next to Buy – links on iOS; on tvOS (no browser) focusable buttons that show
+/// the QR code + URL.
+private struct PaywallLegalLinks: View {
+    @Environment(AppEnvironment.self) private var env
+    #if os(tvOS)
+    @State private var shown: (key: String, url: URL)?
+    #endif
+
+    var body: some View {
+        HStack(spacing: 24) {
+            link("terms", env.config.termsURL, id: "paywall_terms")
+            link("privacy", env.config.privacyURL, id: "paywall_privacy")
+        }
+        #if os(tvOS)
+        .sheet(isPresented: Binding(get: { shown != nil }, set: { if !$0 { shown = nil } })) {
+            if let shown { LegalQRView(titleKey: shown.key, url: shown.url) }
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private func link(_ key: String, _ url: URL, id: String) -> some View {
+        #if os(tvOS)
+        Button(L10n.t(key)) { shown = (key, url) }
+            .buttonStyle(SecondaryButtonStyle())
+            .accessibilityIdentifier(id)
+        #else
+        Link(destination: url) { LText(key).font(Theme.caption).underline() }
+            .foregroundStyle(Theme.primary)
+            .accessibilityIdentifier(id)
+        #endif
     }
 }

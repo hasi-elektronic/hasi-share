@@ -62,6 +62,22 @@ public final class SourceRepository: Sendable {
         updateMirror()
     }
 
+    /// Atomic read-modify-write of a stored source (refresh results, EPG status): concurrent writers (a catalog
+    /// refresh, an EPG load, a settings change) never overwrite each other's fields with a stale copy.
+    /// Returns the updated source (nil when it no longer exists).
+    @discardableResult
+    public func update(id: String, _ change: (inout Source) -> Void) throws -> Source? {
+        let updated: Source? = try db.transaction {
+            guard var source = try self.source(id: id) else { return nil }
+            change(&source)
+            let json = String(decoding: try Self.encoder.encode(source), as: UTF8.self)
+            try db.run("UPDATE sources SET json = ? WHERE id = ?", [.text(json), .text(id)])
+            return source
+        }
+        if updated != nil { updateMirror() }
+        return updated
+    }
+
     /// New order of the sources (ids not listed keep their place after the listed ones).
     public func reorder(_ ids: [String]) throws {
         try db.transaction {

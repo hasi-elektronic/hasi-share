@@ -400,9 +400,16 @@ public final class AppEnvironment {
         }
     }
 
-    /// Updates metadata/secrets of an existing source (EPG shift, auto refresh).
+    /// Updates metadata/secrets of an existing source.
     public func updateSource(_ source: Source, secrets: SourceSecrets? = nil) {
         try? sourceRepository.save(source, secrets: secrets)
+        reloadSources()
+    }
+
+    /// Changes user settings of a source (EPG shift, auto refresh) atomically – a refresh running meanwhile keeps
+    /// its result, the change is not lost to the refresh's copy either.
+    public func updateSource(id: String, _ change: (inout Source) -> Void) {
+        _ = try? sourceRepository.update(id: id, change)
         reloadSources()
     }
 
