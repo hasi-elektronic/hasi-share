@@ -27,9 +27,16 @@ final class TVFlowTests: XCTestCase {
         UITestSupport.snap("tvos-01-welcome", in: self)
     }
 
+    /// QR pairing needs the backend: hidden while ACCOUNTS_ENABLED = NO (Build 16); with accounts and a reachable
+    /// dev backend (DEV_BACKEND_URL + ACCOUNTS_ENABLED = YES) the QR code is shown.
     @MainActor
     func testPairingQRCode() throws {
         let app = UITestSupport.launch(["-uiScreen", "pairing"], seed: false)
+        XCTAssertTrue(app.buttons["add_add_source_m3u"].waitForExistence(timeout: 20))
+        guard app.buttons["add_add_source_qr"].exists else {
+            XCTAssertFalse(app.staticTexts["pair_code"].exists, "no pairing screen without accounts")
+            throw XCTSkip("accounts disabled (ACCOUNTS_ENABLED = NO): QR pairing hidden")
+        }
         XCTAssertTrue(app.staticTexts["pair_code"].waitForExistence(timeout: 20), "needs a reachable backend (DEV_BACKEND_URL)")
         sleep(1)
         UITestSupport.snap("tvos-10-pairing-qr", in: self)

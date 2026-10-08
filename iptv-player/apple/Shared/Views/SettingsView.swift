@@ -200,6 +200,7 @@ struct AdvancedSettingsView: View {
             }
             Section(L10n.t("settings_purchase")) {
                 NavigationLink(value: SettingsRoute.paywall) { PurchaseStatusRow() }
+                    .accessibilityIdentifier("settings_purchase")
             }
             Section {
                 // A/V sync A/B tests (CONTRACT §6.1 rule −1): device-local, applies at the next open.
