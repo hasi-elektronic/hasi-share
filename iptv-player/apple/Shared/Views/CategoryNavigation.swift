@@ -595,7 +595,7 @@ struct TVCategoryBrowseView: View {
                 if !hidden.isEmpty {
                     entry(key: "show_hidden", selected: false, identifier: "category_show_hidden", action: { showHidden.toggle() }) {
                         Image(systemName: showHidden ? "eye.slash" : "eye")
-                        Text("\(L10n.t("catnav_show_hidden")) (\(hidden.count))").lineLimit(1)
+                        Text("\(L10n.t("catnav_show_hidden")) (\(hidden.count))").lineLimit(2)   // count never cut (B-16)
                         Spacer(minLength: 0)
                     }
                     .padding(.top, 12)
@@ -636,7 +636,7 @@ struct TVCategoryBrowseView: View {
             model.recordOpened(info)
         }) {
             CategoryLeadingMark(code: info.countryCode)
-            Text(categoryTitle(info)).lineLimit(1)
+            Text(categoryTitle(info)).lineLimit(2)   // long names wrap instead of "4K UHD Neuersch…" (B-16)
             Spacer(minLength: 8)
             Text("\(info.itemCount)").monospacedDigit().foregroundStyle(Theme.textSecondary)
         }

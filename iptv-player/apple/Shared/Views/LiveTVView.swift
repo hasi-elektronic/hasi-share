@@ -476,7 +476,7 @@ private struct LiveCategoryColumn: View {
                     Button { model.filter = item.id } label: {
                         HStack(spacing: 10) {
                             if item.starred { Image(systemName: "star.fill").font(.system(size: 20)).foregroundStyle(Theme.warning) }
-                            Text(item.title).lineLimit(1)
+                            Text(item.title).lineLimit(2)   // B-16
                             Spacer(minLength: 0)
                         }
                         .font(Theme.caption.weight(selected ? .bold : .medium))
