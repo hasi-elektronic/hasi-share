@@ -54,6 +54,8 @@ struct LiveTVView: View {
     @State private var archiveChannel: Channel?
     @State private var selection = LiveSelection()
     @State private var selectTask: Task<Void, Never>?
+    /// Minute clock of the rows (progress bars; now/next re-read every minute, audit B10).
+    @State private var now = Date()
 
     var body: some View {
         Group {
@@ -79,6 +81,14 @@ struct LiveTVView: View {
         .onChange(of: env.catalogVersion) { model?.reload() }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
         .onChange(of: model?.filter) { selection.channel = nil }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(EpgClock.secondsToNextMinute()))
+                guard !Task.isCancelled else { return }
+                now = Date()
+                model?.refreshNowNext(at: now)
+            }
+        }
     }
 
     /// Search → live category (SCREENS §3.6): show that category.
@@ -156,6 +166,7 @@ struct LiveTVView: View {
         }
         #if os(tvOS)
         .scrollClipDisabled()
+        .tvTopClipped(leading: 24)   // rows do not slide under the floating tab bar (B-05)
         .focusSection()
         #endif
         .accessibilityIdentifier("live_list")
@@ -165,7 +176,7 @@ struct LiveTVView: View {
         let channel = row.channel
         let selection = selection
         return LiveChannelRow(row: row, isPlaying: playing == channel.id, selection: selectFirst ? selection : nil,
-                              identifier: id,
+                              identifier: id, now: now,
                               onTap: {
                                   if selectFirst && selection.channel?.id != channel.id { selection.channel = channel } else { router.play(.channel(channel), channels: zap) }
                               },
@@ -232,11 +243,13 @@ private struct LivePanel: View {
 /// · NEXT line · ⭐ (iOS; tvOS: one focus target per row, favorite via long OK / player ▲ card).
 private struct LiveChannelRow: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(\.dynamicTypeSize) private var typeSize
     let row: ChannelRow
     let isPlaying: Bool
     /// iPad select-first: the row reads the selection itself (only then); tvOS rows never do.
     let selection: LiveSelection?
     let identifier: String
+    let now: Date
     let onTap: () -> Void
     let onFocus: () -> Void
     let onArchive: () -> Void
@@ -244,6 +257,8 @@ private struct LiveChannelRow: View {
 
     private var channel: Channel { row.channel }
     private var isSelected: Bool { selection?.channel?.id == channel.id }
+    /// iPhone/iPad at accessibility text sizes: multi-line layout.
+    private var large: Bool { !Theme.isTV && typeSize.isAccessibilitySize }
 
     var body: some View {
         let target = env.favoriteTarget(channel)
@@ -301,9 +316,16 @@ private struct LiveChannelRow: View {
                     .frame(width: Theme.isTV ? 56 : 28, alignment: .trailing)
                 ChannelTile(channel: channel, width: tile, height: tile, radius: Theme.isTV ? 12 : 9)
                 VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 2) {
+                    // Accessibility text sizes (IOS-14): the name gets its own lines (not "Das Ers…"), the badges follow.
+                    if large {
+                        Text(channel.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+                            .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack(spacing: 6) {
-                        Text(channel.name).font(Theme.isTV ? Theme.body.weight(.semibold) : .subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        if !large {
+                            Text(channel.name).font(Theme.isTV ? Theme.body.weight(.semibold) : .subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        }
                         if let q = MediaTags.quality(in: channel.name) {
                             Text(q).font(.system(size: Theme.isTV ? 15 : 9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
                                 .padding(.horizontal, 4).padding(.vertical, 1)
@@ -322,20 +344,27 @@ private struct LiveChannelRow: View {
                         }
                     }
                     if let now {
-                        HStack(spacing: 6) {
+                        if large {   // time above the title, the title on up to 3 lines (it was squeezed out, IOS-14)
                             Text(env.timeFormatter.range(start: now.start, end: now.end))
-                                .font((Theme.isTV ? Font.system(size: 20) : .caption2).monospacedDigit()).foregroundStyle(Theme.textSecondary)
-                                .lineLimit(1).fixedSize()
-                            Text(now.title).font(Theme.isTV ? .system(size: 22, weight: .medium) : .caption.weight(.medium))
-                                .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                                .font(.caption2.monospacedDigit()).foregroundStyle(Theme.textSecondary).lineLimit(2)
+                            Text(now.title).font(.caption.weight(.medium)).foregroundStyle(Theme.textPrimary)
+                                .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            HStack(spacing: 6) {
+                                Text(env.timeFormatter.range(start: now.start, end: now.end))
+                                    .font((Theme.isTV ? Font.system(size: 20) : .caption2).monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1).fixedSize()
+                                Text(now.title).font(Theme.isTV ? .system(size: 22, weight: .medium) : .caption.weight(.medium))
+                                    .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                            }
                         }
-                        ProgressBar(value: EpgSchedule.progress(of: now, at: Date())).frame(maxWidth: Theme.isTV ? 360 : 160).frame(height: Theme.isTV ? 4 : 2.5)
+                        ProgressBar(value: EpgSchedule.progress(of: now, at: self.now)).frame(maxWidth: Theme.isTV ? 360 : 160).frame(height: Theme.isTV ? 4 : 2.5)
                     } else {
                         LText("epg_no_info").font(Theme.isTV ? .system(size: 20) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
                     }
                     if let next = row.nowNext?.next {
                         Text(L10n.t("live_next_at", env.timeFormatter.time(next.start), next.title))
-                            .font(Theme.isTV ? .system(size: 19) : .caption2).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                            .font(Theme.isTV ? .system(size: 19) : .caption2).foregroundStyle(Theme.textSecondary).lineLimit(large ? 2 : 1)
                     }
                 }
                 Spacer(minLength: 0)
@@ -607,8 +636,13 @@ private struct GuidePanel: View {
     var identifier = "guide_panel"
 
     var body: some View {
+        // Re-rendered every minute: "Now on air" and "Today" follow the clock while the panel stays open (B10).
+        TimelineView(.everyMinute) { context in content(now: context.date) }
+    }
+
+    @ViewBuilder
+    private func content(now: Date) -> some View {
         let programs = channel.map(load) ?? []
-        let now = Date()
         let current = programs.first { $0.isOnAir(at: now) }
         let upcoming = programs.filter { $0.start > now }.prefix(Theme.isTV ? 6 : 10)
         ScrollView {
@@ -672,6 +706,8 @@ private struct GuidePanel: View {
             .padding(Theme.isTV ? 28 : 16)
         }
         .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+        // The "Today" rows stay inside the card (tvOS drew the last ones below it, B-10).
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .accessibilityIdentifier(identifier)
     }
 
@@ -790,36 +826,6 @@ struct CatchupSheet: View {
     }
 }
 
-/// Time window of the EPG list: "now" sits right after the channel tile when the list opens.
-struct EpgTimeline {
-    let start: Date
-    let end: Date
-    let pointsPerMinute: CGFloat
-
-    init(now: Date, tileWidth: CGFloat, pointsPerMinute: CGFloat, hours: Double = 12) {
-        self.pointsPerMinute = pointsPerMinute
-        let leadMinutes = Double(tileWidth / pointsPerMinute) + 20
-        let raw = now.addingTimeInterval(-leadMinutes * 60)
-        start = Date(timeIntervalSince1970: (raw.timeIntervalSince1970 / 60).rounded(.down) * 60)
-        end = start.addingTimeInterval(hours * 3600)
-    }
-
-    func x(_ date: Date) -> CGFloat {
-        CGFloat(min(max(date.timeIntervalSince(start), 0), end.timeIntervalSince(start)) / 60) * pointsPerMinute
-    }
-
-    var width: CGFloat { x(end) }
-    var interval: DateInterval { DateInterval(start: start, end: end) }
-
-    /// Half-hour ticks inside the window.
-    var ticks: [Date] {
-        var t = Date(timeIntervalSince1970: (start.timeIntervalSince1970 / 1800).rounded(.up) * 1800)
-        var out: [Date] = []
-        while t < end { out.append(t); t = t.addingTimeInterval(1800) }
-        return out
-    }
-}
-
 /// Layout constants of the EPG list.
 private enum EpgMetrics {
     #if os(tvOS)
@@ -872,6 +878,9 @@ struct EpgListView: View {
     @State private var scrollX: CGFloat = 0
     @State private var now = Date()
     @State private var timeline = EpgTimeline(now: Date(), tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute)
+    /// Focused programme block (`EpgBlockKey`). Entering the list (▼ from the tab bar / chips) lands on the
+    /// programme airing now in the first row, with the "now" line in view (B-08).
+    @FocusState private var focusedBlock: String?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -881,7 +890,8 @@ struct EpgListView: View {
                     ScrollView(.vertical, showsIndicators: !Theme.isTV) {
                         LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
                             ForEach(rows) { row in
-                                EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now, onSelect: onSelect)
+                                EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now,
+                                           focus: $focusedBlock, onSelect: onSelect)
                                     .id(row.id)
                                     .onAppear { onRowAppear(row) }
                             }
@@ -904,10 +914,16 @@ struct EpgListView: View {
         .onPreferenceChange(EpgScrollKey.self) { value in updateScrollX(value) }
         .modifier(ScrollOffsetObserver { updateScrollX($0) })
         .overlay(alignment: .topLeading) { todayLabel }
+        .defaultFocus($focusedBlock, rows.first.map { EpgBlockKey.now($0.channel.id) }, priority: .userInitiated)
+        // Minute tick on the minute: the now line, the on-air blocks and – every 30 min – the window itself move
+        // with the clock (a guide left open for hours never freezes or runs empty, audit B10).
         .task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(EpgClock.secondsToNextMinute()))
+                guard !Task.isCancelled else { return }
                 now = Date()
+                let moved = timeline.following(now)
+                if moved != timeline { timeline = moved }
             }
         }
     }
@@ -963,6 +979,19 @@ struct EpgListView: View {
     }
 }
 
+/// Sleeping until the next full minute (+50 ms): minute ticks of the guide and the Live list.
+enum EpgClock {
+    static func secondsToNextMinute(_ date: Date = Date()) -> Double {
+        60 - date.timeIntervalSince1970.truncatingRemainder(dividingBy: 60) + 0.05
+    }
+}
+
+/// Focus keys of the programme blocks: the on-air block of a channel has a stable key.
+enum EpgBlockKey {
+    static func now(_ channelId: String) -> String { "\(channelId)|now" }
+    static func at(_ channelId: String, _ start: Date) -> String { "\(channelId)|\(Int(start.timeIntervalSince1970))" }
+}
+
 /// One channel of the EPG list.
 private struct EpgRowView: View {
     @Environment(AppEnvironment.self) private var env
@@ -972,6 +1001,7 @@ private struct EpgRowView: View {
     let timeline: EpgTimeline
     let scrollX: CGFloat
     let now: Date
+    let focus: FocusState<String?>.Binding
     var onSelect: ((Channel) -> Void)?
     @State private var programs: [EpgProgram]?
 
@@ -1056,10 +1086,11 @@ private struct EpgRowView: View {
         let elapsed = p.map { CGFloat(EpgSchedule.progress(of: $0, at: now)) } ?? 0
         return EpgBlockButton(action: play) {
             EpgBlockLabel(channel: channel, program: p, onAir: onAir, isPast: isPast, elapsed: elapsed,
-                          inset: inset, timeText: p.map { env.timeFormatter.time($0.start) }, isFirst: isFirst,
+                          inset: inset, width: width, timeText: p.map { env.timeFormatter.time($0.start) }, isFirst: isFirst,
                           onFocus: { onSelect?(channel) })
                 .frame(width: width, height: EpgMetrics.rowHeight, alignment: .leading)
         }
+        .focused(focus, equals: onAir ? EpgBlockKey.now(channel.id) : EpgBlockKey.at(channel.id, p?.start ?? timeline.start))
         .contextMenu { ChannelMenuItems(channel: channel) }
         .accessibilityLabel([channel.name, p?.title ?? L10n.t("epg_no_info"),
                              p.map { env.timeFormatter.range(start: $0.start, end: $0.end) }].compactMap { $0 }.joined(separator: ", "))
@@ -1091,28 +1122,26 @@ private struct EpgBlockLabel: View {
     let isPast: Bool
     let elapsed: CGFloat
     let inset: CGFloat
+    /// Visible width of the block: short programmes drop the channel name / time instead of overlapping.
+    let width: CGFloat
     let timeText: String?
     let isFirst: Bool
     var onFocus: () -> Void = {}
 
+    /// Room for the text after the sticky inset and the paddings.
+    private var textWidth: CGFloat { width - inset - (Theme.isTV ? 24 : 14) }
+    private var showsChannel: Bool { (onAir || program == nil) && textWidth >= (Theme.isTV ? 320 : 150) }
+    private var showsTime: Bool { timeText != nil && textWidth >= (Theme.isTV ? 110 : 52) }
+
     var body: some View {
         let color = Theme.channelColor(channel.name)
         let radius: CGFloat = Theme.isTV ? 12 : 9
-        ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(onAir ? color.opacity(0.42) : (isPast ? Theme.surface : color.opacity(0.2)))
-            if onAir, program != nil {
-                GeometryReader { g in
-                    Rectangle().fill(color.opacity(0.38)).frame(width: g.size.width * elapsed)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            }
-            if isFocused {
-                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.white.opacity(0.14))
-            }
-            VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 1) {
+        // The text is laid out inside the block's width and clipped to it: a 15-min programme never prints its
+        // time or title over the next block ("13:2213:37", IOS-05 / B-11).
+        VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 1) {
+            if showsChannel || showsTime {
                 HStack(spacing: Theme.isTV ? 8 : 4) {
-                    if onAir || program == nil {
+                    if showsChannel {
                         Text(channel.name.uppercased()).lineLimit(1)
                         if let q = MediaTags.quality(in: channel.name) {
                             Text(q).font(.system(size: Theme.isTV ? 15 : 8, weight: .heavy))
@@ -1121,17 +1150,32 @@ private struct EpgBlockLabel: View {
                                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.textSecondary, lineWidth: 1))
                         }
                     }
-                    if let timeText { Text(timeText).monospacedDigit().fixedSize() }
+                    if showsTime, let timeText { Text(timeText).monospacedDigit().lineLimit(1).layoutPriority(1) }
                 }
                 .font(Theme.isTV ? .system(size: 20, weight: .semibold) : .system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
-                Text(program?.title ?? L10n.t("epg_no_info"))
-                    .font(Theme.isTV ? .system(size: 27, weight: .semibold) : .system(size: 15, weight: .semibold))
-                    .foregroundStyle(isPast ? Theme.textSecondary : Theme.textPrimary)
-                    .lineLimit(1)
             }
-            .padding(.leading, inset + (Theme.isTV ? 14 : 8))
-            .padding(.trailing, Theme.isTV ? 10 : 6)
+            Text(program?.title ?? L10n.t("epg_no_info"))
+                .font(Theme.isTV ? .system(size: 27, weight: .semibold) : .system(size: 15, weight: .semibold))
+                .foregroundStyle(isPast ? Theme.textSecondary : Theme.textPrimary)
+                .lineLimit(1)
+        }
+        .padding(.leading, inset + (Theme.isTV ? 14 : 8))
+        .padding(.trailing, Theme.isTV ? 10 : 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(onAir ? color.opacity(0.42) : (isPast ? Theme.surface : color.opacity(0.2)))
+                if onAir, program != nil {
+                    GeometryReader { g in
+                        Rectangle().fill(color.opacity(0.38)).frame(width: g.size.width * elapsed)
+                    }
+                }
+                if isFocused {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.white.opacity(0.14))
+                }
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         .onChange(of: isFocused) { _, focused in if focused { onFocus() } }

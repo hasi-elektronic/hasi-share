@@ -135,11 +135,21 @@ public final class LiveTVViewModel {
         if let index = rows.firstIndex(of: row), index >= rows.count - 20 { loadMore() }
     }
 
-    private func attachEpg(_ channels: [Channel]) -> [ChannelRow] {
+    private func attachEpg(_ channels: [Channel], at date: Date = Date()) -> [ChannelRow] {
         guard let sourceId else { return [] }
         let ids = channels.compactMap(\.epgId)
-        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: Date())) ?? [:]
+        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: date)) ?? [:]
         return channels.map { ChannelRow(channel: $0, nowNext: $0.epgId.flatMap { map[$0.lowercased()] }) }
+    }
+
+    /// Re-reads now/next of the loaded rows and the favorites section for `date` (the Live screen calls it every
+    /// minute): a screen left open for hours keeps showing what is on air (audit B10). Only changed arrays are
+    /// assigned, so an unchanged minute does not re-render the list.
+    public func refreshNowNext(at date: Date = Date()) {
+        let fresh = attachEpg(rows.map(\.channel), at: date)
+        if fresh != rows { rows = fresh }
+        let freshFavorites = attachEpg(favoriteRows.map(\.channel), at: date)
+        if freshFavorites != favoriteRows { favoriteRows = freshFavorites }
     }
 
     /// All loaded channels (zapping list).
