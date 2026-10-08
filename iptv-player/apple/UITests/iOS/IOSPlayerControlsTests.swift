@@ -215,8 +215,11 @@ final class IOSPlayerControlsTests: XCTestCase {
         }
     }
 
-    /// IOS-02 (Build 16): a slow drag with a hold while an MKV plays in VLCKit must seek once on release and keep
-    /// playing there – it used to send playback to the very end ("ended", frozen last frame).
+    /// IOS-02 (Build 16). Root cause, reproduced here: the QA tour opened the subtitle menu while the 3-min MKV played;
+    /// with VLCKit rendering XCUITest waits ~60 s for "idle" per step, so the movie simply reached its end. A scrub
+    /// on the finished item then only moved the label – libVLC ignores `time` once the input ended – and the picture
+    /// stayed on the last frame. Now the seek restarts the item at the target (`VLCPlaybackEngine`) and the controller
+    /// plays on. The bubble's "−1:12" was correct: the jump from where the drag began (the end, IOS-15).
     @MainActor
     func testScrubWhilePlayingMKVKeepsPlaying() throws {
         let app = try Self.launchMovie(VLCTestSupport.movieM3U)
@@ -224,40 +227,38 @@ final class IOSPlayerControlsTests: XCTestCase {
         XCTAssertTrue(Self.waitPlaying(app, after: 3), "MKV plays")
         let duration = Self.duration(app)
         XCTAssertGreaterThan(duration, 60, "duration known")
-        // As in the QA run: the movie resumes (VLCKit `:start-time`) at ~40 % before the drag.
+        // Let the movie end (as during the QA tour).
         Self.freshOverlay(app)
         let scrubber = app.descendants(matching: .any)["player_scrubber"]
-        scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)).tap()
-        sleep(2)
-        app.buttons["player_close"].firstMatch.tap()
-        XCTAssertTrue(app.otherElements["video_surface"].waitForNonExistence(timeout: 5))
-        Self.playFromDetail(app)
-        XCTAssertTrue(Self.waitPlaying(app, after: duration * 0.4, timeout: 30), "resumed MKV plays")
-        // QA chose the Turkish subtitles right before the drag.
+        scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.5)).tap()
+        let playPause = app.buttons["player_play_pause"]
+        let deadline = Date().addingTimeInterval(20)
+        var ended = false
+        while Date() < deadline, !ended {
+            sleep(1)
+            let (time, value) = Self.state(app)
+            ended = value == "Paused" && time >= duration - 2
+        }
+        XCTAssertTrue(ended, "the movie reached its end")
+        UITestSupport.snap("scrub-mkv-ended", in: self)
+
+        // Slow drag 10 % → 60 % with a hold (the QA gesture): one seek on release, playback restarts there.
         Self.freshOverlay(app)
-        app.buttons["Subtitles"].tap()
-        let turkish = app.buttons["Turkish"]
-        XCTAssertTrue(turkish.waitForExistence(timeout: 3), "subtitle menu")
-        turkish.tap()
-        sleep(3)
-        UITestSupport.snap("scrub-mkv-after-subtitle", in: self)
-        Self.freshOverlay(app)
-        XCTAssertTrue(scrubber.exists)
         scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
             .press(forDuration: 0.2, thenDragTo: scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)),
                    withVelocity: .slow, thenHoldForDuration: 1)
         let target = duration * 0.6
-        // IOS-15: the bubble's jump is relative to where the drag began (~40 % → 60 %: "+0:3x"), not the time left.
         let bubble = app.descendants(matching: .any)["player_seek_bubble"]
         if bubble.waitForExistence(timeout: 1) {
-            XCTAssertTrue(bubble.label.contains(", +0:"), "jump from the drag start: \(bubble.label)")
+            XCTAssertTrue(bubble.label.contains(", \u{2212}1:1"), "jump from the drag start (the end): \(bubble.label)")
         }
         sleep(3)
         UITestSupport.snap("scrub-mkv-after-drag", in: self)
         let (time, value) = Self.state(app)
-        XCTAssertEqual(value, "Playing", "still playing after the scrub (not ended)")
+        XCTAssertEqual(value, "Playing", "plays again after the scrub (no frozen last frame)")
         XCTAssertEqual(time, target, accuracy: 6, "landed near the target")
         XCTAssertTrue(Self.waitPlaying(app, after: target + 2, timeout: 20), "playback continues past the target")
+        _ = playPause
     }
 
     @MainActor
