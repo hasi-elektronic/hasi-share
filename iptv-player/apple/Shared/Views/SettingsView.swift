@@ -133,6 +133,8 @@ struct SourcesView: View {
 /// Settings → Advanced: playback details, appearance, account, purchase, diagnostics and about.
 struct AdvancedSettingsView: View {
     @Environment(AppEnvironment.self) private var env
+    @State private var syncResetDone = false
+    @State private var syncResetTask: Task<Void, Never>?
 
     var body: some View {
         @Bindable var settings = env.settings
@@ -170,7 +172,27 @@ struct AdvancedSettingsView: View {
             Section(L10n.t("settings_purchase")) {
                 NavigationLink(value: SettingsRoute.paywall) { PurchaseStatusRow() }
             }
-            Section(L10n.t("settings_advanced")) {
+            Section {
+                // A/V sync A/B tests (CONTRACT §6.1 rule −1): device-local, applies at the next open.
+                Picker(L10n.t("settings_player_engine"), selection: $settings.playerEngine) {
+                    Text(L10n.t("automatic")).tag(PlayerEngineOverride.automatic)
+                    Text(L10n.t("player_engine_apple")).tag(PlayerEngineOverride.avPlayer)
+                    Text(L10n.t("player_engine_vlc")).tag(PlayerEngineOverride.vlcKit)
+                }
+                .accessibilityIdentifier("settings_player_engine")
+                .onChange(of: settings.playerEngine) { env.player.setEngineOverride(settings.playerEngine) }
+                // The confirmation sits in the same row (one focusable on tvOS, visible without scrolling).
+                Button { resetSync() } label: {
+                    HStack {
+                        Text(L10n.t("audio_sync_reset"))
+                        Spacer()
+                        if syncResetDone {
+                            Text(L10n.t("audio_sync_reset_done")).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("settings_reset_sync")
                 NavigationLink(value: SettingsRoute.formatTest) { LText("diagnostics_format_test") }
                 Toggle(L10n.t("perf_overlay"), isOn: $settings.showPerfOverlay)
                     .accessibilityIdentifier("settings_perf_overlay")
@@ -180,11 +202,29 @@ struct AdvancedSettingsView: View {
                 NavigationLink(value: SettingsRoute.licenses) { LText("about_licenses") }
                     .accessibilityIdentifier("settings_licenses")
                 LText("privacy").foregroundStyle(Theme.textSecondary)
+            } header: {
+                Text(L10n.t("settings_advanced"))
+            } footer: {
+                Text(L10n.t("settings_player_engine_hint"))
             }
         }
         .hiddenListBackground()
         .screenBackground()
         .navigationTitle(L10n.t("settings_advanced"))
+        .onDisappear { syncResetTask?.cancel() }
+    }
+
+    /// "Reset sync": every audio delay (device + all channels/titles) back to 0, confirmed for 2.5 s.
+    private func resetSync() {
+        env.player.resetAudioDelays()
+        AccessibilityNotification.Announcement(L10n.t("audio_sync_reset_done")).post()
+        syncResetDone = true
+        syncResetTask?.cancel()
+        syncResetTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            syncResetDone = false
+        }
     }
 }
 

@@ -223,6 +223,17 @@
     <string name="audio_delay_earlier">%1$s · audio earlier</string>
     <string name="audio_sync_unavailable" formatted="false">Sync can\'t be applied to this stream</string>
     <string name="settings_device_audio_delay" formatted="false">Audio delay (TV/soundbar)</string>
+    <string name="settings_player_engine" formatted="false">Player engine</string>
+    <string name="player_engine_apple" formatted="false">Apple (AVPlayer)</string>
+    <string name="player_engine_vlc" formatted="false">VLC</string>
+    <string name="settings_player_engine_hint" formatted="false">For audio/video sync tests. Applies from the next stream. Apple: no audio delay, no MKV/TS. VLC: everything through VLC.</string>
+    <string name="audio_sync_reset" formatted="false">Reset sync</string>
+    <string name="audio_sync_reset_done" formatted="false">All audio delays set to 0</string>
+    <string name="audio_sync_apple_engine" formatted="false">Player engine is Apple (AVPlayer): audio delay is off. Set Player engine to Automatic or VLC to use it.</string>
+    <string name="perr_format_apple_ts_override" formatted="false">Ask your provider for HLS (m3u8) output – or set Player engine back to Automatic (Settings → Advanced).</string>
+    <string name="perr_needs_vlc_engine" formatted="false">This content needs the VLC engine – switch Player engine to Automatic (Settings → Advanced).</string>
+    <string name="perf_engine_forced">%1$s · forced in Settings</string>
+    <string name="perf_audio_delay_detail">%1$s (device %2$s, channel %3$s)</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_title" formatted="false">About</string>
     <string name="about_version_build">Version %1$s (Build %2$s)</string>

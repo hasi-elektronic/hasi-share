@@ -146,6 +146,8 @@ public final class PlayerController {
     public private(set) var audioSyncUnavailable = false
     /// Seeks handed to the engine since launch (performance overlay; the tvOS seek preview seeks once per commit).
     public private(set) var seekCount = 0
+    /// Settings → Advanced → Player engine (CONTRACT §6.1 rule −1); change it with `setEngineOverride(_:)`.
+    public private(set) var engineOverride: PlayerEngineOverride = .automatic
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -189,6 +191,8 @@ public final class PlayerController {
     /// VLCKit plays this stream only because of the audio delay (AVPlayer could play it): a VLCKit
     /// format/codec failure falls back to AVPlayer without the delay (CONTRACT §6.1).
     @ObservationIgnored private var delayRoutedToVLC = false
+    /// The opened stream reached `.playing` at least once (a forced-HLS failure after that is a normal error).
+    @ObservationIgnored private var streamPlayed = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
     @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
@@ -268,6 +272,7 @@ public final class PlayerController {
         pausedDuringReconnect = false
         delayRoutedToVLC = false
         audioSyncUnavailable = false
+        streamPlayed = false
         if self.request?.id != request.id { unkeyedContentDelay = 0 }   // retry / resume keep a raw URL's delay
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
@@ -308,7 +313,7 @@ public final class PlayerController {
             guard let self else { return }
             do {
                 let stream: ResolvedStream
-                if let cached { stream = cached } else { stream = try await resolver.resolve(request) }
+                if let cached { stream = cached } else { stream = try await resolver.resolve(request, engineOverride: engineOverride) }
                 guard !Task.isCancelled else { return }
                 self.resolving = false
                 self.stream = stream
@@ -325,9 +330,17 @@ public final class PlayerController {
         }
     }
 
-    /// Engine kind for a resolved stream (fallback wins; an audio delay ≠ 0 → VLCKit; VLCKit only when available).
+    /// Engine kind for a resolved stream (fallback wins; user override; an audio delay ≠ 0 → VLCKit; VLCKit only
+    /// when available).
     func engineKind(for stream: ResolvedStream) -> PlayerEngine {
         if let fallbackEngine { return fallbackEngine }
+        switch engineOverride {
+        case .avPlayer: return .avPlayer
+        case .vlcKit:
+            return ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, override: .vlcKit) == .vlcKit
+                ? .vlcKit : .avPlayer
+        case .automatic: break
+        }
         if currentAudioDelay != 0,
            ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, audioDelayMs: currentAudioDelay) == .vlcKit {
             return .vlcKit
@@ -360,7 +373,7 @@ public final class PlayerController {
 
     private func load(_ stream: ResolvedStream, startMs: Int64?) {
         let kind = engineKind(for: stream)
-        if kind == .vlcKit, currentAudioDelay != 0, fallbackEngine == nil || delayRoutedToVLC,
+        if kind == .vlcKit, engineOverride == .automatic, currentAudioDelay != 0, fallbackEngine == nil || delayRoutedToVLC,
            ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable) == .avPlayer {
             delayRoutedToVLC = true
         }
@@ -437,6 +450,7 @@ public final class PlayerController {
         switch event {
         case .playing:
             loadReady = true
+            streamPlayed = true
             PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
             if let channel = currentChannel { updateLastSession(LastSession(sourceId: channel.sourceId, channelId: channel.id, endedInPlayer: true)) }
             prefetchNeighboursIfNeeded()
@@ -501,7 +515,7 @@ public final class PlayerController {
             return
         }
         if let stream, let current = engine?.kind, fallbackEngine == nil,
-           let next = ApplePlayback.fallbackEngine(after: error, on: current, vlcAvailable: engines.vlcAvailable) {
+           let next = ApplePlayback.fallbackEngine(after: error, on: current, vlcAvailable: engines.vlcAvailable, override: engineOverride) {
             SafeLog.info("\(current.rawValue) failed (\(error)) – retrying with \(next.rawValue)")
             fallbackEngine = next
             load(stream, startMs: request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs))
@@ -509,7 +523,7 @@ public final class PlayerController {
         }
         guard PlaybackErrorMapper.isRecoverable(error), stream != nil else {
             stopPlayback()
-            phase = .failed(error)
+            phase = .failed(finalError(error))
             return
         }
         let (state, decision) = reconnectPolicy.error(reconnectState, nowMs: SystemClock.monotonicMs())
@@ -527,8 +541,15 @@ public final class PlayerController {
             }
         case .giveUp:
             stopPlayback()
-            phase = .failed(error)
+            phase = .failed(finalError(error))
         }
+    }
+
+    /// Error card for a failed stream: an Xtream live `.m3u8` requested only because of the Apple engine
+    /// override (account lists only `ts`) that never played → "ask your provider for HLS" (CONTRACT §4.5).
+    func finalError(_ error: PlaybackError) -> PlaybackError {
+        guard stream?.hlsForcedByOverride == true, !streamPlayed else { return error }
+        return .unsupportedFormat(container: StreamContainer.mpegts.rawValue)
     }
 
     /// After the first frame of a live channel: warm the previous/next channel (once per channel).
@@ -824,6 +845,32 @@ public final class PlayerController {
         }
         refreshAudioDelay()
         applyAudioDelay()
+    }
+
+    /// "Reset sync" (Sync panel, Settings → Advanced): device and every per-content delay back to 0. A stream
+    /// on VLCKit gets 0 at once; Automatic routing stops forcing VLCKit from the next open (CONTRACT §6.1).
+    public func resetAudioDelays() {
+        audioDelayStore?.resetAll()
+        unkeyedContentDelay = 0
+        refreshAudioDelay()
+        applyAudioDelay()
+        SafeLog.info("audio delays reset")
+    }
+
+    /// Settings → Advanced → Player engine: applies from the next open; an open player reopens the current
+    /// request at once (VOD at the position, live at the live edge). Prefetched neighbours are dropped.
+    public func setEngineOverride(_ value: PlayerEngineOverride) {
+        guard value != engineOverride else { return }
+        engineOverride = value
+        prefetcher?.cancelAll()
+        SafeLog.info("player engine override \(value.rawValue)")
+        guard var request else { return }
+        switch phase {
+        case .idle, .locked: return
+        default: break
+        }
+        if !request.isLive, currentTime > 1 { request.startPositionMs = Int64(currentTime * 1000) }
+        open(request)
     }
 
     /// Settings → Playback → device/soundbar delay (added to every content).

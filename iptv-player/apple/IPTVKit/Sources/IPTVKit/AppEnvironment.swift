@@ -117,7 +117,10 @@ public final class AppEnvironment {
         let streamResolver = StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable)
         player = PlayerController(resolver: streamResolver, library: library, engines: engines)
         player.audioDelayStore = AudioDelayStore(kv: kv)   // per-content + device audio delay (SCREENS §3.7)
-        player.prefetcher = ZapPrefetcher(resolver: { try await streamResolver.resolve($0) },
+        let controller = player
+        player.prefetcher = ZapPrefetcher(resolver: { [weak controller] in
+                                              try await streamResolver.resolve($0, engineOverride: controller?.engineOverride ?? .automatic)
+                                          },
                                           fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()
         // A database without sources (tvOS purged it, corrupt file, new file in Caches/memory): put the mirrored
@@ -217,6 +220,7 @@ public final class AppEnvironment {
         player.onLibraryChange = { [weak self] in self?.libraryChanged() }
         player.aspect = settings.aspect
         player.largeBuffer = settings.largeBuffer
+        player.setEngineOverride(settings.playerEngine)
         player.restoreLastSession(settings.lastSession)
         player.onLastSessionChange = { [weak self] in self?.settings.lastSession = $0 }
         player.onAspectChange = { [weak self] mode in self?.settings.aspect = mode }

@@ -3,9 +3,10 @@ import IPTVCore
 import IPTVKit
 import SwiftUI
 
-/// Settings → Diagnostics → "Performance overlay": engine, last zap time (+ p50/p90), buffer
-/// state, the engine's bitrate / dropped frames, the audio output latency and the audio delay the
-/// engine applies (A/V sync diagnosis, docs/ARCHITECTURE.md §3.2), polled once a second. Durations only.
+/// Settings → Diagnostics → "Performance overlay": engine (first row, bold – A/V sync A/B tests), last zap
+/// time (+ p50/p90), buffer state, the engine's bitrate / dropped frames, the audio output latency and the
+/// audio delay the engine applies with its device / channel parts (A/V sync diagnosis, docs/ARCHITECTURE.md
+/// §3.2), polled once a second. Durations only.
 struct PerfOverlayView: View {
     let player: PlayerController
 
@@ -21,13 +22,15 @@ struct PerfOverlayView: View {
             let diag = player.engine?.diagnostics ?? EngineDiagnostics()
             VStack(alignment: .leading, spacing: 2) {
                 row("perf_engine", engineName)
+                    .font(.system(size: Self.fontSize * 1.3, weight: .bold, design: .monospaced))
                 row("perf_zap", zapText(trace))
                 row("perf_buffer", Self.bufferText(player.phase))
                 row("perf_seeks", String(player.seekCount))
                 row("perf_bitrate", diag.bitrate.map { String(format: "%.2f Mbit/s", $0 / 1_000_000) } ?? "—")
                 row("perf_dropped", diag.droppedFrames.map(String.init) ?? "—")
                 row("perf_output_latency", "\(Int((AVAudioSession.sharedInstance().outputLatency * 1000).rounded())) ms")
-                row("perf_audio_delay", diag.audioDelayMs.map(Self.signedMs) ?? "—")
+                row("perf_audio_delay", L10n.t("perf_audio_delay_detail", Self.signedMs(appliedDelay(diag)),
+                                               Self.signedMs(player.deviceAudioDelay), Self.signedMs(player.contentAudioDelay)))
                 if let resolution = diag.resolution { Text(resolution) }
             }
             .font(.system(size: Self.fontSize, design: .monospaced))
@@ -45,12 +48,19 @@ struct PerfOverlayView: View {
     }
 
     private var engineName: String {
-        switch player.engineKind {
+        let name = switch player.engineKind {
         case .avPlayer: "AVPlayer"
         case .vlcKit: "VLCKit"
         case .media3: "Media3"
         case nil: "—"
         }
+        return player.engineOverride == .automatic ? name : L10n.t("perf_engine_forced", name)
+    }
+
+    /// Delay the engine really applies: libVLC's read-back, else the effective value on VLCKit; AVPlayer has none.
+    private func appliedDelay(_ diag: EngineDiagnostics) -> Int {
+        if let applied = diag.audioDelayMs { return applied }
+        return player.engineKind == .vlcKit ? player.currentAudioDelay : 0
     }
 
     private func zapText(_ trace: PerfTrace) -> String {

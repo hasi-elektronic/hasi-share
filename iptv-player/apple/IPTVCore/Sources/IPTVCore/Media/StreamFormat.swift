@@ -61,6 +61,17 @@ extension StreamContainer {
     }
 }
 
+/// User override of the Apple engine choice (CONTRACT §6.1 rule −1; Settings → Advanced → "Player engine",
+/// device-local). Raw values are the stored setting and the vector keys.
+public enum PlayerEngineOverride: String, Sendable, Hashable, CaseIterable, Codable {
+    /// Rules 0–3 (today's behaviour).
+    case automatic = "auto"
+    /// AVPlayer only: never VLCKit, audio delay ignored, no fallback.
+    case avPlayer = "apple"
+    /// VLCKit for everything it plays (when the app ships it).
+    case vlcKit = "vlc"
+}
+
 /// Engine choice of the Apple apps (CONTRACT §6.1): AVPlayer for what it plays natively
 /// (HLS, MP4/MOV, unknown → try), VLCKit for everything else; one fallback AVPlayer → VLCKit
 /// when AVPlayer reports a format/codec error.
@@ -69,22 +80,36 @@ public enum ApplePlayback {
     /// - Parameter vlcAvailable: false when the app is built without VLCKit (AVPlayer only).
     /// - Parameter audioDelayMs: effective user audio delay (content + device); ≠ 0 → VLCKit when
     ///   available (AVPlayer cannot delay audio), ignored without VLCKit.
-    public static func engine(for container: StreamContainer, vlcAvailable: Bool = true, audioDelayMs: Int = 0) -> PlayerEngine? {
-        if audioDelayMs != 0, vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
-        if container.isSupported(by: .avPlayer) { return .avPlayer }
-        if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
-        return nil
+    /// - Parameter override: user override (rule −1); `.avPlayer` ignores VLCKit and the delay,
+    ///   `.vlcKit` uses VLCKit for everything it supports.
+    public static func engine(for container: StreamContainer, vlcAvailable: Bool = true, audioDelayMs: Int = 0,
+                              override: PlayerEngineOverride = .automatic) -> PlayerEngine? {
+        switch override {
+        case .avPlayer:
+            return container.isSupported(by: .avPlayer) ? .avPlayer : nil
+        case .vlcKit:
+            if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
+            return container.isSupported(by: .avPlayer) ? .avPlayer : nil
+        case .automatic:
+            if audioDelayMs != 0, vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
+            if container.isSupported(by: .avPlayer) { return .avPlayer }
+            if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
+            return nil
+        }
     }
 
     /// Pre-playback check: nil if playable on Apple, else the error to show.
-    public static func playbackError(for container: StreamContainer, vlcAvailable: Bool = true) -> PlaybackError? {
-        engine(for: container, vlcAvailable: vlcAvailable) == nil ? .unsupportedFormat(container: container.rawValue) : nil
+    public static func playbackError(for container: StreamContainer, vlcAvailable: Bool = true,
+                                     override: PlayerEngineOverride = .automatic) -> PlaybackError? {
+        engine(for: container, vlcAvailable: vlcAvailable, override: override) == nil
+            ? .unsupportedFormat(container: container.rawValue) : nil
     }
 
     /// Engine to retry with after `error` on `engine` (at most once per opened stream): only
-    /// AVPlayer → VLCKit, only for `UnsupportedFormat` / `UnsupportedCodec`.
-    public static func fallbackEngine(after error: PlaybackError, on engine: PlayerEngine, vlcAvailable: Bool = true) -> PlayerEngine? {
-        guard vlcAvailable, engine == .avPlayer else { return nil }
+    /// AVPlayer → VLCKit, only for `UnsupportedFormat` / `UnsupportedCodec`, never with a user override.
+    public static func fallbackEngine(after error: PlaybackError, on engine: PlayerEngine, vlcAvailable: Bool = true,
+                                      override: PlayerEngineOverride = .automatic) -> PlayerEngine? {
+        guard override == .automatic, vlcAvailable, engine == .avPlayer else { return nil }
         switch error {
         case .unsupportedFormat, .unsupportedCodec: return .vlcKit
         default: return nil

@@ -212,6 +212,76 @@
         "unknown": "avplayer"
       }
     },
+    "override": {
+      "_why": "CONTRACT §6.1 rule −1 – user override (Settings → Player engine, Apple apps only). 'apple' = AVPlayer only (audio delay ignored, no VLCKit fallback); 'vlc' = VLCKit for everything it plays (without VLCKit: the AVPlayer column). Same result with audioDelayMs 0 and the value below; 'auto' = the tables above.",
+      "audioDelayMs": 200,
+      "apple": {
+        "select": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        },
+        "selectWithoutVlc": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        }
+      },
+      "vlc": {
+        "select": {
+          "hls": "vlckit",
+          "dash": "vlckit",
+          "mpegts": "vlckit",
+          "mp4": "vlckit",
+          "mkv": "vlckit",
+          "webm": "vlckit",
+          "flv": "vlckit",
+          "avi": "vlckit",
+          "rtmp": "vlckit",
+          "rtsp": "vlckit",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "vlckit"
+        },
+        "selectWithoutVlc": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        }
+      },
+      "fallback": [
+        { "override": "apple", "engine": "avplayer", "error": "UnsupportedFormat", "expected": null },
+        { "override": "apple", "engine": "avplayer", "error": "UnsupportedCodec", "expected": null },
+        { "override": "vlc", "engine": "avplayer", "error": "UnsupportedFormat", "expected": null },
+        { "override": "vlc", "engine": "vlckit", "error": "UnsupportedCodec", "expected": null }
+      ]
+    },
     "fallback": [
       { "engine": "avplayer", "error": "UnsupportedFormat", "expected": "vlckit" },
       { "engine": "avplayer", "error": "UnsupportedCodec", "expected": "vlckit" },

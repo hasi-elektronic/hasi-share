@@ -223,6 +223,17 @@
     <string name="audio_delay_earlier">%1$s · ses daha erken</string>
     <string name="audio_sync_unavailable" formatted="false">Senkron bu yayında uygulanamadı</string>
     <string name="settings_device_audio_delay" formatted="false">Ses gecikmesi (TV/soundbar)</string>
+    <string name="settings_player_engine" formatted="false">Oynatıcı motoru</string>
+    <string name="player_engine_apple" formatted="false">Apple (AVPlayer)</string>
+    <string name="player_engine_vlc" formatted="false">VLC</string>
+    <string name="settings_player_engine_hint" formatted="false">Ses/görüntü senkron testleri için. Bir sonraki yayından itibaren geçerlidir. Apple: ses gecikmesi yok, MKV/TS yok. VLC: her şey VLC ile.</string>
+    <string name="audio_sync_reset" formatted="false">Senkronu sıfırla</string>
+    <string name="audio_sync_reset_done" formatted="false">Tüm ses gecikmeleri 0 yapıldı</string>
+    <string name="audio_sync_apple_engine" formatted="false">Oynatıcı motoru Apple (AVPlayer): ses gecikmesi kapalı. Kullanmak için oynatıcı motorunu Otomatik veya VLC yapın.</string>
+    <string name="perr_format_apple_ts_override" formatted="false">Sağlayıcınızdan HLS (m3u8) çıkışını isteyin – veya oynatıcı motorunu tekrar Otomatik yapın (Ayarlar → Gelişmiş).</string>
+    <string name="perr_needs_vlc_engine" formatted="false">Bu içerik VLC motoruna ihtiyaç duyuyor – oynatıcı motorunu Otomatik yapın (Ayarlar → Gelişmiş).</string>
+    <string name="perf_engine_forced">%1$s · Ayarlar\'da zorunlu</string>
+    <string name="perf_audio_delay_detail">%1$s (cihaz %2$s, kanal %3$s)</string>
     <string name="about_version">Sürüm %1$s</string>
     <string name="about_title" formatted="false">Hakkında</string>
     <string name="about_version_build">Sürüm %1$s (Derleme %2$s)</string>

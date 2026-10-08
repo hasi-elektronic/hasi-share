@@ -43,6 +43,11 @@ public struct AudioDelayStore: Sendable {
 
     public func setDeviceDelay(_ ms: Int) { kv.setValue(Self.normalize(ms), forKey: "audioDelay.device") }
 
+    /// "Reset sync": the device delay and every per-content delay back to 0 (keys removed).
+    public func resetAll() {
+        for key in kv.keys(withPrefix: "audioDelay.") { kv.set(nil, forKey: key) }
+    }
+
     /// clamp(content + device).
     public func effectiveDelay(_ contentKey: String) -> Int { Self.normalize(contentDelay(contentKey) + deviceDelay) }
 }

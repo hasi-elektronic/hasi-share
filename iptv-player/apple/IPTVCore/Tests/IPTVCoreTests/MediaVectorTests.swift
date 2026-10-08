@@ -91,6 +91,37 @@ final class MediaVectorTests: XCTestCase {
             XCTAssertEqual(ApplePlayback.fallbackEngine(after: error, on: engine)?.rawValue, f.str("expected"), "\(f)")
             XCTAssertNil(ApplePlayback.fallbackEngine(after: error, on: engine, vlcAvailable: false))
         }
+        // Rule −1: user override – same result with and without an audio delay; no fallback.
+        let override = try XCTUnwrap(apple.obj("override"))
+        let overrideDelay = try XCTUnwrap(override["audioDelayMs"] as? Int)
+        for mode in [PlayerEngineOverride.avPlayer, .vlcKit] {
+            let tables = try XCTUnwrap(override.obj(mode.rawValue), mode.rawValue)
+            for (key, vlc) in [("select", true), ("selectWithoutVlc", false)] {
+                let table = try XCTUnwrap(tables.obj(key))
+                XCTAssertEqual(Set(table.keys), Set(StreamContainer.allCases.map(\.rawValue)), "override/\(mode)/\(key)")
+                for (wire, value) in table {
+                    let container = try XCTUnwrap(StreamContainer(rawValue: wire))
+                    let want = try XCTUnwrap(value as? String)
+                    for delay in [0, overrideDelay] {
+                        let got = ApplePlayback.engine(for: container, vlcAvailable: vlc, audioDelayMs: delay, override: mode)
+                        XCTAssertEqual(got?.rawValue ?? "error:UnsupportedFormat", want, "override/\(mode)/\(key)/\(wire)/\(delay)")
+                    }
+                    XCTAssertEqual(ApplePlayback.playbackError(for: container, vlcAvailable: vlc, override: mode) == nil,
+                                   want != "error:UnsupportedFormat", "override/\(mode)/\(key)/\(wire)")
+                }
+            }
+        }
+        for (wire, value) in try XCTUnwrap(apple.obj("select")) {
+            let container = try XCTUnwrap(StreamContainer(rawValue: wire))
+            XCTAssertEqual(ApplePlayback.engine(for: container, override: .automatic)?.rawValue ?? "error:UnsupportedFormat",
+                           value as? String, "override auto/\(wire)")
+        }
+        for f in try XCTUnwrap(override.arr("fallback")) {
+            let mode = try XCTUnwrap(PlayerEngineOverride(rawValue: try XCTUnwrap(f.str("override"))))
+            let engine = try XCTUnwrap(PlayerEngine(rawValue: try XCTUnwrap(f.str("engine"))))
+            let error = try XCTUnwrap(errors[try XCTUnwrap(f.str("error"))])
+            XCTAssertEqual(ApplePlayback.fallbackEngine(after: error, on: engine, override: mode)?.rawValue, f.str("expected"), "\(f)")
+        }
     }
 
     /// The on-device format test list must agree with detection and the AVPlayer matrix.

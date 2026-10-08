@@ -1,3 +1,4 @@
+import IPTVCore
 import IPTVKit
 import SwiftUI
 
@@ -186,14 +187,19 @@ private struct TVAudioDelayStepper: View {
 #endif
 
 /// Player → Audio → Sync (docs/SCREENS.md §3.7): a non-modal panel at the bottom – the picture keeps
-/// playing above it – with this content's delay and the device (TV/soundbar) delay, both applied live.
-/// Notes: AVPlayer → "a delay plays through VLC"; VLCKit failed → "sync could not be applied".
+/// playing above it – with this content's delay and the device (TV/soundbar) delay, both applied live,
+/// and "Reset sync" (every delay back to 0, short confirmation).
+/// Notes: AVPlayer → "a delay plays through VLC"; VLCKit failed → "sync could not be applied"; Player engine
+/// Apple (AVPlayer) → one line "audio delay is off" instead of the steppers.
 struct AudioSyncPanel: View {
     let player: PlayerController
     let onClose: () -> Void
+    @State private var resetDone = false
+    @State private var resetTask: Task<Void, Never>?
     #if os(tvOS)
     @FocusState private var contentFocused: Bool
     @FocusState private var deviceFocused: Bool
+    @FocusState private var resetFocused: Bool
     #endif
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -201,6 +207,9 @@ struct AudioSyncPanel: View {
     #else
     private let maxWidth: CGFloat = 1300
     #endif
+
+    /// Player engine Apple (AVPlayer): the delay is ignored, so no steppers (CONTRACT §6.1 rule −1).
+    private var appleEngine: Bool { player.engineOverride == .avPlayer }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.isTV ? 20 : 8) {
@@ -217,33 +226,53 @@ struct AudioSyncPanel: View {
                 .accessibilityIdentifier("audio_sync_close")
                 #endif
             }
-            #if os(tvOS)
-            AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
-                              identifier: "player_audio_sync_delay", focus: $contentFocused,
-                              onVerticalMove: { if $0 > 0 { deviceFocused = true } }) { player.setAudioDelay($0) }
-            AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
-                              identifier: "player_device_audio_delay", focus: $deviceFocused,
-                              onVerticalMove: { if $0 < 0 { contentFocused = true } }) { player.setDeviceAudioDelay($0) }
-            #else
-            AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
-                              identifier: "player_audio_sync_delay") { player.setAudioDelay($0) }
-            AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
-                              identifier: "player_device_audio_delay") { player.setDeviceAudioDelay($0) }
-            #endif
-            Text(L10n.t("audio_sync_hint"))
-                .font(Theme.caption)
-                .foregroundStyle(Theme.textSecondary)
-            if player.audioSyncUnavailable {
-                Text(L10n.t("audio_sync_unavailable"))
+            if appleEngine {
+                Text(L10n.t("audio_sync_apple_engine"))
                     .font(Theme.caption)
                     .foregroundStyle(Theme.warning)
-                    .accessibilityIdentifier("audio_sync_unavailable")
-            } else if player.engineKind == .avPlayer {
-                Text(L10n.t("audio_sync_vlc_note"))
+                    .accessibilityIdentifier("audio_sync_apple_engine")
+            } else {
+                #if os(tvOS)
+                AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
+                                  identifier: "player_audio_sync_delay", focus: $contentFocused,
+                                  onVerticalMove: { if $0 > 0 { deviceFocused = true } }) { player.setAudioDelay($0) }
+                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
+                                  identifier: "player_device_audio_delay", focus: $deviceFocused,
+                                  onVerticalMove: { if $0 < 0 { contentFocused = true } else { resetFocused = true } }) {
+                    player.setDeviceAudioDelay($0)
+                }
+                #else
+                AudioDelayControl(title: L10n.t("audio_sync_content"), value: player.contentAudioDelay,
+                                  identifier: "player_audio_sync_delay") { player.setAudioDelay($0) }
+                AudioDelayControl(title: L10n.t("settings_device_audio_delay"), value: player.deviceAudioDelay,
+                                  identifier: "player_device_audio_delay") { player.setDeviceAudioDelay($0) }
+                #endif
+                Text(L10n.t("audio_sync_hint"))
                     .font(Theme.caption)
-                    .foregroundStyle(Theme.warning)
-                    .accessibilityIdentifier("audio_sync_vlc_note")
+                    .foregroundStyle(Theme.textSecondary)
+                if player.audioSyncUnavailable {
+                    Text(L10n.t("audio_sync_unavailable"))
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.warning)
+                        .accessibilityIdentifier("audio_sync_unavailable")
+                } else if player.engineKind == .avPlayer {
+                    Text(L10n.t("audio_sync_vlc_note"))
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.warning)
+                        .accessibilityIdentifier("audio_sync_vlc_note")
+                }
             }
+            HStack(spacing: Theme.isTV ? 24 : 12) {
+                resetButton
+                if resetDone {
+                    Text(L10n.t("audio_sync_reset_done"))
+                        .font(Theme.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .accessibilityIdentifier("audio_sync_reset_done")
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: resetDone)
         }
         .padding(.horizontal, Theme.isTV ? 48 : 20)
         .padding(.vertical, Theme.isTV ? 32 : 12)
@@ -255,7 +284,36 @@ struct AudioSyncPanel: View {
         .accessibilityIdentifier("audio_sync_panel")
         #if os(tvOS)
         // After the panel is in the hierarchy (the overlay it replaces held the focus).
-        .onAppear { Task { @MainActor in contentFocused = true } }
+        .onAppear { Task { @MainActor in if appleEngine { resetFocused = true } else { contentFocused = true } } }
         #endif
+        .onDisappear { resetTask?.cancel() }
+    }
+
+    private var resetButton: some View {
+        Button {
+            player.resetAudioDelays()
+            AccessibilityNotification.Announcement(L10n.t("audio_sync_reset_done")).post()
+            resetDone = true
+            resetTask?.cancel()
+            resetTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.5))
+                guard !Task.isCancelled else { return }
+                resetDone = false
+            }
+        } label: {
+            Label(L10n.t("audio_sync_reset"), systemImage: "arrow.counterclockwise")
+        }
+        #if os(tvOS)
+        .buttonStyle(SecondaryButtonStyle())
+        .focused($resetFocused)
+        .onMoveCommand { direction in
+            // The player's root swallows unhandled moves: ▲ back to the device row.
+            if direction == .up, !appleEngine { deviceFocused = true }
+        }
+        #else
+        .buttonStyle(.bordered)
+        .font(.subheadline)
+        #endif
+        .accessibilityIdentifier("audio_sync_reset")
     }
 }

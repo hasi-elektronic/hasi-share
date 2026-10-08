@@ -256,12 +256,16 @@ Apple + only `ts` allowed:
   VLCKit (vectors `liveExtAppleVlc`).
 * AVPlayer-only rule (vectors `liveExt`, also run by Kotlin with `AVPLAYER`) ⇒
   `PlaybackError.UnsupportedFormat("mpegts")` with the "ask your provider for HLS" message.
+* Apple engine override `apple` (§6.1 rule −1) ⇒ always `m3u8` (tried even when only `ts` is listed;
+  failure before the first frame ⇒ the same `UnsupportedFormat("mpegts")` message plus "or set the
+  engine back to Automatic"). Override `vlc` ⇒ the VLCKit rule above.
 
 Apple, M3U live entries with an Xtream-shaped TS URL
 (`^(https?://[^/]+)/(live/)?([^/]+)/([^/]+)/(\d+)\.ts$`): the resolver first probes the same
 URL with `.m3u8` (GET, 1.5 s budget, ≤ 1 KiB read). HTTP 200 and a body starting with
 `#EXTM3U` ⇒ play the `.m3u8` (HLS, AVPlayer); anything else ⇒ keep the `.ts` (VLCKit, or
-`UnsupportedFormat` without VLCKit). Other URLs are never probed. Unit-tested in
+`UnsupportedFormat` without VLCKit or with the engine override `apple`). Other URLs are never probed;
+with the override `vlc` the probe is skipped (the `.ts` plays in VLCKit). Unit-tested in
 `XtreamURLBuilder.hlsVariant(ofLiveTS:)` / `StreamResolver` (no shared vector: `url-vectors.json`
 covers Xtream-built URLs only).
 
@@ -323,7 +327,18 @@ Vectors: `media/expected.json` → `support.{media3,avplayer,vlckit}`.
 
 ### 6.1 Apple: two playback engines
 The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic framework).
-`ApplePlayback.engine(container, vlcAvailable, audioDelayMs)`:
+`ApplePlayback.engine(container, vlcAvailable, audioDelayMs, override)`:
+−1. User override (Settings → Advanced → "Player engine", Apple apps only, device-local, default
+   `auto`; applies at the next open, an open player reopens the current stream):
+   * `apple` ⇒ **AVPlayer** if AVPlayer supports it, else `UnsupportedFormat(container)` – never VLCKit,
+     the audio delay is ignored (the Sync panel says so instead of offering steppers), no fallback.
+     Xtream live always requests `.m3u8` (§4.5), also when `allowed_output_formats` lists only `ts`;
+     an AVPlayer failure of such a forced `.m3u8` before the first frame is shown as
+     `UnsupportedFormat("mpegts")` with the "ask your provider for HLS – or set the engine back to
+     Automatic" hint. Other formats/codecs AVPlayer cannot play ⇒ hint "needs the VLC engine".
+   * `vlc` ⇒ **VLCKit** for everything VLCKit supports (no HLS twin probe, no fallback); without VLCKit
+     the AVPlayer column.
+   * `auto` ⇒ rules 0–3.
 0. `audioDelayMs ≠ 0` (effective user audio delay = content + device, −2000…+2000 ms in 50 ms
    steps) and VLCKit available and supports it ⇒ **VLCKit** (AVPlayer cannot delay audio).
    Without VLCKit the delay is ignored.
@@ -357,7 +372,10 @@ never played ⇒ `UnsupportedCodec`, played then dropped (or a live stream "ende
 `Network` (reconnect policy). AVPlayer: an error without a usable reason before the first
 frame, or an item still not ready after 8 s, is classified with the same probe (2xx/3xx →
 keep the original error / keep waiting).
-Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audioDelay, fallback}`;
+"Reset sync" (Sync panel and Settings → Advanced) sets the device delay and every per-content delay to 0
+(all `audioDelay.*` keys removed); a stream on VLCKit gets 0 at once, rule 0 no longer applies from the next
+open.
+Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audioDelay, override, fallback}`;
 `stream-samples.json` → `expect.apple`.
 
 ---

@@ -376,7 +376,7 @@ struct PlayerView: View {
     }
 
     private func errorCard(_ error: PlaybackError) -> some View {
-        ErrorCardView(presentation: error.presentation) { action in
+        ErrorCardView(presentation: error.presentation(engineOverride: player.engineOverride)) { action in
             switch action {
             case .retry: player.retry()
             case .channelList: openChannelPanel()

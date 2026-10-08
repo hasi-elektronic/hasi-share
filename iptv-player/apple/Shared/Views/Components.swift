@@ -345,6 +345,7 @@ struct ErrorCardView: View {
             Text(text.body).font(Theme.body).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
             if let hint = text.hint {
                 Text(hint).font(Theme.body.weight(.semibold)).foregroundStyle(Theme.primary).multilineTextAlignment(.center)
+                    .accessibilityIdentifier("error_hint")
             }
             HStack(spacing: 16) {
                 ForEach(Array(presentation.actions.enumerated()), id: \.offset) { index, action in

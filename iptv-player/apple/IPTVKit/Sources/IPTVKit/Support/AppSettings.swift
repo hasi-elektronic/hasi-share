@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 import Observation
 
 /// User preferences (UserDefaults) – Settings → Playback / Appearance (docs/SCREENS.md §3.9).
@@ -13,6 +14,8 @@ public final class AppSettings {
     /// ISO language code, "" (automatic) or "off".
     public var subtitleLanguage: String { didSet { defaults.set(subtitleLanguage, forKey: "pref.subLang") } }
     public var largeBuffer: Bool { didSet { defaults.set(largeBuffer, forKey: "pref.largeBuffer") } }
+    /// Settings → Advanced → Player engine (CONTRACT §6.1 rule −1): Automatic (default) | Apple (AVPlayer) | VLC.
+    public var playerEngine: PlayerEngineOverride { didSet { defaults.set(playerEngine.rawValue, forKey: "pref.playerEngine") } }
     /// Settings → Diagnostics: performance overlay on the player (zap time, buffer, bitrate…).
     public var showPerfOverlay: Bool { didSet { defaults.set(showPerfOverlay, forKey: "pref.perfOverlay") } }
     public var tvPreview: Bool { didSet { defaults.set(tvPreview, forKey: "pref.tvPreview") } }
@@ -44,6 +47,7 @@ public final class AppSettings {
         audioLanguage = defaults.string(forKey: "pref.audioLang") ?? ""
         subtitleLanguage = defaults.string(forKey: "pref.subLang") ?? ""
         largeBuffer = defaults.bool(forKey: "pref.largeBuffer")
+        playerEngine = PlayerEngineOverride(rawValue: defaults.string(forKey: "pref.playerEngine") ?? "") ?? .automatic
         showPerfOverlay = defaults.bool(forKey: "pref.perfOverlay")
         tvPreview = defaults.object(forKey: "pref.tvPreview") as? Bool ?? false
         epgTimeZone = defaults.string(forKey: "pref.epgTz") ?? ""

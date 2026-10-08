@@ -5064,6 +5064,259 @@
         }
       }
     },
+    "settings_player_engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Player engine"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oynatıcı motoru"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Player-Engine"
+          }
+        }
+      }
+    },
+    "player_engine_apple": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple (AVPlayer)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple (AVPlayer)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple (AVPlayer)"
+          }
+        }
+      }
+    },
+    "player_engine_vlc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VLC"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VLC"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VLC"
+          }
+        }
+      }
+    },
+    "settings_player_engine_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For audio/video sync tests. Applies from the next stream. Apple: no audio delay, no MKV/TS. VLC: everything through VLC."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ses/görüntü senkron testleri için. Bir sonraki yayından itibaren geçerlidir. Apple: ses gecikmesi yok, MKV/TS yok. VLC: her şey VLC ile."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für Tests der Bild-/Ton-Synchronität. Gilt ab dem nächsten Stream. Apple: keine Audioverzögerung, kein MKV/TS. VLC: alles über VLC."
+          }
+        }
+      }
+    },
+    "audio_sync_reset": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset sync"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senkronu sıfırla"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync zurücksetzen"
+          }
+        }
+      }
+    },
+    "audio_sync_reset_done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All audio delays set to 0"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm ses gecikmeleri 0 yapıldı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Audioverzögerungen auf 0 gesetzt"
+          }
+        }
+      }
+    },
+    "audio_sync_apple_engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Player engine is Apple (AVPlayer): audio delay is off. Set Player engine to Automatic or VLC to use it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oynatıcı motoru Apple (AVPlayer): ses gecikmesi kapalı. Kullanmak için oynatıcı motorunu Otomatik veya VLC yapın."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Player-Engine ist Apple (AVPlayer): Audioverzögerung ist aus. Zum Verwenden Player-Engine auf Automatisch oder VLC stellen."
+          }
+        }
+      }
+    },
+    "perr_format_apple_ts_override": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask your provider for HLS (m3u8) output – or set Player engine back to Automatic (Settings → Advanced)."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcınızdan HLS (m3u8) çıkışını isteyin – veya oynatıcı motorunu tekrar Otomatik yapın (Ayarlar → Gelişmiş)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fragen Sie Ihren Anbieter nach HLS (m3u8) – oder stellen Sie die Player-Engine wieder auf Automatisch (Einstellungen → Erweitert)."
+          }
+        }
+      }
+    },
+    "perr_needs_vlc_engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This content needs the VLC engine – switch Player engine to Automatic (Settings → Advanced)."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu içerik VLC motoruna ihtiyaç duyuyor – oynatıcı motorunu Otomatik yapın (Ayarlar → Gelişmiş)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Inhalt braucht die VLC-Engine – stellen Sie die Player-Engine auf Automatisch (Einstellungen → Erweitert)."
+          }
+        }
+      }
+    },
+    "perf_engine_forced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · forced in Settings"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · Ayarlar'da zorunlu"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · in Einstellungen erzwungen"
+          }
+        }
+      }
+    },
+    "perf_audio_delay_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (device %2$@, channel %3$@)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (cihaz %2$@, kanal %3$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (Gerät %2$@, Sender %3$@)"
+          }
+        }
+      }
+    },
     "about_version": {
       "extractionState": "manual",
       "localizations": {

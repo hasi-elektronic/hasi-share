@@ -445,6 +445,12 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   uygulanamadı" notu (4 sn) görünür. Katmanın araçlarında "Senkronu düzelt" düğmesi
   (`arrow.triangle.2.circlepath`): canlıyı canlı uçtan, VOD'u mevcut konumdan yeniden açar.
   Ayarlar (üst düzey) → "Ses gecikmesi (TV/soundbar)" (aynı kontrol, alt bilgide yön ipucu).
+  Panelin son satırı **"Senkronu sıfırla"** (Apple, Build 15): cihaz gecikmesi ve **tüm** kanal/içerik
+  gecikmeleri 0 olur, yanında kısa onay "Tüm ses gecikmeleri 0 yapıldı" (2,5 sn). VLCKit'te oynayan yayın
+  gecikmeyi hemen 0 alır; Otomatik yönlendirme bir sonraki açılıştan itibaren VLC'yi zorlamaz (CONTRACT §6.1).
+  tvOS: cihaz satırından ▼ → düğme, ▲ geri. **Oynatıcı motoru = Apple (AVPlayer)** iken panel
+  adım kontrolleri yerine tek satır gösterir: "Oynatıcı motoru Apple (AVPlayer): ses gecikmesi kapalı…"
+  (sıfırla düğmesi kalır, tvOS'ta odak onda).
 * **Bağlantı koparsa:** katmanda "Yeniden bağlanılıyor… (2/5)" + son kare donuk; 1-2-4-8-15 sn
   aralıklarla 5 deneme, ardından hata kartı (Tekrar dene ★ / Kanal listesi / Geri).
   Canlıda "canlı pencerenin gerisinde" hatası sessizce canlı uca atlar.
@@ -491,6 +497,16 @@ alt bilgide Hızlı başlat açıklaması ve gecikme yön ipucu. Altında **Geli
   * **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
     senkronizasyon durumu, çıkış, **hesabı sil**.
   * **Satın alma:** durum, geri yükle.
+  * **Gelişmiş** grubunun başında (Apple, Build 15 – A/V senkron A/B testi): **Oynatıcı motoru**
+    Otomatik (varsayılan) / Apple (AVPlayer) / VLC – cihaza özel, bir sonraki açılıştan geçerli; oynatıcı
+    açıksa mevcut yayın hemen yeniden açılır (CONTRACT §6.1 kural −1). Apple: hiçbir zaman VLCKit, ses
+    gecikmesi yok sayılır; Xtream canlı her zaman `.m3u8` (hesap yalnızca `ts` listelese de denenir, ilk
+    kareden önce hata → "Sağlayıcınızdan HLS isteyin – veya motoru Otomatik yapın"); AVPlayer'ın açamadığı
+    içerik (MKV, AVI…) → format hatası + "Bu içerik VLC motoruna ihtiyaç duyuyor – Otomatik yapın". VLC: her şey
+    VLCKit ile (HLS ikiz denemesi yok). Hemen altında **Senkronu sıfırla** (panel ile aynı; kısa onay aynı satırın
+    sağında, 2,5 sn). Alt bilgide açıklama. Performans katmanının ilk satırı kalın: "Motor: AVPlayer" / "Motor: VLCKit"
+    (+ "· Ayarlar'da zorunlu"), ses gecikmesi satırı "Ses gecikmesi: N ms (cihaz M, kanal K)" (N = motorun
+    uyguladığı).
   * **Tanılama:** Format testi (`stream-samples.json`; Apple'da her örneğin motoru – AVPlayer/VLCKit –
     gösterilir ve `expect.apple` ile karşılaştırılır), performans katmanı, önbelleği temizle (görsel / EPG),
     uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +

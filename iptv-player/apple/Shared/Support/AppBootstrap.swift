@@ -182,6 +182,8 @@ enum AppBootstrap {
         let settings = AppSettings(defaults: suite)
         #if DEBUG
         if arguments.contains("-perfOverlay") { settings.showPerfOverlay = true }   // UI tests read the engine label
+        // UI tests: `-playerEngine apple|vlc` (Settings → Advanced → Player engine).
+        if let engine = argument("-playerEngine").flatMap(PlayerEngineOverride.init(rawValue:)) { settings.playerEngine = engine }
         #endif
         L10n.setLanguage(settings.appLanguage)
         do {

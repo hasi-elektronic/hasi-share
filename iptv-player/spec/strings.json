@@ -1104,6 +1104,61 @@
    "tr": "Ses gecikmesi (TV/soundbar)",
    "de": "Audioverzögerung (TV/Soundbar)"
   },
+  "settings_player_engine": {
+   "en": "Player engine",
+   "tr": "Oynatıcı motoru",
+   "de": "Player-Engine"
+  },
+  "player_engine_apple": {
+   "en": "Apple (AVPlayer)",
+   "tr": "Apple (AVPlayer)",
+   "de": "Apple (AVPlayer)"
+  },
+  "player_engine_vlc": {
+   "en": "VLC",
+   "tr": "VLC",
+   "de": "VLC"
+  },
+  "settings_player_engine_hint": {
+   "en": "For audio/video sync tests. Applies from the next stream. Apple: no audio delay, no MKV/TS. VLC: everything through VLC.",
+   "tr": "Ses/görüntü senkron testleri için. Bir sonraki yayından itibaren geçerlidir. Apple: ses gecikmesi yok, MKV/TS yok. VLC: her şey VLC ile.",
+   "de": "Für Tests der Bild-/Ton-Synchronität. Gilt ab dem nächsten Stream. Apple: keine Audioverzögerung, kein MKV/TS. VLC: alles über VLC."
+  },
+  "audio_sync_reset": {
+   "en": "Reset sync",
+   "tr": "Senkronu sıfırla",
+   "de": "Sync zurücksetzen"
+  },
+  "audio_sync_reset_done": {
+   "en": "All audio delays set to 0",
+   "tr": "Tüm ses gecikmeleri 0 yapıldı",
+   "de": "Alle Audioverzögerungen auf 0 gesetzt"
+  },
+  "audio_sync_apple_engine": {
+   "en": "Player engine is Apple (AVPlayer): audio delay is off. Set Player engine to Automatic or VLC to use it.",
+   "tr": "Oynatıcı motoru Apple (AVPlayer): ses gecikmesi kapalı. Kullanmak için oynatıcı motorunu Otomatik veya VLC yapın.",
+   "de": "Player-Engine ist Apple (AVPlayer): Audioverzögerung ist aus. Zum Verwenden Player-Engine auf Automatisch oder VLC stellen."
+  },
+  "perr_format_apple_ts_override": {
+   "en": "Ask your provider for HLS (m3u8) output – or set Player engine back to Automatic (Settings → Advanced).",
+   "tr": "Sağlayıcınızdan HLS (m3u8) çıkışını isteyin – veya oynatıcı motorunu tekrar Otomatik yapın (Ayarlar → Gelişmiş).",
+   "de": "Fragen Sie Ihren Anbieter nach HLS (m3u8) – oder stellen Sie die Player-Engine wieder auf Automatisch (Einstellungen → Erweitert)."
+  },
+  "perr_needs_vlc_engine": {
+   "en": "This content needs the VLC engine – switch Player engine to Automatic (Settings → Advanced).",
+   "tr": "Bu içerik VLC motoruna ihtiyaç duyuyor – oynatıcı motorunu Otomatik yapın (Ayarlar → Gelişmiş).",
+   "de": "Dieser Inhalt braucht die VLC-Engine – stellen Sie die Player-Engine auf Automatisch (Einstellungen → Erweitert)."
+  },
+  "perf_engine_forced": {
+   "en": "{0} · forced in Settings",
+   "tr": "{0} · Ayarlar'da zorunlu",
+   "de": "{0} · in Einstellungen erzwungen"
+  },
+  "perf_audio_delay_detail": {
+   "en": "{0} (device {1}, channel {2})",
+   "tr": "{0} (cihaz {1}, kanal {2})",
+   "de": "{0} (Gerät {1}, Sender {2})"
+  },
   "about_version": {
    "en": "Version {0}",
    "tr": "Sürüm {0}",

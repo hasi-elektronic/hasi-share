@@ -96,6 +96,8 @@ public final class InMemorySecureStore: SecureStore, @unchecked Sendable {
 public protocol KeyValueStore: Sendable {
     func data(forKey key: String) -> Data?
     func set(_ data: Data?, forKey key: String)
+    /// Stored keys starting with `prefix` (bulk resets, e.g. all audio delays).
+    func keys(withPrefix prefix: String) -> [String]
 }
 
 extension KeyValueStore {
@@ -116,6 +118,9 @@ public struct UserDefaultsStore: KeyValueStore, @unchecked Sendable {
     public func set(_ data: Data?, forKey key: String) {
         if let data { defaults.set(data, forKey: key) } else { defaults.removeObject(forKey: key) }
     }
+    public func keys(withPrefix prefix: String) -> [String] {
+        defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix(prefix) }
+    }
 }
 
 /// In-memory key/value store (tests).
@@ -130,5 +135,9 @@ public final class InMemoryKeyValueStore: KeyValueStore, @unchecked Sendable {
     public func set(_ data: Data?, forKey key: String) {
         lock.lock(); defer { lock.unlock() }
         values[key] = data
+    }
+    public func keys(withPrefix prefix: String) -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        return values.keys.filter { $0.hasPrefix(prefix) }
     }
 }

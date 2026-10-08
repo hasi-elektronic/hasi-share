@@ -97,3 +97,20 @@ extension PlaybackError {
         }
     }
 }
+
+extension PlaybackError {
+    /// Error card with the hint of the Apple (AVPlayer) engine override (CONTRACT §6.1 rule −1): MPEG-TS →
+    /// "ask for HLS – or back to Automatic", other formats / codecs → "needs the VLC engine".
+    public func presentation(engineOverride: PlayerEngineOverride) -> ErrorPresentation {
+        var p = presentation
+        guard engineOverride == .avPlayer else { return p }
+        switch self {
+        case .unsupportedFormat(let container) where container == StreamContainer.mpegts.rawValue:
+            p.hintKey = "perr_format_apple_ts_override"
+        case .unsupportedFormat, .unsupportedCodec:
+            p.hintKey = "perr_needs_vlc_engine"
+        default: break
+        }
+        return p
+    }
+}
