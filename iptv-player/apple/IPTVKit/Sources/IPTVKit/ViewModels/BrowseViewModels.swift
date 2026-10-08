@@ -135,11 +135,21 @@ public final class LiveTVViewModel {
         if let index = rows.firstIndex(of: row), index >= rows.count - 20 { loadMore() }
     }
 
-    private func attachEpg(_ channels: [Channel]) -> [ChannelRow] {
+    private func attachEpg(_ channels: [Channel], at date: Date = Date()) -> [ChannelRow] {
         guard let sourceId else { return [] }
         let ids = channels.compactMap(\.epgId)
-        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: Date())) ?? [:]
+        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: date)) ?? [:]
         return channels.map { ChannelRow(channel: $0, nowNext: $0.epgId.flatMap { map[$0.lowercased()] }) }
+    }
+
+    /// Re-reads now/next of the loaded rows and the favorites section for `date` (the Live screen calls it every
+    /// minute): a screen left open for hours keeps showing what is on air (audit B10). Only changed arrays are
+    /// assigned, so an unchanged minute does not re-render the list.
+    public func refreshNowNext(at date: Date = Date()) {
+        let fresh = attachEpg(rows.map(\.channel), at: date)
+        if fresh != rows { rows = fresh }
+        let freshFavorites = attachEpg(favoriteRows.map(\.channel), at: date)
+        if freshFavorites != favoriteRows { favoriteRows = freshFavorites }
     }
 
     /// All loaded channels (zapping list).
@@ -202,19 +212,9 @@ public final class MoviesViewModel {
         if let index = movies.firstIndex(of: movie), index >= movies.count - 18 { loadMore() }
     }
 
-    /// Xtream VOD details (plot, duration…), lazily.
-    public func details(for movie: Movie) async -> XtreamVodInfo? {
-        guard case .xtream(let secrets)? = env.secrets(for: movie.sourceId),
-              let client = XtreamClient(sourceId: movie.sourceId, secrets: secrets) else { return nil }
-        let info = try? await client.vodInfo(vodId: movie.id)
-        if let info {   // cast/director + description become searchable (SCREENS §3.6); off the main actor
-            let catalog = env.catalog
-            Task.detached(priority: .utility) {
-                try? catalog.updateDetails(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: info.cast,
-                                           director: info.director, plot: info.plot)
-            }
-        }
-        return info
+    /// Xtream VOD details (plot, duration, genre, cast, trailer…), lazily (cached in `item_details`).
+    public func details(for movie: Movie) async -> ItemDetails? {
+        try? await env.fetchMovieDetails(movie)
     }
 }
 
@@ -268,20 +268,33 @@ public final class SeriesListViewModel {
     }
 }
 
-/// Series detail with seasons and episodes (docs/SCREENS.md §3.5).
+/// Series detail with seasons and episodes (docs/SCREENS.md §3.5). Stale-while-revalidate: the cached episodes
+/// and details show at once; Xtream `get_series_info` is (re)fetched when nothing is cached or the cache is older
+/// than `ItemDetails.ttl` (weekly new episodes). A failed fetch without cached episodes is an error state with
+/// Retry; with a cache the page stays as it is.
 @MainActor
 @Observable
 public final class SeriesDetailViewModel {
     public let series: Series
-    public private(set) var episodes: [Episode] = []
+    public private(set) var episodes: [Episode] = [] { didSet { reloadProgress() } }
     public var season: Int = 1
     public private(set) var isLoading = false
     public private(set) var plot: String?
+    /// Provider metadata (genre, cast, director, year, trailer).
+    public private(set) var details: ItemDetails?
+    /// `get_series_info` failed and nothing is cached.
+    public private(set) var loadError: SourceError?
+    /// Progress of this series' episodes by episode id (one query, refreshed with `reloadProgress`).
+    public private(set) var progressByEpisode: [String: SyncItem] = [:]
+    /// "Continue S02E05" target, nil when nothing of the series was watched.
+    public private(set) var continueEpisode: Episode?
     @ObservationIgnored private let env: AppEnvironment
+    @ObservationIgnored private let now: () -> Date
 
-    public init(env: AppEnvironment, series: Series) {
+    public init(env: AppEnvironment, series: Series, now: @escaping () -> Date = Date.init) {
         self.env = env
         self.series = series
+        self.now = now
         self.plot = series.plot
     }
 
@@ -290,41 +303,98 @@ public final class SeriesDetailViewModel {
 
     public func load() async {
         episodes = (try? env.catalog.episodes(sourceId: series.sourceId, seriesId: series.id)) ?? []
-        if episodes.isEmpty, case .xtream(let secrets)? = env.secrets(for: series.sourceId),
-           let client = XtreamClient(sourceId: series.sourceId, secrets: secrets) {
-            isLoading = true
-            defer { isLoading = false }
-            if let info = try? await client.seriesInfo(seriesId: series.id) {
-                episodes = info.episodes.sorted { ($0.season, $0.number) < ($1.season, $1.number) }
-                if plot == nil { plot = info.details.plot }
-                try? env.catalog.replaceEpisodes(sourceId: series.sourceId, seriesId: series.id, episodes: episodes)
-                let catalog = env.catalog, item = series, details = info.details
-                Task.detached(priority: .utility) {
-                    try? catalog.updateDetails(sourceId: item.sourceId, kind: .series, itemId: item.id,
-                                               cast: details.cast ?? item.cast, director: details.director ?? item.director,
-                                               plot: details.plot)
-                }
-            }
+        let cached = try? env.catalog.details(sourceId: series.sourceId, kind: .series, itemId: series.id)
+        if let cached { apply(cached.details) }
+        selectSeason()
+        guard env.isXtream(sourceId: series.sourceId) else { return }
+        let stale = cached.map { now().timeIntervalSince($0.fetchedAt) >= ItemDetails.ttl } ?? true
+        if episodes.isEmpty || stale { await revalidate() }
+    }
+
+    /// Retry after an error (or a manual reload).
+    public func retry() async {
+        await revalidate()
+    }
+
+    private func revalidate() async {
+        let hadEpisodes = !episodes.isEmpty
+        isLoading = !hadEpisodes
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            let info = try await env.fetchSeriesInfo(sourceId: series.sourceId, seriesId: series.id, now: now())
+            apply(info.details)
+            let previousSeason = season
+            episodes = info.episodes
+            if hadEpisodes, seasons.contains(previousSeason) { season = previousSeason } else { selectSeason() }
+        } catch {
+            let mapped = ErrorClassifier.sourceError(from: error)
+            guard mapped != .cancelled else { return }
+            SafeLog.warning("series info failed: \(mapped.code)")
+            if !hadEpisodes { loadError = mapped }
         }
+    }
+
+    private func apply(_ details: ItemDetails) {
+        self.details = details
+        if plot?.isEmpty ?? true { plot = details.plot }
+    }
+
+    private func selectSeason() {
         if let next = continueEpisode { season = next.season } else if let first = seasons.first { season = first }
     }
 
-    public func progress(of episode: Episode) -> SyncItem? {
-        env.contentKey(sourceId: episode.sourceId, kind: .episode, itemId: episode.id).flatMap { try? env.library.progress(contentKey: $0) }
+    /// Re-reads the progress of the episodes in one query (after `load`, playback, a sync – also while this
+    /// detail stays in the navigation stack). Long daily series have 600–1500 episodes.
+    public func reloadProgress() {
+        let keys = episodes.compactMap { e in env.contentKey(sourceId: e.sourceId, kind: .episode, itemId: e.id).map { (e.id, $0) } }
+        let byKey = (try? env.library.progress(contentKeys: keys.map(\.1))) ?? [:]
+        var out: [String: SyncItem] = [:]
+        for (id, key) in keys { if let p = byKey[key] { out[id] = p } }
+        progressByEpisode = out
+        continueEpisode = Self.continueEpisode(in: episodes, progress: out)
     }
 
-    /// "Continue S02E05": last watched episode, or the next one if it was completed.
-    public var continueEpisode: Episode? {
-        var latest: (Episode, SyncItem)?
-        for e in episodes {
-            if let p = progress(of: e), latest == nil || p.updatedAt > latest!.1.updatedAt { latest = (e, p) }
+    public func progress(of episode: Episode) -> SyncItem? {
+        progressByEpisode[episode.id]
+    }
+
+    /// "Continue S02E05": last watched episode (any position), or the next one if it was completed.
+    static func continueEpisode(in episodes: [Episode], progress: [String: SyncItem]) -> Episode? {
+        var latest: (index: Int, item: SyncItem)?
+        for (index, e) in episodes.enumerated() {
+            if let p = progress[e.id], latest == nil || p.updatedAt > latest!.item.updatedAt { latest = (index, p) }
         }
-        guard let (episode, item) = latest else { return nil }
+        guard let (index, item) = latest else { return nil }
         if let pos = item.data.positionMs, let dur = item.data.durationMs, WatchHistory.isCompleted(positionMs: pos, durationMs: dur),
-           let index = episodes.firstIndex(of: episode), index + 1 < episodes.count {
+           index + 1 < episodes.count {
             return episodes[index + 1]
         }
-        return episode
+        return episodes[index]
+    }
+}
+
+/// Movie detail metadata (IOS-09): cached `get_vod_info` at once, refetched when missing or stale.
+@MainActor
+@Observable
+public final class MovieDetailViewModel {
+    public let movie: Movie
+    public private(set) var details: ItemDetails?
+    @ObservationIgnored private let env: AppEnvironment
+    @ObservationIgnored private let now: () -> Date
+
+    public init(env: AppEnvironment, movie: Movie, now: @escaping () -> Date = Date.init) {
+        self.env = env
+        self.movie = movie
+        self.now = now
+        details = (try? env.catalog.details(sourceId: movie.sourceId, kind: .movie, itemId: movie.id))?.details
+    }
+
+    public func load() async {
+        guard movie.url == nil, env.isXtream(sourceId: movie.sourceId) else { return }
+        let cached = try? env.catalog.details(sourceId: movie.sourceId, kind: .movie, itemId: movie.id)
+        if let cached, now().timeIntervalSince(cached.fetchedAt) < ItemDetails.ttl { return }
+        if let fresh = try? await env.fetchMovieDetails(movie, now: now()) { details = fresh }
     }
 }
 
@@ -376,11 +446,18 @@ public final class HomeViewModel {
         case .movie:
             return (try? env.catalog.movie(sourceId: source.id, id: parsed.itemId)).flatMap { $0.map(PlaybackRequest.Item.movie) }
         case .episode:
-            let all = (try? env.database.db.queryFirst("SELECT series_id FROM episodes WHERE source_id = ? AND id = ?",
-                                                       [.text(source.id), .text(parsed.itemId)]) { $0.string(0) }) ?? nil
-            guard let seriesId = all, let episode = (try? env.catalog.episodes(sourceId: source.id, seriesId: seriesId))?.first(where: { $0.id == parsed.itemId }) else { return nil }
-            let title = (try? env.catalog.seriesItem(sourceId: source.id, id: seriesId))??.name ?? ""
-            return .episode(episode, seriesTitle: title)
+            if let episode = (try? env.catalog.episode(sourceId: source.id, id: parsed.itemId)) ?? nil {
+                let title = (try? env.catalog.seriesItem(sourceId: source.id, id: episode.seriesId))??.name ?? ""
+                return .episode(episode, seriesTitle: title)
+            }
+            // No cached row (Xtream episodes are fetched per series, a progress synced from another device): an
+            // episode built from the progress entry; playback completes it (`AppEnvironment.playableEpisode`).
+            guard let seriesId = progress.data.seriesKey.flatMap(ContentKey.parse)?.itemId else { return nil }
+            let stored = EpisodeTitle.parse(progress.data.title)
+            let series = (try? env.catalog.seriesItem(sourceId: source.id, id: seriesId)) ?? nil
+            let episode = Episode(sourceId: source.id, id: parsed.itemId, seriesId: seriesId, season: stored.season ?? 0,
+                                  number: stored.number ?? 0, title: stored.episodeTitle, posterUrl: progress.data.posterUrl)
+            return .episode(episode, seriesTitle: series?.name ?? stored.seriesTitle)
         default:
             return nil
         }
@@ -467,5 +544,19 @@ public final class EpgGridViewModel {
         rows = channels.prefix(200).map { c in
             (c, c.epgId.flatMap { try? env.epg.programs(sourceId: c.sourceId, epgId: $0, in: interval) } ?? [])
         }
+    }
+}
+
+/// Splits the title a progress entry stores for an episode (`PlaybackRequest.title`:
+/// "Series · S2E5 Episode title") back into its parts.
+public enum EpisodeTitle {
+    public static func parse(_ title: String) -> (seriesTitle: String, season: Int?, number: Int?, episodeTitle: String) {
+        guard let range = title.range(of: #" · S(\d+)E(\d+) ?"#, options: .regularExpression) else {
+            return (title, nil, nil, title)
+        }
+        let code = title[range].trimmingCharacters(in: .whitespaces).dropFirst(2)   // "S2E5"
+        let numbers = code.dropFirst().split(separator: "E").compactMap { Int($0) }
+        let rest = String(title[range.upperBound...])
+        return (String(title[..<range.lowerBound]), numbers.first, numbers.count > 1 ? numbers[1] : nil, rest)
     }
 }

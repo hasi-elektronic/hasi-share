@@ -89,6 +89,18 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(f.range(start: start, end: start.addingTimeInterval(5400)), "18:30 – 20:00")
     }
 
+    /// P1: one formatter per settings combination instead of two `DateFormatter`s per row / EPG block.
+    func testCachedEpgTimeFormatterIsReusedUntilSettingsChange() {
+        let berlin = TimeZone(identifier: "Europe/Berlin")!, de = Locale(identifier: "de_DE")
+        let a = EpgTimeFormatter.cached(timeZone: berlin, locale: de, use24Hour: nil)
+        XCTAssertTrue(a === EpgTimeFormatter.cached(timeZone: berlin, locale: de, use24Hour: nil))
+        let twelve = EpgTimeFormatter.cached(timeZone: berlin, locale: de, use24Hour: false)
+        XCTAssertFalse(a === twelve, "a changed setting builds a new one")
+        XCTAssertEqual(twelve.locale.identifier, "de_DE")
+        let istanbul = EpgTimeFormatter.cached(timeZone: TimeZone(identifier: "Europe/Istanbul")!, locale: de, use24Hour: true)
+        XCTAssertEqual(istanbul.time(Date(timeIntervalSince1970: 1_759_591_800)), "18:30")
+    }
+
     // MARK: Sync
 
     func testLastWriterWinsAndTiesKeepStored() {

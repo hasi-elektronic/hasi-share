@@ -38,8 +38,9 @@ final class DatabaseMigrationTests: XCTestCase {
         }
 
         // Reopen with the current code.
+        IndexGarbage.waitForBackground()   // the first connection's background work holds it open
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 8)
+        XCTAssertEqual(db.db.userVersion, 9)
         XCTAssertEqual(db.value(forKey: "k"), "kept")
         XCTAssertEqual(try CatalogRepository(database: db).channelCount(sourceId: "s"), 1)
         let epg = EpgRepository(database: db)
@@ -61,8 +62,9 @@ final class DatabaseMigrationTests: XCTestCase {
         let path = tempPath()
         defer { try? FileManager.default.removeItem(atPath: path) }
         _ = try AppDatabase(db: SQLiteDatabase(path: path))
+        IndexGarbage.waitForBackground()
         let again = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(again.db.userVersion, 8)
+        XCTAssertEqual(again.db.userVersion, 9)
     }
 
     /// A v2 database (no `item_categories`) keeps its category lists: v3 backfills memberships from `category_id`.
@@ -81,8 +83,9 @@ final class DatabaseMigrationTests: XCTestCase {
             try db.db.execute("DROP TABLE item_categories")
             db.db.userVersion = 2
         }
+        IndexGarbage.waitForBackground()   // the first connection's background work holds it open
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 8)
+        XCTAssertEqual(db.db.userVersion, 9)
         let catalog = CatalogRepository(database: db)
         XCTAssertEqual(try catalog.channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
         XCTAssertEqual(try catalog.channelCount(sourceId: "s", categoryId: "de"), 1)
@@ -106,11 +109,51 @@ final class DatabaseMigrationTests: XCTestCase {
             try session.commit()
             db.db.userVersion = 4
         }
+        IndexGarbage.waitForBackground()   // the first connection's background work holds it open
         let db = try AppDatabase(db: SQLiteDatabase(path: path))
-        XCTAssertEqual(db.db.userVersion, 8)
+        XCTAssertEqual(db.db.userVersion, 9)
         let indexes = try db.db.query("SELECT name FROM sqlite_master WHERE type = 'index'") { $0.string(0) }
         for name in ["channels_cat", "movies_cat", "series_cat"] { XCTAssertFalse(indexes.contains(name), name) }
         XCTAssertTrue(indexes.contains("item_categories_sort"))
         XCTAssertEqual(try CatalogRepository(database: db).channels(sourceId: "s", categoryId: "tr").map(\.id), ["c1"])
+    }
+    /// B9: a lock held by another connection at launch is waited out (busy timeout + retries) – the app must not
+    /// fall back to an empty database in Caches.
+    func testOpenWaitsForALockInsteadOfFallingBackToCaches() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("busy-\(UUID().uuidString)")
+        let caches = FileManager.default.temporaryDirectory.appendingPathComponent("busy-caches-\(UUID().uuidString)")
+        addTeardownBlock {
+            for url in [dir, caches] where FileManager.default.fileExists(atPath: url.path) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        do {
+            let first = try AppDatabase.onDisk(directory: dir, fileName: "catalog.sqlite")
+            first.setValue("kept", forKey: "k")
+        }
+        // The next launch has a migration to run (a write) while another connection still holds the write lock
+        // for a moment (e.g. the previous process's connection closing).
+        let holder = try SQLiteDatabase(path: dir.appendingPathComponent("catalog.sqlite").path)
+        holder.userVersion = 7
+        try holder.execute("BEGIN EXCLUSIVE; INSERT INTO kv (key, value) VALUES ('x', 'y');")
+        let released = expectation(description: "released")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.8) {
+            do { try holder.execute("COMMIT;") } catch { XCTFail("release failed: \(error)") }
+            released.fulfill()
+        }
+        let started = Date()
+        let opened = AppDatabase.open(primary: dir, caches: caches, busyRetryDelays: [0.3, 0.6, 1.2])
+        XCTAssertLessThan(Date().timeIntervalSince(started), 4.5)
+        wait(for: [released], timeout: 5)
+        XCTAssertEqual(opened.location, .applicationSupport)
+        XCTAssertFalse(opened.recreatedCorruptFile)
+        XCTAssertEqual(opened.database.value(forKey: "k"), "kept")
+    }
+
+    func testBusyAndLockedAreNotCorruption() {
+        XCTAssertTrue(SQLiteDatabase.isBusy(SQLiteError(code: 5, message: "database is locked")))
+        XCTAssertTrue(SQLiteDatabase.isBusy(SQLiteError(code: 6 | (1 << 8), message: "locked")))
+        XCTAssertFalse(AppDatabase.isCorruption(SQLiteError(code: 5, message: "database is locked")))
+        XCTAssertFalse(SQLiteDatabase.isBusy(SQLiteError(code: 11, message: "malformed")))
     }
 }

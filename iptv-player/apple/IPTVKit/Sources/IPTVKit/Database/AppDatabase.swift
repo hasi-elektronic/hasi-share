@@ -76,12 +76,16 @@ public final class AppDatabase: Sendable {
     /// Opens the app database without ever failing: the primary directory (Application Support); if the file is
     /// corrupt, once more after deleting it; then the Caches directory; only then in memory (lost at exit – the
     /// durable mirror still restores the sources on the next launch). Logs carry no paths.
-    public static func open(fileName: String = "catalog.sqlite", primary: URL? = nil, caches: URL? = nil) -> Opened {
+    public static func open(fileName: String = "catalog.sqlite", primary: URL? = nil, caches: URL? = nil,
+                            busyRetryDelays: [TimeInterval] = [0.25, 0.5, 1, 2]) -> Opened {
         var recreated = false
         let primaryDir = primary ?? (try? applicationSupportDirectory())
         if let dir = primaryDir {
             do {
-                return Opened(database: try onDisk(directory: dir, fileName: fileName), location: .applicationSupport, recreatedCorruptFile: false)
+                // A lock held elsewhere (SQLITE_BUSY/LOCKED) is waited out with back-off – never a reason to open an
+                // empty database in Caches (the user would see every source gone).
+                return Opened(database: try openRetryingBusy(directory: dir, fileName: fileName, delays: busyRetryDelays),
+                              location: .applicationSupport, recreatedCorruptFile: false)
             } catch where isCorruption(error) {
                 SafeLog.error("database corrupt (\((error as? SQLiteError)?.code ?? -1)): recreating")
                 deleteFiles(at: dir.appendingPathComponent(fileName))
@@ -107,6 +111,20 @@ public final class AppDatabase: Sendable {
         SafeLog.error("database in memory for this launch")
         // An in-memory database with the schema cannot fail short of memory exhaustion.
         return Opened(database: try! inMemory(), location: .memory, recreatedCorruptFile: recreated)
+    }
+
+    /// `onDisk`, retried after each delay while it fails with SQLITE_BUSY / SQLITE_LOCKED.
+    static func openRetryingBusy(directory: URL, fileName: String, delays: [TimeInterval]) throws -> AppDatabase {
+        var attempt = 0
+        while true {
+            do {
+                return try onDisk(directory: directory, fileName: fileName)
+            } catch where SQLiteDatabase.isBusy(error) && attempt < delays.count {
+                SafeLog.warning("database busy at open (attempt \(attempt + 1)): retrying")
+                Thread.sleep(forTimeInterval: delays[attempt])
+                attempt += 1
+            }
+        }
     }
 
     private func migrate() throws {
@@ -296,6 +314,19 @@ public final class AppDatabase: Sendable {
                 try db.execute("""
                 CREATE TABLE IF NOT EXISTS library_push (key TEXT PRIMARY KEY);
                 PRAGMA user_version = 8;
+                """)
+            }
+        }
+        if db.userVersion < 9 {
+            // Detail metadata from Xtream `get_vod_info` / `get_series_info` (genre, cast, director, year, trailer…)
+            // with its fetch time: shown at once on the next visit and offline, revalidated after a TTL
+            // (`CatalogRepository.details`). Kept across catalog refreshes like `item_people`.
+            try db.transaction {
+                try db.execute("""
+                CREATE TABLE IF NOT EXISTS item_details (
+                  source_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, json TEXT NOT NULL,
+                  fetched_at INTEGER NOT NULL, PRIMARY KEY (source_id, kind, item_id));
+                PRAGMA user_version = 9;
                 """)
             }
         }

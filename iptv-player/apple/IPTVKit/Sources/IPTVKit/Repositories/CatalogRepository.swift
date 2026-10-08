@@ -164,8 +164,8 @@ public final class CatalogRepository: Sendable {
     /// Removes all content of a source.
     public func deleteContent(sourceId: String) throws {
         try db.transaction {
-            for table in ["categories", "item_categories", "item_people", "item_plot", "search_terms", "channels", "movies",
-                          "series", "episodes", "epg"] {
+            for table in ["categories", "item_categories", "item_people", "item_plot", "item_details", "search_terms", "channels",
+                          "movies", "series", "episodes", "epg"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ? OR source_id = ?",
                            [.text(sourceId), .text(sourceId + AppDatabase.stagingSuffix)])
             }
@@ -455,6 +455,30 @@ public final class CatalogRepository: Sendable {
             try db.run("DELETE FROM episodes WHERE source_id = ? AND series_id = ?", [.text(sourceId), .text(seriesId)])
             for e in episodes { try CatalogRefreshSession.insert(episode: e, sourceId: sourceId, db: db) }
         }
+    }
+
+    /// One episode by id (any series of the source).
+    public func episode(sourceId: String, id: String) throws -> Episode? {
+        try db.queryFirst("""
+            SELECT source_id, id, series_id, season, number, title, container_ext, duration_sec, plot, poster_url, url
+            FROM episodes WHERE source_id = ? AND id = ?
+            """, [.text(sourceId), .text(id)], map: Self.episode)
+    }
+
+    // MARK: Detail metadata (`item_details`)
+
+    /// Cached detail metadata of a movie / series and when it was fetched.
+    public func details(sourceId: String, kind: ContentKind, itemId: String) throws -> (details: ItemDetails, fetchedAt: Date)? {
+        let row = try db.queryFirst("SELECT json, fetched_at FROM item_details WHERE source_id = ? AND kind = ? AND item_id = ?",
+                                    [.text(sourceId), .text(kind.rawValue), .text(itemId)]) { ($0.string(0), $0.date(1)) }
+        guard let row, let details = try? JSONDecoder().decode(ItemDetails.self, from: Data(row.0.utf8)) else { return nil }
+        return (details, row.1)
+    }
+
+    public func saveDetails(_ details: ItemDetails, sourceId: String, kind: ContentKind, itemId: String, fetchedAt: Date) throws {
+        let json = String(decoding: try JSONEncoder().encode(details), as: UTF8.self)
+        try db.run("INSERT OR REPLACE INTO item_details (source_id, kind, item_id, json, fetched_at) VALUES (?,?,?,?,?)",
+                   [.text(sourceId), .text(kind.rawValue), .text(itemId), .text(json), .from(fetchedAt)])
     }
 
     /// Full-text search over channel, movie and series titles, cast/director and descriptions (prefix match per
@@ -995,10 +1019,20 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         guard !finished else { return }
         let started = DispatchTime.now()
         try db.transaction {
-            for table in ["categories", "item_categories", "channels", "movies", "series", "episodes"] {
+            for table in ["categories", "item_categories", "channels", "movies", "series"] {
                 try db.run("DELETE FROM \(table) WHERE source_id = ?", [.text(sourceId)])
                 try db.run("UPDATE \(table) SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
             }
+            // Episodes: Xtream lists carry none (they are fetched per series via `get_series_info`), so the cached
+            // episodes of series still in the new catalog stay – "Continue watching" and offline details keep
+            // working after every refresh. Staged episodes (M3U) replace those of their series; episodes of series
+            // that left the catalog go.
+            try db.run("""
+                DELETE FROM episodes WHERE source_id = ?1 AND (
+                  series_id IN (SELECT series_id FROM episodes WHERE source_id = ?2)
+                  OR series_id NOT IN (SELECT id FROM series WHERE source_id = ?1))
+                """, [.text(sourceId), .text(stagingId)])
+            try db.run("UPDATE episodes SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
             let indexStart = DispatchTime.now()
             defer { indexMilliseconds = Self.ms(since: indexStart) }
             if let searchTable {

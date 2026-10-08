@@ -64,16 +64,30 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 1. Kullanıcı M3U URL'si veya Xtream bilgilerini girer (TV'de QR eşleştirmesi ile telefondan).
 2. Gizli bilgiler (URL, kullanıcı adı, şifre, EPG URL) **yalnızca** güvenli depoya yazılır;
    veritabanında yalnızca `Source` meta verisi (ad, host, durum) durur.
-3. Xtream: `player_api.php` → hesap sınıflandırması (CONTRACT §4.4) → kategoriler → canlı /
-   film / dizi listeleri (paralel, iptal edilebilir) → veritabanına toplu yazım (1000'lik
-   işlemler) → XMLTV (`xmltv.php`) arka planda.
+3. Xtream: `player_api.php` → hesap sınıflandırması (CONTRACT §4.4) → kategoriler (paralel) → canlı /
+   film / dizi listeleri **sırayla** (Build 16: aynı anda tek gövde + JSON ağacı bellekte; liste çağrıları
+   60 sn boşta / 10 dk toplam zaman aşımı, 35k filmlik panellerde 20 sn sınırı tüm yenilemeyi düşürüyordu;
+   sahte 35k/9k panelde tepe bellek 102 → 95 MB) → veritabanına toplu yazım (1000'lik işlemler) → XMLTV
+   (`xmltv.php`, 60 sn boşta / 10 dk) arka planda. EPG sonucu (`SourceStatus.epgError` / `epgLoadedAt` /
+   program sayısı) kaynak durumuna yazılır ve Kaynak detayında gösterilir.
 4. M3U: akış halinde satır satır ayrıştırma (dosya belleğe alınmaz) → 1000'lik partiler →
    veritabanı. Başlıktaki `url-tvg` EPG adresi otomatik önerilir.
 5. EPG: gzip otomatik tespit, akış halinde ayrıştırma, yalnızca kaynaktaki kanallar ve
    saklama penceresi `[şimdi − max(catchup günü, 1 gün), şimdi + 7 gün]` yazılır.
 6. Yenileme atomiktir: yeni veri geçici tabloya/işleme yazılır, başarıyla bitince eskisinin
    yerine geçer (yarım liste görünmez). Favoriler/ilerleme `contentKey` ile bağlı olduğu için
-   yenilemeden etkilenmez.
+   yenilemeden etkilenmez. **Bölümler (Build 16):** Xtream listeleri bölüm içermez (dizi başına
+   `get_series_info`), bu yüzden commit yeni katalogda hâlâ bulunan dizilerin önbellekteki bölümlerini **korur**;
+   staging'de bölümü olan diziler (M3U) kendi bölümlerini değiştirir, katalogdan çıkan dizilerin bölümleri silinir.
+   "İzlemeye devam et" bölüm satırı olmadan da çözülür (ilerleme kaydındaki `seriesKey` + saklanan başlık
+   "Dizi · S2E5 Başlık"); oynatmadan önce `AppEnvironment.playableEpisode` eksik bölümü bir kez `get_series_info`
+   ile tamamlar. Kaynak durumu yazımları (`SourceRepository.update(id:)`) tek işlemde oku-değiştir-yaz'dır:
+   yenileme sürerken gelen EPG sonucu veya ayar değişikliği (EPG kaydırma, otomatik yenileme) kaybolmaz.
+   **Düzenleme:** `editSource` yeni bilgileri kaydeder ve normal yenilemeyle doğrular; hata olursa eski ad /
+   gizli bilgiler / durum geri yazılır. Host veya kullanıcı adı (parmak izi) değişirse kaynağın favori ve
+   ilerleme kayıtları yeni anahtarlara taşınır (yeni öğe + eski anahtar için silme işareti, senkronlanır).
+   **Ön plana dönüş:** `refreshOnResume` vadesi gelen katalogları ve 24 saatten kısa kalan EPG'yi yeniler
+   (dakikada en fazla bir kontrol, 3 sn gecikme, oynatma başlarken bekler).
 7. **Katalog biçim sürümü (`CatalogFormat.current`, Apple: `SourceRefresher.swift`; şu an 2):** her
    başarılı katalog yüklemesi kaynağın kataloğunun hangi biçimle kurulduğunu `kv` tablosuna yazar
    (`catalog.format.<kaynakId>`). Açılışta (`env.start()` → `refreshDueSources`, QuickStart'tan sonra, arka
@@ -308,7 +322,9 @@ Gizli bilgiler Keychain'de (`ThisDeviceOnly`) ve silinmez.
   arka planda, sırayla, normal yenileme hattından **bir kez** yenilenir (`refreshDueSources` bu açılışta onları
   atlar; açılışı ve QuickStart'ı bekletmez). Yenileme sürerken alt kenarda odaklanamayan, dokunulamayan
   "Katalog yeniden yükleniyor…" (`catalog_restoring`) bildirimi görünür.
-* **Veritabanı açma** (`AppDatabase.open`, asla başarısız olmaz): Application Support → dosya bozuksa
+* **Veritabanı açma** (`AppDatabase.open`, asla başarısız olmaz): Application Support (yazıcı `busy_timeout`
+  5 sn; `SQLITE_BUSY`/`SQLITE_LOCKED` 0,25/0,5/1/2 sn geri çekilmeyle yeniden denenir – kilit asla boş bir Caches
+  veritabanına geçiş nedeni değildir) → dosya bozuksa
   (`SQLITE_CORRUPT`/`SQLITE_NOTADB`) silinip bir kez daha → Caches → bellek içi (yalnızca bu açılış; ayna bir sonraki
   açılışta yine geri yükler). Loglar yol içermez (`SafeLog`, yalnızca hata kodu ve konum).
 * iOS'ta Application Support nadiren silinir; aynı kod yolu bozuk dosyayı da kapsar.
@@ -409,7 +425,17 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
 * Veritabanına toplu yazım, sayfalı okuma (Paging 3 / LIMIT-OFFSET + keyset), FTS arama,
   250 ms debounce.
 * EPG: yalnızca pencere içi ve kaynaktaki kanallar; `(sourceId, channelEpgId, start)` indeksi;
-  "şimdi/sıradaki" sorguları indeksli.
+  "şimdi/sıradaki" sorguları indeksli. Rehber penceresi `EpgTimeline` (IPTVKit) saati izler: dakika
+  başında tik, şimdi 30 dk ilerleyince pencere yeniden konumlanır (`following(_:)`); Canlı TV satırlarının
+  şimdi/sonra bilgisi `LiveTVViewModel.refreshNowNext(at:)` ile dakikada bir yüklü satırlar için yeniden
+  okunur (değişmeyen dakika yeniden çizim tetiklemez) – Build 16.
+* Dizi detayı: bölüm ilerlemeleri `SeriesDetailViewModel.reloadProgress()` ile yüklemede ve
+  `libraryVersion` değişince **bir kez** okunur (render başına bölüm başına SQLite okuması yok);
+  "Devam et SxEy" saklanan sonuçtan gelir.
+* tvOS Filmler/Diziler: Keşfet sayfası (`BrowseView`) kategori grid'inin altında canlı tutulur (gizli,
+  devre dışı, erişilebilirlik ağacı dışında); Keşfet'e dönüş yeniden kurulum yapmaz. Ölçüm (35 000 film,
+  simülatör, Keşfet'e OK sonrası ana iş parçacığı commit'i): önce 0,44 / 0,11 / 0,11 sn → sonra
+  0,15 / 0,03 / 0,04 sn, görseller yeniden yüklenmez.
 * Görseller: boyutlandırılmış çözümleme, bellek + disk önbelleği; TV'de odak dışı satırlarda
   ön yükleme sınırlı.
 * Ağ: tüm çağrılar iptal edilebilir, bağlantı 10 sn / okuma 30 sn / toplam 20–120 sn zaman

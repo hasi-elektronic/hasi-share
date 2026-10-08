@@ -106,9 +106,16 @@ struct TVRootView: View {
         }
     }
 
-    /// `nil` lets the system act: content → tab bar, Home tab → leave the app, pushed page → pop.
+    /// `nil` lets the system act: content → tab bar, pushed page → pop, Home tab at its root → leave the app.
+    /// With the focus on the tab bar over a pushed page (detail, settings page…) the system would leave the
+    /// app (B-01): pop that page ourselves – never exit while the tab's stack is not at its root.
     private var exitHandler: (() -> Void)? {
-        guard focusInTabBar, router.section != .home, paths[router.section]?.isEmpty ?? true else { return nil }
+        guard focusInTabBar else { return nil }
+        let section = router.section
+        if let path = paths[section], !path.isEmpty {
+            return { paths[section]?.removeLast() }
+        }
+        guard section != .home else { return nil }
         return { router.section = .home }
     }
 

@@ -530,8 +530,14 @@ struct ChannelMenuItems: View {
 private struct BrowseHero: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
-    #if !os(tvOS)
+    #if os(tvOS)
+    /// Focused hero action. Entering the hero (▼ from the tab bar, ▲ from the rows) lands on the primary ▶ pill,
+    /// not on the geometrically nearer "Favorite" / "Info" under the centred tab bar (B-12): one OK plays.
+    @FocusState private var heroFocus: HeroFocus?
+    private enum HeroFocus: Hashable { case play, favorite, info }
+    #else
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
     #endif
     let model: BrowseModel
     let entry: ContinueEntry?
@@ -583,16 +589,20 @@ private struct BrowseHero: View {
                 Text(title).font(Theme.largeTitle).foregroundStyle(.white).lineLimit(2).minimumScaleFactor(0.6)
                 if !subtitle.isEmpty { Text(subtitle).font(Theme.body).foregroundStyle(Theme.textSecondary).lineLimit(1) }
                 HStack(spacing: 26) {
-                    Button(action: play) { Label(playTitle, systemImage: "play.fill") }
+                    // The pill grows with its label: "Fortsetzen (30:00)" keeps its time (B-14).
+                    Button(action: play) { Label(playTitle, systemImage: "play.fill").fixedSize() }
                         .buttonStyle(WhitePillButtonStyle())
+                        .focused($heroFocus, equals: .play)
                         .accessibilityIdentifier("hero_play")
                     if let favoriteTarget {
                         FavoriteButton(target: favoriteTarget, style: .labeled)
                             .buttonStyle(SecondaryButtonStyle())
+                            .focused($heroFocus, equals: .favorite)
                     }
                     if item != nil {
                         Button(action: openInfo) { Label(L10n.t("action_info"), systemImage: "info.circle") }
                             .buttonStyle(SecondaryButtonStyle())
+                            .focused($heroFocus, equals: .info)
                             .accessibilityIdentifier("hero_info")
                     }
                     if kind == .home { TrialChip() }
@@ -605,6 +615,11 @@ private struct BrowseHero: View {
         }
         .frame(height: 700)
         .focusSection()
+        .defaultFocus($heroFocus, .play, priority: .userInitiated)
+        .onChange(of: heroFocus) { old, new in
+            // Focus came from outside the hero straight onto a secondary action: move it to ▶.
+            if old == nil, let new, new != .play { heroFocus = .play }
+        }
         #else
         ZStack(alignment: .bottom) {
             Group {
@@ -628,27 +643,49 @@ private struct BrowseHero: View {
                 if !subtitle.isEmpty {
                     Text(subtitle).font(.footnote.weight(.medium)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
-                HStack(alignment: .center) {
-                    // No tappable control kept at opacity 0 (iOS 26 hit testing): a plain spacer instead.
-                    if let favoriteTarget {
-                        FavoriteButton(target: favoriteTarget, style: .stacked).buttonStyle(.plain)
-                    } else {
-                        Color.clear.frame(width: 64, height: 44)
-                    }
-                    Spacer()
-                    Button(action: play) { Label(playTitle, systemImage: "play.fill").fixedSize().frame(minWidth: 110) }
+                if typeSize.isAccessibilitySize {
+                    // Accessibility text sizes: the pill gets the full width (label may wrap), Favorite · Info
+                    // below it – side by side they clipped and overlapped (IOS-04).
+                    VStack(spacing: 10) {
+                        Button(action: play) {
+                            Label(playTitle, systemImage: "play.fill").lineLimit(2).multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                        }
                         .buttonStyle(WhitePillButtonStyle())
                         .accessibilityIdentifier("hero_play")
-                    Spacer()
-                    if item != nil {
-                        labeledIcon("info.circle", L10n.t("action_info"), action: openInfo)
-                            .accessibilityIdentifier("hero_info")
-                    } else {
-                        Color.clear.frame(width: 64, height: 44)
+                        HStack(alignment: .top) {
+                            if let favoriteTarget { FavoriteButton(target: favoriteTarget, style: .stacked).buttonStyle(.plain) }
+                            Spacer(minLength: 12)
+                            if item != nil {
+                                labeledIcon("info.circle", L10n.t("action_info"), action: openInfo)
+                                    .accessibilityIdentifier("hero_info")
+                            }
+                        }
                     }
+                    .padding(.top, 4)
+                } else {
+                    HStack(alignment: .center) {
+                        // No tappable control kept at opacity 0 (iOS 26 hit testing): a plain spacer instead.
+                        if let favoriteTarget {
+                            FavoriteButton(target: favoriteTarget, style: .stacked).buttonStyle(.plain)
+                        } else {
+                            Color.clear.frame(width: 64, height: 44)
+                        }
+                        Spacer()
+                        Button(action: play) { Label(playTitle, systemImage: "play.fill").fixedSize().frame(minWidth: 110) }
+                            .buttonStyle(WhitePillButtonStyle())
+                            .accessibilityIdentifier("hero_play")
+                        Spacer()
+                        if item != nil {
+                            labeledIcon("info.circle", L10n.t("action_info"), action: openInfo)
+                                .accessibilityIdentifier("hero_info")
+                        } else {
+                            Color.clear.frame(width: 64, height: 44)
+                        }
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.top, 4)
                 }
-                .padding(.horizontal, 28)
-                .padding(.top, 4)
                 if kind == .home { homeStatusRow }
             }
             .padding(.horizontal, Theme.safeH)
@@ -679,7 +716,10 @@ private struct BrowseHero: View {
         HStack(spacing: 10) {
             if showPicker {
                 Menu {
-                    ForEach(env.sources) { source in Button(source.name) { env.selectSource(source.id) } }
+                    // IOS-08: the source in use carries a checkmark.
+                    Picker(L10n.t("source_picker"), selection: Binding(get: { env.currentSource?.id ?? "" }, set: { env.selectSource($0) })) {
+                        ForEach(env.sources) { source in Text(source.name).tag(source.id) }
+                    }
                 } label: {
                     Label(env.currentSource?.name ?? L10n.t("source_picker"), systemImage: "antenna.radiowaves.left.and.right")
                         .font(.caption.weight(.medium)).foregroundStyle(Theme.textPrimary)

@@ -175,6 +175,23 @@
     <string name="source_last_refresh">Son yenileme %1$s</string>
     <string name="catalog_restoring" formatted="false">Katalog yeniden yükleniyor…</string>
     <string name="source_never_refreshed" formatted="false">Hiç yenilenmedi</string>
+    <string name="source_edit_title" formatted="false">Kaynağı düzenle</string>
+    <string name="source_saved_title" formatted="false">Kaynak kaydedildi</string>
+    <string name="source_active" formatted="false">Aktif</string>
+    <string name="source_use" formatted="false">Bu kaynağı kullan</string>
+    <string name="source_move_up" formatted="false">Yukarı taşı</string>
+    <string name="source_move_down" formatted="false">Aşağı taşı</string>
+    <string name="source_epg_url" formatted="false">EPG URL\'si</string>
+    <string name="source_epg_default">Varsayılan: %1$s</string>
+    <string name="source_epg_none" formatted="false">EPG URL\'si yok</string>
+    <string name="epg_status_loaded">Yayın akışı: %1$s program · %2$s</string>
+    <string name="epg_shift_earlier" formatted="false">15 dakika erken</string>
+    <string name="epg_shift_later" formatted="false">15 dakika geç</string>
+    <string name="timezone_search" formatted="false">Saat dilimi ara</string>
+    <string name="action_trailer" formatted="false">Fragman</string>
+    <string name="cast_value">Oyuncular: %1$s</string>
+    <string name="director_value">Yönetmen: %1$s</string>
+    <string name="legal_open_on_phone">Kodu tarayın veya telefonunuzda açın: %1$s</string>
     <string name="source_epg_shift" formatted="false">EPG saat kaydırma</string>
     <string name="source_auto_refresh" formatted="false">Otomatik yenileme</string>
     <string name="every_n_hours">%1$s saatte bir</string>
@@ -295,6 +312,8 @@
     <string name="home_featured" formatted="false">Öne çıkan</string>
     <string name="epg_today" formatted="false">Bugün</string>
     <string name="epg_now_on_air" formatted="false">Şimdi yayında</string>
+    <string name="epg_later" formatted="false">Daha sonra</string>
+    <string name="epg_earlier" formatted="false">Daha önce</string>
     <string name="action_more" formatted="false">Daha fazla</string>
     <string name="action_see_all" formatted="false">Tümünü gör</string>
     <string name="action_info" formatted="false">Bilgi</string>

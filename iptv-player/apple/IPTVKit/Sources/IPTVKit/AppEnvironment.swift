@@ -18,9 +18,18 @@ public struct AppConfig: Sendable {
     /// `identifierForVendor` (hashed into the device key, never sent raw).
     public var rawDeviceId: String
     public var deviceName: String
+    /// Accounts, phone sign-in and QR pairing (`ACCOUNTS_ENABLED`); off until the backend is live.
+    public var accountsEnabled: Bool
+    /// Privacy policy / terms of use (`PRIVACY_URL`, `TERMS_URL`) – paywall, settings, about.
+    public var privacyURL: URL
+    public var termsURL: URL
+
+    public static let defaultPrivacyURL = URL(string: "https://hasi-elektronic.de/datenschutz")!
+    public static let defaultTermsURL = URL(string: "https://hasi-elektronic.de/agb")!
 
     public init(displayName: String, bundleId: String, appVersion: String, backendBaseURL: URL, productIDs: ProductIDs,
-                licenseKeysJSON: Data, platform: BackendPlatform, rawDeviceId: String, deviceName: String) {
+                licenseKeysJSON: Data, platform: BackendPlatform, rawDeviceId: String, deviceName: String,
+                accountsEnabled: Bool = true, privacyURL: URL = AppConfig.defaultPrivacyURL, termsURL: URL = AppConfig.defaultTermsURL) {
         self.displayName = displayName
         self.bundleId = bundleId
         self.appVersion = appVersion
@@ -30,9 +39,20 @@ public struct AppConfig: Sendable {
         self.platform = platform
         self.rawDeviceId = rawDeviceId
         self.deviceName = deviceName
+        self.accountsEnabled = accountsEnabled
+        self.privacyURL = privacyURL
+        self.termsURL = termsURL
     }
 
     public var deviceKey: String { DeviceKey.make(appId: bundleId, rawDeviceId: rawDeviceId) }
+
+    /// False for the placeholder backend of the shipped config (`*.example…`, `invalid.example`): no backend call is
+    /// made then – it could only fail and show "server unreachable".
+    public var backendConfigured: Bool {
+        guard let host = backendBaseURL.host?.lowercased(), !host.isEmpty else { return false }
+        let labels = host.split(separator: ".")
+        return !labels.contains("example") && !labels.contains("invalid")
+    }
 }
 
 /// Manual dependency container + app-wide state (docs/ARCHITECTURE.md §2 "AppEnvironment").
@@ -55,6 +75,8 @@ public final class AppEnvironment {
     /// Last searches per source (device-local, SCREENS §3.6).
     @ObservationIgnored public let recentSearches: RecentSearchStore
     @ObservationIgnored public let secureStore: any SecureStore
+    /// HTTP transport of every source request (lists, details, EPG).
+    @ObservationIgnored public let transport: any HTTPTransport
     /// Persistent copy of sources + favorites/progress/recent searches (tvOS purges the database, ARCHITECTURE §3.3).
     @ObservationIgnored public let mirror: DurableStateMirror
     public let settings: AppSettings
@@ -90,6 +112,7 @@ public final class AppEnvironment {
         self.config = config
         self.database = database
         self.secureStore = secureStore
+        self.transport = transport
         self.settings = settings
         mirror = DurableStateMirror(store: kv)
         sourceRepository = SourceRepository(database: database, secureStore: secureStore, mirror: mirror)
@@ -193,11 +216,20 @@ public final class AppEnvironment {
         mirror.noteUserStateChanged()
     }
 
+    /// Accounts / phone sign-in / QR pairing are offered (config flag and a real backend).
+    public var accountsEnabled: Bool { config.accountsEnabled && config.backendConfigured }
+
+    /// `POST /v1/license/sync` – only against a configured backend (StoreKit alone decides otherwise).
+    public func syncLicense() async {
+        guard config.backendConfigured else { return }
+        await license.sync()
+    }
+
     private func wire() {
         store.onChange = { [weak self] snapshot in
             guard let self else { return }
             license.update(store: snapshot)
-            Task { await self.license.sync() }
+            Task { await self.syncLicense() }
         }
         favorites.now = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
         favorites.onChange = { [weak self] in self?.libraryChanged() }
@@ -213,7 +245,7 @@ public final class AppEnvironment {
                 } else {
                     await self.syncManager.reset()
                 }
-                await self.license.sync()
+                await self.syncLicense()
             }
         }
         player.canPlay = { [weak self] in self?.license.canPlay ?? false }
@@ -234,12 +266,27 @@ public final class AppEnvironment {
         player.preferredSubtitleLanguage = settings.subtitleLanguage.isEmpty || settings.subtitleLanguage == "off" ? nil : settings.subtitleLanguage
     }
 
+    /// `start()` ran (later activations refresh on resume instead).
+    @ObservationIgnored public private(set) var hasStarted = false
+    /// Last resume check (activations closer together than `resumeRefreshMinInterval` are ignored).
+    @ObservationIgnored private var lastResumeCheck: Date?
+    /// EPG reloads tried on resume, by source (a failing XMLTV is not retried on every activation).
+    @ObservationIgnored private var epgResumeAttempts: [String: Date] = [:]
+    /// The resume refresh waits this long (a playback start – QuickStart, the player resuming – goes first).
+    @ObservationIgnored public var resumeRefreshDelay: Duration = .seconds(3)
+    @ObservationIgnored public var resumeRefreshMinInterval: TimeInterval = 60
+    /// The running resume refresh (tests await it).
+    @ObservationIgnored public private(set) var resumeRefresh: Task<Void, Never>?
+
     /// App start: StoreKit listener, config, license sync, account sync, due refreshes.
     public func start() async {
+        hasStarted = true
         store.start()
-        await license.refreshConfig()
-        await license.sync()
-        if account.isSignedIn {
+        if config.backendConfigured {
+            await license.refreshConfig()
+            await license.sync()
+        }
+        if accountsEnabled, account.isSignedIn {
             await syncManager.syncNow()
             lastSyncedAt = await syncManager.lastSyncedAt
             favorites.reload()
@@ -271,8 +318,8 @@ public final class AppEnvironment {
         if isActive {
             license.evaluate()
             Task {
-                await license.sync()
-                if account.isSignedIn {
+                await syncLicense()
+                if accountsEnabled, account.isSignedIn {
                     await syncManager.syncNow()
                     lastSyncedAt = await syncManager.lastSyncedAt
                     self.favorites.reload()
@@ -280,6 +327,7 @@ public final class AppEnvironment {
                 }
             }
             player.resumeAfterRelease()
+            refreshOnResume()
         } else {
             player.release()
             flushDeferredWrites()
@@ -330,15 +378,17 @@ public final class AppEnvironment {
         catalogVersion += 1
     }
 
-    /// Adds a source and loads it; on failure nothing is kept.
+    /// Adds a source and loads it; on failure nothing is kept. The first source becomes the current one; a further
+    /// source does not silently replace the one in use (IOS-08) – the UI offers to switch (`selectSource`).
     public func addSource(name: String, secrets: SourceSecrets,
                           onProgress: @escaping @Sendable (RefreshProgress) -> Void) async throws -> Source {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = Source.make(name: trimmed.isEmpty ? secrets.displayHost : trimmed, secrets: secrets)
+        let hadCurrent = currentSource != nil
         try sourceRepository.save(source, secrets: secrets)
         do {
             let loaded = try await refresher.refresh(sourceId: source.id, includeEpg: false, onProgress: onProgress)
-            settings.currentSourceId = loaded.id
+            if !hadCurrent { settings.currentSourceId = loaded.id }
             reloadSources()
             catalogVersion += 1
             refreshEpgInBackground(sourceId: loaded.id)
@@ -351,9 +401,64 @@ public final class AppEnvironment {
         }
     }
 
-    /// Updates metadata/secrets of an existing source (edit form, EPG shift, auto refresh).
+    /// Updates metadata/secrets of an existing source.
     public func updateSource(_ source: Source, secrets: SourceSecrets? = nil) {
         try? sourceRepository.save(source, secrets: secrets)
+        reloadSources()
+    }
+
+    /// Changes user settings of a source (EPG shift, auto refresh) atomically – a refresh running meanwhile keeps
+    /// its result, the change is not lost to the refresh's copy either.
+    public func updateSource(id: String, _ change: (inout Source) -> Void) {
+        _ = try? sourceRepository.update(id: id, change)
+        reloadSources()
+    }
+
+    /// Source edit (SCREENS §3.9 "Düzenle"): saves the new name / connection data and re-validates by reloading the
+    /// source through the normal (atomic) refresh. On failure the previous name, connection data and status come
+    /// back and the error is thrown – the catalog was never touched. When the provider's host or user name changed
+    /// (new fingerprint), favorites and progress of the source move to the new content keys.
+    @discardableResult
+    public func editSource(id: String, name: String, secrets newSecrets: SourceSecrets,
+                           onProgress: @escaping @Sendable (RefreshProgress) -> Void = { _ in }) async throws -> Source {
+        guard let old = (try? sourceRepository.source(id: id)) ?? nil, let oldSecrets = secrets(for: id) else { throw SourceError.notFound }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var edited = old
+        edited.name = trimmed.isEmpty ? newSecrets.displayHost : trimmed
+        edited.displayHost = newSecrets.displayHost
+        edited.epgUrlOverride = newSecrets.epgUrl != nil
+        let oldFingerprint = fingerprint(sourceId: id)
+        try sourceRepository.save(edited, secrets: newSecrets)
+        fingerprintCache[id] = nil
+        refreshing.insert(id)
+        defer { refreshing.remove(id) }
+        do {
+            let loaded = try await refresher.refresh(sourceId: id, includeEpg: false, onProgress: onProgress)
+            if let oldFingerprint, let newFingerprint = fingerprint(sourceId: id), newFingerprint != oldFingerprint {
+                let moved = (try? library.rekey(fromFingerprint: oldFingerprint, toFingerprint: newFingerprint,
+                                                nowMs: license.nowMs())) ?? []
+                if !moved.isEmpty {
+                    favorites.reload()
+                    libraryChanged()
+                }
+            }
+            reloadSources()
+            catalogVersion += 1
+            refreshEpgInBackground(sourceId: id)
+            return loaded
+        } catch {
+            try? sourceRepository.save(old, secrets: oldSecrets)
+            fingerprintCache[id] = nil
+            reloadSources()
+            throw ErrorClassifier.sourceError(from: error)
+        }
+    }
+
+    /// Settings → Sources order (iOS drag, tvOS move up/down).
+    public func moveSources(from: IndexSet, to: Int) {
+        var ids = sources.map(\.id)
+        ids.move(from: from, to: to)
+        try? sourceRepository.reorder(ids)
         reloadSources()
     }
 
@@ -379,10 +484,8 @@ public final class AppEnvironment {
         Task { [weak self] in
             let count = await refresher.refreshEpg(sourceId: sourceId)
             guard let self else { return }
-            if count != nil {
-                self.reloadSources()
-                self.catalogVersion += 1
-            }
+            self.reloadSources()   // the EPG status (programmes / error) is shown in source management
+            if count != nil { self.catalogVersion += 1 }
         }
     }
 
@@ -390,12 +493,48 @@ public final class AppEnvironment {
     /// refresh setting – sources whose catalog was built with an older `CatalogFormat`. Runs through the
     /// normal refresh pipeline after QuickStart; a successful refresh stores the current format, a failed
     /// one is retried on the next launch.
-    public func refreshDueSources() async {
-        let now = Date()
+    public func refreshDueSources(now: Date = Date()) async {
         for source in sources where !refreshing.contains(source.id) && !restore.sources.contains(where: { $0.id == source.id })
             && (source.isRefreshDue(now: now) || refresher.needsFormatRefresh(sourceId: source.id)) {
             await refreshSource(id: source.id)
         }
+    }
+
+    /// Back in the foreground (B5): tvOS keeps an app suspended for days, so catalog and EPG refreshes that became
+    /// due meanwhile run now – after `resumeRefreshDelay` and never while a playback is starting. Catalog: the
+    /// source's auto-refresh interval; EPG (between catalog refreshes): when the stored guide ends within 24 h,
+    /// at most every 6 h per source.
+    public func refreshOnResume(now: Date = Date()) {
+        guard hasStarted else { return }   // the cold start runs `refreshDueSources` itself
+        if let last = lastResumeCheck, now.timeIntervalSince(last) < resumeRefreshMinInterval { return }
+        lastResumeCheck = now
+        resumeRefresh?.cancel()
+        let delay = resumeRefreshDelay
+        resumeRefresh = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            for _ in 0..<20 {   // a playback start in progress: wait (up to ~10 s more)
+                guard let self, !Task.isCancelled else { return }
+                if self.player.phase != .loading { break }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            guard let self, !Task.isCancelled else { return }
+            let due = self.sources.filter { $0.isRefreshDue(now: now) }.map(\.id)
+            await self.refreshDueSources(now: now)
+            for source in self.sources where !due.contains(source.id) && self.epgNeedsReload(sourceId: source.id, now: now) {
+                self.epgResumeAttempts[source.id] = now
+                self.refreshEpgInBackground(sourceId: source.id)
+            }
+        }
+    }
+
+    /// The stored guide ends within 24 h (or there is none) and no reload was tried in the last 6 h.
+    func epgNeedsReload(sourceId: String, now: Date) -> Bool {
+        guard refresher.epgURL(sourceId: sourceId) != nil, !refreshing.contains(sourceId) else { return false }
+        if let tried = epgResumeAttempts[sourceId], now.timeIntervalSince(tried) < 6 * 3600 { return false }
+        if let loaded = sources.first(where: { $0.id == sourceId })?.lastRefreshResult?.epgLoadedAt,
+           now.timeIntervalSince(loaded) < 6 * 3600 { return false }
+        guard let end = (try? epg.latestEnd(sourceId: sourceId)) ?? nil else { return true }
+        return end.timeIntervalSince(now) < 24 * 3600
     }
 
     public func deleteSource(id: String) {
@@ -467,6 +606,61 @@ public final class AppEnvironment {
             request.startPositionMs = ResumePolicy.startPositionMs(positionMs: progress.data.positionMs, durationMs: progress.data.durationMs)
         }
         return request
+    }
+
+    // MARK: Details (Xtream `get_vod_info` / `get_series_info`)
+
+    private func xtreamClient(sourceId: String) -> XtreamClient? {
+        guard case .xtream(let secrets)? = secrets(for: sourceId) else { return nil }
+        return XtreamClient(sourceId: sourceId, secrets: secrets, transport: transport)
+    }
+
+    /// True for an Xtream source (details and episodes are fetched lazily).
+    public func isXtream(sourceId: String) -> Bool {
+        if case .xtream? = secrets(for: sourceId) { return true }
+        return false
+    }
+
+    /// `get_series_info`: the episodes replace the cached ones of the series, the details are cached with the fetch
+    /// time (revalidated after `ItemDetails.ttl`), cast/director/description become searchable. Throws `SourceError`.
+    @discardableResult
+    public func fetchSeriesInfo(sourceId: String, seriesId: String, now: Date = Date()) async throws -> (episodes: [Episode], details: ItemDetails) {
+        guard let client = xtreamClient(sourceId: sourceId) else { throw SourceError.notFound }
+        let info = try await client.seriesInfo(seriesId: seriesId)
+        let episodes = info.episodes.sorted { ($0.season, $0.number) < ($1.season, $1.number) }
+        let details = ItemDetails(info.details)
+        let catalog = catalog
+        try? catalog.replaceEpisodes(sourceId: sourceId, seriesId: seriesId, episodes: episodes)
+        try? catalog.saveDetails(details, sourceId: sourceId, kind: .series, itemId: seriesId, fetchedAt: now)
+        Task.detached(priority: .utility) {
+            try? catalog.updateDetails(sourceId: sourceId, kind: .series, itemId: seriesId, cast: details.cast,
+                                       director: details.director, plot: details.plot)
+        }
+        return (episodes, details)
+    }
+
+    /// `get_vod_info` of an Xtream movie, cached like `fetchSeriesInfo`. Throws `SourceError`.
+    @discardableResult
+    public func fetchMovieDetails(_ movie: Movie, now: Date = Date()) async throws -> ItemDetails {
+        guard let client = xtreamClient(sourceId: movie.sourceId) else { throw SourceError.notFound }
+        let details = ItemDetails(try await client.vodInfo(vodId: movie.id))
+        let catalog = catalog
+        try? catalog.saveDetails(details, sourceId: movie.sourceId, kind: .movie, itemId: movie.id, fetchedAt: now)
+        Task.detached(priority: .utility) {   // cast/director + description become searchable (SCREENS §3.6)
+            try? catalog.updateDetails(sourceId: movie.sourceId, kind: .movie, itemId: movie.id, cast: details.cast,
+                                       director: details.director, plot: details.plot)
+        }
+        return details
+    }
+
+    /// An episode ready to play. A "Continue watching" entry may only know the episode id (Xtream episodes are
+    /// fetched per series; a progress synced from another device): the stored row, else `get_series_info` once.
+    public func playableEpisode(_ episode: Episode) async -> Episode {
+        if episode.url != nil || episode.containerExt != nil { return episode }
+        if let stored = try? catalog.episode(sourceId: episode.sourceId, id: episode.id) { return stored }
+        guard isXtream(sourceId: episode.sourceId),
+              let fetched = try? await fetchSeriesInfo(sourceId: episode.sourceId, seriesId: episode.seriesId) else { return episode }
+        return fetched.episodes.first { $0.id == episode.id } ?? episode
     }
 
     // MARK: Diagnostics

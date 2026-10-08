@@ -92,14 +92,21 @@ listesinde satır başına tek odak hedefi vardır (favori / arşiv uzun OK men�
 **Geri tuşu kuralları (TV, öngörülebilir):**
 1. Oynatıcıda: açık panel/menü varsa kapatır → yoksa oynatıcıdan çıkar (önceki ekrana, odak
    oynatılan öğede).
-2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir.
+2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir. Film/dizi detayı tam ekrandır,
+   üst sekme çubuğu gizlenir (Apple TV uygulaması gibi; Build 16).
 3. Bir bölümün içeriğinde (satır/grid/EPG): odağı üst sekme çubuğuna taşır. İstisna Filmler/Diziler:
    sağ içerikte (göz atma sayfası / kategori grid'i) önce odağı soldaki kategori sütununa (seçili satır)
    taşır, sütunda ikinci basış sekme çubuğuna (§3.2).
-4. Sekme çubuğundayken: Ana Sayfa değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
-5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında).
+4. Sekme çubuğundayken: sekmenin yığınında açılmış bir sayfa varsa (ör. Favoriler, ayar alt sayfası) önce o
+   sayfa kapanır — yığın kökte değilken uygulamadan **asla** çıkılmaz (Build 16, B-01); kökteyse Ana Sayfa
+   değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
+5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında). Kaynak ekleme hata kartında Menü doldurulmuş
+   forma döner (yazılanlar korunur, B-04).
 
-**Odak kuralları:** Her ekranın varsayılan odak öğesi tanımlıdır (aşağıda ★). Satırlar arası
+**Odak kuralları:** Her ekranın varsayılan odak öğesi tanımlıdır (aşağıda ★). Bir bölgeye dışarıdan
+girildiğinde (sekme çubuğundan ▼, raflardan ▲) geometrik olarak en yakın öğe değil ★ odaklanır: hero ve detay
+eylem satırında beyaz "▶ Oynat / Devam et" pill'i (Favori/Bilgi değil), sezon sekmelerinde seçili sezon,
+kategori sütunlarında seçili satır, TV Rehberi'nde ilk satırın şu an yayındaki bloğu (Build 16). Satırlar arası
 dikey geçişte odak, satırdaki son odaklanan öğeye döner (focus restorer). Liste yeniden
 yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "kaçmaz"
 (wrap yok; sekme çubuğuna yalnızca yukarı basınca / geri tuşuyla geçer).
@@ -113,11 +120,18 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   tek seferlik fiyat (mağazadan alınan yerel fiyat) → **★ Ücretsiz denemeyi başlat** /
   "Satın al" / "Satın alımları geri yükle".
 * Kaynak ekleme seçenekleri: **M3U bağlantısı** · **Xtream Codes** · (TV'de ★) **Telefonla ekle (QR)**.
+  **Build 16:** hesaplar/QR eşleştirme `ACCOUNTS_ENABLED = NO` (xcconfig, Info.plist) ile gizli – backend canlı
+  olana kadar QR seçeneği, "Telefonla giriş yap", hesap satırları ve paywall hesap notu görünmez, backend'e
+  (lisans senkronu dahil) hiç istek gitmez; yer tutucu backend URL'si (`*.example…`) ile de aynı. tvOS
+  karşılamada odak ilk "kaynak ekle" seçeneğindedir.
   * M3U formu: Ad, URL, (isteğe bağlı) EPG URL, gelişmiş: User-Agent.
   * Xtream formu: Ad, Sunucu (`http://host:port`), Kullanıcı adı, Şifre (göster/gizle).
   * "Bağlan" → ilerleme (adım adım: *Bağlanılıyor → Hesap doğrulanıyor → Kanallar yükleniyor (12 430)
     → EPG yükleniyor*) → başarı ekranında özet (kanal / film / dizi sayıları, hesap bitiş tarihi).
-  * Hatalar ayrı ayrı (bkz. §4). Kaydet butonu yalnızca form geçerliyken aktif.
+  * Hatalar ayrı ayrı (bkz. §4). Kaydet butonu yalnızca form geçerliyken aktif. Form içindeki hata kartı her
+    zaman **Düzenle** (forma dön) sunar, hiçbir zaman **Kaynağı sil** sunmaz (henüz kayıtlı kaynak yok).
+  * İkinci ve sonraki kaynak eklenince **aktif kaynak değişmez**; başarı ekranında "Bu kaynağı kullan"
+    düğmesi vardır. Kaynak seçicide (iOS) ve Kaynaklar listesinde aktif kaynak ✓ / "Aktif" ile işaretlidir.
 * TV QR akışı: büyük QR + kısa kod (`ABC-123`) + `{BASE}/pair` adresi + geri sayım (10 dk).
   Telefon formu doldurup gönderince TV otomatik "Kaynak alındı – bağlanılıyor…" ekranına geçer.
   Süre dolarsa "Yeni kod al".
@@ -188,7 +202,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     o kategorinin grid'i (odak sütunda kalır, ▶ grid'e geçer). Uzun OK: sabitle / gizle (gizlenende tekrar
     göster). Ülke değişince ya da seçili kategori sabitlemesi kaldırılıp / gizlenip sütundan çıkınca sağda
     yeniden Keşfet açılır. **Geri:** sağ içerikte → odak sütundaki seçili satıra (satır artık yoksa
-    Keşfet'e); sütunda → üst sekme çubuğu (§2 TV).
+    Keşfet'e); sütunda → üst sekme çubuğu (§2 TV). Keşfet sayfası kategori grid'i açıkken **canlı kalır**
+    (gizli, odaklanamaz): Keşfet'e OK anında, satırlar/görseller ve kaydırma konumu korunarak geri gelir
+    (Build 16, M-09). Sağ içerik üstte (yüzen sekme çubuğunun altında) ve solda (sütunun önünde) kırpılır;
+    Canlı TV listesi de üstte kırpılır.
     Sütunda arama yok (genel arama sekmesi var).
 * **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
@@ -245,10 +262,17 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * Kanal başına bir satır: solda sabit renkli logo karosu (genişliğin ~¼'ü), sağda yatay kaydırılan
   program blokları; **tüm satırlar aynı zaman eksenini paylaşır** (üstte "Bugün" + 30 dk işaretleri,
   "şimdi" ▼ işareti ve kırmızı `live` dikey çizgi). Şu an yayındaki blok kanal rengiyle vurgulu, geçen
-  kısım koyu; bloklar karonun altına kayar, metin görünür kalır.
+  kısım koyu; bloklar karonun altına kayar, metin görünür kalır. Metin bloğun içinde dizilir ve kırpılır;
+  dar bloklar önce kanal adını, daha da darsa saati bırakır (kısa programlar komşu bloğun üstüne yazmaz).
+* **Zaman penceresi saati izler:** dakikada bir "şimdi" çizgisi ve yayındaki bloklar güncellenir; şimdi açılış
+  konumundan 30 dk ilerleyince pencere yeniden "şimdi" karonun hemen sağında olacak şekilde kayar (açık
+  bırakılan rehber donmaz / boşalmaz). Canlı TV listesinin şimdi/sonra bilgisi de dakikada bir yenilenir.
 * Üstte kategori çipleri (Tümü · Favoriler · kategoriler).
 * **iPad (geniş) ve TV:** sağda panel — **"Şimdi yayında"** (seçili/odaklı kanalın programı, saat, açıklama,
-  "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok.
+  "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok. TV'de odak gelecekteki
+  / geçmiş bir bloktaysa panel o programı gösterir (**"Daha sonra"** / **"Daha önce"** başlığı, saat, açıklama;
+  "Bugün" listesi onun ardından başlar). Liste kartın içinde kırpılır.
+* **TV ★:** sekme çubuğundan/çiplerden ▼ ilk satırın şu an yayındaki bloğuna iner, "şimdi" çizgisi görünür kalır.
 * Dokun / OK → kanal oynar (iPad'de karoya dokunmak paneli o kanala getirir). TV'de D-pad ▲▼ kanallar,
   ◀▶ programlar arası. Uzun bas → favori / gizle menüsü.
 * **Geçmiş yayın (catch-up) arşivi:** kanal destekliyorsa panelde/kartta ⟲ → sheet "TV arşivi ·
@@ -260,12 +284,21 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 ### 3.5 Film ve dizi detayı
 * Tam genişlikte hero görsel (iPhone ~%50 yükseklik, TV tam ekran arka plan), ortada büyük **yuvarlak
   ▶ oynat** butonu, sağ üstte **✕ kapat**. Altında büyük başlık; "★ 7.8 · 2024 · 1 sa 52 dk" (dizide
-  sezon sayısı); kısa açıklama; "Tür: …" satırı; küçük eylem satırı: ☆ favori (tek dokunuş, §2) · ⟲ baştan oynat
-  (devam varsa) · format pill ("MKV · HD"). Birincil eylem metni: "Oynat" / "Devam et (01:12:30)" /
+  sezon sayısı); kısa açıklama; "Tür: …" satırı – **sağlayıcının türü** (`get_vod_info` / `get_series_info`
+  `genre`), kategori adı asla tür olarak gösterilmez; "Oyuncular: …", "Yönetmen: …" satırları; küçük eylem satırı:
+  ☆ favori (tek dokunuş, §2) · ⟲ baştan oynat (devam varsa) · **Fragman** (YouTube kimliği/URL'si varsa; iOS'ta
+  YouTube uygulaması/web, tvOS'ta gizli) · format pill ("MKV · HD"). Detay verileri (`item_details`) önbellekte
+  tutulur, bir sonraki açılışta hemen görünür ve 6 saatten eskiyse arka planda yenilenir. Birincil eylem metni: "Oynat" / "Devam et (01:12:30)" /
   "Devam et S02E05".
 * **Dizi:** sezonlar yatay **metin sekmeleri** ("Sezon 1 · Sezon 2 …", seçili `primary` alt çizgi);
   bölüm satırı = 16:9 küçük resim (ortada oynat ikonu, altta ilerleme) + "1. Başlık" + süre /
-  izlendi ✓. ★ "Devam et S02E05" (son izlenen bölüm; bitmişse sonraki). TV'de bölümler yatay 16:9 kart rafı.
+  izlendi ✓. ★ "Devam et S02E05" (son izlenen bölüm — konumu %5'in altında olsa da; bitmişse sonraki).
+  Detay yığında açık kalırken bir bölüm oynatılınca birincil eylem ve bölüm ilerlemeleri hemen güncellenir
+  (kütüphane değişince tek sorguyla yeniden okunur). Önbellekteki bölümler hemen gösterilir, 6 saatten eskiyse
+  `get_series_info` arka planda yeniden istenir (haftalık yeni bölümler); hiç bölüm yokken istek başarısız olursa
+  boş sayfa yerine hata kartı + **Tekrar dene**. Sağlayıcı başlığı numarayı zaten içeriyorsa ("Bölüm 3") numara
+  iki kez yazılmaz; izlenmemiş bölümde boş ilerleme çizgisi yok. Format pill'i hiçbir zaman alt satıra kırılmaz.
+  TV'de bölümler yatay 16:9 kart rafı.
 * **Sonraki bölüm (Build 16, iOS + tvOS):** bölümün son 90 sn'sinde sonraki bölüm aranır (aynı sezonda sonraki
   numara, yoksa bir sonraki mevcut sezonun ilk bölümü; kayıtlı liste yoksa / son kayıtlı bölümse Xtream'de
   `get_series_info` tembel yüklenir ve liste kaydedilir). Son **30 sn**'de (jenerik) ya da bölüm bitince sağ altta kart:
@@ -501,8 +534,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   *Ödeme bekleniyor* (bekleyen işlem: "Ödeme onaylandığında erişim otomatik açılır").
 * **★ Satın al – ₺xx,xx** (mağaza yerel fiyatı) · **Satın alımları geri yükle** · Kullanım
   koşulları · Gizlilik.
-* Hesap bölümü (isteğe bağlı): "Farklı platformda (Apple ↔ Google) satın aldıysanız hesabınıza
-  giriş yapın".
+* Kullanım koşulları ve Gizlilik **bağlantıdır** (iOS: `Link`, URL'ler `TERMS_URL` / `PRIVACY_URL` –
+  varsayılan hasi-elektronic.de/agb ve /datenschutz); tvOS'ta düğme → QR kod + okunur URL.
+* Hesap bölümü (isteğe bağlı, yalnızca hesaplar etkinken): "Farklı platformda (Apple ↔ Google) satın aldıysanız
+  hesabınıza giriş yapın".
 * Satın alma sonuçları: başarı (konfeti yok, sade onay), iptal (sessiz), hata (mağaza mesajı),
   bekliyor (banner), zaten sahip (geri yükleme yapar).
 
@@ -530,19 +565,33 @@ ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te
   web sitesi hasi-elektronic.de ve e-posta info@hasi-elektronic.de (iOS: bağlantı / mailto; tvOS: düz metin,
   tarayıcı yok) · **Açık kaynak lisansları** satırı (VLCKit LGPL-2.1 → lisans ekranı) · alt bilgi
   "© 2026 Hasi Elektronic". tvOS: satır başına tek odaklanabilir öğe, liste odakla kayar.
-* **Kaynaklar ekranı:** liste (ad, tür, host, son yenileme, durum rozeti, hesap bitiş tarihi) →
-  detay: Yenile · Düzenle · EPG URL · EPG saat kaydırma (−12..+12 saat, 15 dk adım) ·
-  Otomatik yenileme (Kapalı/6/12/24 saat) · Sil (onaylı). "Kaynak ekle": **+ M3U** · **+ Xtream** ·
-  (TV) **Telefonla ekle (QR)**.
+* **Kaynaklar ekranı:** liste (ad, tür, host, son yenileme, durum rozeti, hesap bitiş tarihi, birden çok
+  kaynakta aktif olana "Aktif" ✓) – sıralama iOS'ta "Sırala" ile sürükle-bırak, tvOS'ta detayda **Yukarı taşı /
+  Aşağı taşı** →
+  detay: durum (katalog sayıları yerel sayı biçimiyle; **EPG durumu**: "TV rehberi: N program · tarih" veya hata
+  `err_epg_failed` – EPG hatası artık sessiz değil) · Yenile · (aktif değilse) Bu kaynağı kullan · **Düzenle**
+  (ekleme formu doldurulmuş olarak: ad, sunucu/kullanıcı/şifre veya M3U URL, EPG URL, User-Agent; Kaydet yeniden
+  doğrular ve yeniler, hata olursa eski bilgiler aynen kalır; sağlayıcının host/kullanıcı adı değişirse favori ve
+  izleme ilerlemesi yeni parmak izine taşınır) · **EPG URL** (yalnızca host + yol, kimlik bilgisi asla; boşsa
+  "Varsayılan: …" – Xtream `xmltv.php`, M3U `x-tvg-url`) · EPG saat kaydırma (seçici: −12..+12 saat, 30 dk
+  adım; iOS'ta ek olarak ±15 dk düğmeleri, VoiceOver etiketli) · Otomatik yenileme (Kapalı/6/12/24 saat) ·
+  Sil (onaylı). "Kaynak ekle": **+ M3U** · **+ Xtream** · (TV, yalnızca hesaplar etkinken) **Telefonla ekle (QR)**.
+* **Yenileme zamanlaması:** otomatik yenileme soğuk açılışta **ve uygulama ön plana döndüğünde** (en fazla
+  dakikada bir kontrol, oynatma başlarken beklenir) vadesi gelmiş kaynaklarda çalışır; katalog vadesi gelmemiş
+  kaynaklarda saklı rehber 24 saatten kısa sürede bitiyorsa EPG ayrıca (kaynak başına en fazla 6 saatte bir)
+  yenilenir.
 * **Uygulama dili:** Sistem / Deutsch / Türkçe / English – dil adları her zaman kendi dilinde. Arayüz üç
   dilde tamdır (EN/TR/DE); "Sistem" cihaz dilini izler, desteklenmeyen dillerde English. Dil değişince
   arayüz hemen yeniden çizilir; tarih/saat seçilen dile göre biçimlenir (DE/TR: 24 saat).
 * **Gelişmiş ve tanılama** ekranı:
   * **Oynatma:** görüntü oranı varsayılanı, canlı yayın formatı (Android: Otomatik/TS/HLS), arabellek
-    (Normal/Büyük), TV'de önizleme oynatıcısı.
-  * **Görünüm:** EPG saat dilimi (Cihaz/özel), 24 saat biçimi.
-  * **Hesap (opsiyonel):** e-posta ile giriş (kod), TV'de "Telefonla giriş yap" (cihaz kodu + QR),
-    senkronizasyon durumu, çıkış, **hesabı sil**.
+    (Normal/Büyük). (Apple: işlevsiz "TV'de önizleme" anahtarı Build 16'da kaldırıldı.)
+  * **Görünüm:** EPG saat dilimi – "Cihaz" veya aranabilir tüm IANA saat dilimleri listesi (UTC farkıyla);
+    24 saat biçimi – seçilmemişse arayüz dilinin yerel ayarını izler (DE/TR 24 saat, EN-US 12 saat).
+  * **Ses / altyazı dili tercihi:** tüm ISO 639-1 dilleri (önce TR, DE, EN, AR, KU, FR, ES, IT, RU, PL, NL,
+    sonra arayüz dilindeki ada göre).
+  * **Hesap (opsiyonel, yalnızca `ACCOUNTS_ENABLED` + gerçek backend):** e-posta ile giriş (kod), TV'de
+    "Telefonla giriş yap" (cihaz kodu + QR), senkronizasyon durumu, çıkış, **hesabı sil**.
   * **Satın alma:** durum, geri yükle.
   * **Gelişmiş** grubunun başında (Apple, Build 15 – A/V senkron A/B testi): **Oynatıcı motoru**
     Otomatik (varsayılan) / Apple (AVPlayer) / VLC – cihaza özel, bir sonraki açılıştan geçerli; oynatıcı
@@ -551,13 +600,14 @@ ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te
     kareden önce hata → "Sağlayıcınızdan HLS isteyin – veya motoru Otomatik yapın"); AVPlayer'ın açamadığı
     içerik (MKV, AVI…) → format hatası + "Bu içerik VLC motoruna ihtiyaç duyuyor – Otomatik yapın". VLC: her şey
     VLCKit ile (HLS ikiz denemesi yok). Hemen altında **Senkronu sıfırla** (panel ile aynı; kısa onay aynı satırın
-    sağında, 2,5 sn). Alt bilgide açıklama. Performans katmanının ilk satırı kalın: "Motor: AVPlayer" / "Motor: VLCKit"
+    altında ikinci satır olarak, kesilmeden, 2,5 sn). Alt bilgide açıklama. Performans katmanının ilk satırı kalın: "Motor: AVPlayer" / "Motor: VLCKit"
     (+ "· Ayarlar'da zorunlu"), ses gecikmesi satırı "Ses gecikmesi: N ms (cihaz M, kanal K)" (N = motorun
     uyguladığı).
   * **Tanılama:** Format testi (`stream-samples.json`; Apple'da her örneğin motoru – AVPlayer/VLCKit –
     gösterilir ve `expect.apple` ile karşılaştırılır), performans katmanı, önbelleği temizle (görsel / EPG),
     uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +
-    tam metin, diğer bileşenler), gizlilik politikası.
+    tam metin, diğer bileşenler), **Gizlilik politikası** ve **Kullanım koşulları** bağlantıları (iOS: tarayıcı;
+    tvOS: QR + URL; Hakkında ekranında da).
 * Kilitliyken bu ekran tamamen erişilebilir.
 
 ## 4. Hata ve boş durumlar (ayrı ayrı mesajlar)
@@ -589,4 +639,7 @@ bağlanma politikası, sonra kart).
 ## 5. Erişilebilirlik
 * Tüm ikon butonlarda içerik açıklaması (TalkBack/VoiceOver).
 * Dokunma hedefi ≥ 48 dp / 44 pt. Kontrast ≥ 4.5:1 (metin), odak halkası ≥ 3:1.
-* Dinamik yazı boyutu (mobil) desteklenir; TV'de sabit büyük ölçek.
+* Dinamik yazı boyutu (mobil) desteklenir; TV'de sabit büyük ölçek. Erişilebilirlik boyutlarında (AX) hero
+  eylemleri alt alta dizilir (tam genişlik "▶" pill'i, altında Favori · Bilgi); Canlı TV satırında kanal adı
+  kendi satırlarında, saat başlığın üstünde, program başlığı en çok 3 satır (Build 16).
+* iPhone arama: sonuçlar alttaki yüzen arama kapsülünün üstüne kaydırılabilir (yatayda ilk satırı örtmez).

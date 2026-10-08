@@ -64,8 +64,9 @@ final class TVCategoryDiscoverTests: XCTestCase {
         // back (the "Recently opened" section appears above the categories).
         for pass in 1...3 {
             let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'category_row_'")).firstMatch
-            // Pass 1: the column focus may sit below the first row; pass 2 starts on Discover (the row above it).
-            let ok = pass == 1 ? focus(row, pressing: .up, limit: 20) : focus(row, pressing: .down, limit: 3) || focus(row, pressing: .up, limit: 20)
+            // Entering the column lands on the selected row (Discover, Build 16 B-13), the first category is below it;
+            // later passes start on Discover too.
+            let ok = focus(row, pressing: .down, limit: 3) || focus(row, pressing: .up, limit: 20)
             XCTAssertTrue(ok, "a category row (pass \(pass))")
             remote.press(.select)
             let gridPoster = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'grid_'")).firstMatch

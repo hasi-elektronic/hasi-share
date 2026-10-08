@@ -198,6 +198,15 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     /// Reads in a task with this set are interrupted when the task is cancelled (stale searches).
     @TaskLocal public static var interruptsOnCancel = false
+    /// Busy wait of the writer connection (all writes go through it; within the app they are serialized by its
+    /// lock, so BUSY only comes from outside: another connection still closing, WAL recovery).
+    public static let writerBusyTimeoutMs: Int32 = 5000
+
+    /// True for SQLITE_BUSY / SQLITE_LOCKED (extended codes included): a lock held elsewhere, not a damaged file.
+    public static func isBusy(_ error: Error) -> Bool {
+        guard let error = error as? SQLiteError else { return false }
+        return [5, 6].contains(error.code & 0xFF)
+    }
 
     /// Opens (creating) a database. `path == nil` → private in-memory database (tests; no read connection).
     public init(path: String?) throws {
@@ -207,6 +216,9 @@ public final class SQLiteDatabase: @unchecked Sendable {
         if path != nil { flags |= SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION }
         #endif
         writer = try SQLiteConnection(path: self.path, flags: flags)
+        // Another connection (a second process, a database still closing, WAL recovery) may hold a lock for a
+        // moment: wait for it instead of failing with SQLITE_BUSY ("database is locked").
+        sqlite3_busy_timeout(writer.handle, Self.writerBusyTimeoutMs)
         try writer.execute("PRAGMA foreign_keys = OFF; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -32000;")
         if path != nil { try writer.execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;") }
         if path != nil {
