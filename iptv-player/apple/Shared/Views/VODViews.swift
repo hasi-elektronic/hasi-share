@@ -151,6 +151,8 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
         .scrollClipDisabled()
         .ignoresSafeArea()
         .screenBackground()
+        // Full-screen detail like Apple's TV app: no floating tab bar over the hero (B-24); Menu goes back.
+        .toolbar(.hidden, for: .tabBar)
         #else
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {

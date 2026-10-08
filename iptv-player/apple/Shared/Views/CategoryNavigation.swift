@@ -610,6 +610,9 @@ struct TVCategoryBrowseView: View {
         .scrollClipDisabled()
         .tvTopClipped()
         .focusSection()
+        // ◀ from the content lands on the selected row (Discover or the open category), not on the
+        // geometrically nearest one (B-13).
+        .defaultFocus($focused, columnKeys(model).contains(lastColumnKey) ? lastColumnKey : "discover", priority: .userInitiated)
         .accessibilityIdentifier("category_column")
     }
 

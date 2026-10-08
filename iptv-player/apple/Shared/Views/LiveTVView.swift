@@ -463,6 +463,8 @@ private struct LiveCategoryChips: View {
 private struct LiveCategoryColumn: View {
     @Environment(AppEnvironment.self) private var env
     @Bindable var model: LiveTVViewModel
+    /// ◀ from the list lands on the selected category (B-13), not the geometrically nearest row.
+    @FocusState private var focusedIndex: Int?
 
     var body: some View {
         let items = chipItems(model, env: env)
@@ -483,6 +485,7 @@ private struct LiveCategoryColumn: View {
                         .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Theme.surfaceElevated : Color.clear))
                     }
                     .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+                    .focused($focusedIndex, equals: index)
                     .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
                     .accessibilityAddTraits(selected ? .isSelected : [])
                     .accessibilityIdentifier("live_chip_\(index)")
@@ -504,6 +507,7 @@ private struct LiveCategoryColumn: View {
         .scrollClipDisabled()
         .tvTopClipped()
         .focusSection()
+        .defaultFocus($focusedIndex, items.firstIndex { $0.id == model.filter } ?? 0, priority: .userInitiated)
         .accessibilityIdentifier("live_category_chips")
     }
 }
@@ -556,6 +560,8 @@ struct GuideView: View {
     @State private var archiveChannel: Channel?
     /// Row the EPG list scrolls to ("Show in TV guide").
     @State private var scrollTarget: String?
+    /// tvOS: the focused programme block – the panel describes it (B-09).
+    @State private var focusedProgram: EpgProgram?
 
     private var showsPanel: Bool {
         #if os(tvOS)
@@ -579,10 +585,12 @@ struct GuideView: View {
                 } else {
                     HStack(alignment: .top, spacing: Theme.isTV ? 30 : 16) {
                         EpgListView(rows: rows, zapList: model.channels,
-                                    onSelect: showsPanel ? { selected = $0 } : nil, scrollTarget: scrollTarget) { model.loadMoreIfNeeded(current: $0) }
+                                    onSelect: showsPanel ? { selected = $0 } : nil,
+                                    onProgramFocus: Theme.isTV ? { selected = $0; focusedProgram = $1 } : nil,
+                                    scrollTarget: scrollTarget) { model.loadMoreIfNeeded(current: $0) }
                         if showsPanel {
                             GuidePanel(channel: selected ?? rows.first?.channel, zapList: model.channels,
-                                       onArchive: { archiveChannel = $0 })
+                                       onArchive: { archiveChannel = $0 }, focusedProgram: focusedProgram)
                                 .frame(width: Theme.isTV ? 520 : 320)
                                 .padding(.trailing, Theme.safeH)
                         }
@@ -631,6 +639,8 @@ private struct GuidePanel: View {
     let channel: Channel?
     let zapList: [Channel]
     let onArchive: (Channel) -> Void
+    /// tvOS guide: the focused block; a past / future programme is described instead of the one on air (B-09).
+    var focusedProgram: EpgProgram? = nil
     /// Live list panel: ▶ Play · ⭐ · Guide · ⟲ (iOS; tvOS keeps one focus target per list row).
     var liveActions = false
     var identifier = "guide_panel"
@@ -643,11 +653,16 @@ private struct GuidePanel: View {
     @ViewBuilder
     private func content(now: Date) -> some View {
         let programs = channel.map(load) ?? []
-        let current = programs.first { $0.isOnAir(at: now) }
-        let upcoming = programs.filter { $0.start > now }.prefix(Theme.isTV ? 6 : 10)
+        let onAir = programs.first { $0.isOnAir(at: now) }
+        // The focused block of this channel when it is not the one on air: "Later" / "Earlier".
+        let other = focusedProgram.flatMap { p in
+            p.channelEpgId.lowercased() == channel?.epgId?.lowercased() && !p.isOnAir(at: now) ? p : nil
+        }
+        let current = other ?? onAir
+        let upcoming = programs.filter { $0.start > (other.map { max($0.end, now) } ?? now) }.prefix(Theme.isTV ? 6 : 10)
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.isTV ? 18 : 12) {
-                header("epg_now_on_air")
+                header(other.map { $0.start > now ? "epg_later" : "epg_earlier" } ?? "epg_now_on_air")
                 if let channel {
                     HStack(spacing: 12) {
                         ChannelTile(channel: channel, width: Theme.isTV ? 96 : 56, height: Theme.isTV ? 96 : 56, radius: 10)
@@ -657,7 +672,7 @@ private struct GuidePanel: View {
                         Text(current.title).font(Theme.isTV ? Theme.body.weight(.bold) : .subheadline.weight(.bold)).foregroundStyle(Theme.textPrimary)
                         Text(env.timeFormatter.range(start: current.start, end: current.end))
                             .font(Theme.isTV ? Theme.caption : .caption).foregroundStyle(Theme.textSecondary)
-                        ProgressBar(value: EpgSchedule.progress(of: current, at: now)).frame(height: 4)
+                        if other == nil { ProgressBar(value: EpgSchedule.progress(of: current, at: now)).frame(height: 4) }
                         if let d = current.description {
                             Text(d).font(Theme.isTV ? .system(size: 22) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(4)
                         }
@@ -872,6 +887,8 @@ struct EpgListView: View {
     let zapList: [Channel]
     /// iPad: tile tap selects the channel for the side panel; tvOS: called on focus.
     var onSelect: ((Channel) -> Void)? = nil
+    /// tvOS: a programme block got the focus (nil programme = "no information" block).
+    var onProgramFocus: ((Channel, EpgProgram?) -> Void)? = nil
     /// Channel id to scroll to (set → scrolls once).
     var scrollTarget: String? = nil
     var onRowAppear: (ChannelRow) -> Void = { _ in }
@@ -891,7 +908,7 @@ struct EpgListView: View {
                         LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
                             ForEach(rows) { row in
                                 EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now,
-                                           focus: $focusedBlock, onSelect: onSelect)
+                                           focus: $focusedBlock, onSelect: onSelect, onProgramFocus: onProgramFocus)
                                     .id(row.id)
                                     .onAppear { onRowAppear(row) }
                             }
@@ -1003,6 +1020,7 @@ private struct EpgRowView: View {
     let now: Date
     let focus: FocusState<String?>.Binding
     var onSelect: ((Channel) -> Void)?
+    var onProgramFocus: ((Channel, EpgProgram?) -> Void)?
     @State private var programs: [EpgProgram]?
 
     private var channel: Channel { row.channel }
@@ -1087,7 +1105,7 @@ private struct EpgRowView: View {
         return EpgBlockButton(action: play) {
             EpgBlockLabel(channel: channel, program: p, onAir: onAir, isPast: isPast, elapsed: elapsed,
                           inset: inset, width: width, timeText: p.map { env.timeFormatter.time($0.start) }, isFirst: isFirst,
-                          onFocus: { onSelect?(channel) })
+                          onFocus: { onSelect?(channel); onProgramFocus?(channel, p) })
                 .frame(width: width, height: EpgMetrics.rowHeight, alignment: .leading)
         }
         .focused(focus, equals: onAir ? EpgBlockKey.now(channel.id) : EpgBlockKey.at(channel.id, p?.start ?? timeline.start))

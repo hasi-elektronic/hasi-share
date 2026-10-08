@@ -39,22 +39,39 @@ final class TVNavigationLayoutTests: XCTestCase {
         return focusedTab.exists
     }
 
-    /// B-01: Menu with the focus on the floating tab bar over a pushed detail page popped nothing – the system
-    /// left the app. It must pop the detail (never exit while the tab's stack is not at its root).
+    /// B-01: Menu with the focus on the floating tab bar over a pushed page (Favorites on Home) popped nothing –
+    /// the system left the app. It must pop the page (never exit while the tab's stack is not at its root).
     @MainActor
-    func testMenuOnTabBarOverDetailPopsTheDetail() throws {
-        let app = UITestSupport.launch(["-uiScreen", "movieDetail", "-uiSeedLibrary"])
-        let play = app.buttons["detail_play"]
-        XCTAssertTrue(play.waitForExistence(timeout: 30), "movie detail pushed on Home")
+    func testMenuOnTabBarOverPushedPagePopsIt() throws {
+        let app = UITestSupport.launch(["-uiScreen", "favorites", "-uiSeedLibrary"])
+        let segment = app.descendants(matching: .any)["favorites_segment"]
+        XCTAssertTrue(segment.waitForExistence(timeout: 30), "Favorites pushed on Home")
         sleep(2)
-        XCTAssertTrue(focusTabBar(app), "▲ from the detail reaches the tab bar")
-        UITestSupport.snap("b16-tvos-01-tabbar-over-detail", in: self)
+        XCTAssertTrue(focusTabBar(app), "▲ from the page reaches the tab bar")
+        UITestSupport.snap("b16-tvos-01-tabbar-over-page", in: self)
         remote.press(.menu)
-        XCTAssertTrue(play.waitForNonExistence(timeout: 5), "Menu pops the detail")
+        XCTAssertTrue(segment.waitForNonExistence(timeout: 5), "Menu pops the page")
         sleep(1)
         XCTAssertEqual(app.state, .runningForeground, "the app is still in front")
         XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 5), "Home root shown")
         UITestSupport.snap("b16-tvos-02-after-menu", in: self)
+    }
+
+    /// B-24: detail pages are full screen (no tab bar over the hero, so ▲ cannot reach it); Menu goes back.
+    @MainActor
+    func testDetailHidesTheTabBar() throws {
+        let app = UITestSupport.launch(["-uiScreen", "movieDetail", "-uiSeedLibrary"])
+        let play = app.buttons["detail_play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 30))
+        sleep(2)
+        for _ in 0..<4 { remote.press(.up); usleep(400_000) }
+        let focusedTab = app.tabBars.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
+        XCTAssertFalse(focusedTab.exists, "no tab bar to focus on the detail")
+        UITestSupport.snap("b16-tvos-01b-detail-full-screen", in: self)
+        remote.press(.menu)
+        XCTAssertTrue(play.waitForNonExistence(timeout: 5), "Menu pops the detail")
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertTrue(app.buttons["hero_play"].waitForExistence(timeout: 5))
     }
 
     /// B-12: ▼ from the tab bar on Home focuses the primary ▶ pill, not "Favorite".
@@ -88,6 +105,12 @@ final class TVNavigationLayoutTests: XCTestCase {
         let firstNow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'epg_now_'")).firstMatch
         XCTAssertEqual(focusedBlock.identifier, firstNow.identifier, "in the first row")
         UITestSupport.snap("b16-tvos-04-guide-now-focused", in: self)
+        // B-09: ▶ to a later programme → the panel describes it ("Later") instead of the one on air.
+        XCTAssertTrue(app.staticTexts["Now on air"].exists, "panel on the airing programme")
+        remote.press(.right)
+        sleep(1)
+        XCTAssertTrue(app.staticTexts["Later"].waitForExistence(timeout: 3), "panel follows the focused block")
+        UITestSupport.snap("b16-tvos-04b-guide-later", in: self)
     }
 
     /// B-04: Menu on the add-source error card returns to the filled form (nothing typed is lost).
