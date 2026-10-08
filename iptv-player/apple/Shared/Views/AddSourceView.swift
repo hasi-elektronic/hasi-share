@@ -2,7 +2,8 @@ import IPTVCore
 import IPTVKit
 import SwiftUI
 
-/// M3U / Xtream form → stepwise progress → summary or precise error (SCREENS §3.1).
+/// M3U / Xtream form → stepwise progress → summary or precise error (SCREENS §3.1). With `editing` the same form
+/// edits a source (Settings → source → Edit, SCREENS §3.9): prefilled, saving re-validates and reloads it.
 struct AddSourceView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
@@ -10,6 +11,7 @@ struct AddSourceView: View {
     @State private var model: AddSourceViewModel?
     let kind: AddSourceViewModel.Kind
     var payload: PairPayload?
+    var editing: Source?
 
     var body: some View {
         Group {
@@ -21,10 +23,10 @@ struct AddSourceView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .screenBackground()
-        .navigationTitle(L10n.t(kind == .m3u ? "add_source_m3u" : "add_source_xtream"))
+        .navigationTitle(L10n.t(editing != nil ? "source_edit_title" : kind == .m3u ? "add_source_m3u" : "add_source_xtream"))
         .onAppear {
             guard model == nil else { return }
-            let m = AddSourceViewModel(env: env, kind: kind)
+            let m = editing.map { AddSourceViewModel(env: env, editing: $0) } ?? AddSourceViewModel(env: env, kind: kind)
             if let payload {
                 m.apply(payload)
                 m.connect()
@@ -51,9 +53,9 @@ struct AddSourceView: View {
             // screen that presents the settings sheet.
             .onAppear { if env.sources.isEmpty { router.onboarding = true } }
         case .success(let source):
-            successView(source)
+            successView(source, edited: model.isEditing)
         case .failed(let error):
-            ErrorCardView(presentation: error.presentation(formatDate: { L10n.date($0, date: .long, time: .omitted) })) { action in
+            ErrorCardView(presentation: formPresentation(error)) { action in
                 switch action {
                 case .retry, .refresh: model.connect()
                 default: model.backToForm()
@@ -63,13 +65,20 @@ struct AddSourceView: View {
         }
     }
 
-    private func successView(_ source: Source) -> some View {
+    /// IOS-21: inside the form every error offers "Edit" (back to the form) and never "Delete source".
+    private func formPresentation(_ error: SourceError) -> ErrorPresentation {
+        var presentation = error.presentation(formatDate: { L10n.date($0, date: .long, time: .omitted) })
+        presentation.actions = AddSourceViewModel.formErrorActions(presentation.actions)
+        return presentation
+    }
+
+    private func successView(_ source: Source, edited: Bool) -> some View {
         let status = source.lastRefreshResult ?? SourceStatus()
         return VStack(spacing: Theme.isTV ? 24 : 14) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: Theme.isTV ? 96 : 64)).foregroundStyle(Theme.success)
-            LText("source_added_title").font(Theme.title).foregroundStyle(Theme.textPrimary)
+            LText(edited ? "source_saved_title" : "source_added_title").font(Theme.title).foregroundStyle(Theme.textPrimary)
             Text(source.name).font(Theme.headline).foregroundStyle(Theme.textSecondary)
-            LText("source_summary", "\(status.liveCount)", "\(status.movieCount)", "\(status.seriesCount)")
+            LText("source_summary", L10n.number(status.liveCount), L10n.number(status.movieCount), L10n.number(status.seriesCount))
                 .font(Theme.body).foregroundStyle(Theme.textPrimary)
             if let account = source.xtreamAccount {
                 if let expires = account.expiresAt {
@@ -78,11 +87,21 @@ struct AddSourceView: View {
                     LText("source_unlimited").font(Theme.caption).foregroundStyle(Theme.textSecondary)
                 }
             }
+            // IOS-08: a further source does not replace the one in use – switching is offered here.
+            if !edited, env.currentSource?.id != source.id {
+                Button(L10n.t("source_use")) {
+                    env.selectSource(source.id)
+                    router.onboarding = false
+                    dismiss()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("add_source_use")
+            }
             Button(L10n.t("action_continue")) {
                 router.onboarding = false
                 dismiss()
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(!edited && env.currentSource?.id != source.id ? AnyButtonStyle(SecondaryButtonStyle()) : AnyButtonStyle(PrimaryButtonStyle()))
             .accessibilityIdentifier("add_source_continue")
         }
         .padding(Theme.safeH)
@@ -103,6 +122,7 @@ struct AddSourceView: View {
 private struct AddSourceForm: View {
     @Bindable var model: AddSourceViewModel
     @State private var showAdvanced = false
+    @State private var didInit = false
 
     var body: some View {
         Form {
@@ -148,16 +168,23 @@ private struct AddSourceForm: View {
             }
             Section {
                 Toggle(L10n.t("field_advanced"), isOn: $showAdvanced)
+                    .accessibilityIdentifier("field_advanced")
                 if showAdvanced {
                     TextField(L10n.t("field_epg_url"), text: $model.epgURL).urlField()
+                        .accessibilityIdentifier("field_epg_url")
                     if model.epgURLError { LText("validation_url").font(.caption).foregroundStyle(Theme.error) }
+                    if model.epgURL.isEmpty, let hint = model.defaultEpgHint {
+                        LText("source_epg_default", hint).font(.caption).foregroundStyle(Theme.textSecondary)
+                            .accessibilityIdentifier("field_epg_default")
+                    }
                     if model.kind == .m3u {
                         TextField(L10n.t("field_user_agent"), text: $model.userAgent).plainField()
+                            .accessibilityIdentifier("field_user_agent")
                     }
                 }
             }
             Section {
-                Button(L10n.t("action_connect")) { model.connect() }
+                Button(L10n.t(model.isEditing ? "action_save" : "action_connect")) { model.connect() }
                     .disabled(!model.isValid)
                     .accessibilityIdentifier("action_connect")
             }
@@ -166,6 +193,12 @@ private struct AddSourceForm: View {
             }
         }
         .hiddenListBackground()
+        .onAppear {
+            // Edit: the EPG URL / user agent of the source are visible at once.
+            guard !didInit else { return }
+            didInit = true
+            if model.isEditing { showAdvanced = true }
+        }
     }
 }
 

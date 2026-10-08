@@ -14,6 +14,10 @@ struct WelcomeView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @State private var path: [AddSourceRoute] = []
+    #if os(tvOS)
+    /// tvOS: focus starts on the first "add source" option (not on the trial card / a hidden QR option).
+    @FocusState private var focusedOption: AddSourceRoute?
+    #endif
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -32,6 +36,9 @@ struct WelcomeView: View {
             .navigationDestination(for: AddSourceRoute.self) { route in
                 destination(route)
             }
+            #if os(tvOS)
+            .defaultFocus($focusedOption, env.accountsEnabled ? .pairing : .m3u)
+            #endif
         }
         .onAppear(perform: applyDebugScreen)
         .onChange(of: router.debugScreen) { applyDebugScreen() }   // debug hooks may arrive after appear
@@ -42,7 +49,7 @@ struct WelcomeView: View {
         switch router.debugScreen {
         case "addSource": path = [.m3u]
         case "addXtream": path = [.xtream]
-        case "pairing": path = [.pairing]
+        case "pairing" where env.accountsEnabled: path = [.pairing]
         default: break
         }
     }
@@ -72,7 +79,10 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: Theme.isTV ? 20 : 10) {
             LText("add_source").font(Theme.headline).foregroundStyle(Theme.textPrimary)
             #if os(tvOS)
-            option(.pairing, icon: "qrcode", key: "add_source_qr")
+            // QR pairing needs the backend (hidden while ACCOUNTS_ENABLED = NO / placeholder backend).
+            if env.accountsEnabled {
+                option(.pairing, icon: "qrcode", key: "add_source_qr")
+            }
             #endif
             option(.m3u, icon: "list.bullet.rectangle", key: "add_source_m3u")
             option(.xtream, icon: "server.rack", key: "add_source_xtream")
@@ -94,6 +104,9 @@ struct WelcomeView: View {
             .background(RoundedRectangle(cornerRadius: Theme.cardRadius).fill(Theme.surface))
         }
         .buttonStyle(CardButtonStyle())
+        #if os(tvOS)
+        .focused($focusedOption, equals: route)
+        #endif
         .accessibilityIdentifier("add_\(key)")
     }
 }

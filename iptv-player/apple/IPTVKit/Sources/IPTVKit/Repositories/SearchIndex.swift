@@ -213,9 +213,18 @@ enum IndexGarbage {
     }
 
     /// `collect` on a utility queue (after a commit: the refresh does not wait for the DROP).
+    /// Background collections still running (tests wait for them before reopening a database file).
+    static let inFlight = DispatchGroup()
+
     static func collectInBackground(_ db: SQLiteDatabase) {
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.global(qos: .utility).async(group: inFlight) {
             do { try collect(db) } catch { SafeLog.warning("index garbage failed") }
         }
+    }
+
+    /// Waits until every background collection started so far is done (tests).
+    @discardableResult
+    static func waitForBackground(timeout: TimeInterval = 10) -> Bool {
+        inFlight.wait(timeout: .now() + timeout) == .success
     }
 }

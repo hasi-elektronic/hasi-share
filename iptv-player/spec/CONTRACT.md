@@ -125,7 +125,10 @@ PlaybackError =
 Each maps to a localized, actionable message (EN + TR + DE) – see `docs/SCREENS.md` §Errors.
 Retry for source GETs: at most 2 retries (2 s, 4 s) on `Network`/`ServerError(5xx)`;
 never on 4xx. All requests: connect timeout 10 s, read timeout 30 s, whole-call
-timeout 120 s for playlists/EPG, 20 s for Xtream JSON calls; all cancellable.
+timeout 120 s for playlists, 20 s for Xtream JSON calls (account, details, short EPG); all cancellable.
+Xtream **list** calls (`get_*_categories`, `get_live_streams`, `get_vod_streams`, `get_series`) use a
+read (idle) timeout of 60 s and a whole-call timeout of 600 s, and the three big lists are fetched one
+after another (big panels: 35k movies = tens of MB generated server-side). XMLTV: read 60 s, whole call 600 s.
 
 ---
 

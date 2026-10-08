@@ -18,7 +18,6 @@ public final class AppSettings {
     public var playerEngine: PlayerEngineOverride { didSet { defaults.set(playerEngine.rawValue, forKey: "pref.playerEngine") } }
     /// Settings → Diagnostics: performance overlay on the player (zap time, buffer, bitrate…).
     public var showPerfOverlay: Bool { didSet { defaults.set(showPerfOverlay, forKey: "pref.perfOverlay") } }
-    public var tvPreview: Bool { didSet { defaults.set(tvPreview, forKey: "pref.tvPreview") } }
     /// IANA id or "" (device).
     public var epgTimeZone: String { didSet { defaults.set(epgTimeZone, forKey: "pref.epgTz") } }
     /// nil → system/locale default.
@@ -49,7 +48,6 @@ public final class AppSettings {
         largeBuffer = defaults.bool(forKey: "pref.largeBuffer")
         playerEngine = PlayerEngineOverride(rawValue: defaults.string(forKey: "pref.playerEngine") ?? "") ?? .automatic
         showPerfOverlay = defaults.bool(forKey: "pref.perfOverlay")
-        tvPreview = defaults.object(forKey: "pref.tvPreview") as? Bool ?? false
         epgTimeZone = defaults.string(forKey: "pref.epgTz") ?? ""
         let lang = defaults.string(forKey: Self.appLanguageKey) ?? ""
         appLanguage = Self.supportedLanguages.contains(lang) ? lang : ""

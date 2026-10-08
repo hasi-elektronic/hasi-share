@@ -72,6 +72,9 @@ targetTemplates:
         PRODUCT_TRIAL: $(PRODUCT_TRIAL)
         APP_BUNDLE_ID: $(APP_BUNDLE_ID)
         TESTFLIGHT_FULL_ACCESS: $(TESTFLIGHT_FULL_ACCESS)
+        ACCOUNTS_ENABLED: $(ACCOUNTS_ENABLED)
+        PRIVACY_URL: $(PRIVACY_URL)
+        TERMS_URL: $(TERMS_URL)
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations: [en, tr, de]
         # Users add arbitrary (mostly plain-HTTP) IPTV servers (ARCHITECTURE V17).

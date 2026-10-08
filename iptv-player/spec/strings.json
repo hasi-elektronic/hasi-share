@@ -548,7 +548,7 @@
   "favorites_empty": {
    "en": "No favorites yet. Tap ☆ on a channel, movie or series to add it.",
    "tr": "Henüz favori yok. Eklemek için kanal, film veya dizideki ☆ simgesine dokun.",
-   "de": "Noch keine Favoriten. Tippe bei einem Sender, Film oder einer Serie auf ☆."
+   "de": "Noch keine Favoriten. Tippen Sie bei einem Sender, Film oder einer Serie auf ☆."
   },
   "last_synced": {
    "en": "Last synced {0}",
@@ -863,6 +863,91 @@
    "en": "Never refreshed",
    "tr": "Hiç yenilenmedi",
    "de": "Noch nie aktualisiert"
+  },
+  "source_edit_title": {
+   "en": "Edit source",
+   "tr": "Kaynağı düzenle",
+   "de": "Quelle bearbeiten"
+  },
+  "source_saved_title": {
+   "en": "Source saved",
+   "tr": "Kaynak kaydedildi",
+   "de": "Quelle gespeichert"
+  },
+  "source_active": {
+   "en": "Active",
+   "tr": "Aktif",
+   "de": "Aktiv"
+  },
+  "source_use": {
+   "en": "Use this source",
+   "tr": "Bu kaynağı kullan",
+   "de": "Diese Quelle verwenden"
+  },
+  "source_move_up": {
+   "en": "Move up",
+   "tr": "Yukarı taşı",
+   "de": "Nach oben verschieben"
+  },
+  "source_move_down": {
+   "en": "Move down",
+   "tr": "Aşağı taşı",
+   "de": "Nach unten verschieben"
+  },
+  "source_epg_url": {
+   "en": "EPG URL",
+   "tr": "EPG URL'si",
+   "de": "EPG-URL"
+  },
+  "source_epg_default": {
+   "en": "Default: {0}",
+   "tr": "Varsayılan: {0}",
+   "de": "Standard: {0}"
+  },
+  "source_epg_none": {
+   "en": "No EPG URL",
+   "tr": "EPG URL'si yok",
+   "de": "Keine EPG-URL"
+  },
+  "epg_status_loaded": {
+   "en": "TV guide: {0} programmes · {1}",
+   "tr": "Yayın akışı: {0} program · {1}",
+   "de": "TV-Guide: {0} Sendungen · {1}"
+  },
+  "epg_shift_earlier": {
+   "en": "15 minutes earlier",
+   "tr": "15 dakika erken",
+   "de": "15 Minuten früher"
+  },
+  "epg_shift_later": {
+   "en": "15 minutes later",
+   "tr": "15 dakika geç",
+   "de": "15 Minuten später"
+  },
+  "timezone_search": {
+   "en": "Search time zone",
+   "tr": "Saat dilimi ara",
+   "de": "Zeitzone suchen"
+  },
+  "action_trailer": {
+   "en": "Trailer",
+   "tr": "Fragman",
+   "de": "Trailer"
+  },
+  "cast_value": {
+   "en": "Cast: {0}",
+   "tr": "Oyuncular: {0}",
+   "de": "Besetzung: {0}"
+  },
+  "director_value": {
+   "en": "Director: {0}",
+   "tr": "Yönetmen: {0}",
+   "de": "Regie: {0}"
+  },
+  "legal_open_on_phone": {
+   "en": "Scan the code or open on your phone: {0}",
+   "tr": "Kodu tarayın veya telefonunuzda açın: {0}",
+   "de": "Scannen Sie den Code oder öffnen Sie auf dem Smartphone: {0}"
   },
   "source_epg_shift": {
    "en": "EPG time shift",
@@ -1802,7 +1887,7 @@
   "search_did_you_mean": {
    "en": "Did you mean: {0}",
    "tr": "Bunu mu demek istediniz: {0}",
-   "de": "Meintest du: {0}"
+   "de": "Meinten Sie: {0}"
   },
   "search_show_all": {
    "en": "Show all",
@@ -1837,7 +1922,7 @@
   "search_recent_empty": {
    "en": "Search for channels, movies, series, people, descriptions and TV programmes.",
    "tr": "Kanal, film, dizi, kişi, açıklama ve TV programı arayın.",
-   "de": "Suche nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen."
+   "de": "Suchen Sie nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen."
   },
   "search_suggestions": {
    "en": "Suggestions",

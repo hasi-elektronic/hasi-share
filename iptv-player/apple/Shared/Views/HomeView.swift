@@ -679,7 +679,10 @@ private struct BrowseHero: View {
         HStack(spacing: 10) {
             if showPicker {
                 Menu {
-                    ForEach(env.sources) { source in Button(source.name) { env.selectSource(source.id) } }
+                    // IOS-08: the source in use carries a checkmark.
+                    Picker(L10n.t("source_picker"), selection: Binding(get: { env.currentSource?.id ?? "" }, set: { env.selectSource($0) })) {
+                        ForEach(env.sources) { source in Text(source.name).tag(source.id) }
+                    }
                 } label: {
                     Label(env.currentSource?.name ?? L10n.t("source_picker"), systemImage: "antenna.radiowaves.left.and.right")
                         .font(.caption.weight(.medium)).foregroundStyle(Theme.textPrimary)

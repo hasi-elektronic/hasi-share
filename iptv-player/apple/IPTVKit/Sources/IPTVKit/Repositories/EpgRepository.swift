@@ -32,6 +32,11 @@ public final class EpgRepository: Sendable {
         try EpgRefreshSession(db: db, sourceId: sourceId)
     }
 
+    /// End of the last stored programme of a source (nil without EPG).
+    public func latestEnd(sourceId: String) throws -> Date? {
+        try db.queryFirst("SELECT MAX(end) FROM epg WHERE source_id = ?", [.text(sourceId)]) { $0.optDate(0) } ?? nil
+    }
+
     public func programCount(sourceId: String) throws -> Int {
         try db.scalar("SELECT COUNT(*) FROM epg WHERE source_id = ?", [.text(sourceId)])
     }

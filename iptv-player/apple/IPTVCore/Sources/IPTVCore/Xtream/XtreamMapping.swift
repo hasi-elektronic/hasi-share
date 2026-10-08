@@ -29,6 +29,8 @@ public struct XtreamSeriesDetails: Codable, Sendable, Hashable {
     public var year: Int?
     public var backdropUrl: String?
     public var categoryId: String?
+    /// `youtube_trailer`: a YouTube video id or URL (see `YouTubeTrailer`).
+    public var trailer: String? = nil
 }
 
 /// Result of `get_series_info`.
@@ -50,6 +52,8 @@ public struct XtreamVodInfo: Codable, Sendable, Hashable {
     public var posterUrl: String?
     public var backdropUrl: String?
     public var containerExt: String?
+    /// `youtube_trailer`: a YouTube video id or URL (see `YouTubeTrailer`).
+    public var trailer: String? = nil
 }
 
 /// Maps lenient panel JSON to the domain model (CONTRACT §4.3 + test-vectors/README.md).
@@ -215,7 +219,8 @@ public enum XtreamMapper {
                                    cast: text(info["cast"]), director: text(info["director"]),
                                    rating: info["rating"]?.doubleValue, year: year(info),
                                    backdropUrl: firstString(info["backdrop_path"]),
-                                   categoryId: info["category_id"]?.stringValue)
+                                   categoryId: info["category_id"]?.stringValue,
+                                   trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]))
     }
 
     /// `get_vod_info` → details.
@@ -230,7 +235,21 @@ public enum XtreamMapper {
                              durationSec: info["duration_secs"]?.intValue ?? info["duration"]?.stringValue.flatMap(parseClock),
                              posterUrl: info["movie_image"]?.stringValue ?? info["cover_big"]?.stringValue,
                              backdropUrl: firstString(info["backdrop_path"]),
-                             containerExt: movie["container_extension"]?.stringValue)
+                             containerExt: movie["container_extension"]?.stringValue,
+                             trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]))
+    }
+
+    /// YouTube watch URL of a panel `youtube_trailer` value: a bare 11-character video id, or a
+    /// youtube.com / youtu.be URL (anything else → nil).
+    public static func trailerURL(_ value: String?) -> URL? {
+        guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        let idChars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        if raw.count == 11, raw.unicodeScalars.allSatisfy(idChars.contains) {
+            return URL(string: "https://www.youtube.com/watch?v=\(raw)")
+        }
+        guard let url = URL(string: raw), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = url.host?.lowercased(), host == "youtu.be" || host == "youtube.com" || host.hasSuffix(".youtube.com") else { return nil }
+        return url
     }
 
     static func firstString(_ value: JSONValue?) -> String? {

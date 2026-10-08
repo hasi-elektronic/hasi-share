@@ -70,6 +70,21 @@ public final class EpgTimeFormatter: @unchecked Sendable {
         dayFormatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "EEEdMMM", options: 0, locale: locale) ?? "EEE d MMM"
     }
 
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: (key: String, formatter: EpgTimeFormatter)?
+
+    /// One shared formatter per (zone, locale, 24 h) – building `DateFormatter`s per row / EPG block stutters
+    /// long lists on an Apple TV HD. Returns the cached instance while the parameters stay the same.
+    public static func cached(timeZone: TimeZone, locale: Locale, use24Hour: Bool?) -> EpgTimeFormatter {
+        let key = "\(timeZone.identifier)|\(locale.identifier)|\(use24Hour.map { $0 ? "24" : "12" } ?? "-")"
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        if let cache, cache.key == key { return cache.formatter }
+        let formatter = EpgTimeFormatter(timeZone: timeZone, locale: locale, use24Hour: use24Hour)
+        cache = (key, formatter)
+        return formatter
+    }
+
     /// Clock time, e.g. "18:30".
     public func time(_ date: Date) -> String {
         lock.lock()

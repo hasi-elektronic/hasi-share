@@ -178,6 +178,21 @@ final class XtreamVectorTests: XCTestCase {
         }
     }
 
+    /// IOS-09: `youtube_trailer` (id or URL) is mapped for movies and series; only YouTube URLs are accepted.
+    func testTrailerMappingAndURL() throws {
+        let vod = try XCTUnwrap(JSONValue.parse(Data(#"{"info":{"youtube_trailer":"dQw4w9WgXcQ","genre":"Komödie, Drama","releasedate":"2001-07-13"},"movie_data":{}}"#.utf8)))
+        XCTAssertEqual(XtreamMapper.vodInfo(vod).trailer, "dQw4w9WgXcQ")
+        XCTAssertEqual(XtreamMapper.vodInfo(vod).genre, "Komödie, Drama")
+        let series = try XCTUnwrap(JSONValue.parse(Data(#"{"info":{"youtube_trailer":" https://youtu.be/abc "}}"#.utf8)))
+        XCTAssertEqual(XtreamMapper.seriesDetails(series).trailer, "https://youtu.be/abc")
+        XCTAssertNil(XtreamMapper.seriesDetails(try XCTUnwrap(JSONValue.parse(Data(#"{"info":{"youtube_trailer":""}}"#.utf8)))).trailer)
+        XCTAssertEqual(XtreamMapper.trailerURL("dQw4w9WgXcQ")?.absoluteString, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        XCTAssertEqual(XtreamMapper.trailerURL("https://www.youtube.com/watch?v=x")?.host, "www.youtube.com")
+        XCTAssertNil(XtreamMapper.trailerURL("javascript:alert(1)"))
+        XCTAssertNil(XtreamMapper.trailerURL("https://evil.example.com/watch"))
+        XCTAssertNil(XtreamMapper.trailerURL("short"))
+    }
+
     func testShortEpg() throws {
         let entries = XtreamMapper.shortEpg(try json("short_epg.json"))
         let actual = entries.map { e -> [String: Any] in
@@ -344,5 +359,68 @@ final class XtreamVectorTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? SourceError, .empty)
         }
+    }
+    /// B3/P3: the list calls get the long list budget (60 s idle, 10 min total) instead of the 20 s JSON
+    /// limit, and the three big lists are downloaded one after another (never two bodies in flight).
+    func testListCallsUseListTimeoutsAndBigListsAreSequential() async throws {
+        let files: [String: String] = [
+            "": "auth_ok.json", "get_live_categories": "live_categories.json", "get_vod_categories": "live_categories.json",
+            "get_series_categories": "live_categories.json", "get_live_streams": "live_streams.json",
+            "get_vod_streams": "vod_streams.json", "get_series": "series.json",
+        ]
+        let probe = InFlightProbe()
+        let transport = SlowTransport(probe: probe) { request in
+            let action = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "action" })?.value ?? ""
+            guard let file = files[action] else { return HTTPResponse(statusCode: 404) }
+            return HTTPResponse(statusCode: 200, body: try Vectors.data("xtream/\(file)"))
+        }
+        let client = try XCTUnwrap(XtreamClient(sourceId: "s", secrets: XtreamSecrets(serverUrl: "http://iptv.example.com:8080", username: "u", password: "p"),
+                                                transport: transport, sleeper: .immediate))
+        _ = try await client.fetchCatalog(now: Date(timeIntervalSince1970: 1_759_570_000))
+        let byAction = Dictionary(transport.requests.map { r in
+            (URLComponents(url: r.url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "action" })?.value ?? "", r.timeouts)
+        }, uniquingKeysWith: { a, _ in a })
+        XCTAssertEqual(byAction[""], .xtreamJSON, "account check keeps the short JSON budget")
+        for action in ["get_live_streams", "get_vod_streams", "get_series", "get_live_categories"] {
+            XCTAssertEqual(byAction[action], .xtreamList, action)
+        }
+        XCTAssertEqual(HTTPTimeouts.xtreamList.read, 60)
+        XCTAssertEqual(HTTPTimeouts.xtreamList.total, 600)
+        XCTAssertEqual(probe.maxBigInFlight, 1, "big lists one at a time")
+    }
+}
+
+/// Counts concurrent big-list requests.
+final class InFlightProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = 0
+    private(set) var maxBigInFlight = 0
+    func enter() { lock.withLock { current += 1; maxBigInFlight = max(maxBigInFlight, current) } }
+    func leave() { lock.withLock { current -= 1 } }
+}
+
+/// Fake transport whose big-list responses take a moment (so overlapping downloads would be visible).
+final class SlowTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [HTTPRequest] = []
+    private let probe: InFlightProbe
+    private let handler: @Sendable (HTTPRequest) throws -> HTTPResponse
+
+    init(probe: InFlightProbe, _ handler: @escaping @Sendable (HTTPRequest) throws -> HTTPResponse) {
+        self.probe = probe
+        self.handler = handler
+    }
+
+    var requests: [HTTPRequest] { lock.withLock { recorded } }
+
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        lock.withLock { recorded.append(request) }
+        let query = request.url.query ?? ""
+        let big = ["get_live_streams", "get_vod_streams", "get_series"].contains { query.contains("action=\($0)") && !query.contains("action=\($0)_") }
+        if big { probe.enter() }
+        defer { if big { probe.leave() } }
+        if big { try await Task.sleep(nanoseconds: 30_000_000) }
+        return try handler(request)
     }
 }

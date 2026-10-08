@@ -110,7 +110,7 @@
     <string name="favorites_channels" formatted="false">Sender</string>
     <string name="favorites_movies" formatted="false">Filme</string>
     <string name="favorites_series" formatted="false">Serien</string>
-    <string name="favorites_empty" formatted="false">Noch keine Favoriten. Tippe bei einem Sender, Film oder einer Serie auf ☆.</string>
+    <string name="favorites_empty" formatted="false">Noch keine Favoriten. Tippen Sie bei einem Sender, Film oder einer Serie auf ☆.</string>
     <string name="last_synced">Zuletzt synchronisiert: %1$s</string>
     <string name="player_audio" formatted="false">Audio</string>
     <string name="player_subtitles" formatted="false">Untertitel</string>
@@ -175,6 +175,23 @@
     <string name="source_last_refresh">Zuletzt aktualisiert: %1$s</string>
     <string name="catalog_restoring" formatted="false">Katalog wird neu geladen…</string>
     <string name="source_never_refreshed" formatted="false">Noch nie aktualisiert</string>
+    <string name="source_edit_title" formatted="false">Quelle bearbeiten</string>
+    <string name="source_saved_title" formatted="false">Quelle gespeichert</string>
+    <string name="source_active" formatted="false">Aktiv</string>
+    <string name="source_use" formatted="false">Diese Quelle verwenden</string>
+    <string name="source_move_up" formatted="false">Nach oben verschieben</string>
+    <string name="source_move_down" formatted="false">Nach unten verschieben</string>
+    <string name="source_epg_url" formatted="false">EPG-URL</string>
+    <string name="source_epg_default">Standard: %1$s</string>
+    <string name="source_epg_none" formatted="false">Keine EPG-URL</string>
+    <string name="epg_status_loaded">TV-Guide: %1$s Sendungen · %2$s</string>
+    <string name="epg_shift_earlier" formatted="false">15 Minuten früher</string>
+    <string name="epg_shift_later" formatted="false">15 Minuten später</string>
+    <string name="timezone_search" formatted="false">Zeitzone suchen</string>
+    <string name="action_trailer" formatted="false">Trailer</string>
+    <string name="cast_value">Besetzung: %1$s</string>
+    <string name="director_value">Regie: %1$s</string>
+    <string name="legal_open_on_phone">Scannen Sie den Code oder öffnen Sie auf dem Smartphone: %1$s</string>
     <string name="source_epg_shift" formatted="false">EPG-Zeitversatz</string>
     <string name="source_auto_refresh" formatted="false">Automatisch aktualisieren</string>
     <string name="every_n_hours">Alle %1$s Std.</string>
@@ -362,14 +379,14 @@
     <string name="search_section_descriptions" formatted="false">In Beschreibungen</string>
     <string name="search_section_on_tv" formatted="false">Im TV</string>
     <string name="search_section_similar" formatted="false">Ähnliche Ergebnisse</string>
-    <string name="search_did_you_mean">Meintest du: %1$s</string>
+    <string name="search_did_you_mean">Meinten Sie: %1$s</string>
     <string name="search_show_all" formatted="false">Alle anzeigen</string>
     <string name="search_filter_all" formatted="false">Alle</string>
     <string name="search_filter_live" formatted="false">Live</string>
     <string name="search_filter_programmes" formatted="false">TV-Sendungen</string>
     <string name="search_recent" formatted="false">Letzte Suchen</string>
     <string name="search_recent_clear" formatted="false">Löschen</string>
-    <string name="search_recent_empty" formatted="false">Suche nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen.</string>
+    <string name="search_recent_empty" formatted="false">Suchen Sie nach Sendern, Filmen, Serien, Personen, Beschreibungen und TV-Sendungen.</string>
     <string name="search_suggestions" formatted="false">Vorschläge</string>
     <string name="search_time_today">Heute %1$s</string>
     <string name="search_time_tomorrow">Morgen %1$s</string>

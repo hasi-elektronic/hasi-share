@@ -312,6 +312,7 @@ private struct LiveChannelRow: View {
                         }
                         if channel.catchup.isAvailable {
                             Image(systemName: "clock.arrow.circlepath").font(Theme.isTV ? .system(size: 18) : .caption2).foregroundStyle(Theme.textSecondary)
+                                .accessibilityLabel(L10n.t("epg_catchup_available"))   // IOS-18
                         }
                         #if os(tvOS)
                         if isFavorite { Image(systemName: "star.fill").font(.system(size: 18)).foregroundStyle(Theme.warning) }
@@ -1005,7 +1006,9 @@ private struct EpgRowView: View {
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 3) {
                     if isFavorite { Image(systemName: "star.fill").foregroundStyle(Theme.warning) }
-                    if channel.catchup.isAvailable { Image(systemName: "clock.arrow.circlepath").foregroundStyle(.white) }
+                    if channel.catchup.isAvailable {
+                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(.white).accessibilityLabel(L10n.t("epg_catchup_available"))
+                    }
                 }
                 .font(.system(size: Theme.isTV ? 18 : 9, weight: .bold))
                 .shadow(color: .black.opacity(0.6), radius: 2)

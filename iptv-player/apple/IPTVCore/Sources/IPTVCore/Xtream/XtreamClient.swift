@@ -113,16 +113,18 @@ public struct XtreamClient: Sendable {
 
     // MARK: Refresh
 
-    /// Full refresh: account check, then categories and lists concurrently.
+    /// Full refresh: account check, then the small category lists concurrently and the three big lists
+    /// **one after another** – each body and its JSON tree is mapped and released before the next download
+    /// starts (peak memory on Apple TV HD; no competing downloads on a slow panel).
     /// Throws `SourceError.empty` when there is no live, VOD or series item (CONTRACT §4.4).
     public func fetchCatalog(now: Date = Date()) async throws -> XtreamCatalog {
         let account = try await authenticate(now: now)
         async let liveCats = liveCategories()
         async let vodCats = vodCategories()
         async let seriesCats = seriesCategories()
-        async let channels = liveStreams()
-        async let movies = vodStreams()
-        async let series = series()
+        let channels = try await liveStreams()
+        let movies = try await vodStreams()
+        let series = try await series()
         let catalog = try await XtreamCatalog(account: account, liveCategories: liveCats, vodCategories: vodCats,
                                               seriesCategories: seriesCats, channels: channels, movies: movies,
                                               series: series)
@@ -133,15 +135,15 @@ public struct XtreamClient: Sendable {
     // MARK: Plumbing
 
     private func list(_ action: String) async throws -> JSONValue {
-        let json = try await getJSON(urls.apiURL(action: action))
+        let json = try await getJSON(urls.apiURL(action: action), timeouts: .xtreamList)
         switch json {
         case .array, .object, .null: return json
         default: throw SourceError.invalidResponse
         }
     }
 
-    private func getJSON(_ url: URL) async throws -> JSONValue {
-        let request = HTTPRequest(url: url, headers: headers, timeouts: .xtreamJSON)
+    private func getJSON(_ url: URL, timeouts: HTTPTimeouts = .xtreamJSON) async throws -> JSONValue {
+        let request = HTTPRequest(url: url, headers: headers, timeouts: timeouts)
         return try await retryPolicy.run(sleeper: sleeper) {
             let response = try await transport.send(request)
             if let error = ErrorClassifier.sourceError(httpStatus: response.statusCode) { throw error }

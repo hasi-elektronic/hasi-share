@@ -85,6 +85,14 @@ public final class FavoritesController {
         undoPriorOrder = nil
     }
 
+    /// Change time of a toggle, strictly increasing: two toggles in the same millisecond keep their order
+    /// ("newest first") – also while they wait in the library overlay, which sorts by time only.
+    @ObservationIgnored private var lastStamp: Int64 = 0
+    private func stamp() -> Int64 {
+        lastStamp = max(now(), lastStamp + 1)
+        return lastStamp
+    }
+
     /// Optimistic write: cache first, database second – never blocking the UI: while a refresh commit holds the
     /// database the change waits in the library's queue and overlays its reads (read-your-writes).
     @discardableResult
@@ -93,7 +101,7 @@ public final class FavoritesController {
         if on { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
         do {
             try library.setFavoriteWithoutBlocking(on, contentKey: t.contentKey, title: t.title, kind: t.kind,
-                                                   posterUrl: t.posterUrl, nowMs: now())
+                                                   posterUrl: t.posterUrl, nowMs: stamp())
         } catch {   // written at once and failed: the cache shows the real state again
             if was { keys.insert(t.contentKey) } else { keys.remove(t.contentKey) }
             return false
