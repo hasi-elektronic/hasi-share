@@ -20,10 +20,16 @@ public struct HTTPTimeouts: Sendable, Hashable {
         self.total = total
     }
 
-    /// Xtream JSON calls: 10 s / 30 s / 20 s.
+    /// Xtream JSON calls (account, details, short EPG): 10 s / 30 s / 20 s.
     public static let xtreamJSON = HTTPTimeouts(connect: 10, read: 30, total: 20)
-    /// Playlists and EPG: 10 s / 30 s / 120 s.
+    /// Xtream list calls (`get_*_streams`, `get_series`, categories): big panels (35k movies) generate tens
+    /// of MB server-side, often for longer than 20 s before the last byte. An idle (read) timeout of 60 s
+    /// catches a stalled server; the whole call may take up to 10 min.
+    public static let xtreamList = HTTPTimeouts(connect: 10, read: 60, total: 600)
+    /// Playlists: 10 s / 30 s / 120 s.
     public static let playlist = HTTPTimeouts(connect: 10, read: 30, total: 120)
+    /// XMLTV (often several hundred thousand programmes from a slow `xmltv.php`): 10 s / 60 s / 600 s.
+    public static let epg = HTTPTimeouts(connect: 10, read: 60, total: 600)
     /// Backend API calls.
     public static let backend = HTTPTimeouts(connect: 10, read: 30, total: 30)
 }

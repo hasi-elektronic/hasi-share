@@ -102,7 +102,7 @@ public struct XMLTVLoader: Sendable {
 
     /// Downloads to a temporary plain-XML file (gzip inflated while streaming).
     func download(_ url: URL) async throws -> URL {
-        let request = HTTPRequest(url: url, headers: userAgent.map { ["User-Agent": $0] } ?? [:], timeouts: .playlist)
+        let request = HTTPRequest(url: url, headers: userAgent.map { ["User-Agent": $0] } ?? [:], timeouts: .epg)
         let transport = self.transport
         let response = try await retryPolicy.run(sleeper: sleeper) { () -> HTTPStreamResponse in
             let response = try await transport.stream(request)
