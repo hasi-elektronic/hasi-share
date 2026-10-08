@@ -338,6 +338,12 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
      Automatic" hint. Other formats/codecs AVPlayer cannot play ⇒ hint "needs the VLC engine".
    * `vlc` ⇒ **VLCKit** for everything VLCKit supports (no HLS twin probe, no fallback); without VLCKit
      the AVPlayer column.
+   * `remux` ("Apple + Remux (Beta)", spike 2026-10-08, only in builds with the FFmpeg remuxer) ⇒ MKV
+     (H.264/HEVC with a cue index) is remuxed in-app by FFmpeg (LGPL, dynamic `FFmpeg.framework`) into
+     HLS/fMP4 on 127.0.0.1 and played by **AVPlayer**; audio AVPlayer cannot decode (DTS, TrueHD, Opus,
+     Vorbis, FLAC, MP2/MP3) is transcoded to AAC. A remux failure (no cues, other video codec, broken
+     file) falls back once to VLCKit. Everything else as `auto`. The audio delay is not applied to
+     remuxed MKV yet; one audio track, no subtitles, no AirPlay video.
    * `auto` ⇒ rules 0–3.
 0. `audioDelayMs ≠ 0` (effective user audio delay = content + device, −2000…+2000 ms in 50 ms
    steps) and VLCKit available and supports it ⇒ **VLCKit** (AVPlayer cannot delay audio).

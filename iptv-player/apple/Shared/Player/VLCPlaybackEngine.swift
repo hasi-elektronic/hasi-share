@@ -404,9 +404,13 @@ final class VLCDrawableView: UIView {
 }
 
 extension PlaybackEngines {
-    /// AVPlayer + VLCKit (the iOS/tvOS apps).
+    /// AVPlayer + VLCKit (the iOS/tvOS apps) + the FFmpeg remux engine when built ("Apple + Remux (Beta)").
     @MainActor static var app: PlaybackEngines {
+        #if canImport(CNovaRemux)
+        PlaybackEngines(avPlayer: { AVPlayerEngine() }, vlc: { VLCPlaybackEngine() }, remux: { RemuxPlaybackEngine() })
+        #else
         PlaybackEngines(avPlayer: { AVPlayerEngine() }, vlc: { VLCPlaybackEngine() })
+        #endif
     }
 }
 #else

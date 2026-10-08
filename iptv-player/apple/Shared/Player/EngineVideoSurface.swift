@@ -58,8 +58,17 @@ struct EngineVideoSurface: UIViewRepresentable {
         update(view)
     }
 
+    /// AVPlayer itself, or the private AVPlayer of the remux engine ("Apple + Remux (Beta)").
+    private static func avPlayerEngine(_ engine: (any PlaybackEngine)?) -> AVPlayerEngine? {
+        #if canImport(CNovaRemux)
+        AVPlayerEngine.backing(engine)
+        #else
+        engine as? AVPlayerEngine
+        #endif
+    }
+
     private func update(_ view: Container) {
-        if let av = engine as? AVPlayerEngine {
+        if let av = Self.avPlayerEngine(engine) {
             if view.playerLayer.player !== av.player { view.playerLayer.player = av.player }
             view.playerLayer.videoGravity = aspect.videoGravity
             view.playerLayer.isHidden = false

@@ -11,7 +11,9 @@ options:
   developmentLanguage: en
   # VLCKit 3.x binaries (official VideoLAN builds, LGPL-2.1) → Vendor/VLCKit (git-ignored).
   # Idempotent: downloads/verifies/thins only when the pinned version is missing.
-  preGenCommand: sh scripts/fetch-vlckit.sh
+  # FFmpeg (LGPL-2.1, remux engine "Apple + Remux (Beta)") is BUILT from the pinned release tarball
+  # → Vendor/FFmpeg (git-ignored); first run ≈ 3 min, then a stamp check.
+  preGenCommand: sh scripts/fetch-vlckit.sh && sh scripts/build-ffmpeg.sh
 configFiles:
   Debug: Config/Debug.xcconfig
   Release: Config/Release.xcconfig
@@ -55,6 +57,9 @@ targetTemplates:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
         PRODUCT_NAME: NovaPlayer
+        # Remux engine: FFmpeg headers (scripts/build-ffmpeg.sh) + the C shim module `CNovaRemux`.
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/FFmpeg/include
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Shared/Player/Remux/CNovaRemux
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
         CODE_SIGN_ENTITLEMENTS: Config/NovaPlayer.entitlements
       configs:
@@ -85,6 +90,11 @@ targets:
     sources:
       - path: Apps/iOS
     dependencies:
+      # FFmpeg (LGPL-2.1), ONE dynamic framework (relinkable) – remux engine, scripts/build-ffmpeg.sh.
+      # MUST stay BEFORE VLCKit: MobileVLCKit/TVVLCKit export their own (old) libav* symbols and the
+      # linker binds each symbol to the first framework that exports it (two-level namespace).
+      - framework: Vendor/FFmpeg/FFmpeg.xcframework
+        embed: true
       # Second playback engine (MKV/TS/AVI/FLV/DASH/RTSP…), dynamic framework – CONTRACT §6.1.
       - framework: Vendor/VLCKit/MobileVLCKit.xcframework
         embed: true
@@ -111,6 +121,8 @@ targets:
     sources:
       - path: Apps/tvOS
     dependencies:
+      - framework: Vendor/FFmpeg/FFmpeg.xcframework   # before VLCKit (libav* symbol clash, see iOS)
+        embed: true
       - framework: Vendor/VLCKit/TVVLCKit.xcframework
         embed: true
     settings:

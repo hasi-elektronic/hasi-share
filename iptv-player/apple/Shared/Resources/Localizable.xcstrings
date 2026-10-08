@@ -599,6 +599,29 @@
         }
       }
     },
+    "licenses_ffmpeg_notice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app uses FFmpeg (© the FFmpeg developers, https://ffmpeg.org) to repackage MKV files for Apple's player, licensed under the GNU LGPL version 2.1 or later. FFmpeg is linked dynamically and shipped unmodified as a separate framework (FFmpeg.framework); you may replace it with your own build. Source code: https://ffmpeg.org/releases/"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu uygulama MKV dosyalarını Apple oynatıcısı için yeniden paketlemek üzere FFmpeg (© FFmpeg geliştiricileri, https://ffmpeg.org) kullanır; GNU LGPL sürüm 2.1 veya üzeri altında lisanslıdır. FFmpeg dinamik bağlanır ve değiştirilmeden ayrı bir framework (FFmpeg.framework) olarak gelir; kendi derlemenizle değiştirebilirsiniz. Kaynak kodu: https://ffmpeg.org/releases/"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese App verwendet FFmpeg (© die FFmpeg-Entwickler, https://ffmpeg.org), um MKV-Dateien für Apples Player umzupacken, lizenziert unter der GNU LGPL Version 2.1 oder neuer. FFmpeg wird dynamisch gelinkt und unverändert als separates Framework (FFmpeg.framework) ausgeliefert; Sie können es durch einen eigenen Build ersetzen. Quellcode: https://ffmpeg.org/releases/"
+          }
+        }
+      }
+    },
     "loading": {
       "extractionState": "manual",
       "localizations": {
@@ -687,6 +710,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "LIVE"
+          }
+        }
+      }
+    },
+    "player_engine_remux": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple + Remux (Beta)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple + Remux (Beta)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple + Remux (Beta)"
           }
         }
       }

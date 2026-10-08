@@ -78,12 +78,33 @@ final class EngineOverrideTests: XCTestCase {
                         XCTAssertEqual(c.engineKind, .vlcKit, context)
                         XCTAssertTrue(av.loads.isEmpty, context)
                         XCTAssertEqual(vlc.audioDelays.last, delay, context)
-                    case .automatic:
+                    case .automatic, .remux:
+                        // `.remux` without a remux engine (this controller has none) is Automatic.
                         XCTAssertEqual(c.engineKind, delay != 0 || !avPlayable ? .vlcKit : .avPlayer, context)
                     }
                 }
             }
         }
+    }
+
+    func testRemuxOverrideRoutesMKVToRemuxEngineAndFallsBackToVLC() async throws {
+        let remux = FakeEngine(kind: .avRemux)
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }, remux: { remux }))
+        c.setEngineOverride(.remux)
+        c.open(url("http://h.example.com/film.mkv"))
+        for _ in 0..<200 where remux.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avRemux)
+        // MKV without cues / VP9 …: the remuxer reports UnsupportedFormat → VLCKit once.
+        remux.emit(.failed(.unsupportedFormat(container: "mkv")))
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        XCTAssertEqual(vlc.loads.count, 1)
+        // Everything else as Automatic.
+        c.open(url("http://h.example.com/live.m3u8"))
+        for _ in 0..<200 where av.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avPlayer)
     }
 
     func testVLCOverrideWithoutVLCKitIsAVPlayerColumn() async throws {

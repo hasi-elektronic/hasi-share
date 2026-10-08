@@ -1,0 +1,4 @@
+module CNovaRemux {
+    header "nova_remux.h"
+    export *
+}

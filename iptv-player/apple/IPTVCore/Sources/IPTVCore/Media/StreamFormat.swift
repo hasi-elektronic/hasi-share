@@ -32,6 +32,8 @@ public enum PlayerEngine: String, Sendable, Hashable, CaseIterable {
     /// VLCKit 3.x (libVLC) – second engine of the Apple apps (MobileVLCKit / TVVLCKit) for
     /// everything AVPlayer cannot open (CONTRACT §6.1).
     case vlcKit = "vlckit"
+    /// AVPlayer fed by the in-app FFmpeg remuxer (MKV → local HLS/fMP4), "Apple + Remux (Beta)" override only.
+    case avRemux = "avremux"
 }
 
 extension StreamContainer {
@@ -52,6 +54,9 @@ extension StreamContainer {
         case .vlcKit:
             // UDP/RTP multicast needs the restricted multicast entitlement on iOS/tvOS.
             return self != .udp
+        case .avRemux:
+            // H.264/HEVC in Matroska with a cue index (codecs are checked when the remuxer opens it).
+            return self == .mkv
         }
     }
 
@@ -70,6 +75,9 @@ public enum PlayerEngineOverride: String, Sendable, Hashable, CaseIterable, Coda
     case avPlayer = "apple"
     /// VLCKit for everything it plays (when the app ships it).
     case vlcKit = "vlc"
+    /// Spike/beta: MKV through the FFmpeg remuxer into AVPlayer (AVPlayer's own A/V sync); everything
+    /// else as `automatic`. Without the remuxer in the build it is `automatic`.
+    case remux = "remux"
 }
 
 /// Engine choice of the Apple apps (CONTRACT §6.1): AVPlayer for what it plays natively
@@ -90,7 +98,7 @@ public enum ApplePlayback {
         case .vlcKit:
             if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
             return container.isSupported(by: .avPlayer) ? .avPlayer : nil
-        case .automatic:
+        case .automatic, .remux:
             if audioDelayMs != 0, vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
             if container.isSupported(by: .avPlayer) { return .avPlayer }
             if vlcAvailable, container.isSupported(by: .vlcKit) { return .vlcKit }
@@ -106,10 +114,11 @@ public enum ApplePlayback {
     }
 
     /// Engine to retry with after `error` on `engine` (at most once per opened stream): only
-    /// AVPlayer → VLCKit, only for `UnsupportedFormat` / `UnsupportedCodec`, never with a user override.
+    /// AVPlayer → VLCKit, only for `UnsupportedFormat` / `UnsupportedCodec`, never with a user override
+    /// (the remux beta falls back like Automatic: MKV without cues, VP9, …).
     public static func fallbackEngine(after error: PlaybackError, on engine: PlayerEngine, vlcAvailable: Bool = true,
                                       override: PlayerEngineOverride = .automatic) -> PlayerEngine? {
-        guard override == .automatic, vlcAvailable, engine == .avPlayer else { return nil }
+        guard override == .automatic || override == .remux, vlcAvailable, engine == .avPlayer || engine == .avRemux else { return nil }
         switch error {
         case .unsupportedFormat, .unsupportedCodec: return .vlcKit
         default: return nil

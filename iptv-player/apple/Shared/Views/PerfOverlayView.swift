@@ -51,6 +51,7 @@ struct PerfOverlayView: View {
         let name = switch player.engineKind {
         case .avPlayer: "AVPlayer"
         case .vlcKit: "VLCKit"
+        case .avRemux: "AVPlayer+Remux"
         case .media3: "Media3"
         case nil: "—"
         }
