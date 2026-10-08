@@ -213,6 +213,7 @@ public final class PlayerController {
     @ObservationIgnored private let engines: PlaybackEngines
     @ObservationIgnored private var avEngine: (any PlaybackEngine)?
     @ObservationIgnored private var vlcEngine: (any PlaybackEngine)?
+    @ObservationIgnored private var remuxEngine: (any PlaybackEngine)?
     @ObservationIgnored private var reconnectState = ReconnectState()
     @ObservationIgnored private var zapTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
@@ -326,6 +327,8 @@ public final class PlayerController {
 
     /// Whether the VLCKit engine is available (resolver pre-check and fallback use it).
     public var vlcAvailable: Bool { engines.vlcAvailable }
+    /// Whether the FFmpeg remux engine is built in (Settings offers "Apple + Remux (Beta)").
+    public var remuxAvailable: Bool { engines.remuxAvailable }
 
     // MARK: Opening
 
@@ -420,6 +423,9 @@ public final class PlayerController {
         case .vlcKit:
             return ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, override: .vlcKit) == .vlcKit
                 ? .vlcKit : .avPlayer
+        case .remux:
+            // Beta: MKV through the FFmpeg remuxer into AVPlayer (the audio delay is not applied yet).
+            if engines.remuxAvailable, stream.container.isSupported(by: .avRemux) { return .avRemux }
         case .automatic: break
         }
         if currentAudioDelay != 0,
@@ -431,6 +437,12 @@ public final class PlayerController {
     }
 
     private func engineInstance(_ kind: PlayerEngine) -> any PlaybackEngine {
+        if kind == .avRemux, let make = engines.remux {
+            if let remuxEngine { return remuxEngine }
+            let e = wire(make())
+            remuxEngine = e
+            return e
+        }
         if kind == .vlcKit, let make = engines.vlc {
             if let vlcEngine { return vlcEngine }
             let e = wire(make())

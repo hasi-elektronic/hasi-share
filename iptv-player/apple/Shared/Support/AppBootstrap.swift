@@ -374,6 +374,10 @@ enum AppBootstrap {
         if let seconds = argument("-uiUndoSeconds").flatMap(Int.init) { env.favorites.undoWindow = .seconds(seconds) }
         router.debugScreen = argument("-uiScreen")
         if router.debugScreen == "paywall" { router.paywallPresented = true }
+        // Spike measurements: `-playerEngine remux -remuxBench <url>` plays the URL and logs REMUXBENCH lines.
+        if let url = argument("-remuxBench") {
+            router.play(.url(url, title: "Remux bench"))
+        }
         if router.debugScreen == "player" {
             let channels = (try? env.catalog.channels(sourceId: env.currentSource?.id ?? "", limit: 50)) ?? []
             if let first = channels.first { router.play(.channel(first), channels: channels) }

@@ -209,6 +209,9 @@ struct AdvancedSettingsView: View {
                     Text(L10n.t("automatic")).tag(PlayerEngineOverride.automatic)
                     Text(L10n.t("player_engine_apple")).tag(PlayerEngineOverride.avPlayer)
                     Text(L10n.t("player_engine_vlc")).tag(PlayerEngineOverride.vlcKit)
+                    if env.player.remuxAvailable {
+                        Text(L10n.t("player_engine_remux")).tag(PlayerEngineOverride.remux)
+                    }
                 }
                 .accessibilityIdentifier("settings_player_engine")
                 .onChange(of: settings.playerEngine) { env.player.setEngineOverride(settings.playerEngine) }
@@ -745,6 +748,8 @@ struct LicensesView: View {
     private let components = [
         Component(name: "VLCKit / libVLC (MobileVLCKit, TVVLCKit)", license: "LGPL-2.1-or-later", noticeKey: "licenses_vlckit_notice",
                   source: "https://code.videolan.org/videolan/VLCKit"),
+        Component(name: "FFmpeg (libavformat, libavcodec, libavutil, libswresample)", license: "LGPL-2.1-or-later",
+                  noticeKey: "licenses_ffmpeg_notice", source: "https://ffmpeg.org/releases/"),
         Component(name: "swift-crypto (Apple)", license: "Apache-2.0", noticeKey: "licenses_apache_notice",
                   source: "https://github.com/apple/swift-crypto"),
         Component(name: "swift-asn1 (Apple)", license: "Apache-2.0", noticeKey: "licenses_apache_notice",

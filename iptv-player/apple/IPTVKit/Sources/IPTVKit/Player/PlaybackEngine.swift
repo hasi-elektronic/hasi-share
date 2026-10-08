@@ -90,13 +90,18 @@ public extension PlaybackEngine {
 public struct PlaybackEngines {
     public var avPlayer: @MainActor () -> any PlaybackEngine
     public var vlc: (@MainActor () -> any PlaybackEngine)?
+    /// AVPlayer + FFmpeg remuxer (MKV → local HLS), used only with the "Apple + Remux (Beta)" override.
+    public var remux: (@MainActor () -> any PlaybackEngine)?
 
-    public init(avPlayer: @escaping @MainActor () -> any PlaybackEngine, vlc: (@MainActor () -> any PlaybackEngine)?) {
+    public init(avPlayer: @escaping @MainActor () -> any PlaybackEngine, vlc: (@MainActor () -> any PlaybackEngine)?,
+                remux: (@MainActor () -> any PlaybackEngine)? = nil) {
         self.avPlayer = avPlayer
         self.vlc = vlc
+        self.remux = remux
     }
 
     public var vlcAvailable: Bool { vlc != nil }
+    public var remuxAvailable: Bool { remux != nil }
 
     #if canImport(AVFoundation)
     /// AVPlayer only.
