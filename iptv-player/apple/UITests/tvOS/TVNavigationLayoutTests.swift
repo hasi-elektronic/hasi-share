@@ -216,6 +216,15 @@ final class TVNavigationLayoutTests: XCTestCase {
             let grid = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'grid_'")).firstMatch
             XCTAssertTrue(grid.waitForExistence(timeout: 10), "grid (pass \(pass))")
             XCTAssertFalse(hero.exists, "the hidden browse page is out of the accessibility tree")
+            if pass == 1 {   // B-13: ▶ into the grid, ◀ back → the selected category row, not a neighbour
+                let selectedRow = app.buttons[row.identifier]
+                remote.press(.right)
+                usleep(800_000)
+                XCTAssertFalse(selectedRow.hasFocus, "▶ moved into the grid")
+                remote.press(.left)
+                usleep(800_000)
+                XCTAssertTrue(selectedRow.hasFocus, "◀ lands on the selected category")
+            }
             XCTAssertTrue(focus(discover, pressing: .up, limit: 20))
             let start = Date()
             remote.press(.select)
