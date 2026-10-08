@@ -97,8 +97,11 @@ private struct FormatPill: View {
     let text: String
 
     var body: some View {
+        // Never wraps into a narrow "M / K" capsule when the action row is tight (IOS-16).
         Text(text).font((Theme.isTV ? Theme.caption : .caption).weight(.semibold)).foregroundStyle(Theme.textSecondary)
+            .lineLimit(1).fixedSize()
             .padding(.horizontal, Theme.isTV ? 22 : 12).frame(height: Theme.isTV ? 70 : 36)
+            .fixedSize()
             .overlay(Capsule().stroke(Theme.textSecondary.opacity(0.6), lineWidth: 1))
             .accessibilityIdentifier("format_pill")
     }
@@ -148,6 +151,8 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
         .scrollClipDisabled()
         .ignoresSafeArea()
         .screenBackground()
+        // Full-screen detail like Apple's TV app: no floating tab bar over the hero (B-24); Menu goes back.
+        .toolbar(.hidden, for: .tabBar)
         #else
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -205,24 +210,39 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
     }
 }
 
+/// Focus targets of the detail action row.
+enum DetailActionFocus: Hashable { case primary, secondary(Int) }
+
 /// Action row: white pill (play / resume) + round icon buttons + format pill.
 private struct DetailActions<Round: View>: View {
     let primaryTitle: String
     let primaryAction: () -> Void
     var format: String?
-    @ViewBuilder var round: () -> Round
+    /// Round buttons; each binds `.focused(focus, equals: .secondary(n))`.
+    @ViewBuilder var round: (FocusState<DetailActionFocus?>.Binding) -> Round
+    /// Entering the action row (▼ from the tab bar, ▲ from the seasons / episodes) lands on ▶, not on the
+    /// geometrically nearer round button (same rule as the Home hero, B-12).
+    @FocusState private var focus: DetailActionFocus?
 
     var body: some View {
         HStack(spacing: Theme.isTV ? 28 : 10) {
             Button(action: primaryAction) { Label(primaryTitle, systemImage: "play.fill").fixedSize() }
                 .buttonStyle(WhitePillButtonStyle())
+                .focused($focus, equals: .primary)
                 .accessibilityIdentifier("detail_play")
-            round()
+            round($focus)
             #if !os(tvOS)
             Spacer(minLength: 0)
             #endif
             if let format { FormatPill(text: format) }
         }
+        #if os(tvOS)
+        .focusSection()
+        .defaultFocus($focus, .primary, priority: .userInitiated)
+        .onChange(of: focus) { old, new in
+            if old == nil, let new, new != .primary { focus = .primary }
+        }
+        #endif
     }
 }
 
@@ -283,13 +303,15 @@ struct MovieDetailView: View {
                        plot: info?.plot ?? movie.plot, onPlay: { router.play(.movie(movie)) }) {
             DetailActions(primaryTitle: canResume ? L10n.t("action_resume_at", L10n.clock(Double(resumeMs) / 1000)) : L10n.t("action_play"),
                           primaryAction: { router.play(.movie(movie)) },
-                          format: MediaTags.format(container: movie.containerExt, name: movie.name)) {
+                          format: MediaTags.format(container: movie.containerExt, name: movie.name)) { focus in
                 if let target = env.favoriteTarget(movie) {
                     FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
+                        .focused(focus, equals: .secondary(0))
                 }
                 if canResume {
                     Button { router.play(.movie(movie), fromStart: true) } label: { Image(systemName: "arrow.counterclockwise") }
                         .buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
+                        .focused(focus, equals: .secondary(1))
                         .accessibilityLabel(L10n.t("action_play_from_start"))
                         .accessibilityIdentifier("detail_restart")
                 }
@@ -314,6 +336,10 @@ struct MovieDetailView: View {
 private struct SeasonTabs: View {
     let seasons: [Int]
     @Binding var selection: Int
+    #if os(tvOS)
+    /// ▼ from the action row lands on the selected season, not the geometrically nearest tab (B-23).
+    @FocusState private var focusedSeason: Int?
+    #endif
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -332,6 +358,7 @@ private struct SeasonTabs: View {
                     }
                     #if os(tvOS)
                     .buttonStyle(CardButtonStyle(radius: 12, scale: 1.1))
+                    .focused($focusedSeason, equals: season)
                     #else
                     .buttonStyle(.plain)
                     #endif
@@ -345,6 +372,7 @@ private struct SeasonTabs: View {
         #if os(tvOS)
         .scrollClipDisabled()
         .focusSection()
+        .defaultFocus($focusedSeason, selection, priority: .userInitiated)
         #endif
     }
 }
@@ -372,9 +400,10 @@ struct SeriesDetailView: View {
                        genres: details?.genre ?? series.genre,
                        plot: model?.plot ?? series.plot, onPlay: play) {
             DetailActions(primaryTitle: primaryTitle, primaryAction: play,
-                          format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) {
+                          format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) { focus in
                 if let target = env.favoriteTarget(series) {
                     FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
+                        .focused(focus, equals: .secondary(0))
                 }
                 TrailerButton(url: details?.trailerURL)
             }
@@ -389,7 +418,8 @@ struct SeriesDetailView: View {
             model = m
             await m.load()
         }
-        // Back from the player (or a sync): progress, "Continue S01E03" and the season follow at once.
+        // An episode played from here (or elsewhere) while the page stays in the stack: "Continue SxEy" and the
+        // episode progress follow (B-03 / IOS-07), like the movie detail.
         .onChange(of: env.libraryVersion) { model?.reloadProgress() }
     }
 
@@ -414,8 +444,10 @@ struct SeriesDetailView: View {
                     ForEach(model.seasonEpisodes) { episode in
                         let p = model.progress(of: episode)
                         Button { router.play(.episode(episode, seriesTitle: series.name)) } label: {
-                            ContinueCard(title: "\(episode.number). \(episodeTitle(episode))", subtitle: episodeSubtitle(episode, p),
-                                         imageURL: episode.posterUrl ?? series.posterUrl, progress: p?.data.fraction, width: 440)
+                            // No empty progress track on unwatched episodes (B-22).
+                            ContinueCard(title: numberedTitle(episode), subtitle: episodeSubtitle(episode, p),
+                                         imageURL: episode.posterUrl ?? series.posterUrl, progress: p?.data.fraction,
+                                         showsProgress: (p?.data.fraction ?? 0) > 0, width: 440)
                         }
                         .buttonStyle(ArtworkButtonStyle())
                         .accessibilityIdentifier("episode_\(episode.id)")
@@ -449,6 +481,16 @@ struct SeriesDetailView: View {
 
     private func episodeTitle(_ e: Episode) -> String { MediaTags.episodeTitle(e.title, seriesName: series.name) }
 
+    /// "3. Title"; a provider title that already starts with the number ("Bölüm 3", "Folge 3 – Title") is not
+    /// numbered twice ("3. Bölüm 3", B-22).
+    private func numberedTitle(_ e: Episode) -> String {
+        let title = episodeTitle(e)
+        let pattern = "^(bölüm|bolum|folge|episode|episodio|épisode|ep\\.?|teil|part)\\s*0*\(e.number)(?![0-9])[\\s.:,–-]*"
+        guard let range = title.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else { return "\(e.number). \(title)" }
+        let rest = title[range.upperBound...].trimmingCharacters(in: .whitespaces)
+        return rest.isEmpty ? title : "\(e.number). \(rest)"
+    }
+
     private func isWatched(_ p: SyncItem?) -> Bool {
         guard let p, let pos = p.data.positionMs, let dur = p.data.durationMs else { return false }
         return WatchHistory.isCompleted(positionMs: pos, durationMs: dur)
@@ -477,7 +519,7 @@ struct SeriesDetailView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(e.number). \(episodeTitle(e))").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(2)
+                Text(numberedTitle(e)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(2)
                 Text(episodeSubtitle(e, progress)).font(.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 if let plot = e.plot { Text(plot).font(.caption).foregroundStyle(Theme.textSecondary).lineLimit(2) }
             }

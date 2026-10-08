@@ -92,14 +92,21 @@ listesinde satır başına tek odak hedefi vardır (favori / arşiv uzun OK men�
 **Geri tuşu kuralları (TV, öngörülebilir):**
 1. Oynatıcıda: açık panel/menü varsa kapatır → yoksa oynatıcıdan çıkar (önceki ekrana, odak
    oynatılan öğede).
-2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir.
+2. Detay ekranında: bir önceki ekrana döner, odak açılan öğeye geri gelir. Film/dizi detayı tam ekrandır,
+   üst sekme çubuğu gizlenir (Apple TV uygulaması gibi; Build 16).
 3. Bir bölümün içeriğinde (satır/grid/EPG): odağı üst sekme çubuğuna taşır. İstisna Filmler/Diziler:
    sağ içerikte (göz atma sayfası / kategori grid'i) önce odağı soldaki kategori sütununa (seçili satır)
    taşır, sütunda ikinci basış sekme çubuğuna (§3.2).
-4. Sekme çubuğundayken: Ana Sayfa değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
-5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında).
+4. Sekme çubuğundayken: sekmenin yığınında açılmış bir sayfa varsa (ör. Favoriler, ayar alt sayfası) önce o
+   sayfa kapanır — yığın kökte değilken uygulamadan **asla** çıkılmaz (Build 16, B-01); kökteyse Ana Sayfa
+   değilse Ana Sayfa'ya geçer; Ana Sayfa'da uygulamadan çıkar.
+5. Diyaloglar her zaman geri tuşuyla kapanır (iptal anlamında). Kaynak ekleme hata kartında Menü doldurulmuş
+   forma döner (yazılanlar korunur, B-04).
 
-**Odak kuralları:** Her ekranın varsayılan odak öğesi tanımlıdır (aşağıda ★). Satırlar arası
+**Odak kuralları:** Her ekranın varsayılan odak öğesi tanımlıdır (aşağıda ★). Bir bölgeye dışarıdan
+girildiğinde (sekme çubuğundan ▼, raflardan ▲) geometrik olarak en yakın öğe değil ★ odaklanır: hero ve detay
+eylem satırında beyaz "▶ Oynat / Devam et" pill'i (Favori/Bilgi değil), sezon sekmelerinde seçili sezon,
+kategori sütunlarında seçili satır, TV Rehberi'nde ilk satırın şu an yayındaki bloğu (Build 16). Satırlar arası
 dikey geçişte odak, satırdaki son odaklanan öğeye döner (focus restorer). Liste yeniden
 yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "kaçmaz"
 (wrap yok; sekme çubuğuna yalnızca yukarı basınca / geri tuşuyla geçer).
@@ -195,7 +202,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     o kategorinin grid'i (odak sütunda kalır, ▶ grid'e geçer). Uzun OK: sabitle / gizle (gizlenende tekrar
     göster). Ülke değişince ya da seçili kategori sabitlemesi kaldırılıp / gizlenip sütundan çıkınca sağda
     yeniden Keşfet açılır. **Geri:** sağ içerikte → odak sütundaki seçili satıra (satır artık yoksa
-    Keşfet'e); sütunda → üst sekme çubuğu (§2 TV).
+    Keşfet'e); sütunda → üst sekme çubuğu (§2 TV). Keşfet sayfası kategori grid'i açıkken **canlı kalır**
+    (gizli, odaklanamaz): Keşfet'e OK anında, satırlar/görseller ve kaydırma konumu korunarak geri gelir
+    (Build 16, M-09). Sağ içerik üstte (yüzen sekme çubuğunun altında) ve solda (sütunun önünde) kırpılır;
+    Canlı TV listesi de üstte kırpılır.
     Sütunda arama yok (genel arama sekmesi var).
 * **"YENİ" kuralı:** `added` sırasına göre en yeni 20 öğe. **Top 10 kuralı:** kaynağın puanı
   (`rating`) azalan; puanı olan öğe yoksa en yeni eklenen 10 öğe. (Sunucuya izlenme verisi
@@ -247,10 +257,17 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * Kanal başına bir satır: solda sabit renkli logo karosu (genişliğin ~¼'ü), sağda yatay kaydırılan
   program blokları; **tüm satırlar aynı zaman eksenini paylaşır** (üstte "Bugün" + 30 dk işaretleri,
   "şimdi" ▼ işareti ve kırmızı `live` dikey çizgi). Şu an yayındaki blok kanal rengiyle vurgulu, geçen
-  kısım koyu; bloklar karonun altına kayar, metin görünür kalır.
+  kısım koyu; bloklar karonun altına kayar, metin görünür kalır. Metin bloğun içinde dizilir ve kırpılır;
+  dar bloklar önce kanal adını, daha da darsa saati bırakır (kısa programlar komşu bloğun üstüne yazmaz).
+* **Zaman penceresi saati izler:** dakikada bir "şimdi" çizgisi ve yayındaki bloklar güncellenir; şimdi açılış
+  konumundan 30 dk ilerleyince pencere yeniden "şimdi" karonun hemen sağında olacak şekilde kayar (açık
+  bırakılan rehber donmaz / boşalmaz). Canlı TV listesinin şimdi/sonra bilgisi de dakikada bir yenilenir.
 * Üstte kategori çipleri (Tümü · Favoriler · kategoriler).
 * **iPad (geniş) ve TV:** sağda panel — **"Şimdi yayında"** (seçili/odaklı kanalın programı, saat, açıklama,
-  "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok.
+  "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok. TV'de odak gelecekteki
+  / geçmiş bir bloktaysa panel o programı gösterir (**"Daha sonra"** / **"Daha önce"** başlığı, saat, açıklama;
+  "Bugün" listesi onun ardından başlar). Liste kartın içinde kırpılır.
+* **TV ★:** sekme çubuğundan/çiplerden ▼ ilk satırın şu an yayındaki bloğuna iner, "şimdi" çizgisi görünür kalır.
 * Dokun / OK → kanal oynar (iPad'de karoya dokunmak paneli o kanala getirir). TV'de D-pad ▲▼ kanallar,
   ◀▶ programlar arası. Uzun bas → favori / gizle menüsü.
 * **Geçmiş yayın (catch-up) arşivi:** kanal destekliyorsa panelde/kartta ⟲ → sheet "TV arşivi ·
@@ -270,10 +287,13 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   "Devam et S02E05".
 * **Dizi:** sezonlar yatay **metin sekmeleri** ("Sezon 1 · Sezon 2 …", seçili `primary` alt çizgi);
   bölüm satırı = 16:9 küçük resim (ortada oynat ikonu, altta ilerleme) + "1. Başlık" + süre /
-  izlendi ✓. ★ "Devam et S02E05" (son izlenen bölüm, %5'in altı dahil; bitmişse sonraki; oynatıcıdan dönünce
-  hemen güncellenir). Önbellekteki bölümler hemen gösterilir, 6 saatten eskiyse `get_series_info` arka planda
-  yeniden istenir (haftalık yeni bölümler); hiç bölüm yokken istek başarısız olursa boş sayfa yerine hata kartı +
-  **Tekrar dene**. Bölüm bitince sonraki bölüm
+  izlendi ✓. ★ "Devam et S02E05" (son izlenen bölüm — konumu %5'in altında olsa da; bitmişse sonraki).
+  Detay yığında açık kalırken bir bölüm oynatılınca birincil eylem ve bölüm ilerlemeleri hemen güncellenir
+  (kütüphane değişince tek sorguyla yeniden okunur). Önbellekteki bölümler hemen gösterilir, 6 saatten eskiyse
+  `get_series_info` arka planda yeniden istenir (haftalık yeni bölümler); hiç bölüm yokken istek başarısız olursa
+  boş sayfa yerine hata kartı + **Tekrar dene**. Sağlayıcı başlığı numarayı zaten içeriyorsa ("Bölüm 3") numara
+  iki kez yazılmaz; izlenmemiş bölümde boş ilerleme çizgisi yok. Format pill'i hiçbir zaman alt satıra kırılmaz.
+  Bölüm bitince sonraki bölüm
   için 10 sn geri sayım kartı. TV'de bölümler yatay 16:9 kart rafı.
 
 ### 3.6 Favoriler ve arama
@@ -572,4 +592,7 @@ bağlanma politikası, sonra kart).
 ## 5. Erişilebilirlik
 * Tüm ikon butonlarda içerik açıklaması (TalkBack/VoiceOver).
 * Dokunma hedefi ≥ 48 dp / 44 pt. Kontrast ≥ 4.5:1 (metin), odak halkası ≥ 3:1.
-* Dinamik yazı boyutu (mobil) desteklenir; TV'de sabit büyük ölçek.
+* Dinamik yazı boyutu (mobil) desteklenir; TV'de sabit büyük ölçek. Erişilebilirlik boyutlarında (AX) hero
+  eylemleri alt alta dizilir (tam genişlik "▶" pill'i, altında Favori · Bilgi); Canlı TV satırında kanal adı
+  kendi satırlarında, saat başlığın üstünde, program başlığı en çok 3 satır (Build 16).
+* iPhone arama: sonuçlar alttaki yüzen arama kapsülünün üstüne kaydırılabilir (yatayda ilk satırı örtmez).

@@ -1549,6 +1549,16 @@
    "tr": "Şimdi yayında",
    "de": "Jetzt läuft"
   },
+  "epg_later": {
+   "en": "Later",
+   "tr": "Daha sonra",
+   "de": "Später"
+  },
+  "epg_earlier": {
+   "en": "Earlier",
+   "tr": "Daha önce",
+   "de": "Früher"
+  },
   "action_more": {
    "en": "More",
    "tr": "Daha fazla",

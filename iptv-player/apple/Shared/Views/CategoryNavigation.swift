@@ -442,9 +442,11 @@ struct FlowLayout: Layout {
 extension View {
     /// tvOS side columns keep `scrollClipDisabled` (focus scaling and shadows must not be cut at the sides),
     /// but rows scrolled up must not draw under / next to the floating tab bar: clip only the top edge.
-    func tvTopClipped() -> some View {
+    /// `leading`: how far content may draw past the leading edge (focus scaling). The content next to a side
+    /// column passes a small value, so horizontally scrolled shelves never draw over the column (B-06).
+    func tvTopClipped(leading: CGFloat = 80) -> some View {
         mask {
-            Rectangle().padding(.horizontal, -80).padding(.bottom, -400)
+            Rectangle().padding(.leading, -leading).padding(.trailing, -80).padding(.bottom, -400)
         }
     }
 }
@@ -472,6 +474,9 @@ struct TVCategoryBrowseView: View {
                 column(model).frame(width: 360)
                 content(model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    // Rows scrolled up stop under the tab bar like the column (B-05); shelves scrolled to the
+                    // side stop before the column (B-06; the 36 pt gap keeps room for focus scaling).
+                    .tvTopClipped(leading: 24)
                     .focusSection()
                     // Menu in the content → the column's selected row; if that row is gone (country changed,
                     // unpinned, hidden) → Discover, never a key no view has (focus would not move at all).
@@ -529,14 +534,22 @@ struct TVCategoryBrowseView: View {
         return keys
     }
 
+    /// The Discover page stays alive under a category grid (hidden, not focusable, out of the accessibility
+    /// tree): OK on "Discover" shows it again at once with its rows, artwork and scroll position, instead of
+    /// rebuilding hero + New + Top 10 + 12 rows (≈ 1.6 s on a 35 000-movie panel in the simulator, M-09).
     @ViewBuilder
     private func content(_ model: BrowseModel) -> some View {
-        if let selected {
-            CatalogGridView(kind: selected.category.kind.contentKind, categoryId: selected.id,
-                            title: CountryFlag.displayTitle(selected.category.name), initialSort: .added, embedded: true)
-                .id(selected.id)
-        } else {
+        let showsGrid = selected != nil
+        ZStack(alignment: .topLeading) {
             BrowseView(model: model)
+                .opacity(showsGrid ? 0 : 1)
+                .disabled(showsGrid)
+                .accessibilityHidden(showsGrid)
+            if let selected {
+                CatalogGridView(kind: selected.category.kind.contentKind, categoryId: selected.id,
+                                title: CountryFlag.displayTitle(selected.category.name), initialSort: .added, embedded: true)
+                    .id(selected.id)
+            }
         }
     }
 
@@ -582,7 +595,7 @@ struct TVCategoryBrowseView: View {
                 if !hidden.isEmpty {
                     entry(key: "show_hidden", selected: false, identifier: "category_show_hidden", action: { showHidden.toggle() }) {
                         Image(systemName: showHidden ? "eye.slash" : "eye")
-                        Text("\(L10n.t("catnav_show_hidden")) (\(hidden.count))").lineLimit(1)
+                        Text("\(L10n.t("catnav_show_hidden")) (\(hidden.count))").lineLimit(2)   // count never cut (B-16)
                         Spacer(minLength: 0)
                     }
                     .padding(.top, 12)
@@ -597,6 +610,9 @@ struct TVCategoryBrowseView: View {
         .scrollClipDisabled()
         .tvTopClipped()
         .focusSection()
+        // ◀ from the content lands on the selected row (Discover or the open category), not on the
+        // geometrically nearest one (B-13).
+        .defaultFocus($focused, columnKeys(model).contains(lastColumnKey) ? lastColumnKey : "discover", priority: .userInitiated)
         .accessibilityIdentifier("category_column")
     }
 
@@ -620,7 +636,7 @@ struct TVCategoryBrowseView: View {
             model.recordOpened(info)
         }) {
             CategoryLeadingMark(code: info.countryCode)
-            Text(categoryTitle(info)).lineLimit(1)
+            Text(categoryTitle(info)).lineLimit(2)   // long names wrap instead of "4K UHD Neuersch…" (B-16)
             Spacer(minLength: 8)
             Text("\(info.itemCount)").monospacedDigit().foregroundStyle(Theme.textSecondary)
         }

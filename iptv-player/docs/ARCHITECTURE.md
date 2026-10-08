@@ -410,7 +410,17 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
 * Veritabanına toplu yazım, sayfalı okuma (Paging 3 / LIMIT-OFFSET + keyset), FTS arama,
   250 ms debounce.
 * EPG: yalnızca pencere içi ve kaynaktaki kanallar; `(sourceId, channelEpgId, start)` indeksi;
-  "şimdi/sıradaki" sorguları indeksli.
+  "şimdi/sıradaki" sorguları indeksli. Rehber penceresi `EpgTimeline` (IPTVKit) saati izler: dakika
+  başında tik, şimdi 30 dk ilerleyince pencere yeniden konumlanır (`following(_:)`); Canlı TV satırlarının
+  şimdi/sonra bilgisi `LiveTVViewModel.refreshNowNext(at:)` ile dakikada bir yüklü satırlar için yeniden
+  okunur (değişmeyen dakika yeniden çizim tetiklemez) – Build 16.
+* Dizi detayı: bölüm ilerlemeleri `SeriesDetailViewModel.reloadProgress()` ile yüklemede ve
+  `libraryVersion` değişince **bir kez** okunur (render başına bölüm başına SQLite okuması yok);
+  "Devam et SxEy" saklanan sonuçtan gelir.
+* tvOS Filmler/Diziler: Keşfet sayfası (`BrowseView`) kategori grid'inin altında canlı tutulur (gizli,
+  devre dışı, erişilebilirlik ağacı dışında); Keşfet'e dönüş yeniden kurulum yapmaz. Ölçüm (35 000 film,
+  simülatör, Keşfet'e OK sonrası ana iş parçacığı commit'i): önce 0,44 / 0,11 / 0,11 sn → sonra
+  0,15 / 0,03 / 0,04 sn, görseller yeniden yüklenmez.
 * Görseller: boyutlandırılmış çözümleme, bellek + disk önbelleği; TV'de odak dışı satırlarda
   ön yükleme sınırlı.
 * Ağ: tüm çağrılar iptal edilebilir, bağlantı 10 sn / okuma 30 sn / toplam 20–120 sn zaman

@@ -312,6 +312,8 @@
     <string name="home_featured" formatted="false">Empfohlen</string>
     <string name="epg_today" formatted="false">Heute</string>
     <string name="epg_now_on_air" formatted="false">Jetzt läuft</string>
+    <string name="epg_later" formatted="false">Später</string>
+    <string name="epg_earlier" formatted="false">Früher</string>
     <string name="action_more" formatted="false">Mehr</string>
     <string name="action_see_all" formatted="false">Alle anzeigen</string>
     <string name="action_info" formatted="false">Info</string>

@@ -312,6 +312,8 @@
     <string name="home_featured" formatted="false">Öne çıkan</string>
     <string name="epg_today" formatted="false">Bugün</string>
     <string name="epg_now_on_air" formatted="false">Şimdi yayında</string>
+    <string name="epg_later" formatted="false">Daha sonra</string>
+    <string name="epg_earlier" formatted="false">Daha önce</string>
     <string name="action_more" formatted="false">Daha fazla</string>
     <string name="action_see_all" formatted="false">Tümünü gör</string>
     <string name="action_info" formatted="false">Bilgi</string>

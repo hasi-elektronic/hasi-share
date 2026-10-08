@@ -135,11 +135,21 @@ public final class LiveTVViewModel {
         if let index = rows.firstIndex(of: row), index >= rows.count - 20 { loadMore() }
     }
 
-    private func attachEpg(_ channels: [Channel]) -> [ChannelRow] {
+    private func attachEpg(_ channels: [Channel], at date: Date = Date()) -> [ChannelRow] {
         guard let sourceId else { return [] }
         let ids = channels.compactMap(\.epgId)
-        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: Date())) ?? [:]
+        let map = (try? env.epg.nowNext(sourceId: sourceId, epgIds: ids, at: date)) ?? [:]
         return channels.map { ChannelRow(channel: $0, nowNext: $0.epgId.flatMap { map[$0.lowercased()] }) }
+    }
+
+    /// Re-reads now/next of the loaded rows and the favorites section for `date` (the Live screen calls it every
+    /// minute): a screen left open for hours keeps showing what is on air (audit B10). Only changed arrays are
+    /// assigned, so an unchanged minute does not re-render the list.
+    public func refreshNowNext(at date: Date = Date()) {
+        let fresh = attachEpg(rows.map(\.channel), at: date)
+        if fresh != rows { rows = fresh }
+        let freshFavorites = attachEpg(favoriteRows.map(\.channel), at: date)
+        if freshFavorites != favoriteRows { favoriteRows = freshFavorites }
     }
 
     /// All loaded channels (zapping list).
@@ -276,6 +286,8 @@ public final class SeriesDetailViewModel {
     public private(set) var loadError: SourceError?
     /// Progress of this series' episodes by episode id (one query, refreshed with `reloadProgress`).
     public private(set) var progressByEpisode: [String: SyncItem] = [:]
+    /// "Continue S02E05" target, nil when nothing of the series was watched.
+    public private(set) var continueEpisode: Episode?
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private let now: () -> Date
 
@@ -332,24 +344,26 @@ public final class SeriesDetailViewModel {
         if let next = continueEpisode { season = next.season } else if let first = seasons.first { season = first }
     }
 
-    /// Re-reads the progress of the episodes (after playback / a sync).
+    /// Re-reads the progress of the episodes in one query (after `load`, playback, a sync – also while this
+    /// detail stays in the navigation stack). Long daily series have 600–1500 episodes.
     public func reloadProgress() {
         let keys = episodes.compactMap { e in env.contentKey(sourceId: e.sourceId, kind: .episode, itemId: e.id).map { (e.id, $0) } }
         let byKey = (try? env.library.progress(contentKeys: keys.map(\.1))) ?? [:]
         var out: [String: SyncItem] = [:]
         for (id, key) in keys { if let p = byKey[key] { out[id] = p } }
         progressByEpisode = out
+        continueEpisode = Self.continueEpisode(in: episodes, progress: out)
     }
 
     public func progress(of episode: Episode) -> SyncItem? {
         progressByEpisode[episode.id]
     }
 
-    /// "Continue S02E05": last watched episode, or the next one if it was completed.
-    public var continueEpisode: Episode? {
+    /// "Continue S02E05": last watched episode (any position), or the next one if it was completed.
+    static func continueEpisode(in episodes: [Episode], progress: [String: SyncItem]) -> Episode? {
         var latest: (index: Int, item: SyncItem)?
         for (index, e) in episodes.enumerated() {
-            if let p = progressByEpisode[e.id], latest == nil || p.updatedAt > latest!.item.updatedAt { latest = (index, p) }
+            if let p = progress[e.id], latest == nil || p.updatedAt > latest!.item.updatedAt { latest = (index, p) }
         }
         guard let (index, item) = latest else { return nil }
         if let pos = item.data.positionMs, let dur = item.data.durationMs, WatchHistory.isCompleted(positionMs: pos, durationMs: dur),
