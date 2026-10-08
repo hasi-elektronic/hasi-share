@@ -61,9 +61,10 @@ final class EngineOverrideTests: XCTestCase {
             for delay in [0, 200] {
                 for (u, container) in containers {
                     let c = controller(override)
-                    store.setDeviceDelay(delay)
+                    store.setVLCCalibration(delay)
+                    c.audioDelayStore = store   // the controller reads the calibration when the store is set
                     try await open(c, url(u))
-                    let context = "\(override.rawValue) delay \(delay) \(container.rawValue)"
+                    let context = "\(override.rawValue) calibration \(delay) \(container.rawValue)"
                     let avPlayable = container == .hls || container == .mp4
                     switch override {
                     case .avPlayer:
@@ -79,7 +80,9 @@ final class EngineOverrideTests: XCTestCase {
                         XCTAssertTrue(av.loads.isEmpty, context)
                         XCTAssertEqual(vlc.audioDelays.last, delay, context)
                     case .automatic:
-                        XCTAssertEqual(c.engineKind, delay != 0 || !avPlayable ? .vlcKit : .avPlayer, context)
+                        // Build 16: the per-device VLC calibration never changes the engine (CONTRACT §6.1 rule 0).
+                        XCTAssertEqual(c.engineKind, avPlayable ? .avPlayer : .vlcKit, context)
+                        if !avPlayable { XCTAssertEqual(vlc.audioDelays.last, delay, context) }
                     }
                 }
             }
@@ -205,7 +208,8 @@ final class EngineOverrideTests: XCTestCase {
 
     func testResetClearsAllDelays() async throws {
         let c = controller(.automatic)
-        store.setDeviceDelay(-150)
+        store.setVLCCalibration(-150)
+        c.audioDelayStore = store
         store.setContentDelay(200, for: "fp:live:1")
         store.setContentDelay(-400, for: "fp:movie:9")
         kv.set(Data("x".utf8), forKey: "other.key")
@@ -213,16 +217,17 @@ final class EngineOverrideTests: XCTestCase {
         try await open(c, r)
         XCTAssertEqual(c.engineKind, .vlcKit, "delay routes HLS to VLCKit")
         vlc.emit(.playing)
+        XCTAssertEqual(vlc.audioDelays.last, 50, "content 200 + calibration −150")
         c.resetAudioDelays()
-        XCTAssertEqual(store.deviceDelay, 0)
         XCTAssertEqual(store.contentDelay("fp:live:1"), 0)
         XCTAssertEqual(store.contentDelay("fp:movie:9"), 0)
-        XCTAssertTrue(kv.keys(withPrefix: "audioDelay.").isEmpty, "every delay key removed")
+        XCTAssertTrue(kv.keys(withPrefix: "audioDelay.").isEmpty, "every content delay key removed")
         XCTAssertNotNil(kv.data(forKey: "other.key"), "other settings kept")
+        XCTAssertEqual(store.vlcCalibration, -150, "the device calibration is kept")
         XCTAssertEqual(c.currentAudioDelay, 0)
-        XCTAssertEqual(c.deviceAudioDelay, 0)
+        XCTAssertEqual(c.vlcCalibrationMs, -150)
         XCTAssertEqual(c.contentAudioDelay, 0)
-        XCTAssertEqual(vlc.audioDelays.last, 0, "VLCKit gets 0 at once")
+        XCTAssertEqual(vlc.audioDelays.last, -150, "VLCKit gets the content 0 at once (calibration stays)")
         // Automatic routing no longer forces VLCKit.
         try await open(c, request(.channel(Channel(sourceId: "s", id: "2", name: "C2", url: "http://h.example.com/live/2.m3u8"))))
         XCTAssertEqual(c.engineKind, .avPlayer)
@@ -233,10 +238,10 @@ final class EngineOverrideTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let s = AudioDelayStore(kv: UserDefaultsStore(defaults))
-        s.setDeviceDelay(100)
+        s.setVLCCalibration(100)
         s.setContentDelay(250, for: "k1")
         s.resetAll()
-        XCTAssertEqual(s.deviceDelay, 0)
+        XCTAssertEqual(s.vlcCalibration, 100)
         XCTAssertEqual(s.contentDelay("k1"), 0)
     }
 

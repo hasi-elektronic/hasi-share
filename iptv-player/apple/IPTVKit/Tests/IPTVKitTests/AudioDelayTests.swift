@@ -11,26 +11,47 @@ final class AudioDelayTests: XCTestCase {
         XCTAssertEqual(s.contentDelay("ch:a"), 150)
         s.setContentDelay(9999, for: "ch:a")
         XCTAssertEqual(s.contentDelay("ch:a"), 2000)
-        s.setDeviceDelay(-300)
-        XCTAssertEqual(s.effectiveDelay("ch:a"), 1700)
-        XCTAssertEqual(s.effectiveDelay("ch:b"), -300)
+        s.setVLCCalibration(-300)
+        XCTAssertEqual(s.effectiveDelay("ch:a"), 2000, "the calibration never takes part in the routing delay")
+        XCTAssertEqual(s.effectiveDelay("ch:b"), 0)
         s.setContentDelay(0, for: "ch:a")
         XCTAssertEqual(s.contentDelay("ch:a"), 0)
     }
 
-    func testNegativeValuesAndEffectiveClamp() {
+    func testNegativeValuesAndCalibrationClamp() {
         let kv = InMemoryKeyValueStore()
         let s = AudioDelayStore(kv: kv)
         s.setContentDelay(-130, for: "ch:a")
         XCTAssertEqual(s.contentDelay("ch:a"), -150)
         s.setContentDelay(-5000, for: "ch:a")
         XCTAssertEqual(s.contentDelay("ch:a"), -2000)
-        s.setDeviceDelay(-400)
-        XCTAssertEqual(s.effectiveDelay("ch:a"), -2000, "content + device stays in range")
-        XCTAssertEqual(s.deviceDelay, -400)
+        s.setVLCCalibration(-123)
+        XCTAssertEqual(s.vlcCalibration, -120, "10 ms steps")
+        s.setVLCCalibration(-900)
+        XCTAssertEqual(s.vlcCalibration, -500, "±500 ms")
         s.setContentDelay(0, for: "ch:a")
         XCTAssertNil(kv.data(forKey: "audioDelay.ch:a"), "0 removes the key")
-        XCTAssertEqual(AudioDelayStore(kv: kv).deviceDelay, -400, "persisted")
+        XCTAssertEqual(AudioDelayStore(kv: kv).vlcCalibration, -500, "persisted")
+    }
+
+    /// Build ≤ 15 device ("TV/soundbar") delay → the VLC calibration, once; it no longer routes to VLCKit.
+    func testLegacyDeviceDelayMigratesIntoCalibration() {
+        let kv = InMemoryKeyValueStore()
+        kv.setValue(-250, forKey: "audioDelay.device")
+        let s = AudioDelayStore(kv: kv)
+        XCTAssertTrue(s.migrateDeviceDelayIfNeeded())
+        XCTAssertEqual(s.vlcCalibration, -250)
+        XCTAssertNil(kv.data(forKey: "audioDelay.device"), "legacy key removed")
+        XCTAssertFalse(s.migrateDeviceDelayIfNeeded(), "only once")
+        // An existing calibration wins; an out-of-range legacy value is clamped.
+        kv.setValue(1800, forKey: "audioDelay.device")
+        XCTAssertFalse(s.migrateDeviceDelayIfNeeded())
+        XCTAssertEqual(s.vlcCalibration, -250)
+        let fresh = InMemoryKeyValueStore()
+        fresh.setValue(1800, forKey: "audioDelay.device")
+        let t = AudioDelayStore(kv: fresh)
+        XCTAssertTrue(t.migrateDeviceDelayIfNeeded())
+        XCTAssertEqual(t.vlcCalibration, 500)
     }
 
     /// libVLC 3 (audiounit_ios) already compensates `outputLatency` up to 1 s; only the rest is added (audio earlier).
@@ -108,14 +129,33 @@ final class AudioDelayPlayerTests: XCTestCase {
         XCTAssertEqual(c.currentAudioDelay, 0)
     }
 
-    func testDeviceDelayAppliesToEveryItem() async throws {
+    /// Build 16: the VLC calibration is added to every VLCKit item but never moves AVPlayer content to VLCKit.
+    func testCalibrationAppliesToVLCItemsOnlyAndNeverRoutes() async throws {
         let c = controller()
-        store.setDeviceDelay(-100)
-        let movie = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mp4")
-        try await open(c, request(.movie(movie)))
+        store.setVLCCalibration(-100)
+        c.audioDelayStore = store
+        let mp4 = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mp4")
+        try await open(c, request(.movie(mp4)))
+        XCTAssertEqual(c.engineKind, .avPlayer, "calibration alone keeps AVPlayer")
+        XCTAssertTrue(vlc.loads.isEmpty)
+        let mkv = Movie(sourceId: "s", id: "m2", name: "Film MKV", url: "http://h.example.com/film.mkv")
+        try await open(c, request(.movie(mkv)))
         XCTAssertEqual(c.engineKind, .vlcKit)
-        XCTAssertEqual(vlc.audioDelays.last, -100)
-        XCTAssertEqual(c.contentAudioDelay, 0)
+        XCTAssertEqual(vlc.audioDelays.last, -100, "calibration applied to VLCKit")
+        // A content delay adds up with the calibration on VLCKit.
+        c.setAudioDelay(250)
+        XCTAssertEqual(vlc.audioDelays.last, 150)
+        XCTAssertEqual(c.contentAudioDelay, 250)
+    }
+
+    func testMigratedDeviceDelayNoLongerForcesVLC() async throws {
+        let kv = InMemoryKeyValueStore()
+        kv.setValue(-200, forKey: "audioDelay.device")
+        let c = controller()
+        c.audioDelayStore = AudioDelayStore(kv: kv)
+        XCTAssertEqual(c.vlcCalibrationMs, -200)
+        try await open(c, request(.channel(channel("1", "http://h.example.com/live/1.m3u8"))))
+        XCTAssertEqual(c.engineKind, .avPlayer)
     }
 
     func testDelayIgnoredWithoutVLC() async throws {
@@ -383,15 +423,27 @@ final class AudioDelayPlayerTests: XCTestCase {
         XCTAssertEqual(c.contentAudioDelay, 0)
     }
 
-    func testDeviceDelayChangeAppliesToVLCLive() async throws {
+    func testCalibrationChangeAppliesToVLCLive() async throws {
         let c = controller()
         let movie = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mkv")
         try await open(c, request(.movie(movie)))
-        c.setDeviceAudioDelay(-250)
-        XCTAssertEqual(store.deviceDelay, -250)
-        XCTAssertEqual(c.deviceAudioDelay, -250)
-        XCTAssertEqual(c.currentAudioDelay, -250)
+        vlc.emit(.playing)
+        c.setVLCCalibration(-250)
+        XCTAssertEqual(store.vlcCalibration, -250)
+        XCTAssertEqual(c.vlcCalibrationMs, -250)
+        XCTAssertEqual(c.currentAudioDelay, 0, "routing delay unchanged")
         XCTAssertEqual(vlc.audioDelays.last, -250)
+    }
+
+    func testCalibrationChangeOnAVPlayerDoesNotReload() async throws {
+        let c = controller()
+        let movie = Movie(sourceId: "s", id: "m1", name: "Film", url: "http://h.example.com/film.mp4")
+        try await open(c, request(.movie(movie)))
+        av.emit(.playing)
+        c.setVLCCalibration(120)
+        XCTAssertEqual(c.engineKind, .avPlayer)
+        XCTAssertEqual(av.loads.count, 1)
+        XCTAssertTrue(vlc.loads.isEmpty)
     }
 }
 

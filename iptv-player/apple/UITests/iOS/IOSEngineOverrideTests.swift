@@ -101,15 +101,17 @@ final class IOSEngineOverrideTests: XCTestCase {
         let plus = app.buttons["player_audio_sync_delay_plus"]
         plus.tap()
         plus.tap()
-        app.buttons["player_device_audio_delay_minus"].tap()
+        app.buttons["player_vlc_calibration_minus"].tap()
         XCTAssertEqual(app.staticTexts["player_audio_sync_delay_value"].label, "+100 ms · audio later")
-        XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Audio delay: +50 ms (device -50 ms, channel +100 ms)"], timeout: 30),
+        XCTAssertTrue(waitPerf(app, contains: ["VLCKit", "Audio delay: +90 ms (device -10 ms, channel +100 ms)"], timeout: 30),
                       "delay on VLCKit: \(perf(app))")
         app.buttons["audio_sync_reset"].tap()
         XCTAssertTrue(app.staticTexts["audio_sync_reset_done"].waitForExistence(timeout: 2), "confirmation")
         XCTAssertEqual(app.staticTexts["player_audio_sync_delay_value"].label, "0 ms")
-        XCTAssertEqual(app.staticTexts["player_device_audio_delay_value"].label, "0 ms")
-        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: 0 ms (device 0 ms, channel 0 ms)"], timeout: 5), perf(app))
+        // Build 16: the per-device VLC calibration is not part of "Reset sync".
+        XCTAssertEqual(app.staticTexts["player_vlc_calibration_value"].label, "-10 ms · audio earlier")
+        XCTAssertTrue(waitPerf(app, contains: ["Audio delay: -10 ms (device -10 ms, channel 0 ms)"], timeout: 5), perf(app))
+        app.buttons["player_vlc_calibration_plus"].tap()
         UITestSupport.snap("engine-override/ios-reset-sync", in: self)
         XCTAssertTrue(app.staticTexts["audio_sync_reset_done"].waitForNonExistence(timeout: 5), "toast goes away")
     }

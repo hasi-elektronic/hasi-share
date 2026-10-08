@@ -240,9 +240,16 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   oynat yeniden açar). VLCKit kendi ses çıkışında kategoriyi `.playback`/`.moviePlayback` olarak bırakır
   (simülatörde doğrulandı); `activate()` kategoriyi yine de yeniden uygular.
 * **Ses senkronu (A/V gecikmesi):** `AudioDelayStore` (cihaza yerel `KeyValueStore`) içerik anahtarı
-  başına bir gecikme + bir cihaz/soundbar gecikmesi tutar (−2000…+2000 ms, 50 ms adım; pozitif = ses
-  daha geç). Etkin gecikme = clamp(içerik + cihaz). Etkin gecikme ≠ 0 ⇒ **VLCKit** (CONTRACT §6.1;
-  AVPlayer'da ses gecikmesi yok, `setAudioDelay` AVPlayer'da işlemsiz). AVPlayer oynarken gecikme
+  başına bir gecikme (−2000…+2000 ms, 50 ms adım; pozitif = ses daha geç) + cihaz başına **VLC
+  kalibrasyonu** (Build 16, −500…+500 ms, 10 ms adım) tutar. Motoru yalnızca içerik gecikmesi belirler:
+  içerik gecikmesi ≠ 0 ⇒ **VLCKit** (CONTRACT §6.1 kural 0; AVPlayer'da ses gecikmesi yok, `setAudioDelay`
+  AVPlayer'da işlemsiz). Kalibrasyon motoru **asla** değiştirmez; VLCKit'e giden değer = içerik +
+  kalibrasyon (+ aşağıdaki otomatik terim). Eski cihaz/soundbar gecikmesi (`audioDelay.device`, her içeriğe
+  eklenip her yayını VLCKit'e zorluyordu) ilk açılışta bir kez kalibrasyona taşınır (±500 ms'ye kırpılır) ve
+  silinir (`AudioDelayStore.migrateDeviceDelayIfNeeded`). Kalibrasyon ekranı (Ayarlar → Gelişmiş → "Ses
+  senkronunu ayarla", Senkron panelinden de) uygulamaya gömülü test klibini (`Shared/Resources/avsync-test.mkv`
+  / `.mp4`, `scripts/make-avsync-clip.py`) kendi motor örnekleriyle oynatır: VLCKit döngüde (`:input-repeat`),
+  değer canlı uygulanır; "Referans (Apple)" aynı klibi AVPlayer'da gecikmesiz oynatır. AVPlayer oynarken gecikme
   değişirse aynı yayın VLCKit'te yeniden açılır (VOD aynı konumdan, canlı canlı uçtan) ve o açılışta
   VLCKit'te kalır. VLCKit: libVLC işaretiyle (`currentAudioPlaybackDelay`, µs, + = ses geç); libVLC
   gecikmeyi girdi (input) üzerinde tutar, her yeni medyada sıfırlar ve girdi oluşmadan yok sayar →
@@ -276,7 +283,15 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   `videoCropGeometry` (görünüm oranına göre; 16:9 / 4:3 aynı sabit çerçevede).
 * İlerleme: VOD'da 10 sn'de bir + duraklat/çıkışta kaydedilir; `≥ %95` → izlendi.
 * Yaşam döngüsü: ekran kapanınca / arka plana geçince oynatıcı **release** edilir
-  (Android `ON_STOP`, iOS `scenePhase != .active`), pozisyon kaydedilir.
+  (Android `ON_STOP`, iOS/tvOS `scenePhase == .background` – Build 16, B4: `.inactive` (Denetim Merkezi, bildirim
+  perdesi, arama bandı) bırakmaz, `AppEnvironment.scenePhaseChanged(_ AppScenePhase)`), pozisyon kaydedilir.
+* Ekran açık (Build 16, B2): `PlayerController.keepDisplayAwake` faz değişiminde çağrılır (oynuyor / yükleniyor /
+  tamponluyor / yeniden bağlanıyor → true, diğerleri false); uygulama `UIApplication.isIdleTimerDisabled`'ı ayarlar
+  (libVLC bunu yapmaz; AVPlayer'ın `preventsDisplaySleepDuringVideoPlayback`'i yalnızca kendi görüntüsü içindir).
+* İzleme paketi (Build 16): `PlayerController` sonraki bölüm kartını (`upNext`, sağlayıcı
+  `AppEnvironment.nextEpisode(after:)` – kayıtlı liste, gerekirse tembel `get_series_info`), uyku zamanlayıcısını
+  (`sleepTimer`, 10 adımda `setVolume` ile 5 sn kısma) ve altyazı stilini/gecikmesini (`PlayerPreferences`,
+  motorlarda `applySubtitleStyle` / `setSubtitleDelay`) yönetir; ayrıntılar SCREENS §3.5/§3.7.
 
 ### 3.3 Kalıcı depolama: tvOS silinebilir alan ve dayanıklı ayna (Build 14)
 tvOS uygulamalarının yalnızca ~500 KB'lık **kalıcı** yerel alanı vardır (NSUserDefaults); Application Support ve
@@ -439,7 +454,7 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
   `.m3u8` / uzantısız; ör. `get.php?type=m3u_plus` ile M3U olarak eklenmiş Xtream hesabı) kaynak türünden
   bağımsız olarak hesabı bilinmeyen Xtream sayılır: bayt okunmaz ve URL ön ısıtmada **çözülmez** bile, çünkü
   çözümleyici panele istek atar (`.m3u8` ikizi GET'i / içerik koklama) – geçişte doğrudan açılış gibi çözülür. Başka bir kanal açılınca (önbellekte yoksa),
-  ekran/oynatıcı kapanınca ve uygulama `.active` dışına çıkınca (`release()`) iptal edilir;
+  ekran/oynatıcı kapanınca ve uygulama arka plana geçince (`release()`) iptal edilir;
   URL'ler loglanmaz.
 
 ## 8. Güvenlik özeti

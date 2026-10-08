@@ -46,7 +46,12 @@ enum BrowseRoute: Hashable {
 @MainActor
 @Observable
 final class Router {
-    var playerPresented = false
+    var playerPresented = false {
+        didSet { if !playerPresented { browseDeferred = false } }
+    }
+    /// IOS-06: an early QuickStart covers the app with the player from the first frame – the browse screens under
+    /// it are built only once the player closes (their first render competed with the stream start).
+    var browseDeferred = false
     var paywallPresented = false
     /// Current section (mobile header tab / TV top tab).
     var section: AppSection = .home
@@ -87,6 +92,10 @@ final class Router {
 
     init(env: AppEnvironment) {
         self.env = env
+        // IOS-06: QuickStart already opened the last channel while the app was being built – the player cover is
+        // part of the very first frame (no Home first, no presentation wait).
+        playerPresented = AppBootstrap.quickStartedEarly
+        browseDeferred = AppBootstrap.quickStartedEarly
     }
 
     /// Opens the player – or the paywall when playback is locked (CONTRACT §7.4).
@@ -203,11 +212,23 @@ enum AppBootstrap {
                                          settings: settings, engines: .app)
             AudioSessionConfigurator.configure()
             env.player.audioSession = AudioSessionConfigurator.hooks
+            #if canImport(UIKit)
+            // B2: no auto-lock / screensaver while any engine plays (libVLC does not manage the idle timer).
+            env.player.keepDisplayAwake = { UIApplication.shared.isIdleTimerDisabled = $0 }
+            #endif
             #if DEBUG
             // UI tests: a longer seek-preview idle commit, so the bubble can be read before it commits.
             if let ms = argument("-seekCommitMs").flatMap(Int64.init), ms > 0 { env.player.seekCommitIdleMs = ms }
+            // UI tests (Build 16): shorter next-episode countdown / sleep-timer "minute".
+            if let s = argument("-upNextSeconds").flatMap(Int.init), s > 0 { env.player.upNextCountdownSeconds = s }
+            if let ms = argument("-sleepTimerMinuteMs").flatMap(Int64.init), ms > 0 {
+                env.player.sleepTimerMinuteMs = ms
+                env.player.sleepFadeMs = min(env.player.sleepFadeMs, ms)
+            }
             #endif
             audioObserver.start(player: env.player)
+            PerfTrace.shared.launchPhase("env")
+            quickStartEarly(env: env)
             return env
         } catch {
             fatalError("Invalid build configuration (license keys): \(error)")
@@ -263,6 +284,35 @@ enum AppBootstrap {
         }
     }
 
+    /// Set when `quickStartEarly` opened the last channel during `makeEnvironment` (the router presents the player
+    /// from its first frame on).
+    static private(set) var quickStartedEarly = false
+
+    /// IOS-06 (Build 16): QuickStart as early as possible – right after the environment exists, before any view is
+    /// built. Only when playback is allowed without waiting (stored entitlement / trial, the TestFlight receipt);
+    /// otherwise the regular `quickStart` below decides after the StoreKit snapshot. Measured: the first frame no
+    /// longer waits for the Home screen, the `.task` start and the cover animation.
+    static func quickStartEarly(env: AppEnvironment) {
+        guard env.settings.quickStart, let last = env.settings.lastSession, last.endedInPlayer, !env.sources.isEmpty,
+              let channel = (try? env.catalog.channel(sourceId: last.sourceId, id: last.channelId)) ?? nil else { return }
+        #if DEBUG
+        if arguments.contains("-noEarlyQuickStart") { return }   // before/after measurements (IOSQuickStartPerfTests)
+        if arguments.contains("-uiTrial") {
+            env.license.update(store: StoreSnapshot(trialStartMs: env.license.nowMs() - 2 * 86_400_000, trialTransactionId: nil))
+        }
+        #endif
+        if info("TESTFLIGHT_FULL_ACCESS").uppercased() == "YES", Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+            env.license.testerFullAccess = true
+        }
+        env.license.evaluate()
+        guard env.license.canPlay else { return }
+        var page = (try? env.catalog.channels(sourceId: channel.sourceId, categoryId: channel.categoryId, limit: 200)) ?? []
+        if !page.contains(where: { $0.id == channel.id }) { page.insert(channel, at: 0) }
+        env.player.open(env.request(for: .channel(channel), channels: page))
+        quickStartedEarly = true
+        PerfTrace.shared.launchPhase("quickStartEarly")
+    }
+
     /// QuickStart (docs/SCREENS.md §3.2): when the app was left while a live channel was playing, open that
     /// channel in the player right away – before any source refresh (`env.start()`). Call AFTER
     /// `applyTesterAccess` and pass its pending `AppTransaction` confirmation (if any). `canPlay` is only
@@ -274,6 +324,7 @@ enum AppBootstrap {
     static func quickStart(env: AppEnvironment, router: Router, testerAccess: Task<Void, Never>? = nil) async {
         guard !router.playerPresented, !router.onboarding, !env.sources.isEmpty,
               env.settings.lastSession?.endedInPlayer == true else { return }
+        PerfTrace.shared.launchPhase("quickStart")
         let channelOf: (LastSession?) -> Channel? = { last in
             last.flatMap { (try? env.catalog.channel(sourceId: $0.sourceId, id: $0.channelId)) ?? nil }
         }
@@ -284,6 +335,7 @@ enum AppBootstrap {
                 _ = await QuickStart.wait(for: testerAccess, until: deadline)   // runs on after the deadline
             }
         }
+        PerfTrace.shared.launchPhase("quickStartDecided")
         guard !router.playerPresented else { return }   // e.g. the user was faster than the wait
         let last = env.settings.lastSession
         let channel = channelOf(last)
@@ -304,6 +356,7 @@ enum AppBootstrap {
     /// Debug/UI-test hooks: `-seedM3U <url>` adds a source, `-uiScreen <name>` opens a screen,
     /// `-uiTrial` simulates an active StoreKit trial (only in DEBUG builds).
     static func applyDebugHooks(env: AppEnvironment, router: Router) async {
+        PerfTrace.shared.launchPhase("task")
         #if DEBUG
         if arguments.contains("-uiTrial") {
             env.license.update(store: StoreSnapshot(trialStartMs: env.license.nowMs() - 2 * 86_400_000, trialTransactionId: nil))

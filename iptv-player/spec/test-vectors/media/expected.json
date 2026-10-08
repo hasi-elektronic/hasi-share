@@ -181,7 +181,7 @@
       "unknown": "avplayer"
     },
     "audioDelay": {
-      "_why": "CONTRACT §6.1 – audio delay (content + device) ≠ 0 → VLCKit (AVPlayer has no audio delay); delay 0 → the plain select tables; without VLCKit the delay is ignored",
+      "_why": "CONTRACT §6.1 – the content audio delay ≠ 0 → VLCKit (Build 16: the per-device VLC calibration never routes) (AVPlayer has no audio delay); delay 0 → the plain select tables; without VLCKit the delay is ignored",
       "audioDelayMs": 200,
       "select": {
         "hls": "vlckit",

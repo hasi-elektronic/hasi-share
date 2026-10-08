@@ -52,6 +52,26 @@ public struct MediaOption: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Next-episode card (docs/SCREENS.md §3.5, Build 16): the episode that follows, and when it starts on its own
+/// (`deadlineMs`, monotonic; nil = no countdown – autoplay off, or paused by the user).
+public struct UpNext: Equatable, Sendable {
+    public var episode: Episode
+    public var seriesTitle: String
+    public var deadlineMs: Int64?
+}
+
+/// Sleep timer (player tools, Build 16): after n minutes, or at the end of the current episode/movie.
+public enum SleepTimerMode: Hashable, Sendable {
+    case minutes(Int)
+    case endOfItem
+}
+
+public struct SleepTimerState: Equatable, Sendable {
+    public var mode: SleepTimerMode
+    /// Monotonic ms when it fires (nil for `.endOfItem`).
+    public var deadlineMs: Int64?
+}
+
 /// Playback state for the overlay.
 public enum PlayerPhase: Equatable, Sendable {
     case idle
@@ -113,7 +133,15 @@ public struct AudioSessionHooks {
 @MainActor
 @Observable
 public final class PlayerController {
-    public private(set) var phase: PlayerPhase = .idle
+    public private(set) var phase: PlayerPhase = .idle {
+        didSet {
+            let awake = Self.keepsDisplayAwake(phase)
+            if awake != displayKeptAwake {
+                displayKeptAwake = awake
+                keepDisplayAwake(awake)
+            }
+        }
+    }
     public private(set) var request: PlaybackRequest?
     public private(set) var stream: ResolvedStream?
     /// Engine currently showing video (nil before the first open).
@@ -136,18 +164,48 @@ public final class PlayerController {
     public private(set) var previousChannel: Channel?
     /// Resume position applied at open (for the "Play from start" chip).
     public private(set) var resumedFromMs: Int64?
-    /// Effective audio delay of the current request (content + device, ms; CONTRACT §6.1).
+    /// Audio delay that decides the engine (CONTRACT §6.1 rule 0): the current content's own delay, ms.
     public private(set) var currentAudioDelay = 0
     /// The current content's own delay (the player's "Sync" control edits it).
     public private(set) var contentAudioDelay = 0
-    /// Device/soundbar delay (Settings → Playback), added to every content.
-    public private(set) var deviceAudioDelay = 0
+    /// Per-device VLC calibration (Settings → Advanced → "Calibrate audio sync"): added to every VLCKit
+    /// item, never changes the engine (Build 16).
+    public private(set) var vlcCalibrationMs = 0
+    /// Delay handed to the engine: content + VLC calibration (AVPlayer ignores it).
+    public var engineAudioDelay: Int { currentAudioDelay + vlcCalibrationMs }
     /// The delay could not be applied to this opened stream (VLCKit failed, playing on AVPlayer without it).
     public private(set) var audioSyncUnavailable = false
     /// Seeks handed to the engine since launch (performance overlay; the tvOS seek preview seeks once per commit).
     public private(set) var seekCount = 0
     /// Settings → Advanced → Player engine (CONTRACT §6.1 rule −1); change it with `setEngineOverride(_:)`.
     public private(set) var engineOverride: PlayerEngineOverride = .automatic
+
+    // MARK: Build 16 – watching pack state
+    /// Next-episode card (nil = hidden).
+    public private(set) var upNext: UpNext?
+    /// Running sleep timer (nil = off).
+    public private(set) var sleepTimer: SleepTimerState?
+    /// Bumped when the sleep timer stopped playback (the UI shows a short notice).
+    public private(set) var sleepTimerFiredCount = 0
+    /// Subtitle delay of the current item (ms, + = later; VLCKit only, reset per item).
+    public private(set) var subtitleDelayMs = 0
+    /// Autoplay + subtitle style (device-local); set by `AppEnvironment`.
+    @ObservationIgnored public var preferences: PlayerPreferences?
+    /// The episode after the given one (stored list or lazy `get_series_info`); set by `AppEnvironment`.
+    @ObservationIgnored public var nextEpisodeProvider: (@MainActor (Episode) async -> Episode?)?
+    /// Countdown of the next-episode card (UI tests shorten it).
+    @ObservationIgnored public var upNextCountdownSeconds = 10
+    /// Length of a sleep-timer "minute" (UI/unit tests shorten it) and of the fade-out before it stops.
+    @ObservationIgnored public var sleepTimerMinuteMs: Int64 = 60_000
+    @ObservationIgnored public var sleepFadeMs: Int64 = 5_000
+    @ObservationIgnored private var upNextLookup: Task<Void, Never>?
+    @ObservationIgnored private var upNextLookedUpFor: String?
+    @ObservationIgnored private var upNextCandidate: Episode?
+    @ObservationIgnored private var upNextCountdown: Task<Void, Never>?
+    @ObservationIgnored private var upNextDismissedFor: String?
+    @ObservationIgnored private var sleepTask: Task<Void, Never>?
+    /// Subtitle language to re-select after an in-place reload (subtitle style change on VLCKit).
+    @ObservationIgnored private var reloadSubtitleLanguage: String?
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -180,7 +238,12 @@ public final class PlayerController {
     /// Paused when the scene released the player: `resumeAfterRelease` restores the paused state, it does not play.
     @ObservationIgnored private var pausedAtRelease = false
     /// Per-content + device audio delay (docs/SCREENS.md §3.7); set by `AppEnvironment`. nil = no delays.
-    @ObservationIgnored public var audioDelayStore: AudioDelayStore? { didSet { refreshAudioDelay() } }
+    @ObservationIgnored public var audioDelayStore: AudioDelayStore? {
+        didSet {
+            if audioDelayStore?.migrateDeviceDelayIfNeeded() == true { SafeLog.info("device audio delay migrated to the VLC calibration") }
+            refreshAudioDelay()
+        }
+    }
     /// Content delay of a request without content key (raw URL): this session only.
     @ObservationIgnored private var unkeyedContentDelay = 0
     /// The open's resolve is in flight: `stream` still belongs to the previous request, and the engine's
@@ -195,6 +258,19 @@ public final class PlayerController {
     @ObservationIgnored private var streamPlayed = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
     @ObservationIgnored public var audioSession = AudioSessionHooks(activate: {}, deactivate: {})
+    /// Screen stays on (SCREENS §3.7) while any engine plays or is about to (B2: libVLC never disables the
+    /// idle timer, AVPlayer only while it renders): the app sets `UIApplication.isIdleTimerDisabled`. Paused,
+    /// ended, failed, idle (and the sleep timer's stop) give the device its auto-lock / screensaver back.
+    @ObservationIgnored public var keepDisplayAwake: @MainActor (Bool) -> Void = { _ in }
+    @ObservationIgnored private var displayKeptAwake = false
+
+    public nonisolated static func keepsDisplayAwake(_ phase: PlayerPhase) -> Bool {
+        switch phase {
+        case .playing, .buffering, .loading, .reconnecting: return true
+        case .idle, .paused, .failed, .locked, .ended: return false
+        }
+    }
+
     @ObservationIgnored public var canPlay: @MainActor () -> Bool = { true }
     @ObservationIgnored public var nowMs: @MainActor () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     @ObservationIgnored public var onLibraryChange: (@MainActor () -> Void)?
@@ -273,7 +349,11 @@ public final class PlayerController {
         delayRoutedToVLC = false
         audioSyncUnavailable = false
         streamPlayed = false
-        if self.request?.id != request.id { unkeyedContentDelay = 0 }   // retry / resume keep a raw URL's delay
+        resetUpNext()
+        if self.request?.id != request.id {
+            unkeyedContentDelay = 0   // retry / resume keep a raw URL's delay
+            subtitleDelayMs = 0       // per item
+        }
         if case .channel(let current)? = self.request?.item, case .channel(let next) = request.item, current.id != next.id {
             previousChannel = current
         }
@@ -299,6 +379,7 @@ public final class PlayerController {
         }
         phase = .loading
         PerfTrace.shared.mark(.playRequested)
+        PerfTrace.shared.launchPhase("open")
         if !request.isLive { updateLastSession(nil) }   // VOD / raw URL playback: nothing to quick-start
         prefetchedFor = nil
         // A neighbour warmed up while the previous channel played: skip the resolver. Anything else
@@ -393,9 +474,13 @@ public final class PlayerController {
         loadReady = false
         probeTask?.cancel()
         cancelStallTimer()   // a new item starts without the previous item's stall deadline
-        next.setAudioDelay(ms: currentAudioDelay)   // before load: VLCKit starts the item with it
+        next.setAudioDelay(ms: engineAudioDelay)   // before load: VLCKit starts the item with it
+        next.applySubtitleStyle(subtitleStyle)
+        next.setSubtitleDelay(ms: subtitleDelayMs)
+        let subtitleLanguage = reloadSubtitleLanguage ?? preferredSubtitleLanguage
+        reloadSubtitleLanguage = nil
         next.load(stream, isLive: isLive, startMs: startMs,
-                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: preferredSubtitleLanguage,
+                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: subtitleLanguage,
                   tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
         // VOD only: a second connection to a live panel (often one connection per account) could itself be refused.
         if next.kind == .avPlayer, !isLive { watchNotReady(stream) }
@@ -477,6 +562,7 @@ public final class PlayerController {
                 pendingSeek = nil
             }
             currentTime = seconds
+            updateUpNext()
             reconnectState = reconnectPolicy.tick(reconnectState, nowMs: SystemClock.monotonicMs())
             if let last = lastProgressSaveMs, nowMs() - last < Self.progressSaveIntervalMs { break }
             saveProgress()
@@ -587,6 +673,11 @@ public final class PlayerController {
         }
         saveProgress()
         phase = .ended
+        if sleepTimer?.mode == .endOfItem {
+            expireSleepTimer()   // "end of episode/movie": stop here, no next episode
+            return
+        }
+        showUpNextAtEnd()
     }
 
     /// "Retry" on the error card.
@@ -647,6 +738,7 @@ public final class PlayerController {
     // MARK: Transport
 
     public func togglePlayPause() {
+        pauseUpNextCountdown()   // the user takes over: the card stays, it no longer starts by itself
         pausedByInterruption = false   // the user decides from here on
         systemPauseUnclaimed = false
         if reloadOnPlay, phase == .paused {
@@ -795,6 +887,11 @@ public final class PlayerController {
         pendingSeek = (target, nowMs())
         seekCount += 1
         engine?.seek(to: target)
+        if phase == .ended, duration <= 0 || target < duration - 1 {
+            // A seek back into a finished VOD plays from there (IOS-02: it used to stay on the last frame).
+            audioSession.activate()
+            engine?.play()
+        }
     }
 
     // MARK: Audio / subtitles
@@ -823,14 +920,13 @@ public final class PlayerController {
 
     /// Re-reads the effective delay of the current request (store or raw-URL session value).
     private func refreshAudioDelay() {
-        let device = audioDelayStore?.deviceDelay ?? 0
-        deviceAudioDelay = device
+        vlcCalibrationMs = audioDelayStore?.vlcCalibration ?? 0
         if let key = audioDelayContentKey, let audioDelayStore {
             contentAudioDelay = audioDelayStore.contentDelay(key)
             currentAudioDelay = audioDelayStore.effectiveDelay(key)
         } else {
             contentAudioDelay = unkeyedContentDelay
-            currentAudioDelay = AudioDelayStore.normalize(unkeyedContentDelay + device)
+            currentAudioDelay = AudioDelayStore.normalize(unkeyedContentDelay)
         }
     }
 
@@ -847,8 +943,9 @@ public final class PlayerController {
         applyAudioDelay()
     }
 
-    /// "Reset sync" (Sync panel, Settings → Advanced): device and every per-content delay back to 0. A stream
-    /// on VLCKit gets 0 at once; Automatic routing stops forcing VLCKit from the next open (CONTRACT §6.1).
+    /// "Reset sync" (Sync panel, Settings → Advanced): every per-content delay back to 0 (the VLC calibration
+    /// stays). A stream on VLCKit gets it at once; Automatic routing stops forcing VLCKit from the next open
+    /// (CONTRACT §6.1).
     public func resetAudioDelays() {
         audioDelayStore?.resetAll()
         unkeyedContentDelay = 0
@@ -873,17 +970,19 @@ public final class PlayerController {
         open(request)
     }
 
-    /// Settings → Playback → device/soundbar delay (added to every content).
-    public func setDeviceAudioDelay(_ ms: Int) {
-        audioDelayStore?.setDeviceDelay(ms)
+    /// Settings → Advanced → "Calibrate audio sync" / the Sync panel's calibration row: the per-device VLC
+    /// offset. Applied live to a VLCKit item; an AVPlayer item stays on AVPlayer (never reloaded for it).
+    public func setVLCCalibration(_ ms: Int) {
+        audioDelayStore?.setVLCCalibration(ms)
         refreshAudioDelay()
-        applyAudioDelay()
+        guard let engine, engine.kind == .vlcKit, hasActiveItem else { return }
+        engine.setAudioDelay(ms: engineAudioDelay)
     }
 
     private func applyAudioDelay() {
         guard let engine, let stream, hasActiveItem else { return }
         if engine.kind == .vlcKit {
-            engine.setAudioDelay(ms: currentAudioDelay)
+            engine.setAudioDelay(ms: engineAudioDelay)
         } else if currentAudioDelay != 0, engineKind(for: stream) == .vlcKit {
             SafeLog.info("audio delay \(currentAudioDelay) ms – reloading in vlckit")
             fallbackEngine = .vlcKit
@@ -922,6 +1021,7 @@ public final class PlayerController {
 
     /// Saves the position and frees the player (scene not active / screen closed).
     public func release() {
+        pauseUpNextCountdown()
         saveProgress()
         openTask?.cancel()
         zapTask?.cancel()
@@ -961,6 +1061,8 @@ public final class PlayerController {
             updateLastSession(last)
         }
         release()
+        resetUpNext()
+        setSleepTimer(nil)
         pausedAtRelease = false
         request = nil
         stream = nil
@@ -992,6 +1094,214 @@ public final class PlayerController {
         probeTask?.cancel()
         cancelStallTimer()
         engine?.stop()
+    }
+
+    // MARK: Next episode (Build 16, docs/SCREENS.md §3.5)
+
+    /// The card appears this close to the end ("credits") – or when the episode ends.
+    public static let upNextCreditsSeconds: Double = 30
+    /// The next episode is looked up (stored list or `get_series_info`) this close to the end.
+    static let upNextLookupSeconds: Double = 90
+
+    private func resetUpNext() {
+        upNextLookup?.cancel()
+        upNextCountdown?.cancel()
+        upNextLookup = nil
+        upNextCountdown = nil
+        upNextLookedUpFor = nil
+        upNextCandidate = nil
+        upNextDismissedFor = nil
+        if upNext != nil { upNext = nil }
+    }
+
+    private var playingEpisode: (episode: Episode, seriesTitle: String, requestId: String)? {
+        guard let request, case .episode(let episode, let seriesTitle) = request.item else { return nil }
+        return (episode, seriesTitle, request.id)
+    }
+
+    /// Time ticks: look the next episode up near the end, show the card in the credits, hide it again when the
+    /// user seeks back out of them.
+    private func updateUpNext() {
+        guard let current = playingEpisode, duration > 0 else { return }
+        let remaining = duration - currentTime
+        if upNext != nil {
+            if phase != .ended, remaining > Self.upNextCreditsSeconds + 5 { hideUpNext() }
+            return
+        }
+        guard upNextDismissedFor != current.requestId, sleepTimer?.mode != .endOfItem,
+              duration > Self.upNextCreditsSeconds * 2 else { return }   // short items: only at the end
+        if remaining <= Self.upNextLookupSeconds { lookUpNext(current.episode) }
+        if remaining <= Self.upNextCreditsSeconds, phase == .playing, let next = upNextCandidate {
+            showUpNext(next, seriesTitle: current.seriesTitle)
+        }
+    }
+
+    private func showUpNextAtEnd() {
+        guard let current = playingEpisode, upNextDismissedFor != current.requestId, upNext == nil else { return }
+        if let next = upNextCandidate {
+            showUpNext(next, seriesTitle: current.seriesTitle)
+        } else {
+            lookUpNext(current.episode)
+        }
+    }
+
+    private func lookUpNext(_ episode: Episode) {
+        guard let provider = nextEpisodeProvider, let requestId = request?.id, upNextLookedUpFor != requestId else { return }
+        upNextLookedUpFor = requestId
+        upNextLookup = Task { [weak self] in
+            let next = await provider(episode)
+            guard !Task.isCancelled, let self, self.request?.id == requestId else { return }
+            self.upNextCandidate = next
+            if self.phase == .ended { self.showUpNextAtEnd() } else { self.updateUpNext() }
+        }
+    }
+
+    private func showUpNext(_ episode: Episode, seriesTitle: String) {
+        let autoplay = preferences?.autoplayNextEpisode ?? true
+        let seconds = max(1, upNextCountdownSeconds)
+        upNext = UpNext(episode: episode, seriesTitle: seriesTitle,
+                        deadlineMs: autoplay ? SystemClock.monotonicMs() + Int64(seconds) * 1000 : nil)
+        upNextCountdown?.cancel()
+        guard autoplay else { return }
+        upNextCountdown = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, let self, self.upNext?.deadlineMs != nil else { return }
+            self.playNextEpisode()
+        }
+    }
+
+    private func hideUpNext() {
+        upNextCountdown?.cancel()
+        upNextCountdown = nil
+        if upNext != nil { upNext = nil }
+    }
+
+    /// The user paused (or the scene left): the card stays without a countdown.
+    private func pauseUpNextCountdown() {
+        guard upNext?.deadlineMs != nil else { return }
+        upNextCountdown?.cancel()
+        upNext?.deadlineMs = nil
+    }
+
+    /// "Cancel" on the card: hidden for the rest of this episode.
+    public func dismissUpNext() {
+        upNextDismissedFor = request?.id
+        hideUpNext()
+    }
+
+    /// "Play now" on the card (or the countdown): the current episode counts as watched, the next one opens –
+    /// resumed when it has a saved position.
+    public func playNextEpisode() {
+        guard let up = upNext, var next = request else { return }
+        hideUpNext()
+        if duration > 0 { currentTime = duration }   // finished (saved by `open`)
+        next.item = .episode(up.episode, seriesTitle: up.seriesTitle)
+        next.channels = []
+        next.startPositionMs = nil
+        if let key = next.contentKey, let progress = try? library?.progress(contentKey: key) {
+            next.startPositionMs = ResumePolicy.startPositionMs(positionMs: progress.data.positionMs, durationMs: progress.data.durationMs)
+        }
+        SafeLog.info("next episode")
+        open(next)
+    }
+
+    // MARK: Sleep timer (Build 16)
+
+    /// Minute choices of the player's sleep-timer menu (plus "end of episode/movie" for VOD).
+    public static let sleepTimerMinutes = [15, 30, 60, 90]
+
+    /// nil = off. `.endOfItem` only for VOD. A new choice replaces the running timer.
+    public func setSleepTimer(_ mode: SleepTimerMode?) {
+        sleepTask?.cancel()
+        sleepTask = nil
+        engine?.setVolume(1)
+        guard let mode else {
+            if sleepTimer != nil { sleepTimer = nil }
+            return
+        }
+        switch mode {
+        case .endOfItem:
+            guard request?.isLive == false else { sleepTimer = nil; return }
+            sleepTimer = SleepTimerState(mode: mode, deadlineMs: nil)
+            hideUpNext()   // no next episode after "end of episode"
+        case .minutes(let minutes):
+            let total = Int64(max(1, minutes)) * sleepTimerMinuteMs
+            sleepTimer = SleepTimerState(mode: mode, deadlineMs: SystemClock.monotonicMs() + total)
+            let fade = min(sleepFadeMs, total)
+            sleepTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(total - fade))
+                guard !Task.isCancelled else { return }
+                await self?.fadeOutAndExpire(fadeMs: fade)
+            }
+        }
+    }
+
+    /// Lowers the volume in 10 steps over `fadeMs`, then stops (`expireSleepTimer`).
+    private func fadeOutAndExpire(fadeMs: Int64) async {
+        let steps = 10
+        for step in 1...steps {
+            engine?.setVolume(Float(steps - step) / Float(steps))
+            try? await Task.sleep(for: .milliseconds(max(1, fadeMs / Int64(steps))))
+            if Task.isCancelled { engine?.setVolume(1); return }
+        }
+        expireSleepTimer()
+    }
+
+    /// VOD pauses (position saved), live stops (play reopens it at the live edge); the display may sleep again
+    /// (phase `.paused` → `keepDisplayAwake(false)`), the audio session is released.
+    private func expireSleepTimer() {
+        sleepTask = nil
+        sleepTimer = nil
+        hideUpNext()
+        switch phase {
+        case .playing, .buffering, .loading, .reconnecting:
+            if request?.isLive == true {
+                stopPlayback()
+                reloadOnPlay = true
+            } else if let engine {
+                retryTask?.cancel()
+                cancelStallTimer()
+                pauseEngine(engine)
+                saveProgress()
+            }
+            phase = .paused
+        default:
+            break
+        }
+        engine?.setVolume(1)
+        audioSession.deactivate()
+        sleepTimerFiredCount += 1
+        SafeLog.info("sleep timer stopped playback")
+    }
+
+    // MARK: Subtitle style & delay (Build 16)
+
+    public var subtitleStyle: SubtitleStyle { preferences?.subtitleStyle ?? SubtitleStyle() }
+
+    /// Stores the style and applies it: AVPlayer at once (`textStyleRules`); VLCKit reads it when its text
+    /// renderer starts, so a showing subtitle track is reopened in place (VOD at the position, live at the edge).
+    public func setSubtitleStyle(_ style: SubtitleStyle) {
+        guard style != subtitleStyle else { return }
+        preferences?.subtitleStyle = style
+        guard let engine else { return }
+        engine.applySubtitleStyle(style)
+        if engine.kind == .vlcKit, let stream, hasActiveItem, let selected = selectedSubtitle,
+           subtitleOptions.indices.contains(selected) {
+            reloadSubtitleLanguage = subtitleOptions[selected].languageCode
+            reload(stream)
+        }
+    }
+
+    public static let subtitleDelayRange: ClosedRange<Int> = -10_000...10_000
+    public static let subtitleDelayStep = 100
+
+    /// Only VLCKit can delay subtitles (the menu hides the control on AVPlayer).
+    public var supportsSubtitleDelay: Bool { engine?.supportsSubtitleDelay ?? false }
+
+    public func setSubtitleDelay(_ ms: Int) {
+        let clamped = min(max(ms, Self.subtitleDelayRange.lowerBound), Self.subtitleDelayRange.upperBound)
+        subtitleDelayMs = Int((Double(clamped) / Double(Self.subtitleDelayStep)).rounded()) * Self.subtitleDelayStep
+        engine?.setSubtitleDelay(ms: subtitleDelayMs)
     }
 
     // MARK: Progress

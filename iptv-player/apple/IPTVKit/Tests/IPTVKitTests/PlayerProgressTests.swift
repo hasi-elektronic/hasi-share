@@ -256,6 +256,28 @@ final class PlayerProgressTests: XCTestCase {
         XCTAssertEqual(c.currentTime, 300)
     }
 
+    /// IOS-02: a scrub after the item ended (VLCKit had jumped to the end) plays from the target again.
+    func testSeekAfterEndPlaysFromTheTarget() async throws {
+        let c = try controller()
+        let engine = try await open(c, mkvMovie)
+        engine.emit(.ready(duration: 180))
+        engine.emit(.time(72))
+        engine.isPlaying = false
+        engine.emit(.ended)
+        XCTAssertEqual(c.phase, .ended)
+        c.seek(toFraction: 0.6)
+        XCTAssertEqual(engine.seeks.last, 108)
+        XCTAssertTrue(engine.isPlaying, "play() after the seek")
+        engine.emit(.playing)
+        XCTAssertEqual(c.phase, .playing)
+        XCTAssertEqual(c.currentTime, 108)
+        // A seek to the very end of a finished item does not restart it.
+        engine.isPlaying = false
+        engine.emit(.ended)
+        c.seek(toSeconds: 180)
+        XCTAssertFalse(engine.isPlaying)
+    }
+
     // MARK: tvOS hold-to-accelerate
 
     func testSeekAcceleratorStepsUpWhileHeld() {

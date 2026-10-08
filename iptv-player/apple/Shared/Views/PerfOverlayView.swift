@@ -30,8 +30,12 @@ struct PerfOverlayView: View {
                 row("perf_dropped", diag.droppedFrames.map(String.init) ?? "—")
                 row("perf_output_latency", "\(Int((AVAudioSession.sharedInstance().outputLatency * 1000).rounded())) ms")
                 row("perf_audio_delay", L10n.t("perf_audio_delay_detail", Self.signedMs(appliedDelay(diag)),
-                                               Self.signedMs(player.deviceAudioDelay), Self.signedMs(player.contentAudioDelay)))
+                                               Self.signedMs(player.vlcCalibrationMs), Self.signedMs(player.contentAudioDelay)))
+                // Per-device VLC calibration (Build 16, Settings → Advanced → "Calibrate audio sync").
+                row("perf_vlc_calibration", Self.signedMs(player.vlcCalibrationMs))
                 if let resolution = diag.resolution { Text(resolution) }
+                // Launch breakdown up to the first frame (IOS-06 / QuickStart), ms since the app's init.
+                if let launch = trace.launchSummary { row("perf_launch", launch) }
             }
             .font(.system(size: Self.fontSize, design: .monospaced))
             .foregroundStyle(.white)
@@ -60,7 +64,7 @@ struct PerfOverlayView: View {
     /// Delay the engine really applies: libVLC's read-back, else the effective value on VLCKit; AVPlayer has none.
     private func appliedDelay(_ diag: EngineDiagnostics) -> Int {
         if let applied = diag.audioDelayMs { return applied }
-        return player.engineKind == .vlcKit ? player.currentAudioDelay : 0
+        return player.engineKind == .vlcKit ? player.engineAudioDelay : 0
     }
 
     private func zapText(_ trace: PerfTrace) -> String {

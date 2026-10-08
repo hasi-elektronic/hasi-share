@@ -70,7 +70,7 @@ kategori çipi "★ Favoriler", TV Rehberi'nde "Tümü"nün ardından "Favoriler
   "Son izlenen kanallar" → kanal (1).
 * Uygulama dili: ⚙️ → **Uygulama dili** → dil (3).
 * Kaynak eklemek: ⚙️ → **Kaynaklar** → **+ M3U / Xtream** (3; form açık).
-* Ses/altyazı dili, Hızlı başlat, TV/soundbar ses gecikmesi: ⚙️ → satır (2).
+* Ses/altyazı dili, Hızlı başlat, Ses senkronunu ayarla (VLC kalibrasyonu): ⚙️ → satır (2).
 * Oynatıcıda başka kanal: kanal paneli (iOS liste düğmesi / soldan kaydırma, TV: OK) → kanal (2).
 
 **Geri hareketi (iPhone/iPad):** her itilmiş sayfada (detay, grid, arama, ayarlar alt sayfaları) ekranın sol
@@ -220,6 +220,11 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   edilir) QuickStart çalışmaz. TestFlight erişimi önce eşzamanlı sandbox makbuzuyla verilir (StoreKit beklenmez);
   yalnızca o vermezse `AppTransaction` arka planda doğrular ve QuickStart onu en çok StoreKit yetki
   beklemesiyle aynı **1,5 sn** pencere içinde bekler. Hedef: soğuk başlangıç → ilk kare ≤ 1,5 sn.
+  **Erken QuickStart (Build 16, IOS-06):** oynatma beklemeden izinliyse (kayıtlı yetki/deneme ya da TestFlight
+  makbuzu) kanal, ortam (`AppEnvironment`) kurulur kurulmaz – hiçbir ekran çizilmeden – açılır ve oynatıcı ilk
+  karede sunulur (önce Ana Sayfa çizilip `.task` beklenmez). İzin hemen belli değilse yukarıdaki yol (≤ 1,5 sn
+  StoreKit beklemesi) aynen çalışır. Performans katmanı açılış dökümünü gösterir ("Start: pre … · env … · open … ·
+  surface … · frame …", ms; `pre` = süreç başlangıcından uygulama `init`'ine, VLCKit çerçevesi yüklemesi dahil).
 
 ### 3.3 Canlı TV
 **Liste görünümü** (TestFlight build 6 sonrası kullanıcı kararı: kart grid'i yerine, ekranda daha çok kanal).
@@ -293,8 +298,17 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   `get_series_info` arka planda yeniden istenir (haftalık yeni bölümler); hiç bölüm yokken istek başarısız olursa
   boş sayfa yerine hata kartı + **Tekrar dene**. Sağlayıcı başlığı numarayı zaten içeriyorsa ("Bölüm 3") numara
   iki kez yazılmaz; izlenmemiş bölümde boş ilerleme çizgisi yok. Format pill'i hiçbir zaman alt satıra kırılmaz.
-  Bölüm bitince sonraki bölüm
-  için 10 sn geri sayım kartı. TV'de bölümler yatay 16:9 kart rafı.
+  TV'de bölümler yatay 16:9 kart rafı.
+* **Sonraki bölüm (Build 16, iOS + tvOS):** bölümün son 90 sn'sinde sonraki bölüm aranır (aynı sezonda sonraki
+  numara, yoksa bir sonraki mevcut sezonun ilk bölümü; kayıtlı liste yoksa / son kayıtlı bölümse Xtream'de
+  `get_series_info` tembel yüklenir ve liste kaydedilir). Son **30 sn**'de (jenerik) ya da bölüm bitince sağ altta kart:
+  "Nächste Folge in 10 s" (geri sayım) · "S02E01 · Başlık" · **Jetzt abspielen** (★) · **Abbrechen**. 10 sn sonra
+  kendiliğinden oynar (mevcut bölüm izlendi sayılır, sonraki kayıtlı konumundan devam eder). Jeneriğin dışına geri
+  sarınca kart kaybolur, tekrar girince gelir; Abbrechen o bölüm için kartı kapatır (sonda da gelmez); Oynat/Duraklat
+  geri sayımı durdurur (kart kalır). tvOS: kart açılınca odak "Jetzt abspielen"de, ◀▶ iki düğme arasında, Menü =
+  Abbrechen. Ayarlar (üst düzey) → **"Nächste Folge automatisch abspielen"** (varsayılan açık, cihaza yerel); kapalıyken
+  kart geri sayımsız gelir. Süresi bilinmeyen / ≤ 60 sn öğelerde kart yalnızca sonda. Uyku zamanlayıcısı "Bölüm sonunda"
+  iken kart gelmez.
 
 ### 3.6 Favoriler ve arama
 * Favoriler ekranı (Ana Sayfa "Favoriler" satırı → "Tümünü gör"): segment Kanallar · Filmler ·
@@ -353,7 +367,12 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     yerleşimde; çekmece yerleşiminde geri dönünce alan kayboluyordu).
 
 ### 3.7 Oynatıcı
-* Tam ekran, sistem çubukları gizli, ekran açık kalır.
+* Tam ekran, sistem çubukları gizli, **ekran açık kalır** (Build 16: her iki motorda – oynarken, yüklenirken,
+  tamponlarken ve yeniden bağlanırken `isIdleTimerDisabled`; duraklatınca, bitince, hatada ve oynatıcı kapanınca
+  otomatik kilit / Apple TV ekran koruyucu yine çalışır. libVLC bunu kendisi yapmaz, B2).
+* **iPhone dikey (Build 16, IOS-01):** üst satır = ✕ · numara · ad + şu anki program; araçlar ikinci satırda sağa
+  dayalı (canlıda 7 araca kadar ekrana sığmıyordu); erişilebilirlik boyutlarında aralık daralır, gerekirse yatay
+  kaydırılır. Yatay / iPad tek satır.
 * Katman (3 sn sonra kaybolur): üstte kanal/başlık, solda kanal numarası; altta zaman çizgisi
   (VOD) veya program ilerlemesi (canlı), "CANLI" rozeti; sağda araçlar: Ses · Altyazı ·
   Görüntü oranı · **⭐ Favori** (kanal / film / bölümün dizisi; tek dokunuş, 4 sn geri al kapsülü alt çubuğun
@@ -394,13 +413,15 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     (44 pt dokunma yüksekliği): sürüklerken balonda hedef zaman + sıçrama ("01:30 · +1:26",
     sürüklemenin başladığı konuma göre; güvenli durumda önizleme karesiyle, TV ile aynı kural), gelen zaman
     güncellemeleri başparmağı oynatmaz, bırakınca atlar; balon bırakıştan sonra 1,5 sn iniş noktasında kalır.
-    Süre bilinmiyorsa çizgi yalnızca gösterir (sürükleme yok), süre "--:--".
+    Süre bilinmiyorsa çizgi yalnızca gösterir (sürükleme yok), süre "--:--". **Build 16 (IOS-02):** bitmiş bir
+    VOD'da (VLCKit sona atlamış olsa da) sarma/çift dokunma hedeften **oynatır**: libVLC biten girdide `time`'ı yok
+    saydığından VLCKit öğeyi hedef konumdan yeniden açar; AVPlayer atlar ve oynatır (son 1 sn'ye sarmak hariç).
   * **TV (tvOS) – önizlemeli sarma (YouTube gibi, Build 14):** ◀▶ hemen atlamaz; oynatma sürerken zaman
     çizgisinde bir **hedef** işaretini taşır. Çizgi kalınlaşır, işaretin üstünde büyük balon hedef zamanı ve
     sıçramayı gösterir ("1:23:40 · +2:30", sarmanın başladığı konuma göre); sol etiket hedef zamanı, sağ etiket
     hedeften kalan süreyi ("−12:34") gösterir. Basış 10 sn; basılı tutunca 0,3 sn'de bir tekrar ve adım büyür:
     10 sn → 30 sn (1 sn) → 60 sn (3 sn) → 120 sn (5 sn); hedef [0, süre] içinde kalır (süre bilinmiyorsa üst
-    sınır yok, çizgide işaret yok). **Gerçek atlama bir kez olur:** OK'de ya da 0,8 sn hiç girdi olmayınca;
+    sınır yok, çizgide işaret yok). **Gerçek atlama bir kez olur:** OK'de ya da 0,8 sn hiç girdi olmayınca (Build 16, B-19: bu kendiliğinden atlama sondan en az 10 sn önce durur – basılı ▶ filmi bitirip "izlendi" yapmaz; sona yalnızca OK götürür);
     **Menü iptal eder** (hedef geri döner, atlama yok, katman açık kalır). **Oynat/Duraklat** önce hedefe atlar,
     sonra her zamanki gibi duraklatır/sürdürür (duraklatılmışken hedefte oynatır). ▲ önce hedefe atlar, sonra
     üst satıra geçer. Önizleme sürerken katman kendiliğinden kapanmaz. **Siri Remote dokunmatik yüzeyi:**
@@ -417,8 +438,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
     Performans katmanı motorun atlama sayısını gösterir ("Atlama: n"). Katman
     görünürken odak oynat/duraklat'tadır: OK oynat/duraklat (önizleme varken: atla), ◀▶ hedefi taşır (odak yana kaymaz);
     ▲ üst satıra (kapat + araçlar, odak kapat'ta) geçer, ▼ geri döner. Üst satırda ◀▶ araçlar
-    arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · ⭐ · canlıda Kanal listesi ·
-    Son izlenen kanal; uçlarda durur); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
+    arasında gezinir (kapat · Ses · Altyazı · Oran · Senkronu düzelt · Uyku zamanlayıcısı · ⭐ · canlıda Kanal listesi ·
+    Son izlenen kanal; uçlarda durur; Build 16: odaktaki aracın adı simgenin altında küçük bir etiketle görünür, U-04); üst satır (ve oradan açılan menü) kullanılırken katman 3 sn sonra
     kapanmaz, ▼ oynat/duraklat'a döner ve sayacı yeniden başlatır. Canlı: katman açıkken ▲ aynı üst
     satıra girer (katman kapalıyken ▲ = kanal bilgi kartı, değişmedi). Katman kapalıyken OK
     VOD'da duraklatır/sürdürür ve katmanı açar; **canlıda kanal panelini açar** (katman: ◀▶ veya
@@ -465,9 +486,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   altyazı "Kapalı" seçeneği; tercih edilen ses/altyazı dili ayarlardan otomatik uygulanır.
 * **Ses senkronu:** Ses menüsünde her zaman "Senkron" satırı (ses izi olmasa da). Açılan panel
   **modal değildir**, altta durur ve görüntü üstünde oynamaya devam eder (iPhone yatayda alçak, tek
-  satırlık kontroller). İki satır: "Bu kanal/içerik" (bu içerik için kaydedilir) ve "Ses gecikmesi
-  (TV/soundbar)" (cihaz gecikmesi, her içeriğe eklenir) – böylece cihaz gecikmesi izlerken
-  ayarlanabilir. −2000…+2000 ms, 50 ms adım; değer yönüyle gösterilir: "+150 ms · ses daha geç",
+  satırlık kontroller). İki satır: "Bu kanal/içerik" (bu içerik için kaydedilir; −2000…+2000 ms, 50 ms adım) ve
+  "VLC kalibrasyonu (bu cihaz)" (Build 16, −500…+500 ms, 10 ms adım; yalnızca VLCKit'te oynayan her yayına
+  eklenir, motoru değiştirmez – böylece izlerken ince ayar yapılabilir); değer yönüyle gösterilir: "+150 ms · ses daha geç",
   "−100 ms · ses daha erken"; her değişiklik canlı uygulanır (kanal değişimi 400 ms beklerken yapılan
   değişiklik hedef kanala kaydedilir ve o kanal açılınca uygulanır, terk edilen kanala asla). Panel açıkken
   katman hiçbir yoldan (dokunma, Oynat/Duraklat, VoiceOver) üstüne açılmaz. Altında yön ipucu ("Ses görüntüden önce
@@ -477,11 +498,23 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   oynatılır"; VLCKit oynatamazsa yayın gecikmesiz AVPlayer ile sürer ve "Senkron bu yayında
   uygulanamadı" notu (4 sn) görünür. Katmanın araçlarında "Senkronu düzelt" düğmesi
   (`arrow.triangle.2.circlepath`): canlıyı canlı uçtan, VOD'u mevcut konumdan yeniden açar.
-  Ayarlar (üst düzey) → "Ses gecikmesi (TV/soundbar)" (aynı kontrol, alt bilgide yön ipucu).
-  Panelin son satırı **"Senkronu sıfırla"** (Apple, Build 15): cihaz gecikmesi ve **tüm** kanal/içerik
-  gecikmeleri 0 olur, yanında kısa onay "Tüm ses gecikmeleri 0 yapıldı" (2,5 sn). VLCKit'te oynayan yayın
-  gecikmeyi hemen 0 alır; Otomatik yönlendirme bir sonraki açılıştan itibaren VLC'yi zorlamaz (CONTRACT §6.1).
-  tvOS: cihaz satırından ▼ → düğme, ▲ geri. **Oynatıcı motoru = Apple (AVPlayer)** iken panel
+* **Uyku zamanlayıcısı (Build 16):** araçlarda "Senkronu düzelt"ten sonra `moon.zzz` menüsü: Kapalı · 15 · 30 · 60 ·
+  90 dk · (VOD) "Bölüm sonunda" / "Film sonunda". Çalışırken sağ üstte "Schlaf-Timer: 14:32" hapı (katmanla birlikte;
+  son dakikada her zaman). Süre dolunca ses 5 sn'de kısılır, sonra VOD duraklar (konum kaydedilir), canlı durur
+  (Oynat canlı uçtan yeniden açar); "Schlaf-Timer: Wiedergabe gestoppt" notu (4 sn); ekran kilidi / tvOS uyku tekrar
+  serbest. Oynatıcı kapanınca zamanlayıcı iptal.
+* **Altyazı stili ve gecikmesi (Build 16):** altyazı menüsünde izlerin altında **Stil** (Boyut: Klein/Mittel/Groß/
+  Sehr groß · Farbe: Weiß/Gelb · Hintergrund: Ohne/Halbtransparent/Deckend; cihaza yerel kalıcı) ve yalnızca VLCKit'te
+  **Verzögerung** (−2,0 … +2,0 sn hazır değerler, + = altyazı daha geç; öğe başına, yeni öğede 0). AVPlayer: stil
+  `AVPlayerItem.textStyleRules` ile anında; altyazı gecikmesi yok → seçenek gizli. VLCKit: libVLC freetype seçenekleri
+  (`freetype-rel-fontsize` 20/16/12/9, `freetype-color`, `freetype-background-opacity` 0/140/255) metin oluşturucu
+  başlarken okunur → altyazı açıkken stil değişince yayın yerinde yeniden açılır (VOD aynı konum, seçili altyazı dili
+  korunur); kalın/kontur libVLC varsayılanı. Gecikme `currentVideoSubTitleDelay` (µs).
+  Panelin son satırı **"Senkronu sıfırla"** (Apple, Build 15) ve yanında **"Ses senkronunu ayarla"** (Build 16,
+  test klibiyle kalibrasyon ekranı, §3.9; tvOS: sıfırla'dan ▶): **tüm** kanal/içerik gecikmeleri 0 olur (VLC
+  kalibrasyonu kalır), yanında kısa onay "Tüm ses gecikmeleri 0 yapıldı" (2,5 sn). VLCKit'te oynayan yayın
+  içerik gecikmesini hemen 0 alır; Otomatik yönlendirme bir sonraki açılıştan itibaren VLC'yi zorlamaz (CONTRACT §6.1).
+  tvOS: kalibrasyon satırından ▼ → düğme, ▲ geri. **Oynatıcı motoru = Apple (AVPlayer)** iken panel
   adım kontrolleri yerine tek satır gösterir: "Oynatıcı motoru Apple (AVPlayer): ses gecikmesi kapalı…"
   (sıfırla düğmesi kalır, tvOS'ta odak onda).
 * **Bağlantı koparsa:** katmanda "Yeniden bağlanılıyor… (2/5)" + son kare donuk; 1-2-4-8-15 sn
@@ -489,8 +522,10 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
   Canlıda "canlı pencerenin gerisinde" hatası sessizce canlı uca atlar.
 * **Kilit:** deneme bittiyse oynatıcı açılmaz → Paywall (§3.8) açılır, geri tuşu listeye döner.
   (Diğer ekranlara referans: göz atma §3.2, Canlı TV §3.3, Rehber §3.4, detay §3.5.)
-* Kaynaklar: ekran kapanınca / uygulama arka plana geçince oynatıcı **serbest bırakılır**
-  (pozisyon kaydedilir). Arka planda ses oynatma yok (varsayım).
+* Kaynaklar: ekran kapanınca / uygulama arka plana geçince (`.background`) oynatıcı **serbest bırakılır**
+  (pozisyon kaydedilir). **Build 16 (B4):** `.inactive` (Denetim Merkezi, bildirim perdesi, arama bandı, Siri, iPad
+  Slide Over, tvOS Denetim Merkezi) oynatıcıyı bırakmaz – canlı yeniden başlamaz, `max_connections = 1`'e takılmaz;
+  gerçek ses kesintileri (arama sesi alır) `AVAudioSession` kesintisiyle duraklatır. Arka planda ses oynatma yok (varsayım).
 
 ### 3.8 Deneme durumu ve satın alma (Paywall)
 * Başlık: "{app} Premium – tek seferlik satın alma", madde listesi (sınırsız oynatma, tüm
@@ -509,8 +544,20 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 ### 3.9 Ayarlar ve kaynak yönetimi
 **Üst düzey yalnızca kullanıcının sık değiştirdikleri** (tek grup, kaydırmasız):
 **Kaynaklar** (sayı ile → Kaynaklar ekranı) · **Uygulama dili** · **Ses dili** · **Altyazı dili** ·
-**Hızlı başlat** · **Ses gecikmesi (TV/soundbar)** (§3.7 – TV'deki dudak senkronu düzeltmesi, bu yüzden üstte);
-alt bilgide Hızlı başlat açıklaması ve gecikme yön ipucu. Altında **Gelişmiş ve tanılama** → geri kalan her
+**Hızlı başlat** · **Ses senkronunu ayarla** (Build 16; mevcut VLC kalibrasyonu değeriyle, ör. "−120 ms" → kalibrasyon
+ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te de aynı satır); alt bilgide Hızlı başlat açıklaması.
+* **Ses senkronunu ayarla (VLC kalibrasyonu, Build 16, iOS + tvOS):** uygulamaya gömülü 10 sn'lik test klibi
+  (`avsync-test.mkv`, 640×360, 25 fps, H.264 + AAC): **her tam saniyede tek bir tam beyaz kare ("BEEP") ve tam aynı
+  sunum zamanında 40 ms'lik 1 kHz bip**; aradaki karelerde büyük "s.kk" zaman kodu, kare numarası, 25 hücrelik sıra
+  (o anki kare yanar) ve saniyede bir soldan sağa kayan turuncu işaret (flaşı önceden kestirmek için). Klip **VLCKit'te
+  döngüde** oynar; altında tek kontrol "VLC kalibrasyonu (bu cihaz)" −500…+500 ms, 10 ms adım (iOS: kaydırıcı + −/+;
+  tvOS: tek odaklanabilir satır, ◀▶, art arda/basılı tutunca 10 → 20 → 50 ms) – değer anında uygulanır. Kullanıcı bipi
+  flaşla aynı anda duyana kadar ayarlar (bip flaştan sonra → −). Düğmeler: **Referans (Apple)** (aynı klip MP4 olarak
+  AVPlayer'da, kalibrasyonsuz; tekrar basınca "Test (VLC)") · **Kaydet** (yanında "Kaydedildi: −120 ms", 2,5 sn).
+  Değer cihaza yereldir, VLCKit'in oynattığı **her** yayına eklenir (içerik gecikmesi + otomatik gecikme terimiyle),
+  motoru asla değiştirmez (AVPlayer içeriği AVPlayer'da kalır). Eski "Ses gecikmesi (TV/soundbar)" değeri bir kez
+  buraya taşınır. Senkron panelinden açılınca yayın bu sırada serbest bırakılır, ekran kapanınca yeniden açılır (VOD
+  aynı konumdan, canlı canlı uçtan); tvOS'ta Menü kapatır. Performans katmanı "VLC-Kalibrierung: N ms" satırını gösterir. Altında **Gelişmiş ve tanılama** → geri kalan her
 şey; son satır **Hakkında** (Apple, Build 14).
 * **Hakkında ekranı (iOS/iPadOS/tvOS):** uygulama simgesi + adı (`CFBundleDisplayName`) + "Sürüm 1.0.0 (Derleme N)"
   (paketten okunur) · **Geliştiren:** Hasi Elektronic logosu (`HasiLogo`, iOS ≈200 pt, tvOS ≈360 pt), "Hamdi

@@ -46,8 +46,10 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     private var audioIds: [Int32] = []
     private var subtitleIds: [Int32] = []
     private var lastTracksSignature = ""
-    /// User audio delay (content + device) from the controller, ms.
+    /// User audio delay (content + VLC calibration) from the controller, ms.
     private var userAudioDelayMs = 0
+    /// Repeat the item endlessly (`:input-repeat`, the A/V sync calibration clip).
+    var loops = false
 
     override init() {
         player = VLCMediaPlayer()
@@ -83,6 +85,10 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         failureTask?.cancel()
         self.stream = stream
         self.isLive = isLive
+        reloadAt = isLive ? nil : { [weak self] ms in
+            self?.load(stream, isLive: false, startMs: ms, preferredAudioLanguage: preferredAudioLanguage,
+                       preferredSubtitleLanguage: preferredSubtitleLanguage, tuning: tuning)
+        }
         hadPlayed = false
         reportedReady = false
         lastReportedTime = -1
@@ -100,6 +106,10 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         if let referer = stream.headers["Referer"] { media.addOption(":http-referrer=\(referer)") }
         if let startMs, startMs > 0 { media.addOption(":start-time=\(Double(startMs) / 1000)") }
         if stream.container == .rtsp { media.addOption(":rtsp-tcp") }
+        if loops { media.addOption(":input-repeat=65535") }
+        if !subtitleStyle.isDefault {
+            for option in SubtitleStyleMapping.vlcOptions(subtitleStyle) { media.addOption(option) }
+        }
         // Initial input audio delay (ms; libVLC: audio-delay = 1000 × audio-desync at input creation).
         let delayMs = totalAudioDelayMs
         if delayMs != 0 { media.addOption(":audio-desync=\(delayMs)") }
@@ -135,6 +145,40 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         }
     }
 
+    // MARK: Build 16 – volume (sleep timer), subtitle style + delay
+
+    func setVolume(_ volume: Float) {
+        player.audio?.volume = Int32((max(0, min(1, volume)) * 100).rounded())
+    }
+
+    private var subtitleStyle = SubtitleStyle()
+    /// Subtitle delay (ms, + = later); libVLC keeps it on the input → re-applied when an item plays.
+    private var subtitleDelayMs = 0
+
+    /// freetype options for the next item (libVLC reads them when the text renderer starts).
+    func applySubtitleStyle(_ style: SubtitleStyle) { subtitleStyle = style }
+
+    var supportsSubtitleDelay: Bool { true }
+
+    func setSubtitleDelay(ms: Int) {
+        subtitleDelayMs = ms
+        applySubtitleDelay()
+    }
+
+    private func applySubtitleDelay() {
+        guard player.media != nil else { return }
+        let micros = subtitleDelayMs * 1000
+        if player.currentVideoSubTitleDelay != micros { player.currentVideoSubTitleDelay = micros }
+    }
+
+    /// Reopens the current item at a position (ms) with the same options; set by `load`.
+    private var reloadAt: ((Int64) -> Void)?
+
+    /// States in which libVLC has no running input that `time` could move.
+    nonisolated static func needsReloadToSeek(state: VLCMediaPlayerState) -> Bool {
+        state == .ended || state == .stopped || state == .error
+    }
+
     func play() { player.play() }
 
     func pause() {
@@ -143,7 +187,17 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
 
     func seek(to seconds: Double) {
         guard !isLive else { return }
-        player.time = VLCTime(int: Int32(clamping: Int(max(0, seconds) * 1000)))
+        let ms = Int64(max(0, seconds) * 1000)
+        if Self.needsReloadToSeek(state: player.state), let reload = reloadAt {
+            // libVLC ignores `time` once the input ended/stopped (IOS-02: the picture stayed on the last frame and
+            // later seeks only moved the label): start the item again at the target.
+            SafeLog.info("vlc seek after end – reloading at the target")
+            reload(ms)
+            lastReportedTime = seconds
+            onEvent?(.time(seconds))
+            return
+        }
+        player.time = VLCTime(int: Int32(clamping: ms))
         lastReportedTime = seconds
         onEvent?(.time(seconds))
     }
@@ -161,6 +215,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         } else {
             player.currentVideoSubTitleIndex = -1
         }
+        applySubtitleDelay()
         reportTracks(force: true)
     }
 
@@ -172,6 +227,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
     func stop() {
         failureTask?.cancel()
         stream = nil
+        reloadAt = nil
         if player.media != nil {
             player.stop()
             player.media = nil
@@ -228,6 +284,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
             hadPlayed = true
             failureTask?.cancel()
             applyAudioDelay()
+            applySubtitleDelay()
             reportReadyIfNeeded()
             onEvent?(.playing)
             reportTracks(force: false)
