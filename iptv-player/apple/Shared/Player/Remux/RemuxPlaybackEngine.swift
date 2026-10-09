@@ -10,8 +10,9 @@ import IPTVKit
 /// served from 127.0.0.1 (`RemuxHTTPServer`) and played by a private `AVPlayerEngine` – so A/V sync,
 /// output-latency compensation, buffering and seeking are AVPlayer's own.
 ///
-/// Limits of the spike: one muxed audio track (preferred language, else the default), no subtitles,
-/// no audio delay (a later step can shift the audio timestamps instead), no AirPlay video (the
+/// Audio (Build 20): one track is muxed (preferred language, else the default); the audio menu lists every
+/// source track and a choice reopens the session with that track at the current position.
+/// Limits: no subtitles, no audio delay (a later step can shift the audio timestamps instead), no AirPlay video (the
 /// receiver cannot reach the phone's loopback server – external playback is disabled).
 @MainActor
 final class RemuxPlaybackEngine: PlaybackEngine {
@@ -24,6 +25,11 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     private var openTask: Task<Void, Never>?
     private var generation = 0
     private var bench: RemuxBench?
+    /// Arguments of the last `load` (an audio switch reopens with them).
+    private var lastLoad: (stream: ResolvedStream, isLive: Bool, subtitle: String?, tuning: LiveStartTuning)?
+    /// Source audio tracks and the muxed one (source stream index).
+    private var audioTracks: [SourceAudioTrack] = []
+    private var muxedAudioStream = -1
 
     init() {
         inner.player.allowsExternalPlayback = false
@@ -36,18 +42,29 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?,
               preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
+        lastLoad = (stream, isLive, preferredSubtitleLanguage, tuning)
+        // One bench per load (an audio switch reopens the session but keeps the measurement).
+        bench = RemuxBench.enabled ? RemuxBench(engine: self, started: SystemClock.monotonicMs()) : nil
+        audioTracks = []
+        muxedAudioStream = -1
+        open(stream, isLive: isLive, startMs: startMs, audioLanguage: preferredAudioLanguage, audioStream: nil,
+             preferredSubtitleLanguage: preferredSubtitleLanguage, tuning: tuning)
+    }
+
+    private func open(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, audioLanguage preferredAudioLanguage: String?,
+                      audioStream: Int?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         closeSession()
         inner.stop()
         generation += 1
         let generation = generation
         let started = SystemClock.monotonicMs()
         onEvent?(.buffering)
-        bench = RemuxBench.enabled ? RemuxBench(engine: self, started: started) : nil
         openTask = Task { [weak self] in
             do {
                 let port = try await RemuxHTTPServer.shared.start()
                 let session = try await RemuxSession.open(url: stream.url, headers: stream.headers,
-                                                          audioLanguage: preferredAudioLanguage.flatMap(TrackNaming.normalized))
+                                                          audioLanguage: preferredAudioLanguage.flatMap(TrackNaming.normalized),
+                                                          audioStream: audioStream)
                 guard let self, !Task.isCancelled, self.generation == generation else { session.close(); return }
                 let info = session.info
                 SafeLog.info("remux open \(SystemClock.monotonicMs() - started) ms: \(info.videoCodec) \(info.width)x\(info.height) "
@@ -60,6 +77,11 @@ final class RemuxPlaybackEngine: PlaybackEngine {
                 }
                 RemuxHTTPServer.shared.register(session)
                 self.session = session
+                self.audioTracks = info.audioTracks.map {
+                    SourceAudioTrack(streamIndex: $0.streamIndex, language: $0.language, codec: $0.codec,
+                                     channels: $0.channels, title: $0.title)
+                }
+                self.muxedAudioStream = info.audioStreamIndex
                 self.bench?.opened(info: info)
                 let local = ResolvedStream(url: RemuxHTTPServer.shared.url(for: session, port: port), container: .hls, headers: [:])
                 self.inner.load(local, isLive: false, startMs: startMs, preferredAudioLanguage: preferredAudioLanguage,
@@ -91,6 +113,13 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     private func forward(_ event: EngineEvent) {
         bench?.event(event)
+        // The local HLS carries one audio track: the menu shows the source's tracks instead.
+        if case .tracks(_, let subtitles, _, let selectedSubtitle) = event, !audioTracks.isEmpty {
+            onEvent?(.tracks(audio: SourceAudioTracks.options(audioTracks), subtitles: subtitles,
+                             selectedAudio: SourceAudioTracks.index(of: muxedAudioStream, in: audioTracks),
+                             selectedSubtitle: selectedSubtitle))
+            return
+        }
         onEvent?(event)
     }
 
@@ -102,7 +131,22 @@ final class RemuxPlaybackEngine: PlaybackEngine {
         inner.seek(to: seconds)
     }
 
-    func selectAudio(_ id: Int) { inner.selectAudio(id) }
+    /// Another source track: reopen the session with it at the current position (≈ 1–2 s rebuffer).
+    func selectAudio(_ id: Int) {
+        guard audioTracks.indices.contains(id), let last = lastLoad else { return }
+        let wanted = audioTracks[id].streamIndex
+        guard wanted != muxedAudioStream else { return }
+        let seconds = inner.player.currentTime().seconds
+        let startMs = seconds.isFinite && seconds > 0 ? Int64(seconds * 1000) : nil
+        SafeLog.info("remux audio switch → stream \(wanted) at \(startMs ?? 0) ms")
+        let tracks = audioTracks
+        inner.stop()
+        open(last.stream, isLive: last.isLive, startMs: startMs, audioLanguage: nil, audioStream: wanted,
+             preferredSubtitleLanguage: last.subtitle, tuning: last.tuning)
+        // Keep the menu while the session reopens (the new one reports the same list).
+        audioTracks = tracks
+        muxedAudioStream = wanted
+    }
     func selectSubtitle(_ id: Int?) { inner.selectSubtitle(id) }
     func setAspect(_ mode: AspectMode) { inner.setAspect(mode) }
     /// Not applied yet (spike); a production version shifts the audio timestamps in the remuxer.
@@ -112,6 +156,9 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     func setPictureInPictureActive(_ active: Bool) { inner.setPictureInPictureActive(active) }
 
     func stop() {
+        lastLoad = nil
+        audioTracks = []
+        muxedAudioStream = -1
         generation += 1
         openTask?.cancel()
         openTask = nil
@@ -169,12 +216,38 @@ final class RemuxBench {
         if firstFrameAt == nil {
             firstFrameAt = now
             log("first frame \(now - started) ms (after open \(now - (openedAt ?? started)) ms)")
-            Task { await runSeeks() }
+            // `-remuxBenchAudio <menu index>`: audio switch measurement instead of the seeks (Build 20).
+            if let raw = AppBootstrap.argument("-remuxBenchAudio"), let id = Int(raw) {
+                Task { await runAudioSwitch(to: id) }
+            } else {
+                Task { await runSeeks() }
+            }
         }
     }
 
     func seekStarted(_ target: Double) {
         seekStart = (target, SystemClock.monotonicMs())
+    }
+
+    private func runAudioSwitch(to id: Int) async {
+        try? await Task.sleep(for: .seconds(8))
+        guard let engine else { return }
+        let player = engine.inner.player
+        let before = player.currentTime().seconds
+        let t0 = SystemClock.monotonicMs()
+        engine.selectAudio(id)
+        // The new session's player: playing again and time advancing.
+        var resumedAt = -1.0
+        while SystemClock.monotonicMs() - t0 < 20_000 {
+            try? await Task.sleep(for: .milliseconds(10))
+            let p = engine.inner.player
+            let t = p.currentTime().seconds
+            if p.timeControlStatus == .playing, t > 0.5, resumedAt < 0 { resumedAt = t }
+            if resumedAt >= 0, t > resumedAt + 0.1 { break }
+        }
+        log(String(format: "audio switch → %d: playing after %lld ms, position %.2f → %.2f s", id,
+                   SystemClock.monotonicMs() - t0, before, engine.inner.player.currentTime().seconds))
+        log("done")
     }
 
     private func runSeeks() async {

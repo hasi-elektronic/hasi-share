@@ -23,10 +23,23 @@ final class RemuxSession: @unchecked Sendable {
         var audioTranscoded: Bool
         var audioChannels: Int
         var audioTrackCount: Int
+        /// Every audio track of the source (Build 20) and the source stream index of the muxed one (-1 = none).
+        var audioTracks: [AudioTrack] = []
+        var audioStreamIndex: Int = -1
         var bitrate: Int
         var segments: [(start: Double, duration: Double)]
         var targetDuration: Double
         var openBytes: Int64
+    }
+
+    /// One audio track of the source (`nr_audio_tracks`).
+    struct AudioTrack: Sendable, Equatable {
+        var streamIndex: Int
+        var language: String
+        var codec: String
+        var channels: Int
+        var title: String
+        var isDefault: Bool
     }
 
     struct SegmentTiming: Sendable {
@@ -83,7 +96,9 @@ final class RemuxSession: @unchecked Sendable {
     // MARK: Open
 
     /// Opens and indexes the stream (blocking network IO on the worker queue).
-    static func open(url: URL, headers: [String: String], audioLanguage: String?, targetSegment: Double = 4,
+    /// - Parameter audioStream: source stream index of the audio track to mux (`Info.audioTracks`); nil picks by
+    ///   `audioLanguage`, else the default track.
+    static func open(url: URL, headers: [String: String], audioLanguage: String?, audioStream: Int? = nil, targetSegment: Double = 4,
                      forceAudioTranscode: Bool = false, blockSize: Int = 1 << 20, maxInFlight: Int = 1) async throws -> RemuxSession {
         let queue = DispatchQueue(label: "nova.remux.worker", qos: .userInitiated)
         let source = RemuxByteSource(url: url, headers: headers, blockSize: blockSize,
@@ -104,7 +119,7 @@ final class RemuxSession: @unchecked Sendable {
                 let opaque = Unmanaged.passUnretained(source).toOpaque()
                 var code: Int32 = 0
                 var err = [CChar](repeating: 0, count: 256)
-                let ctx = nr_open(opaque, remuxRead, remuxSeek, audioLanguage, targetSegment, forceAudioTranscode ? 1 : 0,
+                let ctx = nr_open(opaque, remuxRead, remuxSeek, audioLanguage, Int32(audioStream ?? -1), targetSegment, forceAudioTranscode ? 1 : 0,
                                   &code, &err, Int32(err.count))
                 guard let ctx else {
                     source.close()
@@ -116,16 +131,29 @@ final class RemuxSession: @unchecked Sendable {
                 var segments: [(Double, Double)] = []
                 segments.reserveCapacity(Int(raw.segment_count))
                 for i in 0..<raw.segment_count { segments.append((nr_segment_start(ctx, i), nr_segment_duration(ctx, i))) }
-                let info = Info(duration: raw.duration, width: Int(raw.width), height: Int(raw.height), fps: raw.fps,
+                var info = Info(duration: raw.duration, width: Int(raw.width), height: Int(raw.height), fps: raw.fps,
                                 videoCodec: string(raw.video_codec), codecs: string(raw.codecs),
                                 videoRange: string(raw.video_range), audioIn: string(raw.audio_codec_in),
                                 audioOut: string(raw.audio_codec_out), audioLanguage: string(raw.audio_language),
                                 audioTranscoded: raw.audio_transcoded != 0, audioChannels: Int(raw.audio_channels),
                                 audioTrackCount: Int(raw.audio_track_count), bitrate: Int(raw.bitrate),
                                 segments: segments, targetDuration: raw.target_duration, openBytes: raw.open_bytes_read)
+                info.audioStreamIndex = Int(raw.audio_stream_index)
+                info.audioTracks = audioTracks(ctx)
                 let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
                 continuation.resume(returning: RemuxSession(token: token, info: info, source: source, ctx: ctx, queue: queue))
             }
+        }
+    }
+
+    private static func audioTracks(_ ctx: OpaquePointer) -> [AudioTrack] {
+        let count = Int(nr_audio_tracks(ctx, nil, 0))
+        guard count > 0 else { return [] }
+        var raw = [NRAudioTrack](repeating: NRAudioTrack(), count: count)
+        _ = raw.withUnsafeMutableBufferPointer { nr_audio_tracks(ctx, $0.baseAddress, Int32(count)) }
+        return raw.map { t in
+            AudioTrack(streamIndex: Int(t.stream_index), language: string(t.language), codec: string(t.codec),
+                       channels: Int(t.channels), title: string(t.title), isDefault: t.is_default != 0)
         }
     }
 

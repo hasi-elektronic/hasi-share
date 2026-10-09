@@ -41,6 +41,7 @@ typedef struct NRInfo {
     int audio_transcoded;
     int audio_channels;         ///< output channels
     int audio_track_count;
+    int audio_stream_index;     ///< source stream index of the muxed audio track (-1 = none)
     int64_t bitrate;            ///< bits/s estimate (BANDWIDTH)
     int segment_count;
     double target_duration;     ///< longest segment, seconds
@@ -54,10 +55,23 @@ typedef struct NRSegmentStats {
     double encode_ms;                        ///< audio transcode time
 } NRSegmentStats;
 
-/// Opens the input and builds the segment index. `audio_language`: preferred ISO 639 code or NULL.
-/// Returns NULL and fills `err` on failure; `*code` gets the error code.
-NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char *audio_language,
+/// One audio track of the source (Build 20: the player's audio menu lists them all).
+typedef struct NRAudioTrack {
+    int stream_index;           ///< source stream index (pass to nr_open's `audio_stream`)
+    char language[8];           ///< ISO 639 code from the container ("" = unknown)
+    char codec[24];             ///< source codec name ("ac3", "dts", "aac" …)
+    int channels;
+    char title[64];             ///< track title from the container ("" = none)
+    int is_default;
+} NRAudioTrack;
+
+/// Opens the input and builds the segment index. `audio_stream`: source stream index of the audio
+/// track to mux (from nr_audio_tracks), or -1 to pick by `audio_language` (preferred ISO 639 code or NULL)
+/// and else the default track. Returns NULL and fills `err` on failure; `*code` gets the error code.
+NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char *audio_language, int audio_stream,
                    double target_segment_seconds, int force_audio_transcode, int *code, char *err, int errlen);
+/// Fills up to `max` audio tracks of the source in container order; returns the total count.
+int nr_audio_tracks(const NRContext *ctx, NRAudioTrack *out, int max);
 void nr_get_info(const NRContext *ctx, NRInfo *info);
 double nr_segment_start(const NRContext *ctx, int index);     ///< playlist time, seconds
 double nr_segment_duration(const NRContext *ctx, int index);  ///< seconds

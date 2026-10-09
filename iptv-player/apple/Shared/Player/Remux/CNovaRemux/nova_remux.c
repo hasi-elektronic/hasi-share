@@ -148,9 +148,14 @@ static int nr_cmp_i64(const void *a, const void *b) {
     return x < y ? -1 : x > y;
 }
 
-static int nr_pick_audio(AVFormatContext *fmt, int vidx, const char *lang, int *count) {
+static int nr_pick_audio(AVFormatContext *fmt, int vidx, const char *lang, int wanted, int *count) {
     int best = -1;
     *count = 0;
+    if (wanted >= 0 && wanted < (int)fmt->nb_streams && fmt->streams[wanted]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+        for (unsigned i = 0; i < fmt->nb_streams; i++)
+            if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) (*count)++;
+        return wanted;
+    }
     for (unsigned i = 0; i < fmt->nb_streams; i++) {
         AVStream *st = fmt->streams[i];
         if (st->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) continue;
@@ -181,7 +186,7 @@ static AVCodecContext *nr_open_aac_encoder(const NRContext *c) {
     return e;
 }
 
-NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char *audio_language,
+NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char *audio_language, int audio_stream,
                    double target_segment_seconds, int force_audio_transcode, int *code, char *err, int errlen) {
     int ret = 0;
     NRContext *c = av_mallocz(sizeof *c);
@@ -214,7 +219,7 @@ NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char 
     enum AVCodecID vid = c->vst->codecpar->codec_id;
     if (vid != AV_CODEC_ID_H264 && vid != AV_CODEC_ID_HEVC) { ret = NR_ERR_VIDEO_CODEC; goto fail; }
 
-    c->aidx = nr_pick_audio(c->fmt, c->vidx, audio_language, &c->audio_track_count);
+    c->aidx = nr_pick_audio(c->fmt, c->vidx, audio_language, audio_stream, &c->audio_track_count);
     for (unsigned i = 0; i < c->fmt->nb_streams; i++)
         if ((int)i != c->vidx && (int)i != c->aidx) c->fmt->streams[i]->discard = AVDISCARD_ALL;
 
@@ -356,10 +361,33 @@ void nr_get_info(const NRContext *c, NRInfo *info) {
         info->audio_channels = c->aout_par->ch_layout.nb_channels;
     }
     info->audio_track_count = c->audio_track_count;
+    info->audio_stream_index = c->aidx;
     info->bitrate = c->bitrate;
     info->segment_count = c->nb_segments;
     info->target_duration = c->target_duration;
     info->open_bytes_read = c->open_bytes;
+}
+
+int nr_audio_tracks(const NRContext *c, NRAudioTrack *out, int max) {
+    int n = 0;
+    for (unsigned i = 0; i < c->fmt->nb_streams; i++) {
+        const AVStream *st = c->fmt->streams[i];
+        if (st->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) continue;
+        if (out && n < max) {
+            NRAudioTrack *t = &out[n];
+            memset(t, 0, sizeof *t);
+            t->stream_index = (int)i;
+            const AVDictionaryEntry *lang = av_dict_get(st->metadata, "language", NULL, 0);
+            if (lang && strcmp(lang->value, "und") != 0) snprintf(t->language, sizeof t->language, "%s", lang->value);
+            snprintf(t->codec, sizeof t->codec, "%s", avcodec_get_name(st->codecpar->codec_id));
+            t->channels = st->codecpar->ch_layout.nb_channels;
+            const AVDictionaryEntry *title = av_dict_get(st->metadata, "title", NULL, 0);
+            if (title) snprintf(t->title, sizeof t->title, "%s", title->value);
+            t->is_default = (st->disposition & AV_DISPOSITION_DEFAULT) != 0;
+        }
+        n++;
+    }
+    return n;
 }
 
 double nr_segment_start(const NRContext *c, int i) {

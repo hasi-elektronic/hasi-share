@@ -366,7 +366,11 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
      HLS/fMP4 on 127.0.0.1 and played by **AVPlayer**; audio AVPlayer cannot decode (DTS, TrueHD, Opus,
      Vorbis, FLAC, MP2/MP3) is transcoded to AAC. A remux failure (no cues, other video codec, broken
      file) falls back once to VLCKit. Everything else as `auto`. The audio delay is not applied to
-     remuxed MKV yet; one audio track, no subtitles, no AirPlay video.
+     remuxed MKV yet; no subtitles, no AirPlay video. **Audio (Build 20):** one track is muxed into the
+     local HLS (preferred language, else the container default); the player's audio menu lists every
+     source track (language name, else title; equal names get the title or "AC3 5.1") and a choice
+     reopens the remux session with that track at the current position (≈ 1–2 s rebuffer, no extra
+     download – the source is read once).
    * `auto` ⇒ rules 0–3.
 0. `audioDelayMs ≠ 0` (the content's own audio delay – per channel/title, −2000…+2000 ms in 50 ms
    steps) and VLCKit available and supports it ⇒ **VLCKit** (AVPlayer cannot delay audio).
@@ -380,7 +384,7 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
 1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
 1a. **tvOS, Build 19:** MKV and the remuxer is in the build ⇒ **Apple + Remux** (the owner measured far less A/V drift
    than VLCKit on Apple TV); a remux failure falls back once to VLCKit. Rule 0 (a content delay) still wins. iOS keeps
-   rules 1–2. Limits of the remux engine (one audio track, no subtitles, no AirPlay video) apply.
+   rules 1–2. Limits of the remux engine (no subtitles, no AirPlay video; audio switch reopens) apply.
 2. else VLCKit supports it ⇒ **VLCKit**.
 3. else ⇒ `UnsupportedFormat(container)` before playback.
 

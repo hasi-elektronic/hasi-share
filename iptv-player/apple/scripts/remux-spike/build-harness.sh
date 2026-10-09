@@ -12,9 +12,11 @@ OUT="${1:?out dir}"
 mkdir -p "$OUT"
 clang -c -O2 -g -Wall -Wextra -Wno-unused-parameter -I "$A/Vendor/FFmpeg/include" \
   "$A/Shared/Player/Remux/CNovaRemux/nova_remux.c" -o "$OUT/nova_remux.o"
+# Top-level code is only allowed in a file named main.swift when several files are compiled.
+cp "$(dirname "$0")/harness-main.swift" "$OUT/main.swift"
 swiftc -swift-version 6 -O -g -I "$A/Shared/Player/Remux/CNovaRemux" \
   "$A/Shared/Player/Remux/RemuxByteSource.swift" "$A/Shared/Player/Remux/RemuxSession.swift" \
-  "$A/Shared/Player/Remux/RemuxHTTPServer.swift" "$(dirname "$0")/harness-main.swift" "$OUT/nova_remux.o" \
+  "$A/Shared/Player/Remux/RemuxHTTPServer.swift" "$OUT/main.swift" "$OUT/nova_remux.o" \
   "$A/Vendor/FFmpeg/macos/libavformat.a" "$A/Vendor/FFmpeg/macos/libavcodec.a" \
   "$A/Vendor/FFmpeg/macos/libswresample.a" "$A/Vendor/FFmpeg/macos/libavutil.a" -lz -o "$OUT/harness"
 echo "built $OUT/harness"

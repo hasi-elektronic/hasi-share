@@ -3,7 +3,7 @@ import CNovaRemux
 import Foundation
 
 // Developer harness (macOS): remux server + segment dump + AVPlayer measurements.
-// usage: harness <url> dump <dir> [--transcode]
+// usage: harness <url> dump <dir> [--transcode]      env: AUDIO_STREAM, AUDIO_LANG (audio track)
 //        harness <url> avplayer [--transcode]
 //        harness <url> serve [--transcode]
 
@@ -72,7 +72,10 @@ Task {
     do {
         let port = try await RemuxHTTPServer.shared.start()
         let t0 = now()
-        let session = try await RemuxSession.open(url: url, headers: ["User-Agent": "NovaPlayer-Harness"], audioLanguage: nil,
+        // AUDIO_STREAM=<source stream index> (Build 20 audio switch), AUDIO_LANG=<iso 639> (preferred language).
+        let env = ProcessInfo.processInfo.environment
+        let session = try await RemuxSession.open(url: url, headers: ["User-Agent": "NovaPlayer-Harness"], audioLanguage: env["AUDIO_LANG"],
+                                                  audioStream: env["AUDIO_STREAM"].flatMap(Int.init),
                                                   targetSegment: Double(ProcessInfo.processInfo.environment["SEG"] ?? "6") ?? 6,
                                                   forceAudioTranscode: transcode,
                                                   blockSize: (Int(ProcessInfo.processInfo.environment["BLOCK_KB"] ?? "512") ?? 512) * 1024,
@@ -81,6 +84,10 @@ Task {
         print(String(format: "OPEN %.0f ms, bytes=%lld, dur=%.2f, %dx%d %.3ffps codecs=%@ range=%@ audio %@→%@ ch=%d transcoded=%d segs=%d target=%.2f",
                      now() - t0, info.openBytes, info.duration, info.width, info.height, info.fps, info.codecs, info.videoRange,
                      info.audioIn, info.audioOut, info.audioChannels, info.audioTranscoded ? 1 : 0, info.segments.count, info.targetDuration))
+        for t in info.audioTracks {
+            print("TRACK stream=\(t.streamIndex) lang=\(t.language) codec=\(t.codec) ch=\(t.channels) title=\(t.title) default=\(t.isDefault)"
+                  + (t.streamIndex == info.audioStreamIndex ? " MUXED" : ""))
+        }
         session.onSegment = { t in
             print(String(format: "SEG %d %@ %.1f ms enc %.1f ms %d B  v[%.4f..%.4f] a[%.4f..%.4f]", t.index, t.prefetch ? "pre" : "req",
                          t.ms, t.encodeMs, t.bytes, t.videoFirst, t.videoEnd, t.audioFirst, t.audioEnd))
