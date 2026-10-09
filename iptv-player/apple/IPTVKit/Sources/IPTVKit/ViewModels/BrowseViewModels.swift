@@ -424,7 +424,8 @@ public final class HomeViewModel {
         }
         let progress = (try? env.library.progressItems()) ?? []
         let mine = progress.filter { $0.contentKey.hasPrefix(fingerprint + ":") }
-        continueWatching = WatchHistory.continueWatching(mine, limit: 20)
+        // Parental lock: entries of locked content are left out (their stored titles / posters never show).
+        continueWatching = WatchHistory.continueWatching(mine.filter { !env.isLocked(progress: $0, sourceId: source.id) }, limit: 20)
         let recentIds = WatchHistory.recentlyWatched(mine, kind: .live, limit: 20).compactMap { ContentKey.parse($0.contentKey)?.itemId }
         let favIds = env.favorites.orderedKeys(kind: .live).filter { $0.hasPrefix(fingerprint + ":") }
             .compactMap { ContentKey.parse($0)?.itemId }
