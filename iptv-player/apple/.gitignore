@@ -1,0 +1,18 @@
+# SwiftPM / Xcode build products
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
+# XcodeGen output – project.yml is the source of truth (run `xcodegen generate`)
+NovaPlayer.xcodeproj/
+Apps/*-Info.plist
+# Local-only build overrides (e.g. dev backend URL)
+Config/Local.xcconfig
+# Local build/test artifacts (xcodebuild -derivedDataPath build/DerivedData)
+build/
+TestResults/
+*.xcresult
+# VLCKit binaries (scripts/fetch-vlckit.sh, ~1 GB with dSYMs) – downloaded, never committed
+Vendor/

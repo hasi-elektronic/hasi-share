@@ -1,0 +1,57 @@
+{
+  "epgUrls": [],
+  "skipped": 4,
+  "entries": [
+    {
+      "name": "Good One",
+      "url": "http://ok.example.com/1.ts",
+      "kind": "live",
+      "tvgId": null,
+      "tvgName": null,
+      "logo": null,
+      "group": "A",
+      "chno": null,
+      "duration": -1,
+      "catchup": null,
+      "tvgShiftHours": null,
+      "userAgent": null,
+      "referrer": null,
+      "drm": false,
+      "series": null
+    },
+    {
+      "name": "Good Two",
+      "url": "http://ok.example.com/2.ts",
+      "kind": "live",
+      "tvgId": null,
+      "tvgName": null,
+      "logo": null,
+      "group": "A",
+      "chno": null,
+      "duration": -1,
+      "catchup": null,
+      "tvgShiftHours": null,
+      "userAgent": null,
+      "referrer": null,
+      "drm": false,
+      "series": null
+    },
+    {
+      "name": "Weird",
+      "url": "http://ok.example.com/4.ts",
+      "kind": "live",
+      "tvgId": null,
+      "tvgName": "Unclosed quote",
+      "logo": null,
+      "group": null,
+      "chno": null,
+      "duration": -1,
+      "catchup": null,
+      "tvgShiftHours": null,
+      "userAgent": null,
+      "referrer": null,
+      "drm": false,
+      "series": null
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+[
+ {
+  "num": 1,
+  "name": "Konuşanlar",
+  "series_id": 901,
+  "cover": "http://localhost:8765/redesign/poster-lights.jpg",
+  "plot": "Talk show.",
+  "cast": "Hasan Can Kaya",
+  "director": "Murat Yılmaz",
+  "genre": "Talk Show",
+  "releaseDate": "2021-01-01",
+  "rating": "8.1",
+  "category_id": "20"
+ },
+ {
+  "num": 2,
+  "name": "Kuruluş Osman",
+  "series_id": 902,
+  "cover": "http://localhost:8765/redesign/poster-night.jpg",
+  "cast": "Burak Özçivit, Özge Törer",
+  "genre": "Drama",
+  "releaseDate": "2019-11-20",
+  "rating": "7.5",
+  "category_id": "21"
+ },
+ {
+  "num": 3,
+  "name": "Yalı Çapkını",
+  "series_id": 903,
+  "cover": "http://localhost:8765/redesign/poster-orbit.jpg",
+  "cast": [
+   "Afra Saraçoğlu",
+   "Mert Ramazan Demir"
+  ],
+  "releaseDate": "2022-09-13",
+  "category_id": "21",
+  "plot": "Gaziantepli zengin ailenin oğlu Ferit ile Seyran'ın zorla başlayan evliliği."
+ }
+]

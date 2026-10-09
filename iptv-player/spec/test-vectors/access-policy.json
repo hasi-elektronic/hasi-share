@@ -1,0 +1,303 @@
+{
+  "_note": "CONTRACT §7.4. token = lic claims object (already validated) or null. Times: token seconds, others ms.",
+  "cases": [
+    {
+      "name": "fresh-install",
+      "input": {
+        "platformStore": "google",
+        "store": "none",
+        "token": null,
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1759570000000
+      },
+      "expected": {
+        "state": "TRIAL_NOT_STARTED",
+        "trialEndMs": null,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "trial-active",
+      "input": {
+        "platformStore": "google",
+        "store": "none",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1759656400000
+      },
+      "expected": {
+        "state": "TRIAL_ACTIVE",
+        "trialEndMs": 1760174800000,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "trial-ends-exactly",
+      "input": {
+        "platformStore": "google",
+        "store": "none",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1760174800000
+      },
+      "expected": {
+        "state": "TRIAL_EXPIRED",
+        "trialEndMs": 1760174800000,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "store-purchased",
+      "input": {
+        "platformStore": "google",
+        "store": "purchased",
+        "token": null,
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1759570000000
+      },
+      "expected": {
+        "state": "PURCHASED",
+        "trialEndMs": null,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "license-purchased-other-platform",
+      "input": {
+        "platformStore": "google",
+        "store": "none",
+        "token": {
+          "purchased": true,
+          "src": "account",
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1762162000000
+      },
+      "expected": {
+        "state": "PURCHASED",
+        "trialEndMs": 1760174800000,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "pending-during-trial",
+      "input": {
+        "platformStore": "google",
+        "store": "pending",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1759656400000
+      },
+      "expected": {
+        "state": "TRIAL_ACTIVE",
+        "trialEndMs": 1760174800000,
+        "canPlay": true,
+        "pendingPurchase": true
+      }
+    },
+    {
+      "name": "pending-after-trial",
+      "input": {
+        "platformStore": "google",
+        "store": "pending",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1760261200000
+      },
+      "expected": {
+        "state": "TRIAL_EXPIRED",
+        "trialEndMs": 1760174800000,
+        "canPlay": false,
+        "pendingPurchase": true
+      }
+    },
+    {
+      "name": "refunded-expired",
+      "input": {
+        "platformStore": "google",
+        "store": "revoked",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1760261200000
+      },
+      "expected": {
+        "state": "TRIAL_EXPIRED",
+        "trialEndMs": 1760174800000,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "refunded-stale-license-same-store",
+      "input": {
+        "platformStore": "google",
+        "store": "revoked",
+        "token": {
+          "purchased": true,
+          "src": "google",
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1760261200000
+      },
+      "expected": {
+        "state": "TRIAL_EXPIRED",
+        "trialEndMs": 1760174800000,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "refunded-here-but-account-license",
+      "input": {
+        "platformStore": "google",
+        "store": "revoked",
+        "token": {
+          "purchased": true,
+          "src": "account",
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1760261200000
+      },
+      "expected": {
+        "state": "PURCHASED",
+        "trialEndMs": 1760174800000,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "apple-local-trial",
+      "input": {
+        "platformStore": "apple",
+        "store": "none",
+        "token": null,
+        "localTrialStartMs": 1759570000000,
+        "trialDays": 7,
+        "nowMs": 1759829200000
+      },
+      "expected": {
+        "state": "TRIAL_ACTIVE",
+        "trialEndMs": 1760174800000,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "apple-local-trial-14-days",
+      "input": {
+        "platformStore": "apple",
+        "store": "none",
+        "token": null,
+        "localTrialStartMs": 1759570000000,
+        "trialDays": 14,
+        "nowMs": 1760434000000
+      },
+      "expected": {
+        "state": "TRIAL_ACTIVE",
+        "trialEndMs": 1760779600000,
+        "canPlay": true,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "token-trial-wins-over-local",
+      "input": {
+        "platformStore": "apple",
+        "store": "none",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": 1759570000,
+          "trialEnd": 1760174800,
+          "acct": null
+        },
+        "localTrialStartMs": 1759570000000,
+        "trialDays": 14,
+        "nowMs": 1760434000000
+      },
+      "expected": {
+        "state": "TRIAL_EXPIRED",
+        "trialEndMs": 1760174800000,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    },
+    {
+      "name": "token-without-trial",
+      "input": {
+        "platformStore": "google",
+        "store": "none",
+        "token": {
+          "purchased": false,
+          "src": null,
+          "trialStart": null,
+          "trialEnd": null,
+          "acct": null
+        },
+        "localTrialStartMs": null,
+        "trialDays": 7,
+        "nowMs": 1759570000000
+      },
+      "expected": {
+        "state": "TRIAL_NOT_STARTED",
+        "trialEndMs": null,
+        "canPlay": false,
+        "pendingPurchase": false
+      }
+    }
+  ]
+}

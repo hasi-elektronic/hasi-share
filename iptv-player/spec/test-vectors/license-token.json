@@ -1,0 +1,161 @@
+{
+  "_note": "CONTRACT §7.2. nowEpochSeconds is the verification time. stale = exp passed (still valid).",
+  "keys": {
+    "test-1": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "1mZSl5DlTBlGPZy7C3MOMolrHsu5lPP-LqcXvghmRQI",
+      "y": "bXxHgwdgkp-Xrru35KYQv97qM2OgRRllDuada1qBxBU"
+    }
+  },
+  "privateKeyForBackendTests": {
+    "kid": "test-1",
+    "jwk": {
+      "key_ops": [
+        "sign"
+      ],
+      "ext": true,
+      "kty": "EC",
+      "x": "1mZSl5DlTBlGPZy7C3MOMolrHsu5lPP-LqcXvghmRQI",
+      "y": "bXxHgwdgkp-Xrru35KYQv97qM2OgRRllDuada1qBxBU",
+      "crv": "P-256",
+      "d": "ULfjHmjQNMFAaLld409cudoIxVPziryDjUW82l2OlyE"
+    }
+  },
+  "issuer": "iptvp-license",
+  "audience": "de.hasielektronik.novaplayer",
+  "cases": [
+    {
+      "name": "valid",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.rAifnqqbvu3eufHK53IhainGpXz5IjtNxYUPe3tJdgL-CnicucbZdH4NHFI-Xk3kwx450tCHzusIztWG3V2tnA",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": true,
+        "stale": false,
+        "claims": {
+          "iss": "iptvp-license",
+          "aud": "de.hasielektronik.novaplayer",
+          "sub": "aef3771bd1b6413dfcc2182d9b4ccf681ca51e3e15cb99282d22271c1b16ae9c",
+          "iat": 1759570000,
+          "exp": 1760779600,
+          "lic": {
+            "purchased": false,
+            "src": null,
+            "trialStart": 1759570000,
+            "trialEnd": 1760174800,
+            "acct": null
+          }
+        }
+      }
+    },
+    {
+      "name": "valid-purchased",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6dHJ1ZSwic3JjIjoiZ29vZ2xlIiwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOiJhY2NfMTIzIn19.cRQNrCXNPV5mVJSlLQ_4rKqNfDoId6e5fjlz6IWkjE6bhjptOLvjZCc0TIW9e9mK9kbOynAxC4f02sgYmWJQnA",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": true,
+        "stale": false,
+        "claims": {
+          "iss": "iptvp-license",
+          "aud": "de.hasielektronik.novaplayer",
+          "sub": "aef3771bd1b6413dfcc2182d9b4ccf681ca51e3e15cb99282d22271c1b16ae9c",
+          "iat": 1759570000,
+          "exp": 1760779600,
+          "lic": {
+            "purchased": true,
+            "src": "google",
+            "trialStart": 1759570000,
+            "trialEnd": 1760174800,
+            "acct": "acc_123"
+          }
+        }
+      }
+    },
+    {
+      "name": "stale-but-valid",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.rAifnqqbvu3eufHK53IhainGpXz5IjtNxYUPe3tJdgL-CnicucbZdH4NHFI-Xk3kwx450tCHzusIztWG3V2tnA",
+      "nowEpochSeconds": 1760866000,
+      "expected": {
+        "valid": true,
+        "stale": true,
+        "claims": {
+          "iss": "iptvp-license",
+          "aud": "de.hasielektronik.novaplayer",
+          "sub": "aef3771bd1b6413dfcc2182d9b4ccf681ca51e3e15cb99282d22271c1b16ae9c",
+          "iat": 1759570000,
+          "exp": 1760779600,
+          "lic": {
+            "purchased": false,
+            "src": null,
+            "trialStart": 1759570000,
+            "trialEnd": 1760174800,
+            "acct": null
+          }
+        }
+      }
+    },
+    {
+      "name": "tampered-payload",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6dHJ1ZSwic3JjIjpudWxsLCJ0cmlhbFN0YXJ0IjoxNzU5NTcwMDAwLCJ0cmlhbEVuZCI6MTc2MDE3NDgwMCwiYWNjdCI6bnVsbH19.rAifnqqbvu3eufHK53IhainGpXz5IjtNxYUPe3tJdgL-CnicucbZdH4NHFI-Xk3kwx450tCHzusIztWG3V2tnA",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "signature"
+      }
+    },
+    {
+      "name": "unknown-kid",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6Im5vcGUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.6NqT2xQe5RIvMHE8bsDVchBoeSaFzTdqMt3GrmzAyhGW68Cm3j11DEg7J2Hk7RdG7-Dgx-IYYZoleYrweX1xWQ",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "kid"
+      }
+    },
+    {
+      "name": "wrong-key",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.1MKILSZ7Omz8R1qI41Sh3olrMw82fUInuyhSBgl3sLppIBt6i20cdbJceRCSYMFp81E7kz8v7JgOgbzkBM3Jwg",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "signature"
+      }
+    },
+    {
+      "name": "alg-none",
+      "token": "eyJhbGciOiJub25lIiwia2lkIjoidGVzdC0xIiwidHlwIjoiSldUIn0.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "alg"
+      }
+    },
+    {
+      "name": "wrong-audience",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJpcHR2cC1saWNlbnNlIiwiYXVkIjoiY29tLm90aGVyLmFwcCIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.gufeoeXBJQM9NohcjoJZZ27fxB752XlokMqWjkte6XLFMChyUGxzbmANjjfpb3HQaCCCOh9AyppthnWknqdCyg",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "aud"
+      }
+    },
+    {
+      "name": "wrong-issuer",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InRlc3QtMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzb21lb25lIiwiYXVkIjoiZGUuaGFzaWVsZWt0cm9uaWsubm92YXBsYXllciIsInN1YiI6ImFlZjM3NzFiZDFiNjQxM2RmY2MyMTgyZDliNGNjZjY4MWNhNTFlM2UxNWNiOTkyODJkMjIyNzFjMWIxNmFlOWMiLCJpYXQiOjE3NTk1NzAwMDAsImV4cCI6MTc2MDc3OTYwMCwibGljIjp7InB1cmNoYXNlZCI6ZmFsc2UsInNyYyI6bnVsbCwidHJpYWxTdGFydCI6MTc1OTU3MDAwMCwidHJpYWxFbmQiOjE3NjAxNzQ4MDAsImFjY3QiOm51bGx9fQ.ffrDv2eweFzW4kDOSG_t3m0f41shhp1chmLgQa3p1AjqjnkfK8EVHFDWHaMfmav3ShArINGpWQGrhsHWoHaGsA",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "iss"
+      }
+    },
+    {
+      "name": "malformed",
+      "token": "abc.def",
+      "nowEpochSeconds": 1759570060,
+      "expected": {
+        "valid": false,
+        "reason": "format"
+      }
+    }
+  ]
+}

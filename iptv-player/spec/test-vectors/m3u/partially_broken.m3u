@@ -1,0 +1,12 @@
+#EXTM3U
+#EXTINF:-1 group-title="A",Good One
+http://ok.example.com/1.ts
+#EXTINF:-1 group-title="A",Missing URL
+#EXTINF:-1 group-title="A",Good Two
+http://ok.example.com/2.ts
+#EXTINF:-1,Bad Scheme
+ftp://files.example.com/3.ts
+garbage line without scheme
+#EXTINF:-1 tvg-name="Unclosed quote,Weird
+http://ok.example.com/4.ts
+#EXTINF:-1,Last Without URL

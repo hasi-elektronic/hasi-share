@@ -1,0 +1,50 @@
+{
+  "_note": "CONTRACT §9. ct = AES-256-GCM ciphertext || 16-byte tag. HKDF salt empty, info \"iptvp-pair-v1\".",
+  "tvPrivateJwk": {
+    "key_ops": [
+      "deriveBits"
+    ],
+    "ext": true,
+    "kty": "EC",
+    "x": "eg6jmM7r9ZWlHuODNLnDYC2uKnBJRyTmMQgN5xQTSqU",
+    "y": "P8Bd87gq4iiYweVi2K5pQinz3vmwaLssw0NQtqo8O1w",
+    "crv": "P-256",
+    "d": "4oGJEDjTyJvs1RIjX6aqZC9gySxotiJZEEWxvhSvuKc"
+  },
+  "tvPublicJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "eg6jmM7r9ZWlHuODNLnDYC2uKnBJRyTmMQgN5xQTSqU",
+    "y": "P8Bd87gq4iiYweVi2K5pQinz3vmwaLssw0NQtqo8O1w"
+  },
+  "senderPrivateJwk": {
+    "key_ops": [
+      "deriveBits"
+    ],
+    "ext": true,
+    "kty": "EC",
+    "x": "Si6-lfj9xrYzHjT7GyUArd8bURBGWs-c7nm05jK_UWI",
+    "y": "Y_bA7x5Uzawzq5VnPcKERt0bIDjaAlZgNA2WHqxkYDI",
+    "crv": "P-256",
+    "d": "018uUfQQh5zODti3hEm4GMs9PYI9THlDZHG0upMHXg8"
+  },
+  "senderPublicJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "Si6-lfj9xrYzHjT7GyUArd8bURBGWs-c7nm05jK_UWI",
+    "y": "Y_bA7x5Uzawzq5VnPcKERt0bIDjaAlZgNA2WHqxkYDI"
+  },
+  "sharedSecretHex": "395779b0df48c3be1eb8f3284a27f4873d302b2ecac91a1292092d47d2241c22",
+  "aesKeyHex": "1c0184778e3c9c4b5009cdf236c383b284fdd21c6c5cd8d22af2fd0fdbcb4ad2",
+  "payload": {
+    "epk": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "Si6-lfj9xrYzHjT7GyUArd8bURBGWs-c7nm05jK_UWI",
+      "y": "Y_bA7x5Uzawzq5VnPcKERt0bIDjaAlZgNA2WHqxkYDI"
+    },
+    "iv": "AQIDBAUGBwgJCgsM",
+    "ct": "sPqI0J5zZSmVg3_hPOcseVdX6yMCClRmCiG-iYPtfCZ22bH6-unNrBsoowG-mZjEUHFU29hlfAYnG-PZXIBGBIOSjucY-mDcjUMcH7lGxZcLvr0yANa6hJpbpTILmabTVGQBJjB8YOdROyH993jqoqSPzI9kYKGUW2D3Dj08qX98UdzUpjsThC5i"
+  },
+  "plaintext": "{\"v\":1,\"type\":\"xtream\",\"name\":\"Ev\",\"server\":\"http://iptv.example.com:8080\",\"username\":\"user1\",\"password\":\"p@ss/w rd çğ\"}"
+}

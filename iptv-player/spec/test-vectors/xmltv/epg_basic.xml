@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv generator-info-name="fixture">
+  <channel id="trt1.tr">
+    <display-name lang="tr">TRT 1</display-name>
+    <display-name>TRT 1 HD</display-name>
+    <icon src="http://logo.example.com/trt1.png"/>
+  </channel>
+  <channel id="ard.de">
+    <display-name>Das Erste</display-name>
+  </channel>
+  <programme start="20251004183000 +0300" stop="20251004200000 +0300" channel="trt1.tr">
+    <title lang="en">Evening News</title>
+    <title lang="tr">Akşam Haberleri</title>
+    <desc lang="tr">Günün öne çıkan haberleri &amp; hava durumu.</desc>
+    <category lang="tr">Haber</category>
+  </programme>
+  <programme start="20251004200000 +0300" channel="trt1.tr">
+    <title>Dizi: Bölüm 12</title>
+  </programme>
+  <programme start="20251004213000 +0300" stop="20251004230000 +0300" channel="trt1.tr">
+    <title><![CDATA[Film <Gece>]]></title>
+  </programme>
+  <programme start="20251004120000" stop="20251004130000" channel="ard.de">
+    <title>Tagesschau</title>
+  </programme>
+  <programme start="202510041300 -0500" stop="202510041400 -0500" channel="ard.de">
+    <title>Sport</title>
+  </programme>
+  <programme start="20251004150000 +0000" stop="20251004150000 +0000" channel="ard.de">
+    <title>Zero length</title>
+  </programme>
+  <programme start="20251004230000 +0300" channel="trt1.tr">
+    <title>Gece Programı</title>
+  </programme>
+  <programme start="garbage" stop="20251004230000 +0300" channel="trt1.tr">
+    <title>Broken</title>
+  </programme>
+</tv>

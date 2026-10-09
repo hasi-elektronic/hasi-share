@@ -1,0 +1,47 @@
+# Local secrets for `wrangler dev` (copy to .dev.vars – that file is git-ignored).
+#   cp .dev.vars.example .dev.vars
+# In production these are set with `npx wrangler secret put <NAME>` instead.
+# Every value below is a PLACEHOLDER. Never commit real values.
+
+# --- Local overrides of [vars] (wrangler.toml) ---------------------------------
+# Never "true" in production: returns login codes in API responses (devCode) and
+# multiplies all rate limits by 100.
+DEV_MODE="true"
+# Absolute base URL used in pairUrl / verification links (QR codes on the TV).
+PUBLIC_BASE_URL="http://localhost:8787"
+
+# --- License signing (required) ------------------------------------------------
+# ES256 (P-256) private key, PKCS#8 PEM. Generate with `node scripts/keygen.mjs`
+# (writes .keys/license-private.pem). Multi-line values work inside double quotes;
+# "\n"-escaped single-line PEMs are accepted too. LICENSE_KID (wrangler.toml) must match
+# the kid the apps embed.
+LICENSE_SIGNING_KEY="-----BEGIN PRIVATE KEY-----
+REPLACE_WITH_BASE64_PKCS8_FROM_.keys/license-private.pem
+-----END PRIVATE KEY-----"
+
+# --- Admin (required for /admin and /v1/admin/*) -------------------------------
+# At least 32 characters; e.g. `openssl rand -base64 48`. Shorter/missing → admin API disabled.
+ADMIN_TOKEN="REPLACE_WITH_A_RANDOM_TOKEN_OF_AT_LEAST_32_CHARS"
+
+# --- Google Play (Android purchases) -------------------------------------------
+# Service account JSON (Play Console → Users and permissions: View financial data,
+# Manage orders and subscriptions). Paste the whole JSON on ONE line.
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"REPLACE","private_key_id":"REPLACE","private_key":"-----BEGIN PRIVATE KEY-----\nREPLACE\n-----END PRIVATE KEY-----\n","client_email":"play-api@REPLACE.iam.gserviceaccount.com","token_uri":"https://oauth2.googleapis.com/token"}'
+# Shared secret in the Pub/Sub push URL: /v1/webhooks/google?token=<this value>
+GOOGLE_PUBSUB_TOKEN="REPLACE_WITH_A_RANDOM_URL_SAFE_TOKEN"
+
+# --- App Store (Apple purchases) -----------------------------------------------
+# In-App Purchase key (.p8 from App Store Connect → Users and Access → Integrations →
+# In-App Purchase), PKCS#8 PEM. APPLE_ISSUER_ID / APPLE_KEY_ID are [vars] in wrangler.toml
+# (they may be overridden here for local tests).
+APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+REPLACE_WITH_CONTENT_OF_SubscriptionKey_XXXXXXXXXX.p8
+-----END PRIVATE KEY-----"
+# APPLE_ISSUER_ID="00000000-0000-0000-0000-000000000000"
+# APPLE_KEY_ID="XXXXXXXXXX"
+# APPLE_ENVIRONMENT="Sandbox"
+
+# --- E-mail login codes (optional; accounts feature) ---------------------------
+# Resend (https://resend.com) API key. Without it, login e-mails only work with DEV_MODE=true
+# (the code is returned as devCode); in production /v1/auth/email/start answers 503.
+RESEND_API_KEY="re_REPLACE_WITH_RESEND_API_KEY"

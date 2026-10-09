@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1001",
+    "name": "TRT 1 HD",
+    "number": 1,
+    "logoUrl": "http://logo.example.com/trt1.png",
+    "categoryId": "1",
+    "epgId": "trt1.tr",
+    "catchup": {
+      "type": "xtream",
+      "days": 7
+    }
+  },
+  {
+    "id": "1002",
+    "name": "Kanal D",
+    "number": 2,
+    "logoUrl": null,
+    "categoryId": "1",
+    "epgId": null,
+    "catchup": {
+      "type": "none",
+      "days": 0
+    }
+  },
+  {
+    "id": "2001",
+    "name": "beIN Sports 1",
+    "number": null,
+    "logoUrl": "http://logo.example.com/bein1.png",
+    "categoryId": "2",
+    "epgId": "bein1.tr",
+    "catchup": {
+      "type": "none",
+      "days": 0
+    }
+  }
+]

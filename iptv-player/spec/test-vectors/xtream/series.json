@@ -1,0 +1,49 @@
+[
+  {
+    "num": 1,
+    "name": "Breaking Bad",
+    "series_id": 7000,
+    "cover": "http://img.example.com/bb.jpg",
+    "plot": "A chemistry teacher turns to crime.",
+    "cast": "  Bryan Cranston, Aaron Paul ",
+    "director": "",
+    "genre": "Drama",
+    "releaseDate": "2008-01-20",
+    "last_modified": "1700000000",
+    "rating": "9.5",
+    "rating_5based": 4.8,
+    "backdrop_path": [
+      "http://img.example.com/bb_bg.jpg"
+    ],
+    "youtube_trailer": "",
+    "episode_run_time": "47",
+    "category_id": "20"
+  },
+  {
+    "num": 2,
+    "name": "Dark",
+    "series_id": "7100",
+    "cover": "",
+    "plot": null,
+    "release_date": "2017",
+    "rating": "",
+    "category_id": 20
+  },
+  {
+    "num": 3,
+    "name": "Konuşanlar",
+    "series_id": 7200,
+    "cover": "",
+    "cast": [
+      "Hasan Can Kaya",
+      " ",
+      null
+    ],
+    "director": [
+      "Ali Yılmaz"
+    ],
+    "genre": null,
+    "release_date": "2021",
+    "category_id": "21"
+  }
+]

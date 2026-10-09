@@ -1,0 +1,258 @@
+# XcodeGen spec – the single source of truth for NovaPlayer.xcodeproj (generated, git-ignored).
+#   cd apple && xcodegen generate
+# iOS and tvOS targets share ONE bundle id (APP_BUNDLE_ID) → Universal Purchase.
+name: NovaPlayer
+options:
+  bundleIdPrefix: com.hasielektronic
+  deploymentTarget:
+    iOS: "17.0"
+    tvOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  # VLCKit 3.x binaries (official VideoLAN builds, LGPL-2.1) → Vendor/VLCKit (git-ignored).
+  # Idempotent: downloads/verifies/thins only when the pinned version is missing.
+  # FFmpeg (LGPL-2.1, remux engine "Apple + Remux (Beta)") is BUILT from the pinned release tarball
+  # → Vendor/FFmpeg (git-ignored); first run ≈ 3 min, then a stamp check.
+  preGenCommand: sh scripts/fetch-vlckit.sh && sh scripts/build-ffmpeg.sh
+configFiles:
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    # Simulator builds need no team: ad-hoc ("Sign to Run Locally"). Set your team for devices.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+packages:
+  IPTVCore:
+    path: IPTVCore
+  IPTVKit:
+    path: IPTVKit
+
+targetTemplates:
+  NovaApp:
+    type: application
+    sources:
+      - path: Shared
+      - path: Config/license-keys.json
+        buildPhase: resources
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: ../spec/test-vectors/stream-samples.json
+        buildPhase: resources
+      # LGPL-2.1 full text for Settings → Open-source licenses (copied by scripts/fetch-vlckit.sh).
+      - path: Vendor/VLCKit/COPYING.txt
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - package: IPTVCore
+      - package: IPTVKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+        PRODUCT_NAME: NovaPlayer
+        # Remux engine: FFmpeg headers (scripts/build-ffmpeg.sh) + the C shim module `CNovaRemux`.
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/FFmpeg/include
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Shared/Player/Remux/CNovaRemux
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
+        CODE_SIGN_ENTITLEMENTS: Config/NovaPlayer.entitlements
+        # Release archives pass NOVA_APP_PROFILE / NOVA_TOPSHELF_PROFILE (scripts/release/release.sh): one profile per
+        # bundle id now that tvOS embeds the Top Shelf extension. Empty locally (simulator: ad-hoc signing).
+        PROVISIONING_PROFILE_SPECIFIER: $(NOVA_APP_PROFILE)
+      configs:
+        Debug:
+          # get-task-allow: needed by local StoreKit testing (SKTestSession) in the simulator.
+          CODE_SIGN_ENTITLEMENTS: Config/NovaPlayer-Debug.entitlements
+    info:
+      path: Apps/${target_name}-Info.plist
+      properties: &commonInfo
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BACKEND_BASE_URL: $(BACKEND_BASE_URL)
+        PRODUCT_LIFETIME: $(PRODUCT_LIFETIME)
+        PRODUCT_TRIAL: $(PRODUCT_TRIAL)
+        APP_BUNDLE_ID: $(APP_BUNDLE_ID)
+        TESTFLIGHT_FULL_ACCESS: $(TESTFLIGHT_FULL_ACCESS)
+        ACCOUNTS_ENABLED: $(ACCOUNTS_ENABLED)
+        PRIVACY_URL: $(PRIVACY_URL)
+        TERMS_URL: $(TERMS_URL)
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleLocalizations: [en, tr, de]
+        # Build 17: deep links (Top Shelf) – novaplayer://play/channel|movie|episode?… (`DeepLink`).
+        CFBundleURLTypes:
+          - CFBundleURLName: $(APP_BUNDLE_ID)
+            CFBundleURLSchemes: [novaplayer]
+        # Shared Keychain group of the Top Shelf snapshot (`TopShelfStore`, Config/*.entitlements).
+        TopShelfKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
+        # Users add arbitrary (mostly plain-HTTP) IPTV servers (ARCHITECTURE V17).
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+
+targets:
+  NovaPlayer-iOS:
+    templates: [NovaApp]
+    platform: iOS
+    sources:
+      - path: Apps/iOS
+    dependencies:
+      # FFmpeg (LGPL-2.1), ONE dynamic framework (relinkable) – remux engine, scripts/build-ffmpeg.sh.
+      # MUST stay BEFORE VLCKit: MobileVLCKit/TVVLCKit export their own (old) libav* symbols and the
+      # linker binds each symbol to the first framework that exports it (two-level namespace).
+      - framework: Vendor/FFmpeg/FFmpeg.xcframework
+        embed: true
+      # Second playback engine (MKV/TS/AVI/FLV/DASH/RTSP…), dynamic framework – CONTRACT §6.1.
+      - framework: Vendor/VLCKit/MobileVLCKit.xcframework
+        embed: true
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: Apps/NovaPlayer-iOS-Info.plist
+      properties:
+        <<: *commonInfo
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIUserInterfaceStyle: Dark
+        # Build 17: background audio + Picture in Picture (Settings "Keep playing in the background", BackgroundPlayback).
+        UIBackgroundModes: [audio]
+
+  NovaPlayer-tvOS:
+    templates: [NovaApp]
+    platform: tvOS
+    sources:
+      - path: Apps/tvOS
+    dependencies:
+      - framework: Vendor/FFmpeg/FFmpeg.xcframework   # before VLCKit (libav* symbol clash, see iOS)
+        embed: true
+      - framework: Vendor/VLCKit/TVVLCKit.xcframework
+        embed: true
+      # Build 17: dynamic Top Shelf (Continue watching + recently watched channels).
+      - target: NovaPlayer-TopShelf
+        embed: true
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "3"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+    info:
+      path: Apps/NovaPlayer-tvOS-Info.plist
+      properties:
+        <<: *commonInfo
+        UIUserInterfaceStyle: Dark
+        UIRequiredDeviceCapabilities: [arm64]
+
+  # Build 17: tvOS Top Shelf extension. Reads the snapshot the app writes into the shared Keychain group
+  # (TopShelfStore); compiles the two Foundation/Security-only IPTVKit files directly (no package dependency).
+  NovaPlayer-TopShelf:
+    type: app-extension
+    platform: tvOS
+    sources:
+      - path: Apps/TopShelf
+      - path: IPTVKit/Sources/IPTVKit/TopShelf/TopShelfSnapshot.swift
+      - path: IPTVKit/Sources/IPTVKit/TopShelf/TopShelfStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).topshelf
+        PRODUCT_NAME: NovaPlayerTopShelf
+        TARGETED_DEVICE_FAMILY: "3"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: Config/TopShelf.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(NOVA_TOPSHELF_PROFILE)
+    info:
+      path: Apps/TopShelf/Info.plist
+      properties:
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TopShelfKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.tv-top-shelf
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider
+
+  # StoreKit flows (purchase, Ask to Buy, refund, restore) against Config/Products.storekit.
+  NovaPlayerStoreKitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests/iOS
+      - path: Config/Products.storekit
+        buildPhase: resources
+    dependencies:
+      - target: NovaPlayer-iOS
+      - package: IPTVCore
+      - package: IPTVKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.hasielektronik.novaplayer.storekittests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/NovaPlayer.app/NovaPlayer
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  NovaPlayer-iOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests/iOS
+      - path: UITests/Shared
+    dependencies:
+      - target: NovaPlayer-iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.hasielektronik.novaplayer.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: NovaPlayer-iOS
+
+  NovaPlayer-tvOSUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources:
+      - path: UITests/tvOS
+      - path: UITests/Shared
+    dependencies:
+      - target: NovaPlayer-tvOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.hasielektronik.novaplayer.tvuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: NovaPlayer-tvOS
+
+schemes:
+  NovaPlayer-iOS:
+    build:
+      targets:
+        NovaPlayer-iOS: all
+    run:
+      config: Debug
+      storeKitConfiguration: Config/Products.storekit
+    test:
+      config: Debug
+      targets:
+        - NovaPlayerStoreKitTests
+        - NovaPlayer-iOSUITests
+    archive:
+      config: Release
+  NovaPlayer-tvOS:
+    build:
+      targets:
+        NovaPlayer-tvOS: all
+    run:
+      config: Debug
+      storeKitConfiguration: Config/Products.storekit
+    test:
+      config: Debug
+      targets:
+        - NovaPlayer-tvOSUITests
+    archive:
+      config: Release

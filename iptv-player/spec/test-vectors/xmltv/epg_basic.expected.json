@@ -1,0 +1,184 @@
+{
+  "_note": "Times are epoch SECONDS (UTC). Programmes sorted by (channel, start). Dropped: 'Zero length' (end<=start) and 'Broken' (invalid start).",
+  "channels": [
+    {
+      "id": "trt1.tr",
+      "displayNames": [
+        "TRT 1",
+        "TRT 1 HD"
+      ],
+      "icon": "http://logo.example.com/trt1.png"
+    },
+    {
+      "id": "ard.de",
+      "displayNames": [
+        "Das Erste"
+      ],
+      "icon": null
+    }
+  ],
+  "cases": [
+    {
+      "language": "tr",
+      "shiftMinutes": 0,
+      "programmes": [
+        {
+          "channel": "ard.de",
+          "start": 1759579200,
+          "end": 1759582800,
+          "title": "Tagesschau",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "ard.de",
+          "start": 1759600800,
+          "end": 1759604400,
+          "title": "Sport",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759591800,
+          "end": 1759597200,
+          "title": "Akşam Haberleri",
+          "description": "Günün öne çıkan haberleri & hava durumu.",
+          "category": "Haber"
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759597200,
+          "end": 1759602600,
+          "title": "Dizi: Bölüm 12",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759602600,
+          "end": 1759608000,
+          "title": "Film <Gece>",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759608000,
+          "end": 1759609800,
+          "title": "Gece Programı",
+          "description": null,
+          "category": null
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "shiftMinutes": 0,
+      "programmes": [
+        {
+          "channel": "ard.de",
+          "start": 1759579200,
+          "end": 1759582800,
+          "title": "Tagesschau",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "ard.de",
+          "start": 1759600800,
+          "end": 1759604400,
+          "title": "Sport",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759591800,
+          "end": 1759597200,
+          "title": "Evening News",
+          "description": "Günün öne çıkan haberleri & hava durumu.",
+          "category": "Haber"
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759597200,
+          "end": 1759602600,
+          "title": "Dizi: Bölüm 12",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759602600,
+          "end": 1759608000,
+          "title": "Film <Gece>",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759608000,
+          "end": 1759609800,
+          "title": "Gece Programı",
+          "description": null,
+          "category": null
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "shiftMinutes": 60,
+      "programmes": [
+        {
+          "channel": "ard.de",
+          "start": 1759582800,
+          "end": 1759586400,
+          "title": "Tagesschau",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "ard.de",
+          "start": 1759604400,
+          "end": 1759608000,
+          "title": "Sport",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759595400,
+          "end": 1759600800,
+          "title": "Akşam Haberleri",
+          "description": "Günün öne çıkan haberleri & hava durumu.",
+          "category": "Haber"
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759600800,
+          "end": 1759606200,
+          "title": "Dizi: Bölüm 12",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759606200,
+          "end": 1759611600,
+          "title": "Film <Gece>",
+          "description": null,
+          "category": null
+        },
+        {
+          "channel": "trt1.tr",
+          "start": 1759611600,
+          "end": 1759613400,
+          "title": "Gece Programı",
+          "description": null,
+          "category": null
+        }
+      ]
+    }
+  ]
+}

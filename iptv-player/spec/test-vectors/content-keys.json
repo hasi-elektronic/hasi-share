@@ -1,0 +1,83 @@
+{
+  "_note": "CONTRACT §1.1 and §7.1. sha256 over UTF-8; hex lowercase.",
+  "cases": [
+    {
+      "type": "xtream",
+      "host": "iptv.example.com",
+      "username": "user1",
+      "kind": "live",
+      "itemId": "1001",
+      "fingerprint": "d11e55fa87364ff0",
+      "contentKey": "d11e55fa87364ff0:live:1001"
+    },
+    {
+      "type": "xtream",
+      "host": "IPTV.Example.com",
+      "username": "user1",
+      "kind": "movie",
+      "itemId": "5001",
+      "fingerprint": "d11e55fa87364ff0",
+      "contentKey": "d11e55fa87364ff0:movie:5001"
+    },
+    {
+      "type": "xtream",
+      "host": "iptv.example.com",
+      "username": "User1",
+      "kind": "series",
+      "itemId": "7000",
+      "fingerprint": "81e192bbdb324c37",
+      "contentKey": "81e192bbdb324c37:series:7000"
+    },
+    {
+      "type": "xtream",
+      "host": "panel.example.com",
+      "username": "ali.veli",
+      "kind": "episode",
+      "itemId": "70001",
+      "fingerprint": "45b4deb4dc486d39",
+      "contentKey": "45b4deb4dc486d39:episode:70001"
+    },
+    {
+      "type": "m3u",
+      "url": "http://IPTV.example.com:80/get.php?username=a&password=b&type=m3u_plus",
+      "normalizedUrl": "http://iptv.example.com/get.php?username=a&password=b&type=m3u_plus",
+      "kind": "live",
+      "entryUrl": "http://iptv.example.com:8080/live/a/b/1001.ts",
+      "fingerprint": "9bb6067efc9fa784",
+      "itemId": "ud50324d2ec5a685d",
+      "contentKey": "9bb6067efc9fa784:live:ud50324d2ec5a685d"
+    },
+    {
+      "type": "m3u",
+      "url": "https://lists.example.com:443/my%20list.m3u",
+      "normalizedUrl": "https://lists.example.com/my%20list.m3u",
+      "kind": "movie",
+      "entryUrl": "https://cdn.example.com/movies/inception.mkv",
+      "fingerprint": "83d99421f7223ec9",
+      "itemId": "u72178ee4feb70817",
+      "contentKey": "83d99421f7223ec9:movie:u72178ee4feb70817"
+    },
+    {
+      "type": "m3u",
+      "url": " https://lists.example.com/list.m3u?token=XYZ ",
+      "normalizedUrl": "https://lists.example.com/list.m3u?token=XYZ",
+      "kind": "episode",
+      "entryUrl": "http://iptv.example.com:8080/series/a/b/7002.mp4",
+      "fingerprint": "241246b75bfc1ea3",
+      "itemId": "u2e341a7aeb248168",
+      "contentKey": "241246b75bfc1ea3:episode:u2e341a7aeb248168"
+    }
+  ],
+  "deviceKeys": [
+    {
+      "appId": "de.hasielektronik.novaplayer",
+      "rawId": "9774d56d682e549c",
+      "expected": "aef3771bd1b6413dfcc2182d9b4ccf681ca51e3e15cb99282d22271c1b16ae9c"
+    },
+    {
+      "appId": "de.hasielektronik.novaplayer",
+      "rawId": "E621E1F8-C36C-495A-93FC-0C247A3E6E5F",
+      "expected": "9f080903c4e5080b4c30e0edaa02431fd6cb43affd7ee5935c647f70bd8c3173"
+    }
+  ]
+}

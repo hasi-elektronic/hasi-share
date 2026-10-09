@@ -1,0 +1,224 @@
+import IPTVCore
+import IPTVKit
+import SwiftUI
+
+/// M3U / Xtream form → stepwise progress → summary or precise error (SCREENS §3.1). With `editing` the same form
+/// edits a source (Settings → source → Edit, SCREENS §3.9): prefilled, saving re-validates and reloads it.
+struct AddSourceView: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    @Environment(\.dismiss) private var dismiss
+    @State private var model: AddSourceViewModel?
+    let kind: AddSourceViewModel.Kind
+    var payload: PairPayload?
+    var editing: Source?
+
+    var body: some View {
+        Group {
+            if let model {
+                content(model)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .screenBackground()
+        .navigationTitle(L10n.t(editing != nil ? "source_edit_title" : kind == .m3u ? "add_source_m3u" : "add_source_xtream"))
+        .onAppear {
+            guard model == nil else { return }
+            let m = editing.map { AddSourceViewModel(env: env, editing: $0) } ?? AddSourceViewModel(env: env, kind: kind)
+            if let payload {
+                m.apply(payload)
+                m.connect()
+            }
+            model = m
+        }
+        .onDisappear { router.onboarding = false }
+    }
+
+    @ViewBuilder
+    private func content(_ model: AddSourceViewModel) -> some View {
+        switch model.phase {
+        case .editing:
+            AddSourceForm(model: model)
+        case .connecting(let step):
+            VStack(spacing: 24) {
+                ProgressView().controlSize(.large)
+                Text(text(for: step)).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                Button(L10n.t("action_cancel")) { model.cancel() }.buttonStyle(SecondaryButtonStyle())
+            }
+            // Only the first source is onboarding: keep the welcome flow on screen until "Continue"
+            // (the root would switch to home as soon as the source exists). With sources already
+            // present (Settings → add) the root must stay as it is – flipping it would replace the
+            // screen that presents the settings sheet.
+            .onAppear { if env.sources.isEmpty { router.onboarding = true } }
+        case .success(let source):
+            successView(source, edited: model.isEditing)
+        case .failed(let error):
+            ErrorCardView(presentation: formPresentation(error)) { action in
+                switch action {
+                case .retry, .refresh: model.connect()
+                default: model.backToForm()
+                }
+            }
+            .padding(Theme.safeH)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("add_source_error")
+            #if os(tvOS)
+            // Menu on the error card = "cancel" of a dialog (SCREENS §2 rule 5): back to the filled form, never
+            // pop the page and lose what was typed on the on-screen keyboard (B-04).
+            .onExitCommand { model.backToForm() }
+            #endif
+        }
+    }
+
+    /// IOS-21: inside the form every error offers "Edit" (back to the form) and never "Delete source".
+    private func formPresentation(_ error: SourceError) -> ErrorPresentation {
+        var presentation = error.presentation(formatDate: { L10n.date($0, date: .long, time: .omitted) })
+        presentation.actions = AddSourceViewModel.formErrorActions(presentation.actions)
+        return presentation
+    }
+
+    private func successView(_ source: Source, edited: Bool) -> some View {
+        let status = source.lastRefreshResult ?? SourceStatus()
+        return VStack(spacing: Theme.isTV ? 24 : 14) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: Theme.isTV ? 96 : 64)).foregroundStyle(Theme.success)
+            LText(edited ? "source_saved_title" : "source_added_title").font(Theme.title).foregroundStyle(Theme.textPrimary)
+            Text(source.name).font(Theme.headline).foregroundStyle(Theme.textSecondary)
+            LText("source_summary", L10n.number(status.liveCount), L10n.number(status.movieCount), L10n.number(status.seriesCount))
+                .font(Theme.body).foregroundStyle(Theme.textPrimary)
+            if let account = source.xtreamAccount {
+                if let expires = account.expiresAt {
+                    LText("source_expires", L10n.date(expires, date: .long, time: .omitted)).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                } else {
+                    LText("source_unlimited").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                }
+            }
+            // IOS-08: a further source does not replace the one in use – switching is offered here.
+            if !edited, env.currentSource?.id != source.id {
+                Button(L10n.t("source_use")) {
+                    env.selectSource(source.id)
+                    router.onboarding = false
+                    dismiss()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("add_source_use")
+            }
+            Button(L10n.t("action_continue")) {
+                router.onboarding = false
+                dismiss()
+            }
+            .buttonStyle(!edited && env.currentSource?.id != source.id ? AnyButtonStyle(SecondaryButtonStyle()) : AnyButtonStyle(PrimaryButtonStyle()))
+            .accessibilityIdentifier("add_source_continue")
+        }
+        .padding(Theme.safeH)
+    }
+
+    private func text(for step: RefreshProgress) -> String {
+        switch step {
+        case .connecting: return L10n.t("progress_connecting")
+        case .authenticating: return L10n.t("progress_auth")
+        case .channels(let n): return L10n.t("progress_channels", L10n.number(n))
+        case .movies(let n): return L10n.t("progress_movies", L10n.number(n))
+        case .series(let n): return L10n.t("progress_series", L10n.number(n))
+        case .epg: return L10n.t("progress_epg")
+        }
+    }
+}
+
+private struct AddSourceForm: View {
+    @Bindable var model: AddSourceViewModel
+    @State private var showAdvanced = false
+    @State private var didInit = false
+
+    var body: some View {
+        Form {
+            Section {
+                TextField(L10n.t("field_name"), text: $model.name)
+                    .accessibilityIdentifier("field_name")
+                if model.kind == .m3u {
+                    TextField(L10n.t("field_m3u_url"), text: $model.m3uURL)
+                        .urlField()
+                        .accessibilityIdentifier("field_m3u_url")
+                    if model.m3uURLError { LText("validation_url").font(.caption).foregroundStyle(Theme.error) }
+                } else {
+                    TextField(L10n.t("field_server"), text: $model.server)
+                        .urlField()
+                        .accessibilityIdentifier("field_server")
+                    if model.serverError { LText("validation_url").font(.caption).foregroundStyle(Theme.error) }
+                    TextField(L10n.t("field_username"), text: $model.username)
+                        .plainField()
+                        .accessibilityIdentifier("field_username")
+                    #if os(tvOS)
+                    // tvOS: a Form row focuses only ONE control – an eye button next to the field
+                    // would take the focus and the password could never be entered.
+                    SecureField(L10n.t("field_password"), text: $model.password)
+                        .plainField()
+                        .accessibilityIdentifier("field_password")
+                    #else
+                    HStack {
+                        if model.showPassword {
+                            TextField(L10n.t("field_password"), text: $model.password).plainField()
+                        } else {
+                            SecureField(L10n.t("field_password"), text: $model.password).plainField()
+                        }
+                        Button {
+                            model.showPassword.toggle()
+                        } label: {
+                            Image(systemName: model.showPassword ? "eye.slash" : "eye")
+                        }
+                        .accessibilityLabel(L10n.t(model.showPassword ? "action_hide_password" : "action_show_password"))
+                    }
+                    .accessibilityIdentifier("field_password")
+                    #endif
+                }
+            }
+            Section {
+                Toggle(L10n.t("field_advanced"), isOn: $showAdvanced)
+                    .accessibilityIdentifier("field_advanced")
+                if showAdvanced {
+                    TextField(L10n.t("field_epg_url"), text: $model.epgURL).urlField()
+                        .accessibilityIdentifier("field_epg_url")
+                    if model.epgURLError { LText("validation_url").font(.caption).foregroundStyle(Theme.error) }
+                    if model.epgURL.isEmpty, let hint = model.defaultEpgHint {
+                        LText("source_epg_default", hint).font(.caption).foregroundStyle(Theme.textSecondary)
+                            .accessibilityIdentifier("field_epg_default")
+                    }
+                    if model.kind == .m3u {
+                        TextField(L10n.t("field_user_agent"), text: $model.userAgent).plainField()
+                            .accessibilityIdentifier("field_user_agent")
+                    }
+                }
+            }
+            Section {
+                Button(L10n.t(model.isEditing ? "action_save" : "action_connect")) { model.connect() }
+                    .disabled(!model.isValid)
+                    .accessibilityIdentifier("action_connect")
+            }
+            Section {
+                LText("legal_no_content").font(.caption).foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .hiddenListBackground()
+        .onAppear {
+            // Edit: the EPG URL / user agent of the source are visible at once.
+            guard !didInit else { return }
+            didInit = true
+            if model.isEditing { showAdvanced = true }
+        }
+    }
+}
+
+extension View {
+    func urlField() -> some View {
+        #if os(iOS)
+        return self.keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+        #else
+        return self.textInputAutocapitalization(.never).autocorrectionDisabled()
+        #endif
+    }
+
+    func plainField() -> some View {
+        textInputAutocapitalization(.never).autocorrectionDisabled()
+    }
+}

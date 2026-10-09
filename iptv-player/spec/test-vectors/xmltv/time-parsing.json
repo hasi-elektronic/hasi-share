@@ -1,0 +1,45 @@
+{
+  "_note": "XMLTV time parsing. expected = epoch seconds UTC or null (invalid).",
+  "cases": [
+    {
+      "input": "20251004183000 +0300",
+      "expected": 1759591800
+    },
+    {
+      "input": "20251004120000",
+      "expected": 1759579200
+    },
+    {
+      "input": "202510041300 -0500",
+      "expected": 1759600800
+    },
+    {
+      "input": "20251004120000 +0000",
+      "expected": 1759579200
+    },
+    {
+      "input": "20251004120000+0200",
+      "expected": 1759572000
+    },
+    {
+      "input": "20251231233000 -0130",
+      "expected": 1767229200
+    },
+    {
+      "input": "  20251004120000 +0000  ",
+      "expected": 1759579200
+    },
+    {
+      "input": "garbage",
+      "expected": null
+    },
+    {
+      "input": "2025100412",
+      "expected": null
+    },
+    {
+      "input": "",
+      "expected": null
+    }
+  ]
+}

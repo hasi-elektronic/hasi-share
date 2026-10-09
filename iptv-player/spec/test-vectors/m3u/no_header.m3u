@@ -1,0 +1,4 @@
+#EXTINF:-1 tvg-id="a",Channel A
+http://x.example.com/a.m3u8
+#EXTINF:-1 tvg-id="b",Channel B
+http://x.example.com/b.m3u8

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Build 17 iCloud sync (key-value storage only, no CloudKit / containers). iOS and tvOS share the bundle id,
+	     so iPhone, iPad and Apple TV share one store. Needs the iCloud capability on the App ID + new profiles. -->
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<!-- Build 17: the app's own group FIRST (it stays the default group of every existing Keychain item: source
+	     secrets, account token); the second group is shared with the tvOS Top Shelf extension (TopShelfStore). -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(APP_BUNDLE_ID)</string>
+		<string>$(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared</string>
+	</array>
+</dict>
+</plist>

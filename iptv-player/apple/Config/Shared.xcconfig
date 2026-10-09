@@ -1,0 +1,20 @@
+// Single place for the product placeholders (CONTRACT §0). Rename the app here only.
+// Note: "//" starts a comment in xcconfig files, hence "https:/$()/" in URLs.
+APP_DISPLAY_NAME = NovaPlayer
+APP_BUNDLE_ID = com.hasielektronic.novaplayer
+// Non-consumables – must match backend/wrangler.toml APPLE_PRODUCT_ID / APPLE_TRIAL_PRODUCT_ID.
+PRODUCT_LIFETIME = com.hasielektronic.novaplayer.lifetime
+PRODUCT_TRIAL = com.hasielektronic.novaplayer.trial
+// Backend (Cloudflare Worker). Production must be HTTPS.
+BACKEND_BASE_URL = https:/$()/iptv-backend.example.workers.dev
+// Accounts, phone sign-in and QR pairing (owner decision: hidden until the backend is live). YES shows them –
+// they still stay hidden while BACKEND_BASE_URL is a placeholder (*.example…).
+ACCOUNTS_ENABLED = NO
+// Legal pages (paywall, settings, about; tvOS shows them as QR code + URL).
+PRIVACY_URL = https:/$()/hasi-elektronic.de/datenschutz
+TERMS_URL = https:/$()/hasi-elektronic.de/agb
+// TestFlight (StoreKit sandbox) installs get full access without buying; App Store builds are unaffected.
+// Set NO to test the paywall/trial flow via TestFlight.
+TESTFLIGHT_FULL_ACCESS = YES
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 16

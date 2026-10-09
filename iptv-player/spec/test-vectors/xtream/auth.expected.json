@@ -1,0 +1,123 @@
+{
+  "_note": "Account classification (CONTRACT §4.4). nowEpochSeconds fixed for tests.",
+  "nowEpochSeconds": 1759570000,
+  "cases": [
+    {
+      "file": "auth_ok.json",
+      "http": 200,
+      "expected": {
+        "result": "OK",
+        "status": "Active",
+        "expiresAt": 1893456000,
+        "maxConnections": 2,
+        "activeConnections": 0,
+        "allowedOutputFormats": [
+          "m3u8",
+          "ts",
+          "rtmp"
+        ],
+        "serverTimezone": "Europe/Istanbul"
+      }
+    },
+    {
+      "file": "auth_null_exp.json",
+      "http": 200,
+      "expected": {
+        "result": "OK",
+        "status": "Active",
+        "expiresAt": null,
+        "maxConnections": 1,
+        "activeConnections": 1,
+        "allowedOutputFormats": [],
+        "serverTimezone": "UTC"
+      }
+    },
+    {
+      "file": "auth_invalid.json",
+      "http": 200,
+      "expected": {
+        "result": "InvalidCredentials"
+      }
+    },
+    {
+      "file": "auth_user_info_array.json",
+      "http": 200,
+      "expected": {
+        "result": "InvalidCredentials"
+      }
+    },
+    {
+      "file": "auth_empty_array.json",
+      "http": 200,
+      "expected": {
+        "result": "InvalidCredentials"
+      }
+    },
+    {
+      "file": "auth_expired.json",
+      "http": 200,
+      "expected": {
+        "result": "AccountExpired",
+        "expiresAt": 1700000000
+      }
+    },
+    {
+      "file": "auth_expired_by_date.json",
+      "http": 200,
+      "expected": {
+        "result": "AccountExpired",
+        "expiresAt": 1600000000
+      }
+    },
+    {
+      "file": "auth_banned.json",
+      "http": 200,
+      "expected": {
+        "result": "AccountDisabled"
+      }
+    },
+    {
+      "file": "auth_disabled.json",
+      "http": 200,
+      "expected": {
+        "result": "AccountDisabled"
+      }
+    },
+    {
+      "file": "auth_html.txt",
+      "http": 200,
+      "expected": {
+        "result": "InvalidResponse"
+      }
+    },
+    {
+      "file": "auth_ok.json",
+      "http": 401,
+      "expected": {
+        "result": "InvalidCredentials"
+      }
+    },
+    {
+      "file": "auth_html.txt",
+      "http": 403,
+      "expected": {
+        "result": "InvalidCredentials"
+      }
+    },
+    {
+      "file": "auth_html.txt",
+      "http": 404,
+      "expected": {
+        "result": "NotFound"
+      }
+    },
+    {
+      "file": "auth_html.txt",
+      "http": 502,
+      "expected": {
+        "result": "ServerError",
+        "httpStatus": 502
+      }
+    }
+  ]
+}
