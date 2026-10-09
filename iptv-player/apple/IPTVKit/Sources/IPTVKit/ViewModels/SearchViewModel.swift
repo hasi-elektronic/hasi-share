@@ -179,6 +179,9 @@ public struct SearchEngine: Sendable {
     public var hiddenSeriesCategories: Set<String> = []
     /// Archive playback possible (Xtream timeshift).
     public var canReplay = false
+    /// Parental lock with locked content in this source: no typing suggestions (they are raw catalog titles and
+    /// would name locked items; the results themselves are filtered by the catalog).
+    public var suppressSuggestions = false
     /// Programme window: from 2 h ago (archive) to 48 h ahead.
     public static let pastWindow: TimeInterval = 2 * 3600
     public static let futureWindow: TimeInterval = 48 * 3600
@@ -359,7 +362,9 @@ public final class SearchViewModel {
             engine.hiddenLiveCategories = hiddenLiveCategories(sourceId)
             engine.hiddenMovieCategories = env.categoryPrefs.hidden(sourceId: sourceId, kind: .movie)
             engine.hiddenSeriesCategories = env.categoryPrefs.hidden(sourceId: sourceId, kind: .series)
-            engine.canReplay = env.currentSource?.type == .xtream   // metadata only (no Keychain read per keystroke)
+            // Xtream timeshift and (Build 18) M3U catch-up; per channel `catchup` decides (metadata only, no Keychain read).
+            engine.canReplay = true
+            engine.suppressSuggestions = env.catalog.contentLock.filter?.hasLocks(sourceId) ?? false
         }
         return engine
     }
@@ -384,7 +389,7 @@ public final class SearchViewModel {
             guard !Task.isCancelled else { return }
             let work = Task.detached(priority: .userInitiated) {
                 SQLiteDatabase.$interruptsOnCancel.withValue(true) {
-                    (try? engine.catalog.completions(text, sourceId: engine.sourceId)) ?? []
+                    engine.suppressSuggestions ? [] : (try? engine.catalog.completions(text, sourceId: engine.sourceId)) ?? []
                 }
             }
             let found = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
