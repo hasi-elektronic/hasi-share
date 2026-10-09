@@ -44,6 +44,29 @@ enum UITestSupport {
         return app
     }
 
+    #if os(iOS)
+    /// Swipes the screen up until `element` is hittable (at most `maxSwipes`). SwiftUI lists build their rows lazily:
+    /// a row below the fold does not exist in the accessibility tree until it is scrolled to.
+    @MainActor
+    @discardableResult
+    static func scrollTo(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) -> Bool {
+        for _ in 0..<maxSwipes where !(element.exists && element.isHittable) { app.swipeUp() }
+        return element.exists && element.isHittable
+    }
+
+    /// Settings top level → Advanced. The row sits below the iCloud / parental / reminder sections (Build 17/18), so it
+    /// is scrolled to; without a PIN the page opens directly (no PIN gate).
+    @MainActor
+    static func openAdvancedSettings(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(app.buttons["settings_sources"].waitForExistence(timeout: 30), "Settings top level", file: file, line: line)
+        let advanced = app.buttons["settings_advanced"]
+        XCTAssertTrue(scrollTo(advanced, in: app), "Advanced row reachable", file: file, line: line)
+        advanced.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["settings_epg_timezone"].waitForExistence(timeout: 5), "Advanced page", file: file, line: line)
+        XCTAssertFalse(app.descendants(matching: .any)["pin_gate"].exists, "no PIN gate without a PIN", file: file, line: line)
+    }
+    #endif
+
     /// Saves a screenshot as attachment and – when TEST_RUNNER_SCREENSHOT_DIR is set – as PNG file.
     @MainActor
     static func snap(_ name: String, in test: XCTestCase) {

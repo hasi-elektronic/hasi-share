@@ -74,7 +74,7 @@ final class IOSThreeTapTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["settings_avsync_calibration"].exists, "audio sync calibration on the top level")
         XCTAssertFalse(app.buttons["settings_licenses"].exists, "licenses moved to Advanced")
         UITestSupport.snap("three-tap/ios-settings-top", in: self)
-        app.buttons["settings_advanced"].tap()
+        UITestSupport.openAdvancedSettings(app)
         let licenses = app.buttons["settings_licenses"]
         for _ in 0..<6 where !(licenses.exists && licenses.isHittable) { app.swipeUp() }
         XCTAssertTrue(licenses.isHittable, "licenses under Advanced")

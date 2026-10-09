@@ -42,10 +42,11 @@ final class IOSSourceManagementTests: XCTestCase {
         XCTAssertEqual(url.value as? String, UITestSupport.seedM3U, "prefilled from the Keychain secrets")
         XCTAssertTrue(app.textFields["field_epg_url"].exists, "EPG URL field visible in edit mode")
         let name = app.textFields["field_name"]
-        name.tap()
-        name.press(forDuration: 1.0)
-        if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
-        name.typeText("Demo Edited")
+        // Cursor at the end, then delete the old name (a long press only selects the word under the finger).
+        name.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+        let old = (name.value as? String) ?? ""
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count + 2) + "Demo Edited")
+        XCTAssertEqual(name.value as? String, "Demo Edited")
         UITestSupport.snap("a1-ios-source-edit", in: self)
         let save = app.buttons["action_connect"]
         scrollTo(save, in: app)
@@ -92,9 +93,7 @@ final class IOSSourceManagementTests: XCTestCase {
     @MainActor
     func testAdvancedLegalLinksTimeZoneAndNoAccount() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
-        let advanced = app.buttons["settings_advanced"]
-        XCTAssertTrue(advanced.waitForExistence(timeout: 30))
-        advanced.tap()
+        UITestSupport.openAdvancedSettings(app)
         let zone = app.buttons["settings_epg_timezone"]
         XCTAssertTrue(zone.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Sign in with e-mail"].exists, "accounts hidden (ACCOUNTS_ENABLED = NO)")
@@ -124,9 +123,7 @@ final class IOSSourceManagementTests: XCTestCase {
     @MainActor
     func testPaywallHasLegalLinksAndNoAccountHint() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
-        let advanced = app.buttons["settings_advanced"]
-        XCTAssertTrue(advanced.waitForExistence(timeout: 30))
-        advanced.tap()
+        UITestSupport.openAdvancedSettings(app)
         let purchase = app.buttons["settings_purchase"]
         XCTAssertTrue(purchase.waitForExistence(timeout: 5))
         purchase.tap()

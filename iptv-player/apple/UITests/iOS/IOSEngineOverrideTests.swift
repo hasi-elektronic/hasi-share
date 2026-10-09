@@ -121,7 +121,7 @@ final class IOSEngineOverrideTests: XCTestCase {
     func testSettingsEngineAndResetSync() throws {
         let app = UITestSupport.launch(["-uiScreen", "settings"])
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 30))
-        app.buttons["settings_advanced"].tap()
+        UITestSupport.openAdvancedSettings(app)
         let engine = app.descendants(matching: .any)["settings_player_engine"]
         for _ in 0..<6 where !(engine.exists && engine.isHittable) { app.swipeUp() }
         XCTAssertTrue(engine.exists, "Player engine picker")

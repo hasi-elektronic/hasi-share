@@ -94,7 +94,8 @@ final class IOSGuideParentalTests: XCTestCase {
         // Settings → Reminders lists it.
         app.buttons["open_settings"].tap()
         let row = app.buttons["settings_reminders"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings_sources"].waitForExistence(timeout: 5))
+        XCTAssertTrue(UITestSupport.scrollTo(row, in: app), "Reminders row (below the iCloud section)")
         row.tap()
         let reminder = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'reminder_row_'")).firstMatch
         XCTAssertTrue(reminder.waitForExistence(timeout: 5), "reminder listed (\(programme))")
@@ -115,7 +116,8 @@ final class IOSGuideParentalTests: XCTestCase {
         // Settings → Parental control → set PIN 1234 (twice).
         app.buttons["open_settings"].tap()
         let parental = app.buttons["settings_parental"]
-        XCTAssertTrue(parental.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings_sources"].waitForExistence(timeout: 5))
+        XCTAssertTrue(UITestSupport.scrollTo(parental, in: app), "Parental control row (below the iCloud section)")
         parental.tap()
         let setPin = app.buttons["parental_set_pin"]
         XCTAssertTrue(setPin.waitForExistence(timeout: 5))

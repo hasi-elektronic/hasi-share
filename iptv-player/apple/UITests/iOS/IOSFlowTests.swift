@@ -75,7 +75,7 @@ final class IOSFlowTests: XCTestCase {
         sleep(1)
         UITestSupport.snap("ios-10-settings", in: self)
         // Open-source licenses (LGPL-2.1 notice for VLCKit), under Advanced.
-        app.buttons["settings_advanced"].tap()
+        UITestSupport.openAdvancedSettings(app)
         let licenses = app.buttons["settings_licenses"]
         for _ in 0..<6 where !(licenses.exists && licenses.isHittable) { app.swipeUp() }
         licenses.tap()
