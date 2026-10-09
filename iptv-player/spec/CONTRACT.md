@@ -378,6 +378,9 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
    calibration (clamped to ±500 ms) and no longer exists. VLCKit applies content + calibration + the
    automatic latency term below.
 1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
+1a. **tvOS, Build 19:** MKV and the remuxer is in the build ⇒ **Apple + Remux** (the owner measured far less A/V drift
+   than VLCKit on Apple TV); a remux failure falls back once to VLCKit. Rule 0 (a content delay) still wins. iOS keeps
+   rules 1–2. Limits of the remux engine (one audio track, no subtitles, no AirPlay video) apply.
 2. else VLCKit supports it ⇒ **VLCKit**.
 3. else ⇒ `UnsupportedFormat(container)` before playback.
 

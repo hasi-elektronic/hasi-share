@@ -110,6 +110,31 @@ final class EngineOverrideTests: XCTestCase {
         XCTAssertEqual(c.engineKind, .avPlayer)
     }
 
+    /// Build 19 (rule 1a): Apple TV Automatic plays MKV through the remuxer, falls back to VLCKit once.
+    func testTVAutomaticRoutesMKVToRemuxAndFallsBackToVLC() async throws {
+        let remux = FakeEngine(kind: .avRemux)
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }, remux: { remux }))
+        c.remuxByDefault = true
+        c.open(url("http://h.example.com/film.mkv"))
+        for _ in 0..<200 where remux.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avRemux)
+        remux.emit(.failed(.unsupportedFormat(container: "mkv")))
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        XCTAssertEqual(vlc.loads.count, 1)
+        // Not MKV: unchanged.
+        c.open(url("http://h.example.com/live.m3u8"))
+        for _ in 0..<200 where av.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avPlayer)
+        // iOS (default off): MKV stays on VLCKit.
+        c.remuxByDefault = false
+        c.open(url("http://h.example.com/film2.mkv"))
+        for _ in 0..<200 where vlc.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .vlcKit)
+    }
+
     func testVLCOverrideWithoutVLCKitIsAVPlayerColumn() async throws {
         let c = controller(.vlcKit, withVLC: false)
         try await open(c, url("http://h.example.com/live.m3u8"))

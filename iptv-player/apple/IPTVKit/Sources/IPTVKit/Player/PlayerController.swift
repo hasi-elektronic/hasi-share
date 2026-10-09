@@ -449,9 +449,19 @@ public final class PlayerController {
            ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, audioDelayMs: currentAudioDelay) == .vlcKit {
             return .vlcKit
         }
+        // Build 19 (CONTRACT §6.1 rule 1a): on Apple TV `automatic` plays MKV through the remuxer – the owner measured
+        // far less A/V drift than VLCKit. A remux failure falls back once to VLCKit (`fallbackEngine`).
+        if remuxByDefault, engines.remuxAvailable, stream.container.isSupported(by: .avRemux) { return .avRemux }
         if stream.engine == .vlcKit, engines.vlcAvailable { return .vlcKit }
         return .avPlayer
     }
+
+    /// Build 19: `automatic` sends MKV to the remux engine (tvOS only; tests set it).
+    #if os(tvOS)
+    @ObservationIgnored public var remuxByDefault = true
+    #else
+    @ObservationIgnored public var remuxByDefault = false
+    #endif
 
     private func engineInstance(_ kind: PlayerEngine) -> any PlaybackEngine {
         if kind == .avRemux, let make = engines.remux {
