@@ -413,11 +413,14 @@ private struct SearchCategoryLink: View {
     var body: some View {
         Button {
             onOpen()
-            if info.category.kind == .live {
-                router.showLiveCategory(info.id)
-            } else {
-                router.open(BrowseRoute.grid(kind: info.category.kind.contentKind, categoryId: info.id,
-                                             title: CountryFlag.displayTitle(info.category.name), sort: .added))
+            // Build 18: a locked category (show-with-lock mode) opens after the PIN.
+            router.openCategory(info.id, kind: info.category.kind) {
+                if info.category.kind == .live {
+                    router.showLiveCategory(info.id)
+                } else {
+                    router.open(BrowseRoute.grid(kind: info.category.kind.contentKind, categoryId: info.id,
+                                                 title: CountryFlag.displayTitle(info.category.name), sort: .added))
+                }
             }
         } label: { SearchCategoryCard(info: info, fullWidth: fullWidth) }
         .buttonStyle(CardButtonStyle(radius: Theme.cardRadius, scale: 1.05))
