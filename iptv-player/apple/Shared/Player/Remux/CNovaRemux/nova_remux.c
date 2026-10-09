@@ -62,6 +62,8 @@ struct NRContext {
     int nb_subs;
     NRCueFn cue_fn;
     void *cue_opaque;
+
+    int64_t adelay_v;           ///< audio delay in video tb (+ = audio later)
 };
 
 // MARK: IO
@@ -219,6 +221,12 @@ static void nr_emit_cues(NRContext *c, int slot, AVPacket *pkt) {
         if (text[0]) c->cue_fn(c->cue_opaque, c->sub_idx[slot], start, start + dur, text);
     }
     avsubtitle_free(&sub);
+}
+
+void nr_set_audio_delay(NRContext *ctx, int ms) {
+    if (ms > 2000) ms = 2000;
+    if (ms < -2000) ms = -2000;
+    ctx->adelay_v = av_rescale_q(ms, (AVRational){1, 1000}, ctx->vst->time_base);
 }
 
 void nr_set_cue_callback(NRContext *ctx, NRCueFn fn, void *opaque) {
@@ -559,7 +567,7 @@ static int64_t nr_audio_offset(const NRContext *c) {
 
 /// Audio timestamp (audio tb) → output samples relative to playlist time 0 (no offset).
 static int64_t nr_audio_rel(const NRContext *c, int64_t ts) {
-    int64_t k0a = av_rescale_q(c->k0, c->vst->time_base, c->ast->time_base);
+    int64_t k0a = av_rescale_q(c->k0 - c->adelay_v, c->vst->time_base, c->ast->time_base);
     return av_rescale_q(ts - k0a, c->ast->time_base, (AVRational){1, c->aout_rate});
 }
 
@@ -815,7 +823,9 @@ static int nr_generate(NRContext *c, int index, uint8_t **out, int *out_size, NR
     c->avio->error = 0;
     c->avio->eof_reached = 0;
     int64_t seek_ts = start;
-    if (transcode && index > 0) seek_ts = c->keyframes[nr_keyframe_before(c, start - av_rescale_q(100, (AVRational){1, 1000}, vtb))];
+    // Positive delay: this segment's audio comes from up to `adelay_v` before its video → seek that much earlier.
+    int64_t early = (c->ast && c->adelay_v > 0 ? c->adelay_v : 0) + (transcode ? av_rescale_q(100, (AVRational){1, 1000}, vtb) : 0);
+    if (index > 0 && early > 0) seek_ts = c->keyframes[nr_keyframe_before(c, start - early)];
     int ret = av_seek_frame(c->fmt, c->vidx, seek_ts, AVSEEK_FLAG_BACKWARD);
     if (ret < 0) return ret;
 
@@ -854,7 +864,7 @@ static int nr_generate(NRContext *c, int index, uint8_t **out, int *out_size, NR
             int64_t ts_v = av_rescale_q(ts, c->fmt->streams[pkt->stream_index]->time_base, vtb);
             if (ts_v >= start && (last || ts_v < end_ts)) nr_emit_cues(c, nr_sub_slot(c, pkt->stream_index), pkt);
         } else if (pkt->stream_index == c->aidx && ts != AV_NOPTS_VALUE) {
-            int64_t ts_v = av_rescale_q(ts, c->ast->time_base, vtb);
+            int64_t ts_v = av_rescale_q(ts, c->ast->time_base, vtb) + c->adelay_v;   // output (shifted) time
             if (c->audio_copy) {
                 int64_t f = c->aout_frame;
                 int64_t a0rel = nr_audio_rel(c, c->a0);

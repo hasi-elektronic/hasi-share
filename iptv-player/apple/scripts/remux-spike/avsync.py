@@ -43,10 +43,12 @@ for line in a.splitlines():
         rms = -200.0
     if rms > -30 and not loud and (not beeps or t - beeps[-1] > 0.5): beeps.append(t)
     loud = rms > -30
+# Pairing window (s): 0.5 for the 1 s clip; the 5 s clip (audio delay checks up to ±2 s) uses MAXPAIR=2.4.
+MAXPAIR = float(os.environ.get("MAXPAIR", "0.5"))
 offsets = []
 for b in beeps:
     near = min(flashes, key=lambda f: abs(f - b)) if flashes else None
-    if near is not None and abs(near - b) < 0.5: offsets.append((b - near) * 1000)
+    if near is not None and abs(near - b) < MAXPAIR: offsets.append((b - near) * 1000)
 if os.path.isdir(src): os.remove(path)
 if offsets:
     print(f"flashes={len(flashes)} beeps={len(beeps)} pairs={len(offsets)} offset(audio-video) ms: "

@@ -174,6 +174,16 @@ public final class PlayerController {
     public private(set) var vlcCalibrationMs = 0
     /// Delay handed to the engine: content + VLC calibration (AVPlayer ignores it).
     public var engineAudioDelay: Int { currentAudioDelay + vlcCalibrationMs }
+
+    /// Delay handed to an engine: VLCKit gets content + calibration; the remuxer only the content delay (AVPlayer
+    /// compensates the output latency itself, CONTRACT §6.1); AVPlayer none.
+    func audioDelay(for kind: PlayerEngine) -> Int {
+        switch kind {
+        case .vlcKit: return engineAudioDelay
+        case .avRemux: return currentAudioDelay
+        case .avPlayer, .media3: return 0
+        }
+    }
     /// The delay could not be applied to this opened stream (VLCKit failed, playing on AVPlayer without it).
     public private(set) var audioSyncUnavailable = false
     /// Seeks handed to the engine since launch (performance overlay; the tvOS seek preview seeks once per commit).
@@ -441,17 +451,18 @@ public final class PlayerController {
             return ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, override: .vlcKit) == .vlcKit
                 ? .vlcKit : .avPlayer
         case .remux:
-            // Beta: MKV through the FFmpeg remuxer into AVPlayer (the audio delay is not applied yet).
+            // MKV through the FFmpeg remuxer into AVPlayer (Build 22: with the content audio delay).
             if engines.remuxAvailable, stream.container.isSupported(by: .avRemux) { return .avRemux }
         case .automatic: break
         }
+        // Build 19 (CONTRACT §6.1 rule 1a): on Apple TV `automatic` plays MKV through the remuxer – the owner measured
+        // far less A/V drift than VLCKit. Build 22: also with a content audio delay (the remuxer applies it), so rule 0
+        // no longer moves MKV to VLCKit there. A remux failure falls back once to VLCKit (`fallbackEngine`).
+        if remuxByDefault, engines.remuxAvailable, stream.container.isSupported(by: .avRemux) { return .avRemux }
         if currentAudioDelay != 0,
            ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable, audioDelayMs: currentAudioDelay) == .vlcKit {
             return .vlcKit
         }
-        // Build 19 (CONTRACT §6.1 rule 1a): on Apple TV `automatic` plays MKV through the remuxer – the owner measured
-        // far less A/V drift than VLCKit. A remux failure falls back once to VLCKit (`fallbackEngine`).
-        if remuxByDefault, engines.remuxAvailable, stream.container.isSupported(by: .avRemux) { return .avRemux }
         if stream.engine == .vlcKit, engines.vlcAvailable { return .vlcKit }
         return .avPlayer
     }
@@ -516,7 +527,7 @@ public final class PlayerController {
         next.setBackgroundPlayback(allowed: backgroundAudioAllowed)
         next.setPictureInPictureActive(pictureInPictureActive)
         next.setVideoSuspended(videoSuspended)   // a zap / reconnect in the background stays sound-only
-        next.setAudioDelay(ms: engineAudioDelay)   // before load: VLCKit starts the item with it
+        next.setAudioDelay(ms: audioDelay(for: next.kind))   // before load: VLCKit / the remuxer start the item with it
         next.applySubtitleStyle(subtitleStyle)
         next.setSubtitleDelay(ms: subtitleDelayMs)
         let subtitleLanguage = reloadSubtitleLanguage ?? preferredSubtitleLanguage
@@ -1028,8 +1039,8 @@ public final class PlayerController {
 
     private func applyAudioDelay() {
         guard let engine, let stream, hasActiveItem else { return }
-        if engine.kind == .vlcKit {
-            engine.setAudioDelay(ms: engineAudioDelay)
+        if engine.kind == .vlcKit || engine.kind == .avRemux {
+            engine.setAudioDelay(ms: audioDelay(for: engine.kind))
         } else if currentAudioDelay != 0, engineKind(for: stream) == .vlcKit {
             SafeLog.info("audio delay \(currentAudioDelay) ms – reloading in vlckit")
             fallbackEngine = .vlcKit

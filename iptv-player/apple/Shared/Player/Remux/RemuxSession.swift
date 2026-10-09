@@ -129,7 +129,9 @@ final class RemuxSession: @unchecked Sendable {
     /// Opens and indexes the stream (blocking network IO on the worker queue).
     /// - Parameter audioStream: source stream index of the audio track to mux (`Info.audioTracks`); nil picks by
     ///   `audioLanguage`, else the default track.
-    static func open(url: URL, headers: [String: String], audioLanguage: String?, audioStream: Int? = nil, targetSegment: Double = 4,
+    /// - Parameter audioDelayMs: audio delay (+ = later, −2000…+2000), baked into every segment (Build 22).
+    static func open(url: URL, headers: [String: String], audioLanguage: String?, audioStream: Int? = nil, audioDelayMs: Int = 0,
+                     targetSegment: Double = 4,
                      forceAudioTranscode: Bool = false, blockSize: Int = 1 << 20, maxInFlight: Int = 1) async throws -> RemuxSession {
         let queue = DispatchQueue(label: "nova.remux.worker", qos: .userInitiated)
         let source = RemuxByteSource(url: url, headers: headers, blockSize: blockSize,
@@ -157,6 +159,7 @@ final class RemuxSession: @unchecked Sendable {
                     continuation.resume(throwing: RemuxError.open(code: code, message: String(decoding: err.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)))
                     return
                 }
+                if audioDelayMs != 0 { nr_set_audio_delay(ctx, Int32(audioDelayMs)) }
                 let cueSink = CueSink()
                 nr_set_cue_callback(ctx, remuxCue, Unmanaged.passUnretained(cueSink).toOpaque())
                 var raw = NRInfo()

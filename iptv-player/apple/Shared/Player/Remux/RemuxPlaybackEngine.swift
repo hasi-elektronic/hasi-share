@@ -14,7 +14,8 @@ import IPTVKit
 /// source track and a choice reopens the session with that track at the current position.
 /// Subtitles (Build 21): the text tracks' cues are read while segments are generated (`SubtitleCueStore`)
 /// and drawn by `RemuxSubtitleOverlay`; switching or turning them off is instant (no reopen).
-/// Limits: no bitmap (PGS/VobSub) subtitles, no audio delay (a later step can shift the audio timestamps instead), no AirPlay video (the
+/// Audio delay (Build 22): baked into the segments by the remuxer; a change reopens at the position (debounced).
+/// Limits: no bitmap (PGS/VobSub) subtitles (a later step can shift the audio timestamps instead), no AirPlay video (the
 /// receiver cannot reach the phone's loopback server – external playback is disabled).
 @MainActor
 final class RemuxPlaybackEngine: PlaybackEngine {
@@ -39,6 +40,9 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     private(set) var selectedSubtitleTrack: Int?
     private var preferredSubtitle: String?
     private var subtitleDelayMs = 0
+    /// Content audio delay (ms, + = audio later) the open session was built with / the next one gets.
+    private var audioDelayMs = 0
+    private var delayTask: Task<Void, Never>?
     /// The inner AVPlayer's last track report (its own legible options when the source has no text tracks).
     private var innerSubtitles: (options: [MediaOption], selected: Int?) = ([], nil)
 
@@ -54,6 +58,7 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?,
               preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         lastLoad = (stream, isLive, preferredSubtitleLanguage, tuning)
+        delayTask?.cancel()   // a delay set just before this load belongs to this item, not to a reopen of the old one
         cues.removeAll()
         subtitleTracks = []
         selectedSubtitleTrack = nil
@@ -75,12 +80,13 @@ final class RemuxPlaybackEngine: PlaybackEngine {
         let generation = generation
         let started = SystemClock.monotonicMs()
         onEvent?(.buffering)
+        let delayMs = audioDelayMs
         openTask = Task { [weak self] in
             do {
                 let port = try await RemuxHTTPServer.shared.start()
                 let session = try await RemuxSession.open(url: stream.url, headers: stream.headers,
                                                           audioLanguage: preferredAudioLanguage.flatMap(TrackNaming.normalized),
-                                                          audioStream: audioStream)
+                                                          audioStream: audioStream, audioDelayMs: delayMs)
                 guard let self, !Task.isCancelled, self.generation == generation else { session.close(); return }
                 let info = session.info
                 SafeLog.info("remux open \(SystemClock.monotonicMs() - started) ms: \(info.videoCodec) \(info.width)x\(info.height) "
@@ -182,19 +188,25 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     /// Another source track: reopen the session with it at the current position (≈ 1–2 s rebuffer).
     func selectAudio(_ id: Int) {
-        guard audioTracks.indices.contains(id), let last = lastLoad else { return }
+        guard audioTracks.indices.contains(id), lastLoad != nil else { return }
         let wanted = audioTracks[id].streamIndex
         guard wanted != muxedAudioStream else { return }
+        reopenAtPosition(audioStream: wanted, reason: "audio switch → stream \(wanted)")
+    }
+
+    /// Reopens the current item at the player's position (audio track / delay change); menus stay as they are.
+    private func reopenAtPosition(audioStream: Int, reason: String) {
+        guard let last = lastLoad else { return }
         let seconds = inner.player.currentTime().seconds
         let startMs = seconds.isFinite && seconds > 0 ? Int64(seconds * 1000) : nil
-        SafeLog.info("remux audio switch → stream \(wanted) at \(startMs ?? 0) ms")
+        SafeLog.info("remux \(reason) at \(startMs ?? 0) ms")
         let tracks = audioTracks
         inner.stop()
-        open(last.stream, isLive: last.isLive, startMs: startMs, audioLanguage: nil, audioStream: wanted,
+        open(last.stream, isLive: last.isLive, startMs: startMs, audioLanguage: nil, audioStream: audioStream >= 0 ? audioStream : nil,
              preferredSubtitleLanguage: last.subtitle, tuning: last.tuning)
         // Keep the menu while the session reopens (the new one reports the same list).
         audioTracks = tracks
-        muxedAudioStream = wanted
+        muxedAudioStream = audioStream
     }
     func selectSubtitle(_ id: Int?) {
         guard !subtitleTracks.isEmpty else { inner.selectSubtitle(id); return }
@@ -202,13 +214,26 @@ final class RemuxPlaybackEngine: PlaybackEngine {
         reportTracks()
     }
     func setAspect(_ mode: AspectMode) { inner.setAspect(mode) }
-    /// Not applied yet (spike); a production version shifts the audio timestamps in the remuxer.
-    func setAudioDelay(ms: Int) {}
+    /// Build 22: the remuxer shifts the audio in every segment; a change reopens at the position after 0.6 s without
+    /// further changes (stepper presses are merged). Before a load it is just remembered for that item.
+    func setAudioDelay(ms: Int) {
+        let clamped = min(max(ms, -2000), 2000)
+        guard clamped != audioDelayMs else { return }
+        audioDelayMs = clamped
+        delayTask?.cancel()
+        guard session != nil, lastLoad != nil else { return }
+        delayTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard let self, !Task.isCancelled, self.lastLoad != nil else { return }
+            self.reopenAtPosition(audioStream: self.muxedAudioStream, reason: "audio delay \(self.audioDelayMs) ms")
+        }
+    }
     // Build 17: background audio / PiP act on the inner AVPlayer (AirPlay stays audio-only: loopback URL).
     func setBackgroundPlayback(allowed: Bool) { inner.setBackgroundPlayback(allowed: allowed) }
     func setPictureInPictureActive(_ active: Bool) { inner.setPictureInPictureActive(active) }
 
     func stop() {
+        delayTask?.cancel()
         lastLoad = nil
         cues.removeAll()
         subtitleTracks = []
@@ -285,7 +310,9 @@ final class RemuxBench {
                 }
             }
             // `-remuxBenchAudio <menu index>`: audio switch measurement instead of the seeks (Build 20).
-            if let raw = AppBootstrap.argument("-remuxBenchAudio"), let id = Int(raw) {
+            if let raw = AppBootstrap.argument("-remuxBenchDelay"), let ms = Int(raw) {
+                Task { await runDelayChange(to: ms) }
+            } else if let raw = AppBootstrap.argument("-remuxBenchAudio"), let id = Int(raw) {
                 Task { await runAudioSwitch(to: id) }
             } else {
                 Task { await runSeeks() }
@@ -314,6 +341,29 @@ final class RemuxBench {
             if resumedAt >= 0, t > resumedAt + 0.1 { break }
         }
         log(String(format: "audio switch → %d: playing after %lld ms, position %.2f → %.2f s", id,
+                   SystemClock.monotonicMs() - t0, before, engine.inner.player.currentTime().seconds))
+        log("done")
+    }
+
+    /// `-remuxBenchDelay <ms>` (Build 22): three quick delay steps (merged by the debounce) → one reopen at the position.
+    private func runDelayChange(to ms: Int) async {
+        try? await Task.sleep(for: .seconds(8))
+        guard let engine else { return }
+        let before = engine.inner.player.currentTime().seconds
+        let t0 = SystemClock.monotonicMs()
+        engine.setAudioDelay(ms: ms / 3)
+        engine.setAudioDelay(ms: 2 * ms / 3)
+        engine.setAudioDelay(ms: ms)
+        try? await Task.sleep(for: .milliseconds(700))   // debounce fired, session reopening
+        var resumedAt = -1.0
+        while SystemClock.monotonicMs() - t0 < 20_000 {
+            try? await Task.sleep(for: .milliseconds(10))
+            let p = engine.inner.player
+            let t = p.currentTime().seconds
+            if p.timeControlStatus == .playing, t > 0.5, resumedAt < 0 { resumedAt = t }
+            if resumedAt >= 0, t > resumedAt + 0.1 { break }
+        }
+        log(String(format: "audio delay → %d ms: playing after %lld ms, position %.2f → %.2f s", ms,
                    SystemClock.monotonicMs() - t0, before, engine.inner.player.currentTime().seconds))
         log("done")
     }

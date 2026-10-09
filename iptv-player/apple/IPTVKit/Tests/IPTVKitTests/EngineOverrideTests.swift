@@ -135,6 +135,32 @@ final class EngineOverrideTests: XCTestCase {
         XCTAssertEqual(c.engineKind, .vlcKit)
     }
 
+    /// Build 22: on Apple TV a delayed MKV stays on the remuxer, which gets the content delay only (no VLC calibration).
+    func testTVRemuxKeepsMKVWithAContentDelay() async throws {
+        let remux = FakeEngine(kind: .avRemux)
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }, remux: { remux }))
+        let delays = AudioDelayStore(kv: InMemoryKeyValueStore())
+        delays.setVLCCalibration(200)
+        c.audioDelayStore = delays
+        c.remuxByDefault = true
+        c.open(url("http://h.example.com/film.mkv"))
+        for _ in 0..<200 where remux.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avRemux)
+        remux.emit(.ready(duration: 600))
+        remux.emit(.playing)
+        c.setAudioDelay(300)
+        XCTAssertEqual(c.engineKind, .avRemux, "no move to VLCKit")
+        XCTAssertEqual(remux.audioDelays.last, 300, "content delay only – AVPlayer compensates the output latency")
+        XCTAssertTrue(vlc.loads.isEmpty)
+        // Next open of a delayed MKV: still the remuxer, started with the delay.
+        c.open(url("http://h.example.com/film.mkv"))
+        for _ in 0..<200 where remux.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avRemux)
+    }
+
     func testVLCOverrideWithoutVLCKitIsAVPlayerColumn() async throws {
         let c = controller(.vlcKit, withVLC: false)
         try await open(c, url("http://h.example.com/live.m3u8"))

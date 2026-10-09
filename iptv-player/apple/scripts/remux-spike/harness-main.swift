@@ -76,6 +76,7 @@ Task {
         let env = ProcessInfo.processInfo.environment
         let session = try await RemuxSession.open(url: url, headers: ["User-Agent": "NovaPlayer-Harness"], audioLanguage: env["AUDIO_LANG"],
                                                   audioStream: env["AUDIO_STREAM"].flatMap(Int.init),
+                                                  audioDelayMs: env["AUDIO_DELAY"].flatMap(Int.init) ?? 0,
                                                   targetSegment: Double(ProcessInfo.processInfo.environment["SEG"] ?? "6") ?? 6,
                                                   forceAudioTranscode: transcode,
                                                   blockSize: (Int(ProcessInfo.processInfo.environment["BLOCK_KB"] ?? "512") ?? 512) * 1024,

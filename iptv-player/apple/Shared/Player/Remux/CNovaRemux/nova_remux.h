@@ -89,6 +89,11 @@ int nr_subtitle_tracks(const NRContext *ctx, NRSubtitleTrack *out, int max);
 /// Receives the text subtitle cues read while a segment is generated (on the generating thread):
 /// playlist time in seconds, plain UTF-8 text (ASS override tags removed, "\n" line breaks; italic
 /// spans wrapped in <i>…</i>). A segment generated twice reports its cues twice (callers deduplicate).
+/// Audio delay (Build 22, ms, + = audio later, −2000…+2000): every segment carries the audio of its time
+/// range shifted by the delay (segment membership by the shifted time, so each fragment stays aligned).
+/// Set before the first segment is generated; a change needs a new context.
+void nr_set_audio_delay(NRContext *ctx, int ms);
+
 typedef void (*NRCueFn)(void *opaque, int stream_index, double start, double end, const char *text);
 void nr_set_cue_callback(NRContext *ctx, NRCueFn fn, void *opaque);
 void nr_get_info(const NRContext *ctx, NRInfo *info);
