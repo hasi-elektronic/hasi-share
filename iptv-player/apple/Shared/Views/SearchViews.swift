@@ -576,23 +576,15 @@ extension Router {
     /// A programme result: running / upcoming → the channel; ended with catch-up → its archive.
     func open(_ hit: ProgrammeHit) {
         if hit.state == .archive, let url = env.catchupURL(channel: hit.channel, program: hit.program) {
-            play(.url(url, title: "\(hit.channel.name) · \(hit.program.title)"))
+            playGuarded(channel: hit.channel) { self.play(.url(url, title: "\(hit.channel.name) · \(hit.program.title)")) }
         } else {
             play(.channel(hit.channel), channels: [hit.channel])
         }
     }
 }
 
-extension AppEnvironment {
-    /// Xtream timeshift URL of a past programme (CONTRACT §4); `nil` for M3U sources.
-    func catchupURL(channel: Channel, program: EpgProgram) -> String? {
-        guard case .xtream(let secrets)? = secrets(for: channel.sourceId), let builder = XtreamURLBuilder(secrets: secrets) else { return nil }
-        let account = sources.first { $0.id == channel.sourceId }?.xtreamAccount
-        let ext = (account?.allowedOutputFormats.contains("m3u8") ?? true) ? "m3u8" : "ts"
-        return builder.timeshiftURL(streamId: channel.id, start: program.start, end: program.end,
-                                    serverTimezone: account?.serverTimezone, ext: ext).absoluteString
-    }
-}
+// Build 18: `AppEnvironment.catchupURL(channel:program:now:)` lives in IPTVKit (ProgramActions.swift) – Xtream
+// timeshift and M3U catch-up (CONTRACT §4.5, §3.9).
 
 // MARK: - Full lists ("Show all", filter chips)
 

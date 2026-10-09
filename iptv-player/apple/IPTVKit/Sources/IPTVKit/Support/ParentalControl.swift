@@ -320,22 +320,33 @@ public final class ParentalControl {
         prompt = PinPrompt(reason: reason)
     }
 
-    /// The pad was answered: unlocks with `pin` and runs the pending action on success. Returns the check result
-    /// (the pad stays open for `.wrong` / `.coolingDown`).
+    /// The pad was answered: unlocks with `pin` and closes the prompt on success; the pending action runs once the
+    /// pad is gone (`promptDismissed()`, so a player cover is not presented while the pad is still dismissing).
+    /// Returns the check result (the pad stays open for `.wrong` / `.coolingDown`).
     @discardableResult
     public func answerPrompt(_ pin: String) -> PinCheck {
         let result = unlock(pin)
         if result == .ok || result == .noPin {
-            let action = promptAction
+            approvedAction = promptAction
             promptAction = nil
             prompt = nil
-            action?()
         }
         return result
     }
 
+    @ObservationIgnored private var approvedAction: (@MainActor () -> Void)?
+
+    /// The pad finished dismissing: runs the approved action (nothing after a cancel).
+    public func promptDismissed() {
+        let action = approvedAction
+        approvedAction = nil
+        promptAction = nil
+        action?()
+    }
+
     public func cancelPrompt() {
         promptAction = nil
+        approvedAction = nil
         prompt = nil
     }
 

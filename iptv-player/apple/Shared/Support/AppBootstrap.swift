@@ -105,6 +105,11 @@ final class Router {
             paywallPresented = true
             return
         }
+        // Build 18 parental lock: locked content plays only after the PIN (ParentalViews.swift).
+        if Self.isLocked(item, env: env) {
+            env.parental.requestUnlock { [weak self] in self?.play(item, channels: channels, fromStart: fromStart) }
+            return
+        }
         // "Continue watching" may know an Xtream episode only by id (no cached row): complete it first (B1).
         if case .episode(let episode, let seriesTitle) = item, episode.url == nil, episode.containerExt == nil {
             Task {

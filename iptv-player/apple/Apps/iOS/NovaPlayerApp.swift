@@ -10,6 +10,7 @@ struct NovaPlayerApp: App {
     init() {
         PerfTrace.shared.mark(.appLaunch)
         let env = AppBootstrap.makeEnvironment()
+        ReminderNotificationCenter.install(env: env)   // Build 18: reminder notifications (a cold-start tap too)
         _env = State(initialValue: env)
         _router = State(initialValue: Router(env: env))
     }
@@ -87,6 +88,7 @@ struct RootView: View {
         .sheet(isPresented: $router.settingsPresented) {
             SettingsSheet().environment(env).environment(router)
         }
+        .guideParentalOverlays()   // Build 18: PIN pad, reminder banner, relock
     }
 
     private var hasHero: Bool { [.home, .movies, .series].contains(router.section) }

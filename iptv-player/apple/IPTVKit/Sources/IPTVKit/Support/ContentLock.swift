@@ -110,4 +110,16 @@ extension CatalogRepository {
             FROM episodes WHERE source_id = ? AND id = ?
             """, [.text(sourceId), .text(id)], map: Self.episode)
     }
+
+    /// A channel whatever the lock (a reminder's channel: playing it then asks for the PIN).
+    public func channelIgnoringLock(sourceId: String, id: String) throws -> Channel? {
+        try database.db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id = ?",
+                                   [.text(sourceId), .text(id)], map: Self.channel)
+    }
+
+    /// Deepest catch-up archive (days) of the source's channels – the guide's past days.
+    public func maxCatchupDays(sourceId: String) throws -> Int {
+        try database.db.scalar("SELECT COALESCE(MAX(catchup_days), 0) FROM channels WHERE source_id = ? AND catchup_type != 'none'",
+                               [.text(sourceId)])
+    }
 }

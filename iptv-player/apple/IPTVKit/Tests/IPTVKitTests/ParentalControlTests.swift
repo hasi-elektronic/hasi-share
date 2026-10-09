@@ -140,10 +140,15 @@ final class ParentalControlTests: XCTestCase {
         XCTAssertEqual(ran, 1)
         XCTAssertEqual(parental.answerPrompt("1234"), .ok)
         XCTAssertNil(parental.prompt)
+        XCTAssertEqual(ran, 1, "runs once the pad is gone")
+        parental.promptDismissed()
         XCTAssertEqual(ran, 2)
+        parental.promptDismissed()
+        XCTAssertEqual(ran, 2, "once")
         parental.relock()
         parental.requestUnlock { ran += 1 }
         parental.cancelPrompt()
+        parental.promptDismissed()
         XCTAssertNil(parental.prompt)
         XCTAssertEqual(ran, 2)
     }

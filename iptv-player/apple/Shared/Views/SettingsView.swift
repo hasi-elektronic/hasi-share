@@ -68,6 +68,10 @@ struct SettingsView: View {
                 }
             }
             Section {
+                ParentalSettingsRow()   // Build 18 (ParentalViews.swift)
+                RemindersSettingsRow()  // Build 18 (ReminderViews.swift)
+            }
+            Section {
                 NavigationLink(value: SettingsRoute.advanced) {
                     Label(L10n.t("settings_advanced"), systemImage: "slider.horizontal.3")
                 }
@@ -82,20 +86,21 @@ struct SettingsView: View {
         .screenBackground()
         .navigationTitle(L10n.t("nav_settings"))
         .navigationDestination(for: SettingsRoute.self) { route in
+            // Build 18: sources / edit and the engine + calibration area behind the parental PIN (optional).
             switch route {
-            case .sources: SourcesView()
-            case .advanced: AdvancedSettingsView()
-            case .source(let id): SourceDetailView(sourceId: id)
-            case .edit(let id): EditSourceView(sourceId: id)
-            case .add(.m3u): AddSourceView(kind: .m3u)
-            case .add(.xtream): AddSourceView(kind: .xtream)
+            case .sources: PinGate { SourcesView() }
+            case .advanced: PinGate { AdvancedSettingsView() }
+            case .source(let id): PinGate { SourceDetailView(sourceId: id) }
+            case .edit(let id): PinGate { EditSourceView(sourceId: id) }
+            case .add(.m3u): PinGate { AddSourceView(kind: .m3u) }
+            case .add(.xtream): PinGate { AddSourceView(kind: .xtream) }
             case .add(.pairing): PairingView()
             case .account: AccountView()
             case .formatTest: FormatTestView()
             case .paywall: PaywallView()
             case .licenses: LicensesView()
             case .about: AboutView()
-            case .avSyncCalibration: AVSyncCalibrationView()
+            case .avSyncCalibration: PinGate { AVSyncCalibrationView() }
             }
         }
     }

@@ -405,6 +405,66 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server nicht erreichbar (%1$s)</string>
     <string name="account_not_configured" formatted="false">Konten sind in dieser Version nicht verfügbar (kein Server konfiguriert).</string>
+    <string name="guide_day_yesterday" formatted="false">Gestern</string>
+    <string name="guide_day_tomorrow" formatted="false">Morgen</string>
+    <string name="guide_day_picker" formatted="false">Tag</string>
+    <string name="guide_jump_now" formatted="false">Jetzt</string>
+    <string name="guide_jump_now_hint" formatted="false">Zurück zu heute und zur laufenden Sendung</string>
+    <string name="program_details" formatted="false">Sendungsdetails</string>
+    <string name="program_no_description" formatted="false">Keine Beschreibung</string>
+    <string name="program_watch_live" formatted="false">Jetzt ansehen</string>
+    <string name="program_start_over" formatted="false">Von Anfang an</string>
+    <string name="program_watch_recording" formatted="false">Aufnahme ansehen</string>
+    <string name="program_remind" formatted="false">Erinnern</string>
+    <string name="program_remind_remove" formatted="false">Erinnerung entfernen</string>
+    <string name="program_reminder_set" formatted="false">Erinnerung gesetzt</string>
+    <string name="program_on_air_now" formatted="false">Läuft gerade</string>
+    <string name="program_ended" formatted="false">Beendet</string>
+    <string name="program_no_replay" formatted="false">Für diese Sendung gibt es kein TV-Archiv.</string>
+    <string name="catchup_unavailable" formatted="false">Das Archiv dieses Senders kann nicht abgespielt werden.</string>
+    <string name="reminder_banner_now">%1$s beginnt jetzt auf %2$s</string>
+    <string name="reminder_banner_soon">%1$s beginnt in 5 Minuten auf %2$s</string>
+    <string name="reminder_switch" formatted="false">Umschalten</string>
+    <string name="reminder_switch_question" formatted="false">Umschalten?</string>
+    <string name="reminder_switched">Umgeschaltet auf %1$s</string>
+    <string name="reminders_title" formatted="false">Erinnerungen</string>
+    <string name="reminders_empty" formatted="false">Keine Erinnerungen. Wählen Sie im TV-Guide eine Sendung und „Erinnern“.</string>
+    <string name="reminders_early" formatted="false">Auch 5 Minuten vorher</string>
+    <string name="reminders_auto_switch" formatted="false">Zum Beginn automatisch umschalten</string>
+    <string name="reminders_hint_ios" formatted="false">Zum Beginn erhalten Sie eine Mitteilung. Tippen Sie darauf, um den Sender zu öffnen.</string>
+    <string name="reminders_hint_tv" formatted="false">Solange die App geöffnet ist, erscheint zum Beginn ein Hinweis.</string>
+    <string name="reminders_count">%1$s aktiv</string>
+    <string name="parental_title" formatted="false">Kindersicherung</string>
+    <string name="parental_status_on" formatted="false">PIN aktiv</string>
+    <string name="parental_intro" formatted="false">Eine 4-stellige PIN sperrt Kategorien und Sender. Gesperrte Inhalte lassen sich nur mit der PIN öffnen.</string>
+    <string name="parental_set_pin" formatted="false">PIN festlegen</string>
+    <string name="parental_change_pin" formatted="false">PIN ändern</string>
+    <string name="parental_remove_pin" formatted="false">PIN entfernen</string>
+    <string name="parental_enter_pin" formatted="false">PIN eingeben</string>
+    <string name="parental_new_pin" formatted="false">Wählen Sie eine 4-stellige PIN</string>
+    <string name="parental_confirm_pin" formatted="false">PIN wiederholen</string>
+    <string name="parental_current_pin" formatted="false">Aktuelle PIN</string>
+    <string name="parental_pin_mismatch" formatted="false">Die PINs stimmen nicht überein. Bitte versuchen Sie es erneut.</string>
+    <string name="parental_pin_wrong">Falsche PIN – noch %1$s Versuche</string>
+    <string name="parental_pin_cooldown">Zu viele Versuche. Bitte versuchen Sie es in %1$s s erneut.</string>
+    <string name="parental_pin_digit">Ziffer %1$s</string>
+    <string name="parental_pin_entered">%1$s von 4 Ziffern eingegeben</string>
+    <string name="parental_hide_locked" formatted="false">Gesperrte Inhalte ausblenden</string>
+    <string name="parental_hide_locked_hint" formatted="false">Aus: Gesperrte Kategorien und Sender bleiben mit einem Schloss sichtbar und verlangen die PIN. Gesperrte Titel erscheinen nie in der Suche, auf der Startseite oder unter „Weiterschauen“.</string>
+    <string name="parental_protect_settings" formatted="false">PIN für Quellen und Player-Einstellungen</string>
+    <string name="parental_locked_categories" formatted="false">Gesperrte Kategorien</string>
+    <string name="parental_locked_channels" formatted="false">Gesperrte Sender</string>
+    <string name="parental_no_locked_channels" formatted="false">Keine gesperrten Sender. Halten Sie einen Sender gedrückt und wählen Sie „Sender sperren“.</string>
+    <string name="parental_lock_now" formatted="false">Jetzt sperren</string>
+    <string name="parental_unlocked_note" formatted="false">Entsperrt, bis die App in den Hintergrund wechselt.</string>
+    <string name="parental_suggest_title" formatted="false">Kategorien für Erwachsene sperren?</string>
+    <string name="parental_suggest_body" formatted="false">Diese Kategorien sehen nach Inhalten für Erwachsene aus. Gesperrte Kategorien verlangen die PIN.</string>
+    <string name="parental_suggest_lock" formatted="false">Auswahl sperren</string>
+    <string name="parental_suggest_skip" formatted="false">Nicht jetzt</string>
+    <string name="parental_lock_channel" formatted="false">Sender sperren</string>
+    <string name="parental_unlock_channel" formatted="false">Sender entsperren</string>
+    <string name="parental_locked" formatted="false">Gesperrt</string>
+    <string name="parental_pin_set_done" formatted="false">PIN festgelegt. Die Sperren gelten ab dem nächsten Start oder nach „Jetzt sperren“.</string>
     <string name="avsync_calibrate" formatted="false">Audio-Sync kalibrieren</string>
     <string name="avsync_calibration_value" formatted="false">VLC-Kalibrierung (dieses Gerät)</string>
     <string name="avsync_intro" formatted="false">Jede Sekunde blitzt das Bild weiß auf und Sie hören einen kurzen Piepton. Ändern Sie den Wert, bis der Piepton genau mit dem Blitz kommt. Piepton nach dem Blitz? − wählen. Piepton vor dem Blitz? + wählen.</string>

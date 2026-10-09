@@ -405,6 +405,66 @@
     <string name="source_status_ok" formatted="false">Tamam</string>
     <string name="error_backend_generic">Sunucuya ulaşılamıyor (%1$s)</string>
     <string name="account_not_configured" formatted="false">Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).</string>
+    <string name="guide_day_yesterday" formatted="false">Dün</string>
+    <string name="guide_day_tomorrow" formatted="false">Yarın</string>
+    <string name="guide_day_picker" formatted="false">Gün</string>
+    <string name="guide_jump_now" formatted="false">Şimdi</string>
+    <string name="guide_jump_now_hint" formatted="false">Bugüne ve şu an yayındaki programa dön</string>
+    <string name="program_details" formatted="false">Program ayrıntıları</string>
+    <string name="program_no_description" formatted="false">Açıklama yok</string>
+    <string name="program_watch_live" formatted="false">Canlı izle</string>
+    <string name="program_start_over" formatted="false">Baştan izle</string>
+    <string name="program_watch_recording" formatted="false">Kaydı izle</string>
+    <string name="program_remind" formatted="false">Hatırlat</string>
+    <string name="program_remind_remove" formatted="false">Hatırlatmayı kaldır</string>
+    <string name="program_reminder_set" formatted="false">Hatırlatma kuruldu</string>
+    <string name="program_on_air_now" formatted="false">Şu an yayında</string>
+    <string name="program_ended" formatted="false">Bitti</string>
+    <string name="program_no_replay" formatted="false">Bu program için geçmiş yayın yok.</string>
+    <string name="catchup_unavailable" formatted="false">Bu kanalın arşivi oynatılamıyor.</string>
+    <string name="reminder_banner_now">%1$s şimdi %2$s kanalında başlıyor</string>
+    <string name="reminder_banner_soon">%1$s 5 dakika sonra %2$s kanalında başlıyor</string>
+    <string name="reminder_switch" formatted="false">Kanala geç</string>
+    <string name="reminder_switch_question" formatted="false">Kanala geçilsin mi?</string>
+    <string name="reminder_switched">%1$s kanalına geçildi</string>
+    <string name="reminders_title" formatted="false">Hatırlatmalar</string>
+    <string name="reminders_empty" formatted="false">Hatırlatma yok. TV rehberinde bir program seçip “Hatırlat”a dokunun.</string>
+    <string name="reminders_early" formatted="false">5 dakika önce de hatırlat</string>
+    <string name="reminders_auto_switch" formatted="false">Başlangıçta otomatik olarak geç</string>
+    <string name="reminders_hint_ios" formatted="false">Program başlarken bildirim alırsınız. Kanalı açmak için bildirime dokunun.</string>
+    <string name="reminders_hint_tv" formatted="false">Uygulama açıkken program başladığında bir bildirim şeridi görünür.</string>
+    <string name="reminders_count">%1$s etkin</string>
+    <string name="parental_title" formatted="false">Ebeveyn denetimi</string>
+    <string name="parental_status_on" formatted="false">PIN etkin</string>
+    <string name="parental_intro" formatted="false">4 haneli bir PIN kategorileri ve kanalları kilitler. Kilitli içerik yalnızca PIN ile açılır.</string>
+    <string name="parental_set_pin" formatted="false">PIN belirle</string>
+    <string name="parental_change_pin" formatted="false">PIN\'i değiştir</string>
+    <string name="parental_remove_pin" formatted="false">PIN\'i kaldır</string>
+    <string name="parental_enter_pin" formatted="false">PIN\'i girin</string>
+    <string name="parental_new_pin" formatted="false">4 haneli bir PIN seçin</string>
+    <string name="parental_confirm_pin" formatted="false">PIN\'i tekrar girin</string>
+    <string name="parental_current_pin" formatted="false">Mevcut PIN</string>
+    <string name="parental_pin_mismatch" formatted="false">PIN\'ler eşleşmiyor. Lütfen tekrar deneyin.</string>
+    <string name="parental_pin_wrong">Yanlış PIN – %1$s deneme kaldı</string>
+    <string name="parental_pin_cooldown">Çok fazla deneme. %1$s sn sonra tekrar deneyin.</string>
+    <string name="parental_pin_digit">Rakam %1$s</string>
+    <string name="parental_pin_entered">4 rakamdan %1$s tanesi girildi</string>
+    <string name="parental_hide_locked" formatted="false">Kilitli içeriği gizle</string>
+    <string name="parental_hide_locked_hint" formatted="false">Kapalı: kilitli kategoriler ve kanallar kilit simgesiyle görünür ve PIN ister. Kilitli başlıklar aramada, ana sayfada ve “İzlemeye devam et”te hiç görünmez.</string>
+    <string name="parental_protect_settings" formatted="false">Kaynaklar ve oynatıcı ayarları için PIN</string>
+    <string name="parental_locked_categories" formatted="false">Kilitli kategoriler</string>
+    <string name="parental_locked_channels" formatted="false">Kilitli kanallar</string>
+    <string name="parental_no_locked_channels" formatted="false">Kilitli kanal yok. Bir kanala uzun basıp “Kanalı kilitle”yi seçin.</string>
+    <string name="parental_lock_now" formatted="false">Şimdi kilitle</string>
+    <string name="parental_unlocked_note" formatted="false">Uygulama arka plana geçene kadar kilit açık.</string>
+    <string name="parental_suggest_title" formatted="false">Yetişkin kategorileri kilitlensin mi?</string>
+    <string name="parental_suggest_body" formatted="false">Bu kategoriler yetişkin içeriğe benziyor. Kilitli kategoriler PIN ister.</string>
+    <string name="parental_suggest_lock" formatted="false">Seçilenleri kilitle</string>
+    <string name="parental_suggest_skip" formatted="false">Şimdi değil</string>
+    <string name="parental_lock_channel" formatted="false">Kanalı kilitle</string>
+    <string name="parental_unlock_channel" formatted="false">Kanal kilidini kaldır</string>
+    <string name="parental_locked" formatted="false">Kilitli</string>
+    <string name="parental_pin_set_done" formatted="false">PIN belirlendi. Kilitler bir sonraki açılışta veya “Şimdi kilitle”den sonra geçerli olur.</string>
     <string name="avsync_calibrate" formatted="false">Ses senkronunu ayarla</string>
     <string name="avsync_calibration_value" formatted="false">VLC kalibrasyonu (bu cihaz)</string>
     <string name="avsync_intro" formatted="false">Her saniye görüntü beyaz yanıp söner ve kısa bir bip sesi duyulur. Bip, yanıp sönmeyle tam aynı anda gelene kadar değeri değiştirin. Bip yanıp sönmeden sonra mı? − kullanın. Önce mi? + kullanın.</string>
