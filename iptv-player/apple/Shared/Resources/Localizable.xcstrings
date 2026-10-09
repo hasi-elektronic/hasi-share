@@ -9250,6 +9250,167 @@
         }
       }
     },
+    "player_pip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture in Picture"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resim içinde resim"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild-in-Bild"
+          }
+        }
+      }
+    },
+    "player_pip_active": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing in Picture in Picture"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resim içinde resimde oynatılıyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird im Bild-in-Bild abgespielt"
+          }
+        }
+      }
+    },
+    "player_airplay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay"
+          }
+        }
+      }
+    },
+    "airplay_audio_only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay: sound only – this stream plays with the VLC or remux engine."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay: yalnızca ses – bu yayın VLC veya remux motoruyla oynatılıyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay: nur Ton – dieser Stream läuft mit der VLC- oder Remux-Engine."
+          }
+        }
+      }
+    },
+    "settings_background_playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep playing in the background"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arka planda oynatmaya devam et"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Hintergrund weiter abspielen"
+          }
+        }
+      }
+    },
+    "settings_auto_pip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture in Picture automatically"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otomatik resim içinde resim"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild-in-Bild automatisch"
+          }
+        }
+      }
+    },
+    "settings_background_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound keeps playing when you leave the app or lock the screen. Picture in Picture starts when you leave the app while a video plays – not for streams played by the VLC engine (MKV, TS, …): they continue as sound only."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamadan çıktığınızda veya ekranı kilitlediğinizde ses çalmaya devam eder. Video oynarken uygulamadan çıkınca resim içinde resim başlar – VLC motoruyla oynatılan yayınlarda (MKV, TS, …) değil: onlar yalnızca sesle sürer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Ton läuft weiter, wenn Sie die App verlassen oder den Bildschirm sperren. Bild-in-Bild startet, wenn Sie die App während eines Videos verlassen – nicht bei Streams mit der VLC-Engine (MKV, TS, …): Diese laufen nur mit Ton weiter."
+          }
+        }
+      }
+    },
     "avsync_calibrate": {
       "extractionState": "manual",
       "localizations": {

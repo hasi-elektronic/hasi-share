@@ -2,8 +2,8 @@ import AVFoundation
 import IPTVKit
 
 /// App audio session (docs/ARCHITECTURE.md §3.2): `.playback` / `.moviePlayback` so video plays with the
-/// iPhone's silent switch on. Background audio stays off (V10): no `UIBackgroundModes`, the player is
-/// released when the scene leaves `.active`.
+/// iPhone's silent switch on. Build 17 (iOS): `UIBackgroundModes` audio – the session stays active in the background
+/// while background audio / Picture in Picture keep the player (`BackgroundPlayback`).
 enum AudioSessionConfigurator {
     /// App launch: category only (activation waits for the first playback).
     static func configure() {

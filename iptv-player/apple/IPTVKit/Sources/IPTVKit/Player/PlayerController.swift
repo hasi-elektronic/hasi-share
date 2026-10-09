@@ -140,6 +140,7 @@ public final class PlayerController {
                 displayKeptAwake = awake
                 keepDisplayAwake(awake)
             }
+            if phase != oldValue { notifyPlaybackChange() }
         }
     }
     public private(set) var request: PlaybackRequest?
@@ -206,6 +207,21 @@ public final class PlayerController {
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
     /// Subtitle language to re-select after an in-place reload (subtitle style change on VLCKit).
     @ObservationIgnored private var reloadSubtitleLanguage: String?
+
+    // MARK: Build 17 – background playback, Picture in Picture, Now Playing
+    /// The platform can play in the background (`UIBackgroundModes` audio): the iOS app sets true. tvOS and unit tests
+    /// keep false → `.background` always releases (B4).
+    @ObservationIgnored public var backgroundPlaybackSupported = false {
+        didSet { refreshBackgroundPlayback() }
+    }
+    /// Between `enterBackground()` and `enterForeground()`.
+    public private(set) var isInBackground = false
+    /// Picture in Picture is starting or running (the app's PiP coordinator reports it).
+    public private(set) var pictureInPictureActive = false
+    /// Now Playing / remote commands: phase, item, duration or position changed (the app updates the lock screen).
+    @ObservationIgnored public var onPlaybackChange: (@MainActor () -> Void)?
+    /// The VLCKit video track is off for background audio.
+    @ObservationIgnored private var videoSuspended = false
 
     @ObservationIgnored private let resolver: StreamResolver
     @ObservationIgnored private let library: LibraryRepository?
@@ -361,6 +377,7 @@ public final class PlayerController {
             previousChannel = current
         }
         self.request = request
+        notifyPlaybackChange()
         refreshAudioDelay()
         audioOptions = []
         subtitleOptions = []
@@ -486,6 +503,9 @@ public final class PlayerController {
         loadReady = false
         probeTask?.cancel()
         cancelStallTimer()   // a new item starts without the previous item's stall deadline
+        next.setBackgroundPlayback(allowed: backgroundAudioAllowed)
+        next.setPictureInPictureActive(pictureInPictureActive)
+        next.setVideoSuspended(videoSuspended)   // a zap / reconnect in the background stays sound-only
         next.setAudioDelay(ms: engineAudioDelay)   // before load: VLCKit starts the item with it
         next.applySubtitleStyle(subtitleStyle)
         next.setSubtitleDelay(ms: subtitleDelayMs)
@@ -566,7 +586,11 @@ public final class PlayerController {
             if phase == .playing { phase = .buffering }
         case .ready(let d):
             loadReady = true
-            duration = d.isFinite && d > 0 ? d : 0
+            let known = d.isFinite && d > 0 ? d : 0
+            if known != duration {
+                duration = known
+                notifyPlaybackChange()
+            }
         case .time(let seconds):
             if let seek = pendingSeek {
                 // A tick from before the seek completed would make the time label jump back.
@@ -899,6 +923,7 @@ public final class PlayerController {
         pendingSeek = (target, nowMs())
         seekCount += 1
         engine?.seek(to: target)
+        notifyPlaybackChange()   // Now Playing: new elapsed time
         if phase == .ended, duration <= 0 || target < duration - 1 {
             // A seek back into a finished VOD plays from there (IOS-02: it used to stay on the last frame).
             audioSession.activate()
@@ -1080,7 +1105,69 @@ public final class PlayerController {
         stream = nil
         zapTarget = nil
         phase = .idle
+        notifyPlaybackChange()   // Now Playing cleared
     }
+
+    // MARK: Background playback & Picture in Picture (Build 17, `BackgroundPlayback`)
+
+    /// Background audio applies: the platform supports it and the setting is on.
+    public var backgroundAudioAllowed: Bool { backgroundPlaybackSupported && (preferences?.backgroundAudio ?? true) }
+
+    /// Re-applies the background setting to the engines (Settings toggle, platform flag).
+    public func refreshBackgroundPlayback() {
+        let allowed = backgroundAudioAllowed
+        for e in [avEngine, vlcEngine, remuxEngine].compactMap({ $0 }) { e.setBackgroundPlayback(allowed: allowed) }
+    }
+
+    /// The app went to `.background`. `.keepPlaying`: the progress is saved and – without PiP – VLCKit's video track
+    /// is switched off; `.release`: the caller releases as before (`AppEnvironment.scenePhaseChanged`).
+    @discardableResult
+    public func enterBackground() -> BackgroundPlayback.Decision {
+        isInBackground = true
+        let decision = BackgroundPlayback.decision(supported: backgroundPlaybackSupported, audioEnabled: backgroundAudioAllowed,
+                                                   pictureInPicture: pictureInPictureActive, phase: phase)
+        if decision == .keepPlaying {
+            saveProgress()
+            if !pictureInPictureActive { suspendVideo(true) }
+            SafeLog.info("background: keep playing (\(pictureInPictureActive ? "PiP" : "audio"))")
+        }
+        return decision
+    }
+
+    /// Back on screen (`.active`): the picture returns.
+    public func enterForeground() {
+        guard isInBackground else { return }
+        isInBackground = false
+        suspendVideo(false)
+    }
+
+    /// PiP started / stopped (the app's coordinator). Ending in the background without background audio (or after the
+    /// PiP window paused it) releases like a normal `.background`.
+    public func setPictureInPictureActive(_ active: Bool) {
+        guard active != pictureInPictureActive else { return }
+        pictureInPictureActive = active
+        engine?.setPictureInPictureActive(active)
+        if active {
+            suspendVideo(false)
+            return
+        }
+        guard isInBackground, phase != .idle else { return }
+        if BackgroundPlayback.decision(supported: backgroundPlaybackSupported, audioEnabled: backgroundAudioAllowed,
+                                       pictureInPicture: false, phase: phase) == .release {
+            SafeLog.info("background: PiP ended – releasing")
+            release()
+        } else {
+            suspendVideo(true)
+        }
+    }
+
+    private func suspendVideo(_ suspended: Bool) {
+        guard suspended != videoSuspended else { return }
+        videoSuspended = suspended
+        engine?.setVideoSuspended(suspended)
+    }
+
+    private func notifyPlaybackChange() { onPlaybackChange?() }
 
     /// Seeds the cache with the persisted record (a VOD open then clears a stale one); no callback.
     public func restoreLastSession(_ session: LastSession?) { lastSession = session }
@@ -1284,6 +1371,10 @@ public final class PlayerController {
         audioSession.deactivate()
         sleepTimerFiredCount += 1
         SafeLog.info("sleep timer stopped playback")
+        if isInBackground {
+            // Build 17: nobody is watching – free the connection (also ends PiP); the return shows the paused state.
+            release()
+        }
     }
 
     // MARK: Subtitle style & delay (Build 16)

@@ -86,6 +86,11 @@ struct PlayerView: View {
     /// "Sleep timer: playback stopped" (4 s) after the sleep timer fired.
     @State private var sleepNoticeVisible = false
     @State private var sleepNoticeTask: Task<Void, Never>?
+    #if os(iOS)
+    /// Build 17: "AirPlay: sound only" (4 s) when AirPlay carries a VLCKit / remux item.
+    @State private var airPlayNoticeVisible = false
+    @State private var airPlayNoticeTask: Task<Void, Never>?
+    #endif
 
     private var player: PlayerController { env.player }
     private var isVOD: Bool { player.request.map { !$0.isLive } ?? false }
@@ -106,13 +111,16 @@ struct PlayerView: View {
     }
 
     var body: some View {
-        build16Handlers(layers)
+        build17Handlers(build16Handlers(layers))
     }
 
     private var mainLayers: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             video
+            #if os(iOS)
+            if PictureInPictureCoordinator.shared.isActive { pipPlaceholder }
+            #endif
             // Below the controls: an accessibility element above them (its label changes every second)
             // kept the player's Menus from opening under accessibility / XCUITest.
             if env.settings.showPerfOverlay {
@@ -173,7 +181,60 @@ struct PlayerView: View {
         }
         if sleepNoticeVisible { sleepNotice }
         if let upNext = player.upNext, !channelListVisible, !syncPanelVisible { upNextCard(upNext) }
+        #if os(iOS)
+        if airPlayNoticeVisible { airPlayNotice }
+        #endif
     }
+
+    /// Build 17 handlers (iOS): AirPlay of an item whose picture cannot go along.
+    private func build17Handlers<Content: View>(_ content: Content) -> some View {
+        #if os(iOS)
+        content
+            .onChange(of: AirPlayRouteMonitor.shared.isAirPlayActive) { checkAirPlayAudioOnly() }
+            .onChange(of: player.engineKind) { checkAirPlayAudioOnly() }
+        #else
+        content
+        #endif
+    }
+
+    #if os(iOS)
+    private func checkAirPlayAudioOnly() {
+        guard AirPlayRouteMonitor.shared.isAirPlayActive, AirPlayRouteMonitor.isAudioOnly(player.engineKind) else { return }
+        airPlayNoticeVisible = true
+        airPlayNoticeTask?.cancel()
+        airPlayNoticeTask = Task {
+            try? await Task.sleep(for: .seconds(4))
+            if !Task.isCancelled { airPlayNoticeVisible = false }
+        }
+    }
+
+    private var airPlayNotice: some View {
+        Text(L10n.t("airplay_audio_only"))
+            .font(Theme.caption)
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Capsule().fill(Color.black.opacity(0.75)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, Theme.safeV + 56)
+            .padding(.horizontal, Theme.safeH)
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("airplay_audio_only")
+    }
+
+    /// The video is in the PiP window: a hint where it was (the controls stay usable).
+    private var pipPlaceholder: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "pip").font(.system(size: 44, weight: .regular))
+            Text(L10n.t("player_pip_active")).font(Theme.caption)
+        }
+        .foregroundStyle(Theme.textSecondary)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("player_pip_active")
+    }
+    #endif
 
     /// Build 16 handlers (kept out of `body` – one long modifier chain is too much for the type checker).
     private func build16Handlers<Content: View>(_ content: Content) -> some View {
@@ -204,6 +265,9 @@ struct PlayerView: View {
         .animation(.easeInOut(duration: 0.2), value: channelListVisible)
         .persistentSystemOverlays(.hidden)
         .onAppear {
+            #if os(iOS)
+            PictureInPictureCoordinator.shared.activate()   // Build 17
+            #endif
             PerfTrace.shared.launchPhase("surface")
             showOverlay()
             if player.resumedFromMs != nil { showResumeChip() }
@@ -1171,6 +1235,11 @@ struct PlayerView: View {
 
     private func tools(spacing: CGFloat? = nil) -> some View {
         HStack(spacing: spacing ?? (Theme.isTV ? 24 : 18)) {
+            #if os(iOS)
+            // Build 17: PiP (AVPlayer content only) and AirPlay (video for AVPlayer, sound only for VLCKit / remux).
+            PictureInPictureButton(engine: player.engineKind) { PictureInPictureCoordinator.shared.toggle() }
+            AirPlayButton().frame(width: 36, height: 36)
+            #endif
             // Always shown: the Sync row exists even without selectable audio tracks.
             trackedMenu("speaker.wave.2", label: "player_audio") {
                 ForEach(player.audioOptions) { option in

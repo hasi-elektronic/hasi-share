@@ -1,0 +1,40 @@
+{
+ "_note": "Build 17 Apple media strings (team C): Picture in Picture, background audio, AirPlay. Merged with strings.json by spec/tools/gen-strings.mjs.",
+ "strings": {
+  "player_pip": {
+   "en": "Picture in Picture",
+   "tr": "Resim içinde resim",
+   "de": "Bild-in-Bild"
+  },
+  "player_pip_active": {
+   "en": "Playing in Picture in Picture",
+   "tr": "Resim içinde resimde oynatılıyor",
+   "de": "Wird im Bild-in-Bild abgespielt"
+  },
+  "player_airplay": {
+   "en": "AirPlay",
+   "tr": "AirPlay",
+   "de": "AirPlay"
+  },
+  "airplay_audio_only": {
+   "en": "AirPlay: sound only – this stream plays with the VLC or remux engine.",
+   "tr": "AirPlay: yalnızca ses – bu yayın VLC veya remux motoruyla oynatılıyor.",
+   "de": "AirPlay: nur Ton – dieser Stream läuft mit der VLC- oder Remux-Engine."
+  },
+  "settings_background_playback": {
+   "en": "Keep playing in the background",
+   "tr": "Arka planda oynatmaya devam et",
+   "de": "Im Hintergrund weiter abspielen"
+  },
+  "settings_auto_pip": {
+   "en": "Picture in Picture automatically",
+   "tr": "Otomatik resim içinde resim",
+   "de": "Bild-in-Bild automatisch"
+  },
+  "settings_background_hint": {
+   "en": "Sound keeps playing when you leave the app or lock the screen. Picture in Picture starts when you leave the app while a video plays – not for streams played by the VLC engine (MKV, TS, …): they continue as sound only.",
+   "tr": "Uygulamadan çıktığınızda veya ekranı kilitlediğinizde ses çalmaya devam eder. Video oynarken uygulamadan çıkınca resim içinde resim başlar – VLC motoruyla oynatılan yayınlarda (MKV, TS, …) değil: onlar yalnızca sesle sürer.",
+   "de": "Der Ton läuft weiter, wenn Sie die App verlassen oder den Bildschirm sperren. Bild-in-Bild startet, wenn Sie die App während eines Videos verlassen – nicht bei Streams mit der VLC-Engine (MKV, TS, …): Diese laufen nur mit Ton weiter."
+  }
+ }
+}

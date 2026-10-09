@@ -60,11 +60,17 @@ struct SettingsView: View {
                 Toggle(L10n.t("settings_quick_start"), isOn: $settings.quickStart)
                     .accessibilityIdentifier("settings_quick_start")
                 AutoplayNextEpisodeToggle()   // Build 16 (PlayerExtrasViews.swift)
+                #if os(iOS)
+                BackgroundPlaybackSettings()   // Build 17 (PlaybackSystemControls.swift)
+                #endif
                 // Build 16: the device's lip-sync fix is the VLC calibration (test clip; never changes the engine).
                 AVSyncCalibrationRow()
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L10n.t("settings_quick_start_hint"))
+                    #if os(iOS)
+                    Text(L10n.t("settings_background_hint"))
+                    #endif
                 }
             }
             Section {

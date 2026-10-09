@@ -198,9 +198,14 @@ public final class AVPlayerEngine: PlaybackEngine {
     /// (`pauseCause`), and it must not be resumed. (Lost output route and interruption bookkeeping live in
     /// the app's `AudioSessionObserver` → `PlayerController`; this only keeps the engine from fighting them.)
     private func rateChanged(reason: AVPlayer.RateDidChangeReason?) {
+        if player.rate > 0, !wantsToPlay, pictureInPictureActive, reason == .setRateCalled {
+            wantsToPlay = true   // Build 17: Play in the PiP window
+            return
+        }
         guard player.rate == 0, wantsToPlay, player.currentItem != nil else { return }
         guard Self.pauseCause(wantsToPlay: true, itemFinished: itemFinished, rateReason: reason,
-                              externalPlayback: player.isExternalPlaybackActive) == .system else { return }
+                              externalPlayback: player.isExternalPlaybackActive,
+                              pictureInPicture: pictureInPictureActive) == .system else { return }
         SafeLog.debug("avplayer system pause (\(reason?.rawValue ?? "-"))")
         wantsToPlay = false
         cancelResume()
@@ -304,9 +309,12 @@ public final class AVPlayerEngine: PlaybackEngine {
     /// `.audioSessionInterrupted` / `.appBackgrounded` and AirPlay playback are system pauses (never
     /// resumed by the engine); anything else while the user wants to play is a stall.
     nonisolated static func pauseCause(wantsToPlay: Bool, itemFinished: Bool, rateReason: AVPlayer.RateDidChangeReason?,
-                                       externalPlayback: Bool) -> PauseCause {
+                                       externalPlayback: Bool, pictureInPicture: Bool = false) -> PauseCause {
         guard wantsToPlay, !itemFinished else { return .none }
         if externalPlayback || rateReason == .audioSessionInterrupted || rateReason == .appBackgrounded { return .system }
+        // Build 17: with PiP showing this player, a `rate = 0` someone else set (the PiP window's pause – this engine
+        // only pauses after clearing `wantsToPlay`) is the user's pause.
+        if pictureInPicture, rateReason == .setRateCalled { return .system }
         return .stall
     }
 
@@ -430,6 +438,19 @@ public final class AVPlayerEngine: PlaybackEngine {
 
     /// AVPlayer has no audio delay; `PlayerController` moves a delayed stream to VLCKit (CONTRACT §6.1).
     public func setAudioDelay(ms: Int) {}
+
+    // MARK: Build 17 – background playback
+
+    /// `.continuesIfPossible`: AVPlayer keeps playing (sound; video when PiP shows it) when the app goes to the
+    /// background instead of pausing with `rateDidChangeReason` `.appBackgrounded` (`.automatic`, the default).
+    /// PiP shows this player (`pauseCause`).
+    public private(set) var pictureInPictureActive = false
+    public func setPictureInPictureActive(_ active: Bool) { pictureInPictureActive = active }
+
+    public func setBackgroundPlayback(allowed: Bool) {
+        let policy: AVPlayerAudiovisualBackgroundPlaybackPolicy = allowed ? .continuesIfPossible : .automatic
+        if player.audiovisualBackgroundPlaybackPolicy != policy { player.audiovisualBackgroundPlaybackPolicy = policy }
+    }
 
     public func stop() {
         wantsToPlay = false

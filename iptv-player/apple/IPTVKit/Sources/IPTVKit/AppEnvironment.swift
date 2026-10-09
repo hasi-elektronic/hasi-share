@@ -337,7 +337,7 @@ public final class AppEnvironment {
     /// Going to the background: writes still waiting for the database (the position `release()` just saved while
     /// a refresh held the writer, favorites, recent searches) are finished before the app may be suspended/killed,
     /// then the durable mirror gets the final user state.
-    private func flushDeferredWrites() {
+    func flushDeferredWrites() {
         let writes = database.deferredWrites, mirror = mirror
         let work: @Sendable () -> Void = {
             if !writes.isIdle { writes.drain(timeout: 20) }

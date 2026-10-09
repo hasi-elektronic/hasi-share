@@ -389,6 +389,16 @@ final class AudioSessionTests: XCTestCase {
         XCTAssertEqual(cause(wants: false, .audioSessionInterrupted), .none, "the user already paused")
     }
 
+    /// Build 17: the PiP window's pause (`setRateCalled` by AVKit) is the user's pause, not a stall to resume.
+    func testPictureInPicturePauseIsTheUsersIntent() {
+        XCTAssertEqual(AVPlayerEngine.pauseCause(wantsToPlay: true, itemFinished: false, rateReason: .setRateCalled,
+                                                 externalPlayback: false, pictureInPicture: true), .system)
+        XCTAssertEqual(AVPlayerEngine.pauseCause(wantsToPlay: true, itemFinished: false, rateReason: .setRateCalled,
+                                                 externalPlayback: false, pictureInPicture: false), .stall, "unchanged without PiP")
+        XCTAssertEqual(AVPlayerEngine.pauseCause(wantsToPlay: true, itemFinished: false, rateReason: nil,
+                                                 externalPlayback: false, pictureInPicture: true), .stall, "a real stall in PiP")
+    }
+
     /// `PlayerController.handleAudioInterruption(.began)` calls `engine.pause()`; for the real engine
     /// that clears the playback intent, which is what makes AVPlayer's own interruption pause a
     /// real pause (`.paused`) instead of a stall (`.buffering` + automatic resume).

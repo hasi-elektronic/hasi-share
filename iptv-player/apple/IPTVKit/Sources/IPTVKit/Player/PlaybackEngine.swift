@@ -71,6 +71,14 @@ public protocol PlaybackEngine: AnyObject {
     func applySubtitleStyle(_ style: SubtitleStyle)
     var supportsSubtitleDelay: Bool { get }
     func setSubtitleDelay(ms: Int)
+    // Build 17 (defaults below): background playback.
+    /// Sound may continue while the app is in the background (iOS, Settings "Keep playing in the background").
+    func setBackgroundPlayback(allowed: Bool)
+    /// The app plays in the background without a picture: VLCKit turns its video track off (no GPU work off screen)
+    /// and back on when the app returns.
+    func setVideoSuspended(_ suspended: Bool)
+    /// Picture in Picture shows this engine's player: its window's play/pause is the user's intent, not a stall.
+    func setPictureInPictureActive(_ active: Bool)
 }
 
 public extension PlaybackEngine {
@@ -82,6 +90,9 @@ public extension PlaybackEngine {
     /// Subtitle delay in ms (+ = subtitles later). Only VLCKit can (`currentVideoSubTitleDelay`); AVPlayer cannot.
     var supportsSubtitleDelay: Bool { false }
     func setSubtitleDelay(ms: Int) {}
+    func setBackgroundPlayback(allowed: Bool) {}
+    func setVideoSuspended(_ suspended: Bool) {}
+    func setPictureInPictureActive(_ active: Bool) {}
 }
 
 /// Engine factories handed to `PlayerController`. `vlc` is nil for builds without VLCKit

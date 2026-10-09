@@ -43,6 +43,11 @@ final class FakeEngine: PlaybackEngine {
     func setVolume(_ volume: Float) { volumes.append(volume) }
     func applySubtitleStyle(_ style: SubtitleStyle) { subtitleStyles.append(style) }
     func setSubtitleDelay(ms: Int) { subtitleDelays.append(ms) }
+    // Build 17
+    private(set) var backgroundAllowed: [Bool] = []
+    private(set) var videoSuspensions: [Bool] = []
+    func setBackgroundPlayback(allowed: Bool) { backgroundAllowed.append(allowed) }
+    func setVideoSuspended(_ suspended: Bool) { videoSuspensions.append(suspended) }
 }
 
 @MainActor
