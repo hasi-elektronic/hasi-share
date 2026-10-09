@@ -405,6 +405,13 @@
     <string name="source_status_ok" formatted="false">Tamam</string>
     <string name="error_backend_generic">Sunucuya ulaşılamıyor (%1$s)</string>
     <string name="account_not_configured" formatted="false">Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).</string>
+    <string name="player_pip" formatted="false">Resim içinde resim</string>
+    <string name="player_pip_active" formatted="false">Resim içinde resimde oynatılıyor</string>
+    <string name="player_airplay" formatted="false">AirPlay</string>
+    <string name="airplay_audio_only" formatted="false">AirPlay: yalnızca ses – bu yayın VLC veya remux motoruyla oynatılıyor.</string>
+    <string name="settings_background_playback" formatted="false">Arka planda oynatmaya devam et</string>
+    <string name="settings_auto_pip" formatted="false">Otomatik resim içinde resim</string>
+    <string name="settings_background_hint" formatted="false">Uygulamadan çıktığınızda veya ekranı kilitlediğinizde ses çalmaya devam eder. Video oynarken uygulamadan çıkınca resim içinde resim başlar – VLC motoruyla oynatılan yayınlarda (MKV, TS, …) değil: onlar yalnızca sesle sürer.</string>
     <string name="icloud_section" formatted="false">iCloud</string>
     <string name="icloud_sync_toggle" formatted="false">iCloud ile eşitle</string>
     <string name="icloud_status_off" formatted="false">Kapalı – kaynaklar, favoriler ve izleme durumu bu cihazda kalır.</string>

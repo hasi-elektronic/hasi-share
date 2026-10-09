@@ -13,14 +13,24 @@ public final class PlayerPreferences {
     public var autoplayNextEpisode: Bool { didSet { kv.setValue(autoplayNextEpisode, forKey: Self.autoplayKey) } }
     /// Subtitle look for both engines (`SubtitleStyle`).
     public var subtitleStyle: SubtitleStyle { didSet { kv.setValue(subtitleStyle, forKey: Self.styleKey) } }
+    /// Build 17 (iOS): "Keep playing in the background" (default on) – sound continues on Home / screen lock
+    /// (`BackgroundPlayback`).
+    public var backgroundAudio: Bool { didSet { kv.setValue(backgroundAudio, forKey: Self.backgroundAudioKey) } }
+    /// Build 17 (iOS): "Picture in Picture automatically" (default on) – PiP starts when the app is left while a video
+    /// plays on AVPlayer (`canStartPictureInPictureAutomaticallyFromInline`).
+    public var autoPictureInPicture: Bool { didSet { kv.setValue(autoPictureInPicture, forKey: Self.autoPiPKey) } }
 
     static let autoplayKey = "player.autoplayNext"
     static let styleKey = "player.subtitleStyle"
+    static let backgroundAudioKey = "player.backgroundAudio"
+    static let autoPiPKey = "player.autoPiP"
 
     public init(kv: any KeyValueStore) {
         self.kv = kv
         autoplayNextEpisode = kv.value(Bool.self, forKey: Self.autoplayKey) ?? true
         subtitleStyle = kv.value(SubtitleStyle.self, forKey: Self.styleKey) ?? SubtitleStyle()
+        backgroundAudio = kv.value(Bool.self, forKey: Self.backgroundAudioKey) ?? true
+        autoPictureInPicture = kv.value(Bool.self, forKey: Self.autoPiPKey) ?? true
     }
 }
 

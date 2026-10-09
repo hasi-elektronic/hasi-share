@@ -93,6 +93,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         reportedReady = false
         lastReportedTime = -1
         appliedPreferences = false
+        savedVideoTrack = nil
         audioIds = []
         subtitleIds = []
         lastTracksSignature = ""
@@ -169,6 +170,37 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         guard player.media != nil else { return }
         let micros = subtitleDelayMs * 1000
         if player.currentVideoSubTitleDelay != micros { player.currentVideoSubTitleDelay = micros }
+    }
+
+    // MARK: Build 17 – background audio
+
+    /// Background audio: the video track is off (no decoding / GL output while the app is off screen).
+    private var videoSuspended = false
+    /// Track to turn back on when the app returns.
+    private var savedVideoTrack: Int32?
+
+    func setVideoSuspended(_ suspended: Bool) {
+        guard suspended != videoSuspended else { return }
+        videoSuspended = suspended
+        applyVideoSuspension()
+    }
+
+    /// Applied now and again when an item starts / adds streams (a new item in the background starts with video).
+    private func applyVideoSuspension() {
+        guard player.media != nil else { return }
+        if videoSuspended {
+            let current = player.currentVideoTrackIndex
+            guard current != -1 else { return }
+            savedVideoTrack = current
+            player.currentVideoTrackIndex = -1
+            SafeLog.debug("vlc video track off (background)")
+        } else if player.currentVideoTrackIndex == -1 {
+            let first = player.videoTrackIndexes.compactMap { ($0 as? NSNumber)?.int32Value }.first { $0 >= 0 }
+            guard let track = savedVideoTrack ?? first else { return }
+            savedVideoTrack = nil
+            player.currentVideoTrackIndex = track
+            SafeLog.debug("vlc video track on")
+        }
     }
 
     /// Reopens the current item at a position (ms) with the same options; set by `load`.
@@ -285,6 +317,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
             failureTask?.cancel()
             applyAudioDelay()
             applySubtitleDelay()
+            if videoSuspended { applyVideoSuspension() }
             reportReadyIfNeeded()
             onEvent?(.playing)
             reportTracks(force: false)
@@ -294,6 +327,7 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
             // libVLC sends buffering while playing too; only meaningful before first frames.
             if !player.isPlaying { onEvent?(.buffering) }
         case .esAdded:
+            if videoSuspended { applyVideoSuspension() }
             reportTracks(force: false)
         case .error:
             classifyFailure(ended: false)

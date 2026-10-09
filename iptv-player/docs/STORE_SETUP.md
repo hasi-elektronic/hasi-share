@@ -90,6 +90,16 @@ Ayrıntılı adımlar: `backend/README.md`. Özet:
 8. **Gizlilik:** `PrivacyInfo.xcprivacy` (UserDefaults CA92.1, sistem açılış zamanı 35F9.1),
    App Privacy formu (§5).
 9. **tvOS varlıkları:** katmanlı uygulama ikonu (LSR), Top Shelf görseli.
+9a. **Build 17 – Top Shelf uzantısı, arka plan sesi, PiP (portal):**
+   * Yeni explicit App ID `com.hasielektronic.novaplayer.topshelf` (tvOS uzantısı; ek yetenek **yok**).
+   * Profiller: `NovaPlayer TopShelf AppStore` (App Store, tvOS, bu App ID) + geliştirme profili; uygulamanın
+     `NovaPlayer iOS AppStore` / `NovaPlayer tvOS AppStore` profilleri yeniden üretilmeli (yeni entitlement
+     `keychain-access-groups`: `TEAM.com.hasielektronic.novaplayer` + `TEAM.com.hasielektronic.novaplayer.shared`;
+     varsayılan profillerde `TEAM.*` olarak izinli – yine de yeniden indirip doğrulayın).
+   * `UIBackgroundModes = audio` (iOS) ve PiP için portal yeteneği gerekmez; App Review notunda arka plan sesinin
+     amacı (canlı radyo/haber, PiP) belirtilir.
+   * `scripts/release/release.sh` profil adlarını hedef başına verir (`NOVA_APP_PROFILE`, `NOVA_TOPSHELF_PROFILE`),
+     `export-tvOS.plist` uzantıyı da eşler.
 10. **İnceleme notu:** "Uygulama içerik sağlamaz; kullanıcı kendi M3U/Xtream kaynağını ekler.
     Test için: <yasal demo M3U URL'si>." Ayrıca deneme ve satın alma akışının nasıl
     test edileceği.

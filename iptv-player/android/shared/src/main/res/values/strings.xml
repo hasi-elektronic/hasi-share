@@ -405,6 +405,13 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server not reachable (%1$s)</string>
     <string name="account_not_configured" formatted="false">Accounts are not available in this build (no backend configured).</string>
+    <string name="player_pip" formatted="false">Picture in Picture</string>
+    <string name="player_pip_active" formatted="false">Playing in Picture in Picture</string>
+    <string name="player_airplay" formatted="false">AirPlay</string>
+    <string name="airplay_audio_only" formatted="false">AirPlay: sound only – this stream plays with the VLC or remux engine.</string>
+    <string name="settings_background_playback" formatted="false">Keep playing in the background</string>
+    <string name="settings_auto_pip" formatted="false">Picture in Picture automatically</string>
+    <string name="settings_background_hint" formatted="false">Sound keeps playing when you leave the app or lock the screen. Picture in Picture starts when you leave the app while a video plays – not for streams played by the VLC engine (MKV, TS, …): they continue as sound only.</string>
     <string name="icloud_section" formatted="false">iCloud</string>
     <string name="icloud_sync_toggle" formatted="false">Sync with iCloud</string>
     <string name="icloud_status_off" formatted="false">Off – sources, favorites and progress stay on this device.</string>

@@ -107,6 +107,9 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     func setAspect(_ mode: AspectMode) { inner.setAspect(mode) }
     /// Not applied yet (spike); a production version shifts the audio timestamps in the remuxer.
     func setAudioDelay(ms: Int) {}
+    // Build 17: background audio / PiP act on the inner AVPlayer (AirPlay stays audio-only: loopback URL).
+    func setBackgroundPlayback(allowed: Bool) { inner.setBackgroundPlayback(allowed: allowed) }
+    func setPictureInPictureActive(_ active: Bool) { inner.setPictureInPictureActive(active) }
 
     func stop() {
         generation += 1

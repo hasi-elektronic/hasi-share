@@ -8,5 +8,11 @@
 	<!-- Build 17 iCloud sync (key-value storage only) – same as NovaPlayer.entitlements. -->
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
 	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<!-- Build 17: same Keychain groups as NovaPlayer.entitlements (own group first, then the Top Shelf group). -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(APP_BUNDLE_ID)</string>
+		<string>$(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared</string>
+	</array>
 </dict>
 </plist>

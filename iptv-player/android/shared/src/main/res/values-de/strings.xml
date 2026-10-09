@@ -405,6 +405,13 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server nicht erreichbar (%1$s)</string>
     <string name="account_not_configured" formatted="false">Konten sind in dieser Version nicht verfügbar (kein Server konfiguriert).</string>
+    <string name="player_pip" formatted="false">Bild-in-Bild</string>
+    <string name="player_pip_active" formatted="false">Wird im Bild-in-Bild abgespielt</string>
+    <string name="player_airplay" formatted="false">AirPlay</string>
+    <string name="airplay_audio_only" formatted="false">AirPlay: nur Ton – dieser Stream läuft mit der VLC- oder Remux-Engine.</string>
+    <string name="settings_background_playback" formatted="false">Im Hintergrund weiter abspielen</string>
+    <string name="settings_auto_pip" formatted="false">Bild-in-Bild automatisch</string>
+    <string name="settings_background_hint" formatted="false">Der Ton läuft weiter, wenn Sie die App verlassen oder den Bildschirm sperren. Bild-in-Bild startet, wenn Sie die App während eines Videos verlassen – nicht bei Streams mit der VLC-Engine (MKV, TS, …): Diese laufen nur mit Ton weiter.</string>
     <string name="icloud_section" formatted="false">iCloud</string>
     <string name="icloud_sync_toggle" formatted="false">Mit iCloud synchronisieren</string>
     <string name="icloud_status_off" formatted="false">Aus – Quellen, Favoriten und Fortschritt bleiben auf diesem Gerät.</string>

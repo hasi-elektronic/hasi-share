@@ -10,8 +10,12 @@ struct NovaPlayerApp: App {
     init() {
         PerfTrace.shared.mark(.appLaunch)
         let env = AppBootstrap.makeEnvironment()
+        let router = Router(env: env)
         _env = State(initialValue: env)
-        _router = State(initialValue: Router(env: env))
+        _router = State(initialValue: router)
+        // Build 17: Picture in Picture (bound to the app's AVPlayerLayer) and the AirPlay route state.
+        PictureInPictureCoordinator.shared.install(env: env, router: router)
+        AirPlayRouteMonitor.shared.start()
     }
 
     var body: some Scene {
@@ -31,6 +35,8 @@ struct NovaPlayerApp: App {
                     await AppBootstrap.quickStart(env: env, router: router, testerAccess: testerAccess)
                     await env.start()
                 }
+                .onOpenURL { router.open($0) }   // Build 17: novaplayer:// deep links
+                .onChange(of: env.catalogVersion) { router.retryPendingDeepLink() }
         }
         .onChange(of: scenePhase) { _, phase in
             env.scenePhaseChanged(AppScenePhase(phase))   // B4: .inactive keeps the player
@@ -79,7 +85,8 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if !router.playerPresented && !router.onboarding { CatalogRestoreNotice().padding(.bottom, 64) }
         }
-        .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { env.player.close() }) {
+        // Build 17: dismissed for Picture in Picture → playback goes on (the PiP window owns it).
+        .fullScreenCover(isPresented: $router.playerPresented, onDismiss: { if !router.pipMinimized { env.player.close() } }) {
             PlayerView().environment(env).environment(router)
         }
         .sheet(isPresented: $router.paywallPresented) {

@@ -62,6 +62,9 @@ targetTemplates:
         SWIFT_INCLUDE_PATHS: $(SRCROOT)/Shared/Player/Remux/CNovaRemux
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
         CODE_SIGN_ENTITLEMENTS: Config/NovaPlayer.entitlements
+        # Release archives pass NOVA_APP_PROFILE / NOVA_TOPSHELF_PROFILE (scripts/release/release.sh): one profile per
+        # bundle id now that tvOS embeds the Top Shelf extension. Empty locally (simulator: ad-hoc signing).
+        PROVISIONING_PROFILE_SPECIFIER: $(NOVA_APP_PROFILE)
       configs:
         Debug:
           # get-task-allow: needed by local StoreKit testing (SKTestSession) in the simulator.
@@ -82,6 +85,12 @@ targetTemplates:
         TERMS_URL: $(TERMS_URL)
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations: [en, tr, de]
+        # Build 17: deep links (Top Shelf) – novaplayer://play/channel|movie|episode?… (`DeepLink`).
+        CFBundleURLTypes:
+          - CFBundleURLName: $(APP_BUNDLE_ID)
+            CFBundleURLSchemes: [novaplayer]
+        # Shared Keychain group of the Top Shelf snapshot (`TopShelfStore`, Config/*.entitlements).
+        TopShelfKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
         # Users add arbitrary (mostly plain-HTTP) IPTV servers (ARCHITECTURE V17).
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
@@ -117,6 +126,8 @@ targets:
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIUserInterfaceStyle: Dark
+        # Build 17: background audio + Picture in Picture (Settings "Keep playing in the background", BackgroundPlayback).
+        UIBackgroundModes: [audio]
 
   NovaPlayer-tvOS:
     templates: [NovaApp]
@@ -128,6 +139,9 @@ targets:
         embed: true
       - framework: Vendor/VLCKit/TVVLCKit.xcframework
         embed: true
+      # Build 17: dynamic Top Shelf (Continue watching + recently watched channels).
+      - target: NovaPlayer-TopShelf
+        embed: true
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "3"
@@ -138,6 +152,34 @@ targets:
         <<: *commonInfo
         UIUserInterfaceStyle: Dark
         UIRequiredDeviceCapabilities: [arm64]
+
+  # Build 17: tvOS Top Shelf extension. Reads the snapshot the app writes into the shared Keychain group
+  # (TopShelfStore); compiles the two Foundation/Security-only IPTVKit files directly (no package dependency).
+  NovaPlayer-TopShelf:
+    type: app-extension
+    platform: tvOS
+    sources:
+      - path: Apps/TopShelf
+      - path: IPTVKit/Sources/IPTVKit/TopShelf/TopShelfSnapshot.swift
+      - path: IPTVKit/Sources/IPTVKit/TopShelf/TopShelfStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).topshelf
+        PRODUCT_NAME: NovaPlayerTopShelf
+        TARGETED_DEVICE_FAMILY: "3"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: Config/TopShelf.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(NOVA_TOPSHELF_PROFILE)
+    info:
+      path: Apps/TopShelf/Info.plist
+      properties:
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TopShelfKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.tv-top-shelf
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider
 
   # StoreKit flows (purchase, Ask to Buy, refund, restore) against Config/Products.storekit.
   NovaPlayerStoreKitTests:

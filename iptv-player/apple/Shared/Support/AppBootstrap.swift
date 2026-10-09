@@ -98,12 +98,45 @@ final class Router {
         browseDeferred = AppBootstrap.quickStartedEarly
     }
 
+    /// Build 17 (iOS): the player screen was dismissed for Picture in Picture; playback goes on in the PiP window.
+    var pipMinimized = false
+    /// Build 17: a deep link that arrived while the catalog was still loading (cold start, restore); retried when the
+    /// catalog changes (`DeepLinkRouting.swift`).
+    @ObservationIgnored var pendingDeepLink: (url: URL, at: Date)?
+
+    /// PiP started from the player's button: dismiss the player screen without ending playback.
+    func minimizeForPictureInPicture() {
+        guard playerPresented else { return }
+        pipMinimized = true
+        playerPresented = false
+    }
+
+    /// "Restore" in the PiP window (or PiP could not start): the player screen again.
+    func restoreFromPictureInPicture() {
+        let wasMinimized = pipMinimized
+        pipMinimized = false
+        if wasMinimized, env.player.request != nil, !playerPresented { playerPresented = true }
+    }
+
+    /// The PiP window was closed while no player screen exists: playback ends.
+    func endMinimizedPlayback() {
+        pipMinimized = false
+        env.player.close()
+    }
+
     /// Opens the player – or the paywall when playback is locked (CONTRACT §7.4).
     func play(_ item: PlaybackRequest.Item, channels: [Channel] = [], fromStart: Bool = false) {
         env.license.evaluate()
         guard env.license.canPlay else {
             paywallPresented = true
             return
+        }
+        if pipMinimized {
+            // A new item from the app while PiP shows the previous one: back to the full-screen player.
+            pipMinimized = false
+            #if os(iOS)
+            PictureInPictureCoordinator.shared.stop()
+            #endif
         }
         // "Continue watching" may know an Xtream episode only by id (no cached row): complete it first (B1).
         if case .episode(let episode, let seriesTitle) = item, episode.url == nil, episode.containerExt == nil {
@@ -249,6 +282,17 @@ enum AppBootstrap {
             }
             #endif
             audioObserver.start(player: env.player)
+            // Build 17: background audio + PiP (iOS: UIBackgroundModes audio), lock screen / Now Playing (both).
+            #if os(iOS)
+            env.player.backgroundPlaybackSupported = true
+            #endif
+            NowPlayingCoordinator.shared.install(env: env)
+            env.player.onPlaybackChange = {
+                NowPlayingCoordinator.shared.update()
+                #if os(iOS)
+                PictureInPictureCoordinator.shared.playbackChanged()
+                #endif
+            }
             PerfTrace.shared.launchPhase("env")
             quickStartEarly(env: env)
             return env
