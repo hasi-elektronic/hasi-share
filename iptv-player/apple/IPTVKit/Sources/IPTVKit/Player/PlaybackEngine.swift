@@ -29,12 +29,16 @@ public struct EngineDiagnostics: Sendable, Equatable {
     public var resolution: String?
     /// Audio delay the engine actually applies (user + automatic latency term), ms; nil = none/unknown.
     public var audioDelayMs: Int?
+    /// Audio buffers the engine dropped this session (VLCKit: late/early audio during A/V drift correction).
+    public var lostAudioBuffers: Int?
 
-    public init(bitrate: Double? = nil, droppedFrames: Int? = nil, resolution: String? = nil, audioDelayMs: Int? = nil) {
+    public init(bitrate: Double? = nil, droppedFrames: Int? = nil, resolution: String? = nil, audioDelayMs: Int? = nil,
+                lostAudioBuffers: Int? = nil) {
         self.bitrate = bitrate
         self.droppedFrames = droppedFrames
         self.resolution = resolution
         self.audioDelayMs = audioDelayMs
+        self.lostAudioBuffers = lostAudioBuffers
     }
 }
 

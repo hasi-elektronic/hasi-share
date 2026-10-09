@@ -27,7 +27,9 @@ struct PerfOverlayView: View {
                 row("perf_buffer", Self.bufferText(player.phase))
                 row("perf_seeks", String(player.seekCount))
                 row("perf_bitrate", diag.bitrate.map { String(format: "%.2f Mbit/s", $0 / 1_000_000) } ?? "—")
-                row("perf_dropped", diag.droppedFrames.map(String.init) ?? "—")
+                // Build 17: lost audio buffers next to dropped frames – a growing count = libVLC fighting A/V drift.
+                row("perf_dropped", (diag.droppedFrames.map(String.init) ?? "—")
+                    + (diag.lostAudioBuffers.map { " · audio \($0)" } ?? ""))
                 row("perf_output_latency", "\(Int((AVAudioSession.sharedInstance().outputLatency * 1000).rounded())) ms")
                 row("perf_audio_delay", L10n.t("perf_audio_delay_detail", Self.signedMs(appliedDelay(diag)),
                                                Self.signedMs(player.vlcCalibrationMs), Self.signedMs(player.contentAudioDelay)))

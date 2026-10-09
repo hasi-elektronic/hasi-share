@@ -78,7 +78,8 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
             bitrate: stats.demuxBitrate > 0 ? Double(stats.demuxBitrate) * 8_000_000 : nil,
             droppedFrames: Int(stats.lostPictures),
             resolution: size.width > 0 && size.height > 0 ? "\(Int(size.width))x\(Int(size.height))" : nil,
-            audioDelayMs: applied)
+            audioDelayMs: applied,
+            lostAudioBuffers: Int(stats.lostAudioBuffers))
     }
 
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
@@ -103,6 +104,12 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
         let media = VLCMedia(url: stream.url)
         // Live: small but safe cache for IPTV; VOD: a little more for HTTP seeks (LiveStartTuning).
         media.addOption(":network-caching=\(tuning.vlcNetworkCachingMs)")
+        // Build 17 (growing A/V drift on Apple TV live, suspected cause): libVLC's PCR clock recovery
+        // follows the IPTV server's bursty delivery. Play live at the local clock; verify on device.
+        if isLive {
+            media.addOption(":clock-jitter=0")
+            media.addOption(":clock-synchro=0")
+        }
         if let ua = stream.headers["User-Agent"] { media.addOption(":http-user-agent=\(ua)") }
         if let referer = stream.headers["Referer"] { media.addOption(":http-referrer=\(referer)") }
         if let startMs, startMs > 0 { media.addOption(":start-time=\(Double(startMs) / 1000)") }
