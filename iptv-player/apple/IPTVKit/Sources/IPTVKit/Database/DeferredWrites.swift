@@ -42,4 +42,10 @@ public final class DeferredWrites: @unchecked Sendable {
         queue.async { done.signal() }
         return done.wait(timeout: .now() + timeout) == .success
     }
+
+    /// Returns once everything queued before the call is written (non-blocking; tests and read-after-write checks).
+    public func drained() async {
+        guard !isIdle else { return }
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in queue.async { done.resume() } }
+    }
 }

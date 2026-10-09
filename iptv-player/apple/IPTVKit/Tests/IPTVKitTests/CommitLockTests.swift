@@ -39,7 +39,9 @@ final class CommitLockTests: XCTestCase {
     }
 
     /// The commit's search-index work is ≤ 100 ms (it used to re-tokenise every index row: 1–3 s on a Mac), and
-    /// reads made while the whole commit runs (on another thread, like the launch refresh) never wait for it.
+    /// reads made while the commit holds the writer (on another thread, like the launch refresh) never wait for it.
+    /// Deterministic under load: the work is bounded in CPU time of the committing thread, and the commit is held
+    /// inside its transaction (test hook) while the reads run – a read that waited for the writer could not finish.
     func testRefreshCommitDoesNotBlockReads() throws {
         let path = tempPath()
         defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: path + suffix) } }
@@ -48,29 +50,50 @@ final class CommitLockTests: XCTestCase {
         let first = try refresh(repo, commit: true)
         let second = try refresh(repo, commit: false)   // steady state: replaces a full catalog, drops the previous index
 
-        final class Box: @unchecked Sendable { var done = false; let lock = NSLock()
-            var isDone: Bool { lock.lock(); defer { lock.unlock() }; return done } }
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock(); private var done = false, holding = false
+            var isDone: Bool { lock.withLock { done } }
+            var isHolding: Bool { lock.withLock { holding } }
+            func set(done: Bool? = nil, holding: Bool? = nil) {
+                lock.withLock { if let done { self.done = done }; if let holding { self.holding = holding } }
+            }
+        }
         let box = Box()
+        let inside = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+        CommitTestHook.catalog.set {
+            box.set(holding: true)
+            inside.signal()
+            _ = release.wait(timeout: .now() + 30)
+            box.set(holding: false)
+        }
+        defer { CommitTestHook.catalog.set(nil) }
         DispatchQueue.global().async {
             try? second.commit()
-            box.lock.lock(); box.done = true; box.lock.unlock()
+            box.set(done: true)
         }
+        XCTAssertEqual(inside.wait(timeout: .now() + 60), .success, "commit reached its index part")
+        // The swap is done but not committed: readers see the previous catalog without waiting for the writer.
         var maxRead = 0.0, reads = 0
-        while !box.isDone {
+        for _ in 0..<5 {
             let start = DispatchTime.now()
-            _ = try repo.movies(sourceId: "o", limit: 60)
-            _ = try repo.channels(sourceId: "o", categoryId: "c3", limit: 120)
+            XCTAssertEqual(try repo.movies(sourceId: "o", limit: 60).count, 60)
+            XCTAssertFalse(try repo.channels(sourceId: "o", categoryId: "c3", limit: 120).isEmpty)
             maxRead = max(maxRead, CatalogRefreshSession.ms(since: start))
             reads += 1
         }
-        print("PERF refresh commit (owner size, on disk): swap first \(String(format: "%.1f", first.swapMilliseconds)) ms / second "
-              + "\(String(format: "%.1f", second.swapMilliseconds)) ms, of it search index \(String(format: "%.1f", second.indexMilliseconds)) ms; "
-              + "dictionary first \(String(format: "%.1f", first.dictionaryMilliseconds)) ms / second \(String(format: "%.1f", second.dictionaryMilliseconds)) ms; "
-              + "\(reads) reads during the commit, slowest \(String(format: "%.2f", maxRead)) ms")
-        XCTAssertLessThan(second.indexMilliseconds, 100 * factor, "search index part of the commit \(second.indexMilliseconds) ms")
-        XCTAssertLessThan(second.dictionaryMilliseconds, 100 * factor, "dictionary diff \(second.dictionaryMilliseconds) ms")
-        XCTAssertGreaterThan(reads, 3)
-        XCTAssertLessThan(maxRead, 50, "a read waited for the commit")
+        XCTAssertTrue(box.isHolding, "all \(reads) reads finished while the commit held the writer")
+        release.signal()
+        while !box.isDone {   // reads keep working through the rest of the commit (dictionary, garbage)
+            _ = try repo.movies(sourceId: "o", limit: 60)
+            reads += 1
+        }
+        print("PERF refresh commit (owner size, on disk): swap first \(String(format: "%.1f", first.swapMilliseconds)) ms; "
+              + "second: search index \(String(format: "%.1f", second.indexCPUMilliseconds)) ms CPU, "
+              + "dictionary first \(String(format: "%.1f", first.dictionaryMilliseconds)) ms / second \(String(format: "%.1f", second.dictionaryMilliseconds)) ms "
+              + "(\(String(format: "%.1f", second.dictionaryCPUMilliseconds)) ms CPU); "
+              + "\(reads) reads during the commit, slowest while held \(String(format: "%.2f", maxRead)) ms")
+        XCTAssertLessThan(second.indexCPUMilliseconds, 100 * factor, "search index part of the commit \(second.indexCPUMilliseconds) ms CPU")
+        XCTAssertLessThan(second.dictionaryCPUMilliseconds, 100 * factor, "dictionary diff \(second.dictionaryCPUMilliseconds) ms CPU")
         XCTAssertEqual(try repo.search("kizilcik", scope: .descriptions, sourceId: "o", limit: 5).count, 5)
         let dropStart = DispatchTime.now()
         try IndexGarbage.collect(db.db)   // the commit started it in the background; idempotent
@@ -103,12 +126,14 @@ final class CommitLockTests: XCTestCase {
         let catalog = CatalogRepository(database: db)
         var times: [Double] = []
         while db.searchBackfillPending, times.count < 200 {
-            let start = DispatchTime.now()
+            // CPU time of this thread (the chunk runs here): the writer is held for the chunk's work, which a
+            // loaded machine does not change (wall time would include descheduling).
+            let start = CatalogRefreshSession.threadCPUNanoseconds()
             _ = try catalog.backfillSearchIndex(maxChunks: 1, pause: 0)
-            times.append(CatalogRefreshSession.ms(since: start))
+            times.append(CatalogRefreshSession.cpuMs(since: start))
         }
         let sorted = times.sorted()
-        print("PERF v7 copy chunk (300 rows, on disk): median \(String(format: "%.1f", sorted[sorted.count / 2])) ms, max \(String(format: "%.1f", sorted.last ?? 0)) ms, \(times.count) chunks")
+        print("PERF v7 copy chunk (300 rows, on disk): median \(String(format: "%.1f", sorted[sorted.count / 2])) ms CPU, max \(String(format: "%.1f", sorted.last ?? 0)) ms, \(times.count) chunks")
         XCTAssertFalse(db.searchBackfillPending)
         XCTAssertLessThan(sorted[sorted.count / 2], 50, "copy chunk")
     }
@@ -124,31 +149,35 @@ final class CommitLockTests: XCTestCase {
         try session.write(movies: (0..<500).map { Movie(sourceId: "o", id: "m\($0)", name: "Film \($0)", sort: $0) })
         try session.commit()
 
-        let inTransaction = expectation(description: "writer holds the lock")
-        let release = DispatchSemaphore(value: 0)
+        final class Flag: @unchecked Sendable { private let l = NSLock(); private var v = false
+            var value: Bool { get { l.withLock { v } } set { l.withLock { v = newValue } } } }
+        let committed = Flag()
+        let inTransaction = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0), done = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             try? db.db.transaction {
                 try db.db.run("UPDATE movies SET name = 'changed' WHERE id = 'm1'")
                 // Inside: own reads see the uncommitted change (writer connection).
                 XCTAssertEqual(try? db.db.queryFirst("SELECT name FROM movies WHERE id = 'm1'") { $0.string(0) }, "changed")
-                inTransaction.fulfill()
-                _ = release.wait(timeout: .now() + 5)
+                inTransaction.signal()
+                _ = release.wait(timeout: .now() + 30)
             }
+            committed.value = true
+            done.signal()
         }
-        wait(for: [inTransaction], timeout: 5)
+        XCTAssertEqual(inTransaction.wait(timeout: .now() + 30), .success, "writer holds the lock")
         let start = DispatchTime.now()
         let page = try repo.movies(sourceId: "o", limit: 60)
         let hits = try repo.search("film", sourceId: "o")
         let ms = CatalogRefreshSession.ms(since: start)
         XCTAssertEqual(try repo.movie(sourceId: "o", id: "m1")?.name, "Film 1", "last committed state (uncommitted change invisible)")
+        // The writer is released only below: reads that waited for it could not have returned yet.
+        XCTAssertFalse(committed.value, "reads waited for the writer")
         release.signal()
         print("PERF reads during a writer transaction: \(String(format: "%.2f", ms)) ms")
         XCTAssertEqual(page.count, 60)
         XCTAssertEqual(hits.count, 30)
-        XCTAssertLessThan(ms, 100, "reads waited for the writer")
         // After the commit the reader sees it.
-        let deadline = Date().addingTimeInterval(3)
-        while try repo.movie(sourceId: "o", id: "m1")?.name != "changed", Date() < deadline { usleep(10_000) }
+        XCTAssertEqual(done.wait(timeout: .now() + 30), .success)
         XCTAssertEqual(try repo.movie(sourceId: "o", id: "m1")?.name, "changed")
     }
 

@@ -433,6 +433,8 @@ final class SearchScreenModelTests: XCTestCase {
         XCTAssertEqual(model.recent.first, "q11")
         model.removeRecent("q11")
         XCTAssertEqual(model.recent.first, "q10")
+        // The writes go through `DeferredWrites`: queued while a background job (index GC, mirror) holds the writer.
+        await env.database.deferredWrites.drained()
         let store = RecentSearchStore(database: env.database)
         let sourceId = try XCTUnwrap(env.currentSource?.id)
         XCTAssertEqual(store.recent(sourceId: sourceId), model.recent, "persisted")
@@ -445,7 +447,33 @@ final class SearchScreenModelTests: XCTestCase {
         model.submit()
         env.deleteSource(id: sourceId)
         XCTAssertTrue(env.recentSearches.recent(sourceId: sourceId).isEmpty, "removed with the source")
-        XCTAssertNil(env.database.value(forKey: "search.recent.\(sourceId)"))
+        await env.database.deferredWrites.drained()
+        XCTAssertNil(env.database.value(forKey: "search.recent.\(sourceId)"), "a queued earlier write never brings it back")
+    }
+
+    /// While another job holds the writer, recent searches are queued (never block the main actor) and land in order.
+    func testRecentSearchesQueuedBehindABusyWriterLandInOrder() async throws {
+        let env = try await makeEnvironment()
+        await env.database.deferredWrites.drained()
+        let sourceId = try XCTUnwrap(env.currentSource?.id)
+        let model = SearchViewModel(env: env)   // list read before (in-memory test DB: reads share the writer)
+        let db = env.database.db
+        let release = DispatchSemaphore(value: 0)
+        await withCheckedContinuation { (held: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                try? db.transaction {
+                    held.resume()
+                    _ = release.wait(timeout: .now() + 10)
+                }
+            }
+        }
+        for q in ["alpha", "beta", "gamma"] { model.query = q; model.rememberQuery() }
+        model.removeRecent("beta")
+        XCTAssertFalse(env.database.deferredWrites.isIdle, "queued behind the held writer")
+        XCTAssertEqual(model.recent, ["gamma", "alpha"], "read-your-writes from the cache")
+        release.signal()
+        await env.database.deferredWrites.drained()
+        XCTAssertEqual(RecentSearchStore(database: env.database).recent(sourceId: sourceId), ["gamma", "alpha"], "last write wins")
     }
 
     func testSuggestionsFollowTheLatestQuery() async throws {

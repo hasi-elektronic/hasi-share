@@ -1051,6 +1051,9 @@ public final class CatalogRefreshSession: @unchecked Sendable {
     public private(set) var swapMilliseconds = 0.0
     public private(set) var indexMilliseconds = 0.0
     public private(set) var dictionaryMilliseconds = 0.0
+    /// The same parts in CPU time of the committing thread (independent of scheduling under load – what the tests bound).
+    public private(set) var indexCPUMilliseconds = 0.0
+    public private(set) var dictionaryCPUMilliseconds = 0.0
 
     /// Makes the staged rows the live content of the source (atomic swap).
     public func commit() throws {
@@ -1071,8 +1074,11 @@ public final class CatalogRefreshSession: @unchecked Sendable {
                   OR series_id NOT IN (SELECT id FROM series WHERE source_id = ?1))
                 """, [.text(sourceId), .text(stagingId)])
             try db.run("UPDATE episodes SET source_id = ? WHERE source_id = ?", [.text(sourceId), .text(stagingId)])
-            let indexStart = DispatchTime.now()
-            defer { indexMilliseconds = Self.ms(since: indexStart) }
+            let indexStart = DispatchTime.now(), indexCPUStart = Self.threadCPUNanoseconds()
+            defer {
+                indexMilliseconds = Self.ms(since: indexStart)
+                indexCPUMilliseconds = Self.cpuMs(since: indexCPUStart)
+            }
             if let searchTable {
                 // The new index becomes the source's (kv + DROP of the old one): no row is re-tokenised here.
                 // Its rows left in the shared v7 table are ignored from now on and emptied by `SearchIndex.maintain`.
@@ -1109,14 +1115,20 @@ public final class CatalogRefreshSession: @unchecked Sendable {
         swapMilliseconds = Self.ms(since: started)
         // Only now (committed) may maintenance treat the new index like any referenced one.
         if let searchTable { IndexTablesInFlight.shared.remove(searchTable) }
-        let dictionaryStart = DispatchTime.now()
+        let dictionaryStart = DispatchTime.now(), dictionaryCPUStart = Self.threadCPUNanoseconds()
         do { try terms.replace(db, sourceId: sourceId) } catch { SafeLog.warning("search terms update failed") }
         dictionaryMilliseconds = Self.ms(since: dictionaryStart)
+        dictionaryCPUMilliseconds = Self.cpuMs(since: dictionaryCPUStart)
         // The replaced index is dropped in its own transaction, without making the refresh wait.
         IndexGarbage.collectInBackground(db)
     }
 
     static func ms(since start: DispatchTime) -> Double { Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6 }
+
+    /// CPU time of the calling thread (ns).
+    static func threadCPUNanoseconds() -> UInt64 { clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) }
+
+    static func cpuMs(since start: UInt64) -> Double { Double(threadCPUNanoseconds() &- start) / 1e6 }
 
     /// Discards the staged rows; live content stays untouched.
     public func abort() {
