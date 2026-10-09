@@ -31,10 +31,21 @@ struct NovaPlayerTVApp: App {
                     // After tester access + first StoreKit snapshot (≤ 1.5 s in all), before env.start().
                     await AppBootstrap.quickStart(env: env, router: router, testerAccess: testerAccess)
                     await env.start()
+                    TopShelfPublisher.shared.publish(env)
                 }
+                .onOpenURL { router.open($0) }   // Build 17: Top Shelf deep links (novaplayer://)
+                // Build 17: Top Shelf "Continue watching" / "Recently watched" follow the library (debounced).
+                .onChange(of: env.libraryVersion) { TopShelfPublisher.shared.schedule(env) }
+                .onChange(of: env.catalogVersion) {
+                    router.retryPendingDeepLink()
+                    TopShelfPublisher.shared.schedule(env)
+                }
+                .onChange(of: env.settings.currentSourceId) { TopShelfPublisher.shared.schedule(env) }
+                .onChange(of: env.settings.appLanguage) { TopShelfPublisher.shared.schedule(env) }
         }
         .onChange(of: scenePhase) { _, phase in
             env.scenePhaseChanged(AppScenePhase(phase))   // B4: .inactive keeps the player
+            if phase == .background { TopShelfPublisher.shared.publish(env) }
         }
     }
 }
