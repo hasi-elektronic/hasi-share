@@ -405,6 +405,18 @@
     <string name="source_status_ok" formatted="false">Tamam</string>
     <string name="error_backend_generic">Sunucuya ulaşılamıyor (%1$s)</string>
     <string name="account_not_configured" formatted="false">Bu sürümde hesap özelliği kullanılamıyor (sunucu yapılandırılmamış).</string>
+    <string name="icloud_section" formatted="false">iCloud</string>
+    <string name="icloud_sync_toggle" formatted="false">iCloud ile eşitle</string>
+    <string name="icloud_status_off" formatted="false">Kapalı – kaynaklar, favoriler ve izleme durumu bu cihazda kalır.</string>
+    <string name="icloud_status_no_account" formatted="false">iCloud hesabı yok – cihaz ayarlarından iCloud\'a giriş yapın.</string>
+    <string name="icloud_status_syncing" formatted="false">Eşitleniyor…</string>
+    <string name="icloud_status_synced">Güncel · %1$s</string>
+    <string name="icloud_status_on" formatted="false">Açık – değişiklikler diğer cihazlarınızla paylaşılır.</string>
+    <string name="icloud_status_storage_full" formatted="false">Bu uygulamanın iCloud alanı dolu – yalnızca en son izleme durumu eşitlenir.</string>
+    <string name="icloud_hint" formatted="false">Kaynaklar, favoriler, izleme durumu ve kategori ayarları aynı Apple Kimliği ile iPhone, iPad ve Apple TV\'nizde görünür. Sunucu adresleri, kullanıcı adları ve şifreler yalnızca iCloud Anahtar Zinciri\'nde (uçtan uca şifreli) taşınır. Ses gecikmeleri her cihazda ayrı kalır. Veriler iCloud\'unuzda kalır – bizim erişimimiz yoktur.</string>
+    <string name="source_waiting_keychain" formatted="false">iCloud Anahtar Zinciri bekleniyor…</string>
+    <string name="source_waiting_keychain_hint" formatted="false">Bu kaynak başka bir cihazda eklendi. Giriş bilgileri iCloud Anahtar Zinciri üzerinden gelir – bu birkaç dakika sürebilir. Bu cihazda Apple Kimliğiniz için iCloud Anahtar Zinciri\'nin (Parolalar) açık olduğundan emin olun.</string>
+    <string name="about_privacy_icloud" formatted="false">Takip yok, reklam yok. iCloud eşitleme açıkken kaynaklarınız, favorileriniz ve izleme durumunuz kendi iCloud\'unuzda; giriş bilgileri yalnızca iCloud Anahtar Zinciri\'nde saklanır.</string>
     <string name="avsync_calibrate" formatted="false">Ses senkronunu ayarla</string>
     <string name="avsync_calibration_value" formatted="false">VLC kalibrasyonu (bu cihaz)</string>
     <string name="avsync_intro" formatted="false">Her saniye görüntü beyaz yanıp söner ve kısa bir bip sesi duyulur. Bip, yanıp sönmeyle tam aynı anda gelene kadar değeri değiştirin. Bip yanıp sönmeden sonra mı? − kullanın. Önce mi? + kullanın.</string>

@@ -79,6 +79,9 @@ struct AboutView: View {
 
             Section {
                 LegalLinksRows()
+            } footer: {
+                Text(L10n.t("about_privacy_icloud"))   // Build 17: where synced data lives
+                    .accessibilityIdentifier("about_privacy_icloud")
             }
 
             Section {

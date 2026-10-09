@@ -79,6 +79,8 @@ public final class AppEnvironment {
     @ObservationIgnored public let transport: any HTTPTransport
     /// Persistent copy of sources + favorites/progress/recent searches (tvOS purges the database, ARCHITECTURE §3.3).
     @ObservationIgnored public let mirror: DurableStateMirror
+    /// Build 17: sources, favorites, progress and category settings across the user's devices via iCloud.
+    public let cloud: CloudSync
     public let settings: AppSettings
     public let store: StoreManager
     public let license: LicenseManager
@@ -108,13 +110,16 @@ public final class AppEnvironment {
 
     public init(config: AppConfig, database: AppDatabase, secureStore: any SecureStore, kv: any KeyValueStore,
                 settings: AppSettings = AppSettings(), transport: any HTTPTransport = URLSessionTransport.shared,
-                engines: PlaybackEngines? = nil) throws {
+                engines: PlaybackEngines? = nil, cloudStore: (any CloudKeyValueStore)? = nil,
+                cloudAccount: (any CloudAccountProvider)? = nil) throws {
         self.config = config
         self.database = database
         self.secureStore = secureStore
         self.transport = transport
         self.settings = settings
         mirror = DurableStateMirror(store: kv)
+        // Without an explicit store (unit tests, previews) nothing reaches iCloud: in-memory, no account.
+        cloud = CloudSync(store: cloudStore ?? InMemoryCloudKeyValueStore(), account: cloudAccount ?? StaticCloudAccount(available: false), kv: kv)
         sourceRepository = SourceRepository(database: database, secureStore: secureStore, mirror: mirror)
         catalog = CatalogRepository(database: database)
         epg = EpgRepository(database: database)
@@ -146,6 +151,8 @@ public final class AppEnvironment {
                                           },
                                           fetcher: URLSessionPrefetchFetcher(), network: PathNetworkConditions())
         wire()
+        cloud.env = self
+        cloud.preferenceProviders = [categoryPrefs, favorites]   // the app adds hidden live channels (`activate` comes later)
         installPlayerExtras(kv: kv)   // Build 16: next-episode autoplay, subtitle style (NextEpisode.swift)
         // A database without sources (tvOS purged it, corrupt file, new file in Caches/memory): put the mirrored
         // sources and user state back BEFORE anything reads or mirrors the empty state.
@@ -210,10 +217,27 @@ public final class AppEnvironment {
         }
     }
 
-    /// Favorites/progress changed: views reload; the durable mirror schedules a write.
+    /// Favorites/progress changed: views reload; the durable mirror and iCloud schedule a write.
     private func libraryDidChange() {
         libraryVersion += 1
         mirror.noteUserStateChanged()
+        cloud.noteLocalChange()
+    }
+
+    /// iCloud merged favorites/progress of another device.
+    func cloudLibraryChanged() {
+        libraryDidChange()
+    }
+
+    /// Loads sources one after another in the background (sources that arrived through iCloud).
+    func refreshInBackground(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        Task { [weak self] in
+            for id in ids {
+                guard let self else { return }
+                await self.refreshSource(id: id)
+            }
+        }
     }
 
     /// Accounts / phone sign-in / QR pairing are offered (config flag and a real backend).
@@ -233,7 +257,8 @@ public final class AppEnvironment {
         }
         favorites.now = { [weak self] in self?.license.nowMs() ?? Int64(Date().timeIntervalSince1970 * 1000) }
         favorites.onChange = { [weak self] in self?.libraryChanged() }
-        favorites.onLocalChange = { [weak self] in self?.libraryDidChange() }   // order/categories: device-local, no sync push
+        favorites.onLocalChange = { [weak self] in self?.libraryDidChange() }   // order/categories: no backend push (iCloud: yes)
+        categoryPrefs.onChange = { [weak self] in self?.cloud.noteLocalChange() }
         license.sessionToken = { [weak self] in self?.account.sessionToken }
         account.onSessionChange = { [weak self] signedIn in
             guard let self else { return }
@@ -328,9 +353,11 @@ public final class AppEnvironment {
             }
             player.resumeAfterRelease()
             refreshOnResume()
+            cloud.appBecameActive()
         } else {
             player.release()
             flushDeferredWrites()
+            cloud.flush()
         }
     }
 
@@ -360,12 +387,18 @@ public final class AppEnvironment {
     public func reloadSources() {
         fingerprintCache = [:]
         sources = (try? sourceRepository.all()) ?? []
+        defer { sourcesDidChange() }
         if let current = settings.currentSourceId, sources.contains(where: { $0.id == current }) {
             mirror.recordSelectedSource(current)
             return
         }
         settings.currentSourceId = sources.first?.id
         mirror.recordSelectedSource(settings.currentSourceId)
+    }
+
+    /// `reloadSources` is called after every source change: iCloud stamps and schedules a write.
+    private func sourcesDidChange() {
+        cloud.noteLocalChange()
     }
 
     public var currentSource: Source? {

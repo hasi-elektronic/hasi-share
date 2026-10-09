@@ -169,6 +169,45 @@ public final class FavoritesController {
         return Set(favoriteCategoryIds.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) })
     }
 
+    // MARK: iCloud (Build 17): favorite order per kind and favorite categories per source
+
+    static let cloudOrder = "fav.order."
+    static let cloudCategories = "fav.cats"
+
+    public var cloudPreferenceNames: Set<String> {
+        Set(ContentKind.allCases.map { Self.cloudOrder + $0.rawValue } + [Self.cloudCategories])
+    }
+
+    public func cloudPreferences() -> [CloudPreferenceKey: [String]] {
+        var out: [CloudPreferenceKey: [String]] = [:]
+        for kind in ContentKind.allCases {
+            if let order = kv.value([String].self, forKey: orderKey(kind)), !order.isEmpty {
+                out[CloudPreferenceKey(Self.cloudOrder + kind.rawValue)] = order
+            }
+        }
+        var bySource: [String: [String]] = [:]
+        for id in favoriteCategoryIds {
+            guard let bar = id.firstIndex(of: "|") else { continue }
+            bySource[String(id[..<bar]), default: []].append(String(id[id.index(after: bar)...]))
+        }
+        for (sourceId, ids) in bySource { out[CloudPreferenceKey(Self.cloudCategories, sourceId: sourceId)] = ids.sorted() }
+        return out
+    }
+
+    public func applyCloudPreferences(_ values: [CloudPreferenceKey: [String]]) {
+        for (key, value) in values {
+            if key.name == Self.cloudCategories, let sourceId = key.sourceId {
+                let prefix = sourceId + "|"
+                favoriteCategoryIds = favoriteCategoryIds.filter { !$0.hasPrefix(prefix) }
+                    .union(value.map { Self.categoryKey(sourceId: sourceId, categoryId: $0) })
+                kv.setValue(favoriteCategoryIds, forKey: Self.categoriesKey)
+            } else if key.name.hasPrefix(Self.cloudOrder), let kind = ContentKind(rawValue: String(key.name.dropFirst(Self.cloudOrder.count))) {
+                kv.setValue(value.isEmpty ? nil : value, forKey: orderKey(kind))
+            }
+        }
+        onLocalChange()
+    }
+
     public func toggleCategory(sourceId: String, categoryId: String) {
         let id = Self.categoryKey(sourceId: sourceId, categoryId: categoryId)
         if favoriteCategoryIds.contains(id) { favoriteCategoryIds.remove(id) } else { favoriteCategoryIds.insert(id) }
@@ -176,3 +215,6 @@ public final class FavoritesController {
         onLocalChange()
     }
 }
+
+/// iCloud sync (Build 17): the favorite order and favorite categories (implemented above).
+extension FavoritesController: CloudPreferenceProvider {}

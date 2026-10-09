@@ -68,6 +68,7 @@ struct RootView: View {
                         .catalogDestinations()
                 }
                 .onAppear(perform: applyDebugScreen)
+                .onChange(of: router.debugScreen) { applyDebugScreen() }   // UI tests: the browse UI may come first
                 .onChange(of: router.section) { router.headerSolid = false }
             }
         }

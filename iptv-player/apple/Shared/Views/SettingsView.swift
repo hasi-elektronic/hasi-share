@@ -67,6 +67,7 @@ struct SettingsView: View {
                     Text(L10n.t("settings_quick_start_hint"))
                 }
             }
+            ICloudSyncSection()   // Build 17 (ICloudSyncViews.swift)
             Section {
                 NavigationLink(value: SettingsRoute.advanced) {
                     Label(L10n.t("settings_advanced"), systemImage: "slider.horizontal.3")
@@ -300,7 +301,9 @@ struct SourceSummaryRow: View {
                     }
                 }
                 Text("\(source.type == .xtream ? "Xtream" : "M3U") · \(source.displayHost)").font(Theme.caption).foregroundStyle(Theme.textSecondary)
-                if let last = source.lastRefreshAt {
+                if env.cloud.awaitingSecrets.contains(source.id) {
+                    SourceWaitingForKeychainLabel()   // Build 17: from another device, secrets still on their way
+                } else if let last = source.lastRefreshAt {
                     LText("source_last_refresh", L10n.date(last, date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(Theme.textSecondary)
                 } else {
                     LText("source_never_refreshed").font(.caption2).foregroundStyle(Theme.textSecondary)
@@ -332,6 +335,9 @@ struct SourceDetailView: View {
         Form {
             if let source = env.sources.first(where: { $0.id == sourceId }) {
                 Section { SourceSummaryRow(source: source, isActive: env.sources.count > 1 && source.id == env.currentSource?.id).tvFocusableRow() }
+                if env.cloud.awaitingSecrets.contains(sourceId) {
+                    Section { Text(L10n.t("source_waiting_keychain_hint")).font(Theme.caption).tvFocusableRow() }
+                }
                 if let result = source.lastRefreshResult {
                     Section {
                         if let error = result.error {

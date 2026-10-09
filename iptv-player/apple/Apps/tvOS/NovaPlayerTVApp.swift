@@ -79,6 +79,7 @@ struct TVRootView: View {
                     focusInTabBar = Self.isInTabBar(context.nextFocusedItem)
                 }
                 .onAppear(perform: applyDebugScreen)
+                .onChange(of: router.debugScreen) { applyDebugScreen() }   // UI tests: the browse UI may come first
                 .onChange(of: router.tvPushRequest) { _, item in
                     guard let item else { return }
                     paths[router.section, default: NavigationPath()].append(item)

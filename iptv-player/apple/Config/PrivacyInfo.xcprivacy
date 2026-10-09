@@ -6,6 +6,8 @@
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
+	<!-- Build 17 iCloud sync (NSUbiquitousKeyValueStore + iCloud Keychain) is NOT "collection": the data goes to the
+	     user's own iCloud and the developer cannot access it. The entries below cover the optional backend account. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>

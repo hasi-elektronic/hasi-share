@@ -559,6 +559,16 @@ ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te
   buraya taşınır. Senkron panelinden açılınca yayın bu sırada serbest bırakılır, ekran kapanınca yeniden açılır (VOD
   aynı konumdan, canlı canlı uçtan); tvOS'ta Menü kapatır. Performans katmanı "VLC-Kalibrierung: N ms" satırını gösterir. Altında **Gelişmiş ve tanılama** → geri kalan her
 şey; son satır **Hakkında** (Apple, Build 14).
+* **iCloud (Apple, Build 17, ARCHITECTURE §6.1):** üst düzey grubun altında kendi bölümü: **"iCloud ile eşitle"**
+  anahtarı (iCloud hesabı varsa varsayılan açık) + durum: "Güncel · 12:30" / "Eşitleniyor…" / "Kapalı – … bu cihazda
+  kalır" / "iCloud hesabı yok – …" / "iCloud alanı dolu – yalnızca en son izleme durumu eşitlenir". Altında gizlilik
+  notu (ne eşitlenir, şifreler yalnızca iCloud Anahtar Zinciri'nde, ses gecikmeleri cihazda kalır, veriler kullanıcının
+  iCloud'unda – bizim erişimimiz yok). iOS: durum ve not bölüm alt bilgisinde; tvOS (liste alt bilgisi göstermez):
+  durum anahtarın ikinci satırı (tek odaklanabilir satır), not ayrı odaklanabilir metin satırı.
+  Başka cihazdan gelen ama gizli bilgisi henüz iCloud Anahtar Zinciri'nden gelmemiş kaynak: Kaynaklar listesinde
+  hata değil "iCloud Anahtar Zinciri bekleniyor…" (anahtar simgesi, gri), detayda açıklama ("başka cihazda eklendi …
+  birkaç dakika sürebilir, iCloud Anahtar Zinciri açık mı?"). Hakkında ekranında yasal bağlantıların altında tek
+  satır gizlilik notu.
 * **Hakkında ekranı (iOS/iPadOS/tvOS):** uygulama simgesi + adı (`CFBundleDisplayName`) + "Sürüm 1.0.0 (Derleme N)"
   (paketten okunur) · **Geliştiren:** Hasi Elektronic logosu (`HasiLogo`, iOS ≈200 pt, tvOS ≈360 pt), "Hamdi
   Güncavdı" (Hasi mavisi #3ABADF – yalnızca bu blokta), Hasi Elektronic, Grabenstraße 18, 71665 Vaihingen/Enz,

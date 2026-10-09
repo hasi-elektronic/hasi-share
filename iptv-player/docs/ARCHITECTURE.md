@@ -419,6 +419,49 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
 çakışmada `updatedAt` büyük olan kazanır. Aynı kaynak iki cihazda farklı eklenmiş olsa bile
 `contentKey` (kaynak parmak izi + içerik id) aynı olduğu için eşleşir.
 
+### 6.1 iCloud senkronizasyonu (Apple, Build 17 – backend'siz)
+Hesap gizliyken (`ACCOUNTS_ENABLED = NO`) aynı Apple Kimliği'ne sahip iPhone, iPad ve Apple TV arasında eşitleme
+`CloudSync` (IPTVKit/Cloud) ile yapılır. iOS ve tvOS aynı bundle id'yi kullandığı için tek bir iCloud anahtar-değer
+deposunu paylaşırlar.
+
+* **Nerede:** `NSUbiquitousKeyValueStore` (Apple sınırı: 1 MB, 1024 anahtar). Üç anahtar, her biri zlib ile sıkıştırılmış,
+  sürümlü JSON: `nova.sources.v1` (kaynaklar **gizli bilgi olmadan**: ad, tür, host, EPG ayarları, otomatik yenileme,
+  sıra, parmak izi; ≤ 64 KB), `nova.prefs.v1` (Film/Dizi kategorilerinde sabitlenen/gizlenen/seçili ülke, favori sırası,
+  favori kategoriler, Canlı TV'de gizlenen kanal/kategoriler; ≤ 192 KB), `nova.library.v1` (tüm favoriler, en yeni 300
+  izleme ilerlemesi, silme kayıtları; `DurableStateMirror`'ın kompakt satır biçimi; ≤ 640 KB). Toplam < 900 KB.
+  Kaynak gizli bilgileri (M3U URL, Xtream sunucu/kullanıcı/şifre, EPG URL) yalnızca **iCloud Anahtar Zinciri**'nde:
+  eşitleme açıkken `kSecAttrSynchronizable` + `kSecAttrAccessibleAfterFirstUnlock` öğeleri (eşitlenebilir öğe
+  `…ThisDeviceOnly` olamaz). **Eşitlenmeyenler:** ses gecikmeleri / VLC kalibrasyonu (cihaza özgü), seçili kaynak,
+  son açılan kategoriler, son aramalar, hesap oturum token'ı.
+* **Birleştirme:** öğe başına son yazan kazanır. Kütüphane `SyncItem.updatedAt` ile (eşitlikte kayıtlı satır kalır);
+  kaynak ve tercihlerde `CloudMerge` yerel değişikliği hash ile fark eder ve değişiklik zamanını damgalar (cihazdaki
+  kayıt: `icloud.state.v1`, UserDefaults). Silme = mezar taşı (365 gün, kütüphanede en fazla 2000); **eksik olmak
+  hiçbir şeyi silmez** – iCloud anahtar başına son yazanı tutar, yeni kurulan bir cihaz ilk indirmeden önce değeri
+  ezebilir; diğer cihazlar "öndeyim" deyip yeniden yazar, cihazlar yakınsar. Sınır: 365 günden uzun çevrimdışı kalan
+  bir cihaz silinmiş bir öğeyi geri getirebilir.
+* **Akış:** her yazmadan önce uzaktaki değer birleştirilir; içerik uzaktakinden farklıysa yazılır (aynıysa yazılmaz,
+  ping-pong yok). Yerel değişiklik ilk değişiklikten ≥ 2 sn sonra, en sık 5 sn'de bir toplu yazılır; arka plana
+  geçerken hemen. `didChangeExternallyNotification` ana aktörde işlenir; kütüphane birleştirmesi ve okuma ana aktör
+  dışında (`Task.detached`) çalışır.
+* **Aynı kaynak iki cihazda:** eşitleme açılmadan önce iki cihazda ayrı eklenmiş aynı liste/panel (aynı parmak izi)
+  tek kaynağa iner: küçük bulut id'si kazanır, diğer cihaz yerel kaynağını (katalog silinmeden) o id'ye eşler.
+* **Gizli bilgi henüz gelmediyse:** anahtar-değer verisi Anahtar Zinciri'nden önce gelebilir. Kaynak eklenir,
+  katalog yüklenmez, durum hata değil "iCloud Anahtar Zinciri bekleniyor…" olur; 15 sn'de bir ve ön plana gelişte
+  kontrol edilir, gizli bilgi gelince kaynak normal yenileme hattıyla yüklenir.
+* **Kota:** `QuotaViolationChange` gelirse kütüphane bütçesi yarıya iner (en az 16 KB), önce eski ilerleme, sonra eski
+  favoriler dışarıda kalır; Ayarlar'da "iCloud alanı dolu" durumu gösterilir. Yerelde hiçbir şey silinmez.
+* **Açma / kapatma:** iCloud hesabı varsa varsayılan açık (`ubiquityIdentityToken`; seçim yapılmadıysa hesap
+  gelince açılır). İlk açılışta mevcut yerel veriler damgalanıp yazılır, gizli bilgiler iCloud Anahtar Zinciri'ne
+  taşınır. Kapatınca yerel her şey kalır; gizli bilgiler cihaza özel kopyaya döner, iCloud kopyası diğer cihazlar
+  için kalır (kapalıyken silinen kaynak diğer cihazlardan silinmez). Hesap değişirse (`AccountChange`) defter sıfırlanır
+  ve ilk açılış gibi birleştirilir.
+* **Yetki:** `com.apple.developer.ubiquity-kvstore-identifier = $(TeamIdentifierPrefix)$(CFBundleIdentifier)`;
+  CloudKit / iCloud container yok, Anahtar Zinciri erişim grubu eklenmedi (varsayılan grup).
+* **Testler:** `CloudSyncTests` – sahte iCloud sunucusu + sahte iCloud Anahtar Zinciri ile iki "cihaz": kaynak/favori/
+  ilerleme yakınsaması, LWW, eşzamanlı yazma, silme ve dirilmeme, aynı liste → tek kaynak, tercihler, kota, ilk açma
+  göçü, kapatma. UI: `IOSICloudSyncTests`, `TVICloudSyncTests` (`-uiCloudAccount yes`, `-uiCloudSeedSource <ad>`;
+  UI testleri gerçek iCloud'a asla dokunmaz).
+
 ## 7. Performans
 * Listeler akış halinde ayrıştırılır, UI iş parçacığı hiç bloklanmaz (Dispatchers.IO /
   Swift `Task.detached` + aktör).
@@ -458,8 +501,8 @@ uygulama açılışında + ön plana gelişte çekme, değişiklikte 5 sn gecikm
   URL'ler loglanmaz.
 
 ## 8. Güvenlik özeti
-Ayrıntı: `docs/SECURITY.md`. Kısaca: gizli bilgiler Keystore/Keychain'de; veritabanı ve
-gizli bilgiler yedeklemeden hariç; tüm loglar `Redactor`'dan geçer (şifre, token, URL
+Ayrıntı: `docs/SECURITY.md`. Kısaca: gizli bilgiler Keystore/Keychain'de (Apple'da iCloud eşitleme açıkken iCloud
+Anahtar Zinciri, §6.1); veritabanı ve cihaza özel gizli bilgiler yedeklemeden hariç; tüm loglar `Redactor`'dan geçer (şifre, token, URL
 kullanıcı bilgisi, Xtream yol kimlik bilgileri); release'te yalnızca WARN+; lisans token'ı
 imzalı; deneme süresi cihaz saatine dayanmaz; eşleştirme uçtan uca şifreli.
 

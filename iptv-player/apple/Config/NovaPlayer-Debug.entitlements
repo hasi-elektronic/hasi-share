@@ -5,5 +5,8 @@
 	<!-- Debug only: debuggable builds; required by local StoreKit testing (SKTestSession). -->
 	<key>get-task-allow</key>
 	<true/>
+	<!-- Build 17 iCloud sync (key-value storage only) – same as NovaPlayer.entitlements. -->
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 </dict>
 </plist>
