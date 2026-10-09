@@ -226,7 +226,8 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 * **Ses oturumu:** uygulama açılışında `AVAudioSession` kategorisi `.playback` / modu `.moviePlayback`
   (iPhone sessiz anahtarı videonun sesini kesmez); oturum her oynatma başlangıcında/devamında
   etkinleştirilir, oynatıcı release/kapatılınca `.notifyOthersOnDeactivation` ile kapatılır (müzik uygulamaları
-  devam eder). Arka planda ses yok (V10; `UIBackgroundModes` eklenmez). Kesinti ve çıkış rotası
+  devam eder). **Build 17 (iOS/iPadOS):** `UIBackgroundModes = audio`; arka plan sesi / PiP için oturum arka planda
+  etkin kalır (ayrıntı aşağıda "Arka plan, PiP, AirPlay, Now Playing"). Kesinti ve çıkış rotası
   değişiklikleri **tek yerde** işlenir: `AudioSessionObserver` → `PlayerController.handleAudioInterruption`
   (kesinti başladı / `oldDeviceUnavailable` → kullanıcı-duraklatması yolu: `engine.pause()`, ilerleme kaydı;
   yükleme/yeniden bağlanma sırasında da `.paused`; kesinti `shouldResume` ile biterse yalnızca kesintinin
@@ -282,6 +283,35 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   AVPlayerLayer `videoGravity` (+ sabit oranlı çerçeve) / VLCKit `videoAspectRatio` +
   `videoCropGeometry` (görünüm oranına göre; 16:9 / 4:3 aynı sabit çerçevede).
 * İlerleme: VOD'da 10 sn'de bir + duraklat/çıkışta kaydedilir; `≥ %95` → izlendi.
+* **Arka plan, PiP, AirPlay, Now Playing (Build 17):**
+  * `BackgroundPlayback.decision` (saf fonksiyon, `BackgroundPlaybackTests`): `.background`'da önce
+    `PlayerController.enterBackground()` sorulur – PiP (çalışıyor/başlıyor) her fazda, arka plan sesi (iOS + ayar açık)
+    oynuyor/yükleniyor/tamponluyor/yeniden bağlanıyorken oynatıcıyı tutar; aksi hâlde B4 release. Tutulursa ilerleme
+    kaydedilir, ertelenmiş yazmalar/ayna yine boşaltılır, PiP yoksa `setVideoSuspended(true)` (VLCKit
+    `currentVideoTrackIndex = -1`, dönüşte eski iz; yeni öğede de uygulanır). Arka plandayken PiP biterse karar yeniden
+    verilir; uyku zamanlayıcısı dolarsa `release()`. `backgroundPlaybackSupported` yalnızca iOS uygulamasında true
+    (tvOS ve birim testleri eski davranış).
+  * Motor kancaları (`PlaybackEngine`, varsayılan işlemsiz): `setBackgroundPlayback(allowed:)` (AVPlayer
+    `audiovisualBackgroundPlaybackPolicy` `.continuesIfPossible` / `.automatic`), `setVideoSuspended(_:)` (VLCKit),
+    `setPictureInPictureActive(_:)` (AVPlayer: PiP etkinken başkasının `rate = 0`'ı – `rateDidChangeReason
+    .setRateCalled` – kullanıcının duraklatmasıdır, takılma değil; PiP'ten oynat `wantsToPlay`'i geri açar). Remux
+    motoru iç AVPlayer'ına iletir.
+  * PiP (`PictureInPictureCoordinator`, yalnızca iOS): uygulamanın tek `AVPlayerLayer`'ı `PlayerVideoHost`'ta yaşar ve
+    VLCKit çizim görünümü gibi her `EngineVideoSurface`'e yeniden takılır – oynatıcı ekranı kapanınca PiP sürer, açılınca
+    aynı katmana geri döner. AVKit sonradan katmana konan oynatıcıyı izlemediği için katmanın oynatıcısı değişince
+    (PiP çalışmıyorken) denetleyici yeniden kurulur; `App.init` sırasında AVKit PiP'i "desteklenmiyor" bildirdiğinden
+    denetleyici oynatıcı ekranı açılınca kurulur. `Router.pipMinimized`: düğmeyle başlayan PiP oynatıcı ekranını
+    `close()` olmadan kapatır.
+  * AirPlay: `AVRoutePickerView`; remux iç AVPlayer'ı `allowsExternalPlayback = false` (127.0.0.1 HLS'e alıcı
+    erişemez) → yalnızca ses; `AirPlayRouteMonitor` (`AVAudioSession` rota değişimi) VLCKit/remux için notu gösterir.
+  * Now Playing (`NowPlayingCoordinator`, iOS + tvOS): üç motor için **tek, elle yazılan yol** –
+    `NowPlayingMapper` (saf, `NowPlayingTests`) → `MPNowPlayingInfoCenter` (geçen süre + hız; sistem ileri hesaplar),
+    `PlayerController.onPlaybackChange` (faz, öğe, süre, sarma, kapatma) ile güncellenir, canlı program 60 sn'de bir.
+    AVPlayer'ın otomatik yayını (`MPNowPlayingSession`) bilinçli olarak kullanılmadı: yalnızca AVPlayer/remux öğelerini
+    kapsar, motor geri dönüşünde öğe ortasında kaynak değiştirir ve kendi komut merkezini ister. Komutlar
+    `MPRemoteCommandCenter` → `PlayerController.handleRemoteCommand` (`RemoteCommandAvailability`: canlı = oynat/duraklat +
+    sonraki/önceki kanal; VOD = oynat/duraklat + ±10/30 sn + konum). İşleyiciler ve kapak isteği ana aktör dışında
+    kurulur (MediaPlayer kendi kuyruğundan çağırır; Swift 6 yalıtım denetimi aksi hâlde çöker).
 * Yaşam döngüsü: ekran kapanınca / arka plana geçince oynatıcı **release** edilir
   (Android `ON_STOP`, iOS/tvOS `scenePhase == .background` – Build 16, B4: `.inactive` (Denetim Merkezi, bildirim
   perdesi, arama bandı) bırakmaz, `AppEnvironment.scenePhaseChanged(_ AppScenePhase)`), pozisyon kaydedilir.
@@ -331,6 +361,34 @@ Gizli bilgiler Keychain'de (`ThisDeviceOnly`) ve silinmez.
 * **Test**: `DurableStateMirrorTests` (ayna güncelleme, geri yükleme, eksik gizli bilgi, gidiş-dönüş, bütçe,
   açma sırası) ve UI testleri `IOSCatalogRestoreTests` / `TVCatalogRestoreTests`: DEBUG `-uiSandbox <ad>` (gerçek
   SQLite + Keychain + UserDefaults, test adlarıyla) ve `-debugDeleteCatalogDB` (silinmeyi taklit eder) ile.
+
+### 3.4 tvOS Top Shelf ve derin bağlantılar (Build 17)
+* **Uzantı** `NovaPlayer-TopShelf` (`com.hasielektronic.novaplayer.topshelf`, yalnızca tvOS, tvOS uygulamasına gömülü):
+  `TVTopShelfContentProvider` → `TVTopShelfSectionedContent` (iki bölüm; afiş `.poster`, logo `.square`,
+  `playbackProgress`, `displayAction` = `playAction` = derin bağlantı). Paket bağımlılığı yok: IPTVKit'in yalnızca
+  Foundation/Security kullanan iki dosyası (`TopShelf/TopShelfSnapshot.swift`, `TopShelfStore.swift`) doğrudan derlenir.
+* **Veri paylaşımı App Group olmadan:** uygulama küçük bir JSON'u (`TopShelfSnapshot`, ≤ 64 KB, bölüm başına ≤ 10 öğe,
+  başlıklar ≤ 120 karakter) **paylaşılan Keychain grubuna** yazar: `$(AppIdentifierPrefix)com.hasielektronic.novaplayer.shared`
+  (`keychain-access-groups` uygulama + uzantı; uygulamada **kendi grubu ilk sırada** → kaynak şifreleri ve hesap
+  jetonu varsayılan grubunda kalır, uzantı onları göremez). Sırlar yok: başlık, görsel URL'si (yalnızca http/https,
+  kullanıcı bilgisi ve `password/token/username…` sorgusu olmayan, `safeImageURL`), ilerleme ve derin bağlantı (kaynak
+  id + öğe id). Yayın URL'leri asla yazılmaz. Neden Keychain: App Group ek bir App ID yeteneği ve profil değişikliği
+  ister; takım önekli Keychain grubu varsayılan profillerde (`TEAM.*`) zaten izinlidir – portalda yalnızca yeni
+  uzantı kimliği + profili gerekir. Grup adı Info.plist `TopShelfKeychainGroup`'tan okunur. Simülatörde doğrulandı:
+  uygulama yazar, uzantı okur, HeadBoard "Son izlenen kanallar" rafını logo ile gösterir.
+* **Yazan:** `TopShelfPublisher` (tvOS): `libraryVersion` / `catalogVersion` / kaynak / dil değişince 5 sn birleştirerek,
+  `.background`'da ve açılışta hemen; yalnızca değişen anlık görüntü yazılır, sonra
+  `TVTopShelfContentProvider.topShelfContentDidChange()`. İçerik `AppEnvironment.topShelfSnapshot(_:)`
+  (`HomeViewModel` kuralları, gizli kanallar `TopShelfLabels.isHidden` ile – ebeveyn kilidi de buraya bağlanabilir).
+* **Derin bağlantılar** (`DeepLink`, her iki platformda `onOpenURL`): `novaplayer://play/channel?source=&id=`,
+  `/movie?source=&id=`, `/episode?source=&series=&id=`. `AppEnvironment.playbackTarget(for:)` öğeyi çözer (kanal +
+  kategorisi zapping listesi; satırı olmayan bölüm ilerleme kaydından kurulur, `Router.play` tamamlar), `Router.open`
+  kaynağı seçer ve oynatır. Katalog henüz yükleniyorsa bağlantı `pendingDeepLink` olarak 60 sn bekler,
+  `catalogVersion` değişince yeniden denenir. DEBUG + `-uiTestReset`: kaynak id `uitest-current` geçerli kaynağı
+  anlatır (bellek içi UI test kaynağının id'si rastgele).
+* **Test:** `TopShelfTests` (JSON sınırları, sırsız URL'ler, sürüm, derin bağlantı gidiş-dönüş/geçersizler, oluşturma +
+  çözümleme), UI `TVTopShelfTests` (bağlantı oynatıcıda kanalı açar – `XCUIApplication.open` soğuk açılıştır; bilinmeyen
+  bağlantı hiçbir şey açmaz; isteğe bağlı `TEST_RUNNER_TOPSHELF_HOME=1`: ana ekranda raf ekran görüntüsü).
 
 ## 4. Lisans, deneme ve satın alma
 
@@ -476,7 +534,7 @@ imzalı; deneme süresi cihaz saatine dayanmaz; eşleştirme uçtan uca şifreli
 | V7 | Hesap isteğe bağlı; yalnızca Apple↔Google erişimi ve senkron için | Sürtünmesiz başlangıç |
 | V8 | Kilitliyken içerik listelerine göz atılabilir, yalnızca oynatma kilitli | Kullanıcı neyi açacağını görür; gereksinim "oynatma kilitlenecek" |
 | V9 | Backend erişilemezse son geçerli token kullanılır; hiç token yoksa Android'de deneme başlatılamaz (Apple'da StoreKit yerel denemesi çalışır) | IPTV zaten internet ister; kötüye kullanım riski düşük tutulur |
-| V10 | Arka planda ses / PiP ilk sürümde yok | Kapsam; oynatıcı kaynakları ekran kapanınca serbest bırakılır |
+| V10 | ~~Arka planda ses / PiP ilk sürümde yok~~ → **Build 17:** iOS/iPadOS'ta arka plan sesi + PiP (ayarlarla, varsayılan açık); tvOS'ta arka planda serbest bırakma sürer | Rakiplerin hepsinde var (QA C4); bağlantı yalnızca gerçekten dinlenirken / izlenirken tutulur |
 | V11 | Apple'da AVPlayer (HLS, MP4/MOV) + VLCKit (MKV/WebM, AVI, FLV, progresif TS, DASH, RTSP, RTMP); yalnızca UDP/RTP multicast desteklenmez. Xtream canlıda `m3u8` tercih, yalnızca `ts` varsa VLCKit. DASH VLCKit ile (libVLC 3 `adaptive` modülü, DRM'siz) | Sağlayıcıların VOD'ları çoğunlukla `.mkv`; VLCKit LGPL-2.1 (dinamik bağlama + lisans bildirimi, `SECURITY.md §7`), uygulamaya ~35 MB (arm64) ekler |
 | V12 | DRM (Widevine/FairPlay) desteklenmez; KODIPROP içeren kanallar "korumalı yayın" hatası verir | Lisans sunucusu entegrasyonu kapsam dışı |
 | V13 | Catch-up: Xtream `timeshift` + M3U `catchup` öznitelikleri; Apple'da m3u8 timeshift tercih edilir (ts timeshift VLCKit ile oynatılabilir) | Sağlayıcı desteğine bağlı |

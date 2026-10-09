@@ -111,6 +111,16 @@ dikey geçişte odak, satırdaki son odaklanan öğeye döner (focus restorer). 
 yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "kaçmaz"
 (wrap yok; sekme çubuğuna yalnızca yukarı basınca / geri tuşuyla geçer).
 
+**Top Shelf (Build 17, F-01):** uygulama Apple TV ana ekranının üst sırasındayken odaklanınca dinamik raf:
+**"İzlemeye devam et"** (en fazla 10 film/bölüm, afiş + ilerleme çubuğu, Ana Sayfa satırıyla aynı kural, yeniden
+en yeni) ve **"Son izlenen kanallar"** (en fazla 10 kanal logosu, gizlenen kanallar hariç) – geçerli kaynaktan.
+Bir öğeyi seçmek veya Oynat tuşu `novaplayer://` derin bağlantısıyla uygulamayı açar ve öğe **doğrudan oynatıcıda**
+başlar: kanal kendi kategorisi (ilk 200) zapping listesiyle, film/bölüm kaldığı yerden; bağlantının kaynağı geçerli
+kaynak olur. Öğe/kaynak artık yoksa hiçbir şey açılmaz (log). Soğuk açılışta katalog daha yükleniyorsa (kaynaklar
+yükleniyor / ayna geri yükleniyor) bağlantı bekletilir ve katalog değişince yeniden denenir (en fazla 60 sn). Raf
+boşsa varlık kataloğundaki statik Top Shelf görseli görünür. Raf, kitaplık/katalog/kaynak/dil değişince (5 sn
+birleştirme) ve uygulama arka plana geçince güncellenir (ARCHITECTURE §3.4).
+
 ## 3. Ekranlar
 
 ### 3.1 Karşılama ve kaynak ekleme
@@ -376,7 +386,9 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * Katman (3 sn sonra kaybolur): üstte kanal/başlık, solda kanal numarası; altta zaman çizgisi
   (VOD) veya program ilerlemesi (canlı), "CANLI" rozeti; sağda araçlar: Ses · Altyazı ·
   Görüntü oranı · **⭐ Favori** (kanal / film / bölümün dizisi; tek dokunuş, 4 sn geri al kapsülü alt çubuğun
-  üstünde) · (canlı) Kanal listesi. Kanal listesinde favori kanallar en üstte.
+  üstünde) · (canlı) Kanal listesi. Kanal listesinde favori kanallar en üstte. **iOS/iPadOS (Build 17):** araçların
+  başında **Resim içinde resim** (`pip.enter`, yalnızca AVPlayer içeriğinde – AVPlayer motoru ve "Apple + Remux
+  (Beta)") ve **AirPlay** (`AVRoutePickerView`, önce video cihazları).
 * **Kanal paneli (canlı, oynatıcı içinde):** oynatma arkada sürer. Solda panel: iOS yatayda genişliğin
   %40'ı, iOS dikeyde tam ekran (sayfa gibi, kapat ✕), tvOS 600 pt. Üstte "Kanallar" + **kategori seçici**
   (Tümü · ★ Favoriler · favori kategoriler · diğerleri; gizliler hariç); açılışta oynayan kanalın
@@ -525,7 +537,38 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * Kaynaklar: ekran kapanınca / uygulama arka plana geçince (`.background`) oynatıcı **serbest bırakılır**
   (pozisyon kaydedilir). **Build 16 (B4):** `.inactive` (Denetim Merkezi, bildirim perdesi, arama bandı, Siri, iPad
   Slide Over, tvOS Denetim Merkezi) oynatıcıyı bırakmaz – canlı yeniden başlamaz, `max_connections = 1`'e takılmaz;
-  gerçek ses kesintileri (arama sesi alır) `AVAudioSession` kesintisiyle duraklatır. Arka planda ses oynatma yok (varsayım).
+  gerçek ses kesintileri (arama sesi alır) `AVAudioSession` kesintisiyle duraklatır.
+* **Arka planda oynatma (Build 17, iOS/iPadOS, C4/IOS-10):** Ayarlar "Arka planda oynatmaya devam et" (varsayılan açık)
+  ve "Otomatik resim içinde resim" (varsayılan açık). Uygulama arka plana geçince (Ana ekran, uygulama değiştirici,
+  ekran kilidi) karar `BackgroundPlayback`:
+  * **PiP çalışıyor / başlıyor** → oynatıcı kalır (her durumda; duraklatılmış öğe de PiP penceresinde kalır).
+  * **Arka plan sesi açık ve oynuyor** (yükleniyor / tamponluyor / yeniden bağlanıyor dahil) → ses sürer; VLCKit'te
+    video izi kapatılır (arka planda GPU yok), dönüşte geri açılır; arka planda kanal değişimi/yeniden bağlanma da
+    yalnızca sesle başlar. AVPlayer `audiovisualBackgroundPlaybackPolicy = .continuesIfPossible`.
+  * **Diğer her durum** (ayar kapalı, duraklatılmış, bitmiş, hata, tvOS) → B4'teki serbest bırakma (konum kaydedilir,
+    dönüşte yeniden açılır / duraklatılmış kalır).
+  * Arka plandayken: PiP kapatılırsa (arka plan sesi yoksa veya PiP penceresi duraklattıysa) serbest bırakılır;
+    **uyku zamanlayıcısı dolarsa** serbest bırakılır (bağlantı boşalır, PiP de biter; dönüşte duraklatılmış hâl);
+    kilit ekranından duraklatma öğeyi tutar (Oynat oradan devam eder; iOS uygulamayı kısa sürede askıya alır).
+* **Resim içinde resim (Build 17, iOS/iPadOS):** tek `AVPictureInPictureController`, uygulamanın tek `AVPlayerLayer`'ına
+  bağlı (`PlayerVideoHost`; oynatıcı ekranı kapansa da yaşar). **Düğme:** PiP başlar ve oynatıcı ekranı kapanır, oynatma
+  sürer – uygulamada gezilebilir; PiP penceresinde "geri yükle" oynatıcı ekranını yeniden açar; uygulamadan yeni bir
+  öğe oynatılırsa PiP biter ve tam ekran oynatıcı açılır; PiP penceresi kapatılırsa (oynatıcı ekranı yokken) oynatma
+  biter. **Otomatik:** video oynarken uygulamadan çıkınca PiP başlar, oynatıcı ekranı altta açık kalır ("Resim içinde
+  resimde oynatılıyor" ipucu). Canlıda PiP'te ileri/geri sarma düğmeleri yok (`requiresLinearPlayback`). PiP
+  penceresinin oynat/duraklat'ı kullanıcının niyetidir (takılma sayılmaz, motor kendiliğinden sürdürmez). **VLCKit
+  içeriğinde PiP yok** (düğme gizli; Ayarlar alt bilgisi açıklar), motor VLCKit'e geçerse çalışan PiP durdurulur.
+  PiP desteklemeyen cihazda (ör. iOS 26.4 iPhone simülatörü) düğme ve otomatik PiP ayarı görünmez.
+* **AirPlay (Build 17, iOS):** AVPlayer içeriği AirPlay video olarak gider. VLCKit ve remux içeriğinde yalnızca ses
+  (libVLC kendi çizer; remux URL'si alıcının erişemeyeceği 127.0.0.1 adresidir) – AirPlay rotası etkinken 4 sn not
+  "AirPlay: nur Ton – dieser Stream läuft mit der VLC- oder Remux-Engine." (`airplay_audio_only`). VLCKit AirPlay
+  gecikmesini (≈2 sn) otomatik dengeler (ARCHITECTURE §3.2).
+* **Kilit ekranı / Denetim Merkezi / Now Playing (Build 17, iOS + tvOS, C5/IOS-11):** başlık (canlı: yayındaki program,
+  altında kanal; bölüm: bölüm adı, dizi, "S1 E2"; film: temiz ad), kapak (kanal logosu / afiş), canlı bayrağı, VOD'da
+  süre + geçen süre + hız. Uzaktan komutlar: oynat / duraklat / oynat-duraklat, VOD'da ±10/30 sn atlama ve kilit
+  ekranında sarma, canlıda **sonraki/önceki parça = zapping listesinde sonraki/önceki kanal** (400 ms birleştirme
+  aynen). tvOS: Siri Remote'un uygulama içi tuşları değişmedi (tuş haritası); Denetim Merkezi / Now Playing
+  uygulaması aynı komutları kullanır. Oynatıcı kapanınca bilgi silinir.
 
 ### 3.8 Deneme durumu ve satın alma (Paywall)
 * Başlık: "{app} Premium – tek seferlik satın alma", madde listesi (sınırsız oynatma, tüm
@@ -544,7 +587,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 ### 3.9 Ayarlar ve kaynak yönetimi
 **Üst düzey yalnızca kullanıcının sık değiştirdikleri** (tek grup, kaydırmasız):
 **Kaynaklar** (sayı ile → Kaynaklar ekranı) · **Uygulama dili** · **Ses dili** · **Altyazı dili** ·
-**Hızlı başlat** · **Ses senkronunu ayarla** (Build 16; mevcut VLC kalibrasyonu değeriyle, ör. "−120 ms" → kalibrasyon
+**Hızlı başlat** · (iOS, Build 17) **Arka planda oynatmaya devam et** · **Otomatik resim içinde resim** (alt bilgide:
+VLC motorundaki yayınlar yalnızca sesle sürer, PiP yok) · **Ses senkronunu ayarla** (Build 16; mevcut VLC kalibrasyonu değeriyle, ör. "−120 ms" → kalibrasyon
 ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te de aynı satır); alt bilgide Hızlı başlat açıklaması.
 * **Ses senkronunu ayarla (VLC kalibrasyonu, Build 16, iOS + tvOS):** uygulamaya gömülü 10 sn'lik test klibi
   (`avsync-test.mkv`, 640×360, 25 fps, H.264 + AAC): **her tam saniyede tek bir tam beyaz kare ("BEEP") ve tam aynı

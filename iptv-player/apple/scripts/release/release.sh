@@ -1,7 +1,9 @@
 #!/bin/bash
 # Archive, export and upload iOS + tvOS to TestFlight, then wait until App Store Connect reports the build VALID.
 # Usage: apple/scripts/release/release.sh <outDir>   (build number comes from Config/Shared.xcconfig)
-# Needs ~/.hermes/.env: APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_KEY_PATH; App Store profiles "NovaPlayer iOS AppStore" / "NovaPlayer tvOS AppStore".
+# Needs ~/.hermes/.env: APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_KEY_PATH; App Store profiles "NovaPlayer iOS AppStore" / "NovaPlayer tvOS AppStore"
+# and (Build 17, tvOS Top Shelf extension com.hasielektronic.novaplayer.topshelf) "NovaPlayer TopShelf AppStore".
+# Profiles are passed per bundle id (project.yml: PROVISIONING_PROFILE_SPECIFIER = $(NOVA_APP_PROFILE) / $(NOVA_TOPSHELF_PROFILE)).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; APPLE="$(cd "$HERE/../.." && pwd)"; OUT="${1:?outDir}"; mkdir -p "$OUT"
 eval "$(grep -E '^APPLE_(ISSUER_ID|KEY_ID)=' ~/.hermes/.env)"
@@ -11,7 +13,8 @@ for p in iOS:ios tvOS:appletvos; do plat=${p%%:*}; t=${p##*:}
   rm -rf "$OUT/b$BUILD-$plat.xcarchive" "$OUT/b$BUILD-ipa-$plat"
   xcodebuild archive -project NovaPlayer.xcodeproj -scheme NovaPlayer-$plat -configuration Release -destination "generic/platform=$plat" \
     -archivePath "$OUT/b$BUILD-$plat.xcarchive" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=KL2U82NUL6 \
-    CODE_SIGN_IDENTITY=7E71558BC4220D8F5E0DB584E84B586BAC7185C5 "PROVISIONING_PROFILE_SPECIFIER=NovaPlayer $plat AppStore" -quiet \
+    CODE_SIGN_IDENTITY=7E71558BC4220D8F5E0DB584E84B586BAC7185C5 "NOVA_APP_PROFILE=NovaPlayer $plat AppStore" \
+    "NOVA_TOPSHELF_PROFILE=NovaPlayer TopShelf AppStore" -quiet \
     > "$OUT/b$BUILD-archive-$plat.log" 2>&1 || { echo "$plat archive FAILED"; grep error: "$OUT/b$BUILD-archive-$plat.log" | head -5; exit 1; }
   xcodebuild -exportArchive -archivePath "$OUT/b$BUILD-$plat.xcarchive" -exportPath "$OUT/b$BUILD-ipa-$plat" \
     -exportOptionsPlist "$HERE/export-$plat.plist" > "$OUT/b$BUILD-export-$plat.log" 2>&1 || { echo "$plat export FAILED"; tail -5 "$OUT/b$BUILD-export-$plat.log"; exit 1; }
