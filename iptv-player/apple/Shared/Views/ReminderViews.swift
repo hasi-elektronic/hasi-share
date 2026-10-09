@@ -236,7 +236,11 @@ struct GuideParentalOverlays: ViewModifier {
     private var active: Bool { router.playerPresented == inPlayer }
 
     func body(content: Content) -> some View {
-        let prompt = Binding(get: { active ? env.parental.prompt : nil }, set: { if $0 == nil, active { env.parental.cancelPrompt() } })
+        let prompt = Binding(get: { active ? env.parental.prompt : nil }, set: {
+            // Swiped away (the prompt is still pending) = cancel; after a right PIN the prompt is already gone and the
+            // approved action must survive until onDismiss.
+            if $0 == nil, active, env.parental.prompt != nil { env.parental.cancelPrompt() }
+        })
         content
             .overlay(alignment: .top) {
                 if active { ReminderBannerView().animation(.easeOut(duration: 0.25), value: ReminderRuntime.shared.banner?.key) }

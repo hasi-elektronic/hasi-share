@@ -13,19 +13,24 @@ struct GuideDayBar: View {
     let onJumpNow: () -> Void
 
     var body: some View {
+        HStack(spacing: Theme.isTV ? 14 : 8) {
+            // "Jetzt" stays in view (pinned left of the scrolling days).
+            Button(action: onJumpNow) {
+                Label(L10n.t("guide_jump_now"), systemImage: "clock.arrow.2.circlepath")
+                    .font(Theme.isTV ? Theme.caption.weight(.bold) : .subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, Theme.isTV ? 24 : 12).padding(.vertical, Theme.isTV ? 10 : 7)
+                    .background(Capsule().fill(Theme.live.opacity(0.85)))
+            }
+            .buttonStyle(CardButtonStyle(radius: 40, scale: 1.08))
+            .fixedSize()
+            .padding(.leading, Theme.safeH)
+            .accessibilityHint(L10n.t("guide_jump_now_hint"))
+            .accessibilityIdentifier("guide_jump_now")
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.isTV ? 14 : 8) {
-                    Button(action: onJumpNow) {
-                        Label(L10n.t("guide_jump_now"), systemImage: "clock.arrow.2.circlepath")
-                            .font(Theme.isTV ? Theme.caption.weight(.bold) : .subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Theme.isTV ? 24 : 14).padding(.vertical, Theme.isTV ? 10 : 7)
-                            .background(Capsule().fill(Theme.live.opacity(0.85)))
-                    }
-                    .buttonStyle(CardButtonStyle(radius: 40, scale: 1.08))
-                    .accessibilityHint(L10n.t("guide_jump_now_hint"))
-                    .accessibilityIdentifier("guide_jump_now")
                     ForEach(days) { day in
                         let selected = day.offset == selection
                         Button { selection = day.offset } label: {
@@ -43,11 +48,13 @@ struct GuideDayBar: View {
                         .accessibilityIdentifier("guide_day_\(day.offset)")
                     }
                 }
-                .padding(.horizontal, Theme.safeH)
+                .padding(.trailing, Theme.safeH)
+                .padding(.leading, 2)
                 .padding(.vertical, Theme.isTV ? 10 : 2)
             }
             .onAppear { proxy.scrollTo(selection, anchor: .center) }
             .onChange(of: selection) { _, value in withAnimation { proxy.scrollTo(value, anchor: .center) } }
+        }
         }
         #if os(tvOS)
         .focusSection()
@@ -176,6 +183,7 @@ struct ProgramDetailSheet: View {
             }
             #endif
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("program_detail")
     }
 

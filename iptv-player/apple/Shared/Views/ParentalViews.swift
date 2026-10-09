@@ -56,6 +56,7 @@ struct PinPadView: View {
         }
         .padding(Theme.isTV ? 40 : 20)
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pin_pad")
     }
 
@@ -142,6 +143,7 @@ struct ParentalPromptSheet: View {
         #if os(tvOS)
         .onExitCommand { env.parental.cancelPrompt() }
         #endif
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pin_prompt")
     }
 }
@@ -161,6 +163,7 @@ struct PinGate<Content: View>: View {
                 PinPadView(title: L10n.t("parental_enter_pin")) { pin in env.parental.unlock(pin).message }
             }
             .screenBackground()
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("pin_gate")
         } else {
             content()
@@ -515,6 +518,7 @@ private struct AdultSuggestionView: View {
             .navigationTitle(L10n.t("parental_suggest_title"))
         }
         .onAppear { selected = Set(categories.map(key)) }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("parental_suggestions")
     }
 }
