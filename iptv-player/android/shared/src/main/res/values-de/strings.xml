@@ -405,6 +405,18 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server nicht erreichbar (%1$s)</string>
     <string name="account_not_configured" formatted="false">Konten sind in dieser Version nicht verfügbar (kein Server konfiguriert).</string>
+    <string name="icloud_section" formatted="false">iCloud</string>
+    <string name="icloud_sync_toggle" formatted="false">Mit iCloud synchronisieren</string>
+    <string name="icloud_status_off" formatted="false">Aus – Quellen, Favoriten und Fortschritt bleiben auf diesem Gerät.</string>
+    <string name="icloud_status_no_account" formatted="false">Kein iCloud-Account – melden Sie sich in den Geräteeinstellungen bei iCloud an.</string>
+    <string name="icloud_status_syncing" formatted="false">Wird synchronisiert …</string>
+    <string name="icloud_status_synced">Aktuell · %1$s</string>
+    <string name="icloud_status_on" formatted="false">Ein – Änderungen werden mit Ihren anderen Geräten geteilt.</string>
+    <string name="icloud_status_storage_full" formatted="false">Der iCloud-Speicher dieser App ist voll – nur der neueste Fortschritt wird synchronisiert.</string>
+    <string name="icloud_hint" formatted="false">Quellen, Favoriten, Fortschritt und Kategorie-Einstellungen erscheinen auf Ihrem iPhone, iPad und Apple TV mit derselben Apple-ID. Serveradressen, Benutzernamen und Passwörter werden nur über den iCloud-Schlüsselbund übertragen (Ende-zu-Ende-verschlüsselt). Tonverzögerungen bleiben auf jedem Gerät. Die Daten bleiben in Ihrer iCloud – wir haben keinen Zugriff darauf.</string>
+    <string name="source_waiting_keychain" formatted="false">Warten auf den iCloud-Schlüsselbund …</string>
+    <string name="source_waiting_keychain_hint" formatted="false">Diese Quelle wurde auf einem anderen Gerät hinzugefügt. Die Zugangsdaten kommen über den iCloud-Schlüsselbund – das kann einige Minuten dauern. Bitte prüfen Sie, ob der iCloud-Schlüsselbund (Passwörter) für Ihre Apple-ID auf diesem Gerät aktiviert ist.</string>
+    <string name="about_privacy_icloud" formatted="false">Kein Tracking, keine Werbung. Mit iCloud-Synchronisierung werden Ihre Quellen, Favoriten und Ihr Fortschritt in Ihrer eigenen iCloud gespeichert, Zugangsdaten nur im iCloud-Schlüsselbund.</string>
     <string name="avsync_calibrate" formatted="false">Audio-Sync kalibrieren</string>
     <string name="avsync_calibration_value" formatted="false">VLC-Kalibrierung (dieses Gerät)</string>
     <string name="avsync_intro" formatted="false">Jede Sekunde blitzt das Bild weiß auf und Sie hören einen kurzen Piepton. Ändern Sie den Wert, bis der Piepton genau mit dem Blitz kommt. Piepton nach dem Blitz? − wählen. Piepton vor dem Blitz? + wählen.</string>

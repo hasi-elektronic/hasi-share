@@ -405,6 +405,18 @@
     <string name="source_status_ok" formatted="false">OK</string>
     <string name="error_backend_generic">Server not reachable (%1$s)</string>
     <string name="account_not_configured" formatted="false">Accounts are not available in this build (no backend configured).</string>
+    <string name="icloud_section" formatted="false">iCloud</string>
+    <string name="icloud_sync_toggle" formatted="false">Sync with iCloud</string>
+    <string name="icloud_status_off" formatted="false">Off – sources, favorites and progress stay on this device.</string>
+    <string name="icloud_status_no_account" formatted="false">No iCloud account – sign in to iCloud in the device settings.</string>
+    <string name="icloud_status_syncing" formatted="false">Syncing…</string>
+    <string name="icloud_status_synced">Up to date · %1$s</string>
+    <string name="icloud_status_on" formatted="false">On – changes are shared with your other devices.</string>
+    <string name="icloud_status_storage_full" formatted="false">iCloud space for this app is full – only the most recent watch progress is synced.</string>
+    <string name="icloud_hint" formatted="false">Sources, favorites, watch progress and category settings appear on your iPhone, iPad and Apple TV with the same Apple ID. Server addresses, user names and passwords travel only in iCloud Keychain (end-to-end encrypted). Audio delays stay on each device. The data stays in your iCloud – we have no access to it.</string>
+    <string name="source_waiting_keychain" formatted="false">Waiting for iCloud Keychain…</string>
+    <string name="source_waiting_keychain_hint" formatted="false">This source was added on another device. Its login details arrive through iCloud Keychain – this can take a few minutes. Make sure iCloud Keychain (Passwords) is turned on for your Apple ID on this device.</string>
+    <string name="about_privacy_icloud" formatted="false">No tracking, no ads. With iCloud sync on, your sources, favorites and progress are stored in your own iCloud; login details only in iCloud Keychain.</string>
     <string name="avsync_calibrate" formatted="false">Calibrate audio sync</string>
     <string name="avsync_calibration_value" formatted="false">VLC calibration (this device)</string>
     <string name="avsync_intro" formatted="false">Every second the picture flashes white and you hear a short beep. Change the value until the beep comes exactly with the flash. Beep after the flash? Use −. Beep before the flash? Use +.</string>

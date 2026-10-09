@@ -31,7 +31,7 @@ public protocol CloudPreferenceProvider: AnyObject {
 ///   to iCloud Keychain (`CloudSecretStore`, synchronizable items). Audio delays / VLC calibration, the selected
 ///   source and recent searches stay on the device.
 /// - **Merge:** last-writer-wins per item by change time (`SyncItem.updatedAt` for the library, `CloudMerge` stamps
-///   for sources/preferences), tombstones for deletions (90 days, `CloudSyncLimits.tombstoneTTLms`). Every write
+///   for sources/preferences), tombstones for deletions (365 days, capped – `CloudSyncLimits`). Every write
 ///   first merges what other devices wrote; a device that finds itself ahead of the remote writes again – the
 ///   devices converge even when two of them overwrite the same key at once.
 /// - **Same source on two devices** (added before sync was on): one source by fingerprint; the smaller cloud id
@@ -543,6 +543,14 @@ public final class CloudSync {
         for provider in preferenceProviders {
             if let batch = batches[ObjectIdentifier(provider)] { provider.applyCloudPreferences(batch) }
         }
+    }
+
+    /// UI tests / screenshots: `store` holds a source written by "another device" whose secrets never arrive.
+    public nonisolated static func seedRemoteSource(in store: any CloudKeyValueStore, id: String, name: String, host: String) {
+        let record = CloudSourceRecord(name: name, type: .xtream, host: host, epg: false, shift: 0, refresh: 24,
+                                       created: 1_790_000_000_000, sort: 0, fp: String(Hashing.sha256Hex(id).prefix(16)))
+        let payload = CloudMapPayload(h: 0, items: [id: CloudEntry(at: 1_790_000_000_000, val: record)])
+        store.set(CloudCodec.encode(payload), forKey: CloudSyncLimits.sourcesKey)
     }
 
     /// Local changes since the last sync get their change time.

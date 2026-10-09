@@ -4,7 +4,8 @@
 
 | Veri | Android | iOS / tvOS | Backend |
 |---|---|---|---|
-| M3U URL, Xtream sunucu/kullanıcı/şifre, EPG URL | Android Keystore'daki AES-256-GCM anahtarıyla şifreli kayıt (anahtar cihazdan çıkamaz) | Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` | **Hiç** (yalnızca eşleştirmede okunamaz şifreli metin, ≤10 dk) |
+| M3U URL, Xtream sunucu/kullanıcı/şifre, EPG URL | Android Keystore'daki AES-256-GCM anahtarıyla şifreli kayıt (anahtar cihazdan çıkamaz) | Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. **iCloud eşitleme açıkken (Build 17):** iCloud Anahtar Zinciri öğesi (`kSecAttrSynchronizable`, `kSecAttrAccessibleAfterFirstUnlock`; Apple'ın uçtan uca şifrelemesiyle yalnızca kullanıcının kendi cihazlarına gider) | **Hiç** (yalnızca eşleştirmede okunamaz şifreli metin, ≤10 dk) |
+| iCloud eşitleme (Apple, Build 17): kaynak tanımları (**gizli bilgi yok**), favoriler, en yeni 300 izleme ilerlemesi, kategori sabitleme/gizleme/ülke, favori sırası, gizli canlı kanallar | – | Kullanıcının kendi iCloud'u: `NSUbiquitousKeyValueStore` (3 anahtar, < 900 KB, ARCHITECTURE §6.1). Ses gecikmeleri, seçili kaynak, son aramalar eşitlenmez | **Hiç** – geliştirici bu verilere erişemez (App Store anlamında "toplanan veri" değildir, PrivacyInfo değişmedi) |
 | Kanal/film/dizi listeleri, EPG | Uygulamaya özel Room DB | Uygulama konteynerinde SQLite, `NSFileProtectionCompleteUntilFirstUserAuthentication`, iCloud yedeğinden hariç | Hiç |
 | M3U kanal URL'leri (içerik) | Room DB (yedekten hariç) | SQLite (yedekten hariç) | Hiç |
 | Xtream yayın URL'leri | **Saklanmaz** – oynatma anında oluşturulur | Saklanmaz | Hiç |
@@ -20,6 +21,13 @@ anahtarı zaten taşınamaz). iOS'ta veritabanı dosyası `isExcludedFromBackup`
 `ThisDeviceOnly`. **İstisna (Build 14):** dayanıklı ayna `UserDefaults`'ta durduğu için iOS cihaz yedeğine
 girer; içinde gizli bilgi yoktur (M3U/Xtream URL'si, kullanıcı adı, şifre yalnızca Keychain'de), ancak kaynak
 adları/hostları, favori/izleme başlıkları ve son 10 arama yer alır. Apple TV uygulama verisini iCloud'a yedeklemez.
+**Build 17 – iCloud eşitleme (Ayarlar → iCloud, iCloud hesabı varsa varsayılan açık):** açıkken kaynak gizli
+bilgileri `ThisDeviceOnly` değil, iCloud Anahtar Zinciri öğesidir (eşitlenebilir öğeler cihaza bağlanamaz; şifreli
+cihaz yedeğine de girer). Kapatınca cihaza özel kopya geri yazılır; iCloud kopyası kullanıcının diğer cihazları için
+kalır (her yerden kaldırmak için: eşitleme açıkken kaynağı silmek – iCloud kopyası da silinir).
+Anahtar-değer deposuna gizli bilgi yazılmaz (birim testi `testAudioDelaysAndSelectedSourceStayOnTheDevice` M3U
+URL'lerinin depoda olmadığını kontrol eder); kaynak kaydında yalnızca parmak izi (host + kullanıcı adının SHA-256
+öneki, zaten eşitlenen içerik anahtarlarında bulunan değer) vardır.
 
 ## 2. Loglar
 * Tüm log çağrıları `SafeLog` → `Redactor` (CONTRACT §10) üzerinden geçer: kayıtlı gizli

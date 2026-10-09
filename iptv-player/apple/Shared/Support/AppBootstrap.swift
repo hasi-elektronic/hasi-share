@@ -207,9 +207,31 @@ enum AppBootstrap {
         if let engine = argument("-playerEngine").flatMap(PlayerEngineOverride.init(rawValue:)) { settings.playerEngine = engine }
         #endif
         L10n.setLanguage(settings.appLanguage)
+        // Build 17 iCloud sync: the real iCloud key-value store / account; UI tests and sandboxes never touch iCloud
+        // (`-uiCloudAccount yes` = an account is signed in, `-uiCloudSeedSource <name>` = a source from "another
+        // device" whose secrets never arrive).
+        let cloudStore: any CloudKeyValueStore
+        let cloudAccount: any CloudAccountProvider
+        if isUITest || sandbox != nil {
+            let memory = InMemoryCloudKeyValueStore()
+            #if DEBUG
+            if let name = argument("-uiCloudSeedSource") {
+                CloudSync.seedRemoteSource(in: memory, id: "cloud-seed-1", name: name, host: "panel.example.com")
+            }
+            #endif
+            cloudStore = memory
+            cloudAccount = StaticCloudAccount(available: argument("-uiCloudAccount") == "yes")
+        } else {
+            cloudStore = UbiquitousKeyValueStore()
+            cloudAccount = UbiquityAccount()
+        }
         do {
             let env = try AppEnvironment(config: config, database: database, secureStore: secure, kv: kv,
-                                         settings: settings, engines: .app)
+                                         settings: settings, engines: .app, cloudStore: cloudStore, cloudAccount: cloudAccount)
+            // Hidden live channels/categories sync too; activation after every preference provider is registered.
+            env.cloud.preferenceProviders.append(HiddenStore.shared)
+            HiddenStore.shared.onChange = { [weak env] in env?.cloud.noteLocalChange() }
+            env.cloud.activate()
             AudioSessionConfigurator.configure()
             env.player.audioSession = AudioSessionConfigurator.hooks
             #if canImport(UIKit)
