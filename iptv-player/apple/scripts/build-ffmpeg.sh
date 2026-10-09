@@ -37,7 +37,7 @@ STAMP="${VENDOR}/.stamp"
 CACHE="${FFMPEG_CACHE:-$HOME/Library/Caches/NovaPlayer/ffmpeg}"
 JOBS="${FFMPEG_JOBS:-$(sysctl -n hw.ncpu)}"
 # Bump the suffix whenever the configure line below changes.
-WANT_STAMP="${VERSION}-remux1"
+WANT_STAMP="${VERSION}-remux2"   # remux2: text subtitle decoders (Build 21)
 
 if [ "${FFMPEG_FORCE:-0}" != "1" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WANT_STAMP" ] \
    && [ -d "${VENDOR}/FFmpeg.xcframework" ] && { [ "${FFMPEG_MACOS:-0}" != "1" ] || [ -d "${VENDOR}/macos" ]; }; then
@@ -75,7 +75,7 @@ COMMON_FLAGS="--disable-gpl --disable-nonfree --disable-programs --disable-doc -
   --enable-muxer=mp4,mov,webvtt
   --enable-parser=h264,hevc,aac,ac3,mpegaudio,mpegvideo,dca,opus,vorbis,flac,mlp
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,extract_extradata
-  --enable-decoder=aac,ac3,eac3,mp2,mp3,dca,opus,vorbis,flac,truehd,mlp
+  --enable-decoder=aac,ac3,eac3,mp2,mp3,dca,opus,vorbis,flac,truehd,mlp,subrip,srt,ass,ssa,webvtt,text,movtext
   --enable-encoder=aac
   --enable-protocol=file"
 

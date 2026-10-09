@@ -55,6 +55,13 @@ struct NRContext {
     int audio_track_count;
     int64_t bitrate;
     int64_t open_bytes;
+
+    // Text subtitles (Build 21): cues are decoded while segments are generated.
+    int *sub_idx;               ///< source stream indexes of the text subtitle tracks
+    AVCodecContext **sub_dec;
+    int nb_subs;
+    NRCueFn cue_fn;
+    void *cue_opaque;
 };
 
 // MARK: IO
@@ -141,6 +148,101 @@ static const char *nr_audio_codec_string(const AVCodecParameters *p) {
     }
 }
 
+// MARK: Subtitles
+
+static int nr_is_text_subtitle(enum AVCodecID id) {
+    return id == AV_CODEC_ID_SUBRIP || id == AV_CODEC_ID_SRT || id == AV_CODEC_ID_ASS || id == AV_CODEC_ID_SSA
+        || id == AV_CODEC_ID_WEBVTT || id == AV_CODEC_ID_TEXT || id == AV_CODEC_ID_MOV_TEXT;
+}
+
+/// Slot of a source stream in `sub_idx` (or -1).
+static int nr_sub_slot(const NRContext *c, int stream_index) {
+    for (int i = 0; i < c->nb_subs; i++) if (c->sub_idx[i] == stream_index) return i;
+    return -1;
+}
+
+/// Text of an ASS dialogue line from libavcodec ("ReadOrder,Layer,Style,Name,MarginL,MarginR,MarginV,Effect,Text"):
+/// override blocks removed except italics (→ <i>…</i>), \N / \n → newline, \h → space.
+static void nr_ass_to_text(const char *ass, char *out, size_t len) {
+    const char *p = ass;
+    for (int commas = 0; *p && commas < 8; p++) if (*p == ',') commas++;
+    size_t n = 0;
+    int italic = 0;
+#define NR_PUT(str) do { const char *q_ = (str); while (*q_ && n + 1 < len) out[n++] = *q_++; } while (0)
+    while (*p && n + 1 < len) {
+        if (*p == '{') {
+            const char *end = strchr(p, '}');
+            if (!end) break;
+            for (const char *q = p; q < end; q++) {
+                if (q[0] == '\\' && q[1] == 'i' && (q[2] == '1' || q[2] == '0')) {
+                    if (q[2] == '1' && !italic) { NR_PUT("<i>"); italic = 1; }
+                    else if (q[2] == '0' && italic) { NR_PUT("</i>"); italic = 0; }
+                }
+            }
+            p = end + 1;
+        } else if (p[0] == '\\' && (p[1] == 'N' || p[1] == 'n')) {
+            NR_PUT("\n");
+            p += 2;
+        } else if (p[0] == '\\' && p[1] == 'h') {
+            NR_PUT(" ");
+            p += 2;
+        } else {
+            out[n++] = *p++;
+        }
+    }
+    if (italic) NR_PUT("</i>");
+#undef NR_PUT
+    // Trim trailing whitespace / newlines.
+    while (n > 0 && (out[n - 1] == '\n' || out[n - 1] == ' ' || out[n - 1] == '\r')) n--;
+    out[n] = 0;
+}
+
+/// Decodes one subtitle packet and reports its cues (playlist seconds).
+static void nr_emit_cues(NRContext *c, int slot, AVPacket *pkt) {
+    AVStream *st = c->fmt->streams[c->sub_idx[slot]];
+    int64_t ts = pkt->pts != AV_NOPTS_VALUE ? pkt->pts : pkt->dts;
+    if (ts == AV_NOPTS_VALUE) return;
+    AVSubtitle sub;
+    int got = 0;
+    if (avcodec_decode_subtitle2(c->sub_dec[slot], &sub, &got, pkt) < 0 || !got) return;
+    double start = (av_rescale_q(ts, st->time_base, c->vst->time_base) - c->k0) * av_q2d(c->vst->time_base);
+    start += sub.start_display_time / 1000.0;
+    double dur = pkt->duration > 0 ? pkt->duration * av_q2d(st->time_base)
+               : sub.end_display_time > sub.start_display_time && sub.end_display_time != UINT32_MAX
+                 ? (sub.end_display_time - sub.start_display_time) / 1000.0 : 3.0;
+    char text[2048];
+    for (unsigned i = 0; i < sub.num_rects; i++) {
+        const AVSubtitleRect *r = sub.rects[i];
+        if (r->type == SUBTITLE_ASS && r->ass) nr_ass_to_text(r->ass, text, sizeof text);
+        else if (r->type == SUBTITLE_TEXT && r->text) snprintf(text, sizeof text, "%s", r->text);
+        else continue;
+        if (text[0]) c->cue_fn(c->cue_opaque, c->sub_idx[slot], start, start + dur, text);
+    }
+    avsubtitle_free(&sub);
+}
+
+void nr_set_cue_callback(NRContext *ctx, NRCueFn fn, void *opaque) {
+    ctx->cue_fn = fn;
+    ctx->cue_opaque = opaque;
+}
+
+int nr_subtitle_tracks(const NRContext *c, NRSubtitleTrack *out, int max) {
+    for (int i = 0; i < c->nb_subs && out && i < max; i++) {
+        const AVStream *st = c->fmt->streams[c->sub_idx[i]];
+        NRSubtitleTrack *t = &out[i];
+        memset(t, 0, sizeof *t);
+        t->stream_index = c->sub_idx[i];
+        const AVDictionaryEntry *lang = av_dict_get(st->metadata, "language", NULL, 0);
+        if (lang && strcmp(lang->value, "und") != 0) snprintf(t->language, sizeof t->language, "%s", lang->value);
+        snprintf(t->codec, sizeof t->codec, "%s", avcodec_get_name(st->codecpar->codec_id));
+        const AVDictionaryEntry *title = av_dict_get(st->metadata, "title", NULL, 0);
+        if (title) snprintf(t->title, sizeof t->title, "%s", title->value);
+        t->is_default = (st->disposition & AV_DISPOSITION_DEFAULT) != 0;
+        t->is_forced = (st->disposition & AV_DISPOSITION_FORCED) != 0;
+    }
+    return c->nb_subs;
+}
+
 // MARK: Open
 
 static int nr_cmp_i64(const void *a, const void *b) {
@@ -222,6 +324,24 @@ NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char 
     c->aidx = nr_pick_audio(c->fmt, c->vidx, audio_language, audio_stream, &c->audio_track_count);
     for (unsigned i = 0; i < c->fmt->nb_streams; i++)
         if ((int)i != c->vidx && (int)i != c->aidx) c->fmt->streams[i]->discard = AVDISCARD_ALL;
+    // Text subtitles stay in the demux (tiny packets): their cues are read with the segments.
+    c->sub_idx = av_malloc_array(c->fmt->nb_streams > 0 ? c->fmt->nb_streams : 1, sizeof(int));
+    c->sub_dec = av_calloc(c->fmt->nb_streams > 0 ? c->fmt->nb_streams : 1, sizeof(AVCodecContext *));
+    if (!c->sub_idx || !c->sub_dec) { ret = AVERROR(ENOMEM); goto fail; }
+    for (unsigned i = 0; i < c->fmt->nb_streams; i++) {
+        AVStream *st = c->fmt->streams[i];
+        if (st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE || !nr_is_text_subtitle(st->codecpar->codec_id)) continue;
+        const AVCodec *dc = avcodec_find_decoder(st->codecpar->codec_id);
+        if (!dc) continue;
+        AVCodecContext *d = avcodec_alloc_context3(dc);
+        if (!d) continue;
+        avcodec_parameters_to_context(d, st->codecpar);
+        d->pkt_timebase = st->time_base;
+        if (avcodec_open2(d, dc, NULL) < 0) { avcodec_free_context(&d); continue; }
+        st->discard = AVDISCARD_DEFAULT;
+        c->sub_idx[c->nb_subs] = (int)i;
+        c->sub_dec[c->nb_subs++] = d;
+    }
 
     // Keyframe index: Matroska defers the cues until the first seek.
     if ((ret = av_seek_frame(c->fmt, c->vidx, c->vst->start_time != AV_NOPTS_VALUE ? c->vst->start_time : 0,
@@ -729,6 +849,10 @@ static int nr_generate(NRContext *c, int index, uint8_t **out, int *out_size, NR
                 else if ((ret = nr_list_push(&video, pkt)) < 0) goto done;
             }
             if (vdone && ts > end_ts + safety) adone = 1;
+        } else if (c->cue_fn && ts != AV_NOPTS_VALUE && nr_sub_slot(c, pkt->stream_index) >= 0) {
+            // Cues belong to the segment of their start time (by the original timestamp).
+            int64_t ts_v = av_rescale_q(ts, c->fmt->streams[pkt->stream_index]->time_base, vtb);
+            if (ts_v >= start && (last || ts_v < end_ts)) nr_emit_cues(c, nr_sub_slot(c, pkt->stream_index), pkt);
         } else if (pkt->stream_index == c->aidx && ts != AV_NOPTS_VALUE) {
             int64_t ts_v = av_rescale_q(ts, c->ast->time_base, vtb);
             if (c->audio_copy) {
@@ -885,6 +1009,9 @@ void nr_close(NRContext *c) {
     }
     avcodec_parameters_free(&c->aout_par);
     av_channel_layout_uninit(&c->aout_layout);
+    for (int i = 0; i < c->nb_subs; i++) avcodec_free_context(&c->sub_dec[i]);
+    av_free(c->sub_dec);
+    av_free(c->sub_idx);
     av_free(c->keyframes);
     av_free(c->bounds);
     av_free(c);

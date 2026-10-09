@@ -442,6 +442,10 @@ struct PlayerView: View {
                 EngineVideoSurface(engine: player.engine, aspect: player.aspect)
                     .frame(width: size.width, height: size.height)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                // Build 21: text subtitles of the remux engine (drawn over the picture).
+                RemuxSubtitleOverlay(player: player)
+                    .frame(width: size.width, height: size.height)
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 #if os(iOS)
                 // The one owner of taps on the picture (the overlay's empty areas pass through):
                 // single tap toggles the overlay, double tap on the left/right third seeks ∓/±10 s.

@@ -12,7 +12,9 @@ import IPTVKit
 ///
 /// Audio (Build 20): one track is muxed (preferred language, else the default); the audio menu lists every
 /// source track and a choice reopens the session with that track at the current position.
-/// Limits: no subtitles, no audio delay (a later step can shift the audio timestamps instead), no AirPlay video (the
+/// Subtitles (Build 21): the text tracks' cues are read while segments are generated (`SubtitleCueStore`)
+/// and drawn by `RemuxSubtitleOverlay`; switching or turning them off is instant (no reopen).
+/// Limits: no bitmap (PGS/VobSub) subtitles, no audio delay (a later step can shift the audio timestamps instead), no AirPlay video (the
 /// receiver cannot reach the phone's loopback server – external playback is disabled).
 @MainActor
 final class RemuxPlaybackEngine: PlaybackEngine {
@@ -30,6 +32,15 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     /// Source audio tracks and the muxed one (source stream index).
     private var audioTracks: [SourceAudioTrack] = []
     private var muxedAudioStream = -1
+    /// Text subtitle cues of the current item (kept across an audio switch – same file).
+    let cues = SubtitleCueStore()
+    private(set) var subtitleTracks: [SourceSubtitleTrack] = []
+    /// Menu position of the shown subtitle track (nil = off).
+    private(set) var selectedSubtitleTrack: Int?
+    private var preferredSubtitle: String?
+    private var subtitleDelayMs = 0
+    /// The inner AVPlayer's last track report (its own legible options when the source has no text tracks).
+    private var innerSubtitles: (options: [MediaOption], selected: Int?) = ([], nil)
 
     init() {
         inner.player.allowsExternalPlayback = false
@@ -43,6 +54,11 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?,
               preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         lastLoad = (stream, isLive, preferredSubtitleLanguage, tuning)
+        cues.removeAll()
+        subtitleTracks = []
+        selectedSubtitleTrack = nil
+        preferredSubtitle = preferredSubtitleLanguage
+        innerSubtitles = ([], nil)
         // One bench per load (an audio switch reopens the session but keeps the measurement).
         bench = RemuxBench.enabled ? RemuxBench(engine: self, started: SystemClock.monotonicMs()) : nil
         audioTracks = []
@@ -82,6 +98,15 @@ final class RemuxPlaybackEngine: PlaybackEngine {
                                      channels: $0.channels, title: $0.title)
                 }
                 self.muxedAudioStream = info.audioStreamIndex
+                let cues = self.cues
+                session.onCue = { stream, start, end, text in cues.add(stream: stream, cue: SubtitleCue(start: start, end: end, text: text)) }
+                if self.subtitleTracks.isEmpty, !info.subtitleTracks.isEmpty {
+                    self.subtitleTracks = info.subtitleTracks.map {
+                        SourceSubtitleTrack(streamIndex: $0.streamIndex, language: $0.language, title: $0.title,
+                                            isDefault: $0.isDefault, isForced: $0.isForced)
+                    }
+                    self.selectedSubtitleTrack = SourceSubtitleTracks.initialSelection(self.subtitleTracks, preferred: self.preferredSubtitle)
+                }
                 self.bench?.opened(info: info)
                 let local = ResolvedStream(url: RemuxHTTPServer.shared.url(for: session, port: port), container: .hls, headers: [:])
                 self.inner.load(local, isLive: false, startMs: startMs, preferredAudioLanguage: preferredAudioLanguage,
@@ -113,15 +138,39 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     private func forward(_ event: EngineEvent) {
         bench?.event(event)
-        // The local HLS carries one audio track: the menu shows the source's tracks instead.
-        if case .tracks(_, let subtitles, _, let selectedSubtitle) = event, !audioTracks.isEmpty {
-            onEvent?(.tracks(audio: SourceAudioTracks.options(audioTracks), subtitles: subtitles,
-                             selectedAudio: SourceAudioTracks.index(of: muxedAudioStream, in: audioTracks),
-                             selectedSubtitle: selectedSubtitle))
+        // The local HLS carries one audio track and no subtitles: the menus show the source's tracks instead.
+        if case .tracks(let audio, let subtitles, let selectedAudio, let selectedSubtitle) = event,
+           !audioTracks.isEmpty || !subtitleTracks.isEmpty {
+            innerSubtitles = (subtitles, selectedSubtitle)
+            reportTracks(innerAudio: (audio, selectedAudio))
             return
         }
         onEvent?(event)
     }
+
+    private var innerAudio: (options: [MediaOption], selected: Int?) = ([], nil)
+
+    private func reportTracks(innerAudio: (options: [MediaOption], selected: Int?)? = nil) {
+        if let innerAudio { self.innerAudio = innerAudio }
+        let audio = audioTracks.isEmpty ? self.innerAudio.options : SourceAudioTracks.options(audioTracks)
+        let selectedAudio = audioTracks.isEmpty ? self.innerAudio.selected : SourceAudioTracks.index(of: muxedAudioStream, in: audioTracks)
+        let subtitles = subtitleTracks.isEmpty ? innerSubtitles.options : SourceSubtitleTracks.options(subtitleTracks)
+        let selectedSubtitle = subtitleTracks.isEmpty ? innerSubtitles.selected : selectedSubtitleTrack
+        onEvent?(.tracks(audio: audio, subtitles: subtitles, selectedAudio: selectedAudio, selectedSubtitle: selectedSubtitle))
+    }
+
+    // MARK: Subtitles (Build 21)
+
+    /// Texts to show at the player's current time (overlay, main thread), shifted by the subtitle delay.
+    func subtitleTexts() -> [String] {
+        guard let index = selectedSubtitleTrack, subtitleTracks.indices.contains(index) else { return [] }
+        let now = inner.player.currentTime().seconds
+        guard now.isFinite else { return [] }
+        return cues.texts(stream: subtitleTracks[index].streamIndex, at: now - Double(subtitleDelayMs) / 1000)
+    }
+
+    var supportsSubtitleDelay: Bool { true }
+    func setSubtitleDelay(ms: Int) { subtitleDelayMs = ms }
 
     func play() { inner.play() }
     func pause() { inner.pause() }
@@ -147,7 +196,11 @@ final class RemuxPlaybackEngine: PlaybackEngine {
         audioTracks = tracks
         muxedAudioStream = wanted
     }
-    func selectSubtitle(_ id: Int?) { inner.selectSubtitle(id) }
+    func selectSubtitle(_ id: Int?) {
+        guard !subtitleTracks.isEmpty else { inner.selectSubtitle(id); return }
+        selectedSubtitleTrack = id.flatMap { subtitleTracks.indices.contains($0) ? $0 : nil }
+        reportTracks()
+    }
     func setAspect(_ mode: AspectMode) { inner.setAspect(mode) }
     /// Not applied yet (spike); a production version shifts the audio timestamps in the remuxer.
     func setAudioDelay(ms: Int) {}
@@ -157,6 +210,9 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     func stop() {
         lastLoad = nil
+        cues.removeAll()
+        subtitleTracks = []
+        selectedSubtitleTrack = nil
         audioTracks = []
         muxedAudioStream = -1
         generation += 1
@@ -216,6 +272,18 @@ final class RemuxBench {
         if firstFrameAt == nil {
             firstFrameAt = now
             log("first frame \(now - started) ms (after open \(now - (openedAt ?? started)) ms)")
+            // `-remuxBenchSubtitle <menu index>`: show that text subtitle track (Build 21 overlay checks).
+            if let raw = AppBootstrap.argument("-remuxBenchSubtitle"), let id = Int(raw) {
+                engine?.selectSubtitle(id)
+                Task { @MainActor [weak engine] in
+                    for _ in 0..<6 {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard let engine else { return }
+                        log("subtitles: \(engine.subtitleTracks.count) tracks, selected \(engine.selectedSubtitleTrack.map(String.init) ?? "off"), "
+                            + "\(engine.cues.count) cues, t=\(String(format: "%.2f", engine.inner.player.currentTime().seconds)), on screen \(engine.subtitleTexts())")
+                    }
+                }
+            }
             // `-remuxBenchAudio <menu index>`: audio switch measurement instead of the seeks (Build 20).
             if let raw = AppBootstrap.argument("-remuxBenchAudio"), let id = Int(raw) {
                 Task { await runAudioSwitch(to: id) }

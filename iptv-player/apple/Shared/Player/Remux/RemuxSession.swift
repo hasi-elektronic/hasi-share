@@ -26,6 +26,8 @@ final class RemuxSession: @unchecked Sendable {
         /// Every audio track of the source (Build 20) and the source stream index of the muxed one (-1 = none).
         var audioTracks: [AudioTrack] = []
         var audioStreamIndex: Int = -1
+        /// Text subtitle tracks (Build 21); their cues arrive through `onCue` while segments are generated.
+        var subtitleTracks: [SubtitleTrack] = []
         var bitrate: Int
         var segments: [(start: Double, duration: Double)]
         var targetDuration: Double
@@ -40,6 +42,26 @@ final class RemuxSession: @unchecked Sendable {
         var channels: Int
         var title: String
         var isDefault: Bool
+    }
+
+    /// One text subtitle track of the source (`nr_subtitle_tracks`).
+    struct SubtitleTrack: Sendable, Equatable {
+        var streamIndex: Int
+        var language: String
+        var codec: String
+        var title: String
+        var isDefault: Bool
+        var isForced: Bool
+    }
+
+    /// Receives the C cue callback (lives as long as the session's FFmpeg context).
+    final class CueSink: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _handler: (@Sendable (_ stream: Int, _ start: Double, _ end: Double, _ text: String) -> Void)?
+        var handler: (@Sendable (Int, Double, Double, String) -> Void)? {
+            get { lock.lock(); defer { lock.unlock() }; return _handler }
+            set { lock.lock(); _handler = newValue; lock.unlock() }
+        }
     }
 
     struct SegmentTiming: Sendable {
@@ -78,10 +100,19 @@ final class RemuxSession: @unchecked Sendable {
     private var timings: [SegmentTiming] = []
     private let maxCached = 4
 
+    private let cueSink: CueSink
+    /// Text subtitle cues (stream index, playlist seconds, text) – called on the worker queue while segments are
+    /// generated; set before the session serves segments.
+    var onCue: (@Sendable (Int, Double, Double, String) -> Void)? {
+        get { cueSink.handler }
+        set { cueSink.handler = newValue }
+    }
+
     /// Called with each finished segment (diagnostics / spike measurements).
     var onSegment: (@Sendable (SegmentTiming) -> Void)?
 
-    private init(token: String, info: Info, source: RemuxByteSource, ctx: OpaquePointer, queue: DispatchQueue) {
+    private init(token: String, info: Info, source: RemuxByteSource, ctx: OpaquePointer, queue: DispatchQueue, cueSink: CueSink) {
+        self.cueSink = cueSink
         self.token = token
         self.info = info
         self.source = source
@@ -126,6 +157,8 @@ final class RemuxSession: @unchecked Sendable {
                     continuation.resume(throwing: RemuxError.open(code: code, message: String(decoding: err.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)))
                     return
                 }
+                let cueSink = CueSink()
+                nr_set_cue_callback(ctx, remuxCue, Unmanaged.passUnretained(cueSink).toOpaque())
                 var raw = NRInfo()
                 nr_get_info(ctx, &raw)
                 var segments: [(Double, Double)] = []
@@ -140,8 +173,9 @@ final class RemuxSession: @unchecked Sendable {
                                 segments: segments, targetDuration: raw.target_duration, openBytes: raw.open_bytes_read)
                 info.audioStreamIndex = Int(raw.audio_stream_index)
                 info.audioTracks = audioTracks(ctx)
+                info.subtitleTracks = subtitleTracks(ctx)
                 let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-                continuation.resume(returning: RemuxSession(token: token, info: info, source: source, ctx: ctx, queue: queue))
+                continuation.resume(returning: RemuxSession(token: token, info: info, source: source, ctx: ctx, queue: queue, cueSink: cueSink))
             }
         }
     }
@@ -154,6 +188,17 @@ final class RemuxSession: @unchecked Sendable {
         return raw.map { t in
             AudioTrack(streamIndex: Int(t.stream_index), language: string(t.language), codec: string(t.codec),
                        channels: Int(t.channels), title: string(t.title), isDefault: t.is_default != 0)
+        }
+    }
+
+    private static func subtitleTracks(_ ctx: OpaquePointer) -> [SubtitleTrack] {
+        let count = Int(nr_subtitle_tracks(ctx, nil, 0))
+        guard count > 0 else { return [] }
+        var raw = [NRSubtitleTrack](repeating: NRSubtitleTrack(), count: count)
+        _ = raw.withUnsafeMutableBufferPointer { nr_subtitle_tracks(ctx, $0.baseAddress, Int32(count)) }
+        return raw.map { t in
+            SubtitleTrack(streamIndex: Int(t.stream_index), language: string(t.language), codec: string(t.codec),
+                          title: string(t.title), isDefault: t.is_default != 0, isForced: t.is_forced != 0)
         }
     }
 
@@ -346,6 +391,12 @@ private func string<T>(_ tuple: T) -> String {
 }
 
 // MARK: C callbacks (worker thread)
+
+private let remuxCue: NRCueFn = { opaque, stream, start, end, text in
+    guard let opaque, let text else { return }
+    let sink = Unmanaged<RemuxSession.CueSink>.fromOpaque(opaque).takeUnretainedValue()
+    sink.handler?(Int(stream), start, end, String(cString: text))
+}
 
 private let remuxRead: NRReadFn = { opaque, buffer, size in
     guard let opaque, let buffer else { return -1 }

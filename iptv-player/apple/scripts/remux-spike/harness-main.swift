@@ -88,6 +88,14 @@ Task {
             print("TRACK stream=\(t.streamIndex) lang=\(t.language) codec=\(t.codec) ch=\(t.channels) title=\(t.title) default=\(t.isDefault)"
                   + (t.streamIndex == info.audioStreamIndex ? " MUXED" : ""))
         }
+        for t in info.subtitleTracks {
+            print("SUBTRACK stream=\(t.streamIndex) lang=\(t.language) codec=\(t.codec) title=\(t.title) default=\(t.isDefault) forced=\(t.isForced)")
+        }
+        if env["CUES"] != nil {
+            session.onCue = { stream, start, end, text in
+                print(String(format: "CUE %d %.3f %.3f %@", stream, start, end, text.replacingOccurrences(of: "\n", with: "|")))
+            }
+        }
         session.onSegment = { t in
             print(String(format: "SEG %d %@ %.1f ms enc %.1f ms %d B  v[%.4f..%.4f] a[%.4f..%.4f]", t.index, t.prefetch ? "pre" : "req",
                          t.ms, t.encodeMs, t.bytes, t.videoFirst, t.videoEnd, t.audioFirst, t.audioEnd))

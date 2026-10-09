@@ -72,6 +72,25 @@ NRContext *nr_open(void *opaque, NRReadFn read_fn, NRSeekFn seek_fn, const char 
                    double target_segment_seconds, int force_audio_transcode, int *code, char *err, int errlen);
 /// Fills up to `max` audio tracks of the source in container order; returns the total count.
 int nr_audio_tracks(const NRContext *ctx, NRAudioTrack *out, int max);
+
+/// One text subtitle track of the source (Build 21: SRT, ASS/SSA, WebVTT, mov_text – no bitmap subtitles).
+typedef struct NRSubtitleTrack {
+    int stream_index;
+    char language[8];
+    char codec[24];
+    char title[64];
+    int is_default;
+    int is_forced;
+} NRSubtitleTrack;
+
+/// Fills up to `max` text subtitle tracks in container order; returns the total count.
+int nr_subtitle_tracks(const NRContext *ctx, NRSubtitleTrack *out, int max);
+
+/// Receives the text subtitle cues read while a segment is generated (on the generating thread):
+/// playlist time in seconds, plain UTF-8 text (ASS override tags removed, "\n" line breaks; italic
+/// spans wrapped in <i>…</i>). A segment generated twice reports its cues twice (callers deduplicate).
+typedef void (*NRCueFn)(void *opaque, int stream_index, double start, double end, const char *text);
+void nr_set_cue_callback(NRContext *ctx, NRCueFn fn, void *opaque);
 void nr_get_info(const NRContext *ctx, NRInfo *info);
 double nr_segment_start(const NRContext *ctx, int index);     ///< playlist time, seconds
 double nr_segment_duration(const NRContext *ctx, int index);  ///< seconds
