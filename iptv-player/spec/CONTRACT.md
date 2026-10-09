@@ -377,6 +377,9 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
    which was added to every content and so forced every stream into VLCKit, is migrated once into the
    calibration (clamped to ±500 ms) and no longer exists. VLCKit applies content + calibration + the
    automatic latency term below.
+0a. **tvOS, Build 18:** a live channel and VLCKit supports it ⇒ **VLCKit** (Build ≤ 15 did this de facto – the old
+   device delay routed every stream to VLCKit; Build 16 moved live to AVPlayer and many panels' HLS failed to connect
+   and froze on Apple TV). The resolved URL is unchanged (§4.5). iOS keeps rule 1.
 1. AVPlayer supports it (hls, mp4, unknown) ⇒ **AVPlayer** (native HLS, power, AirPlay).
 2. else VLCKit supports it ⇒ **VLCKit**.
 3. else ⇒ `UnsupportedFormat(container)` before playback.

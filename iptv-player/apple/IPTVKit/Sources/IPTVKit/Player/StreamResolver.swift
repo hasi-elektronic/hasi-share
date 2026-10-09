@@ -146,9 +146,26 @@ public struct StreamResolver: Sendable {
             container = StreamFormatDetector.detect(url: url.absoluteString, contentType: probe.contentType, firstBytes: probe.bytes)
             if let error = ApplePlayback.playbackError(for: container, vlcAvailable: vlcAvailable, override: engineOverride) { throw error }
         }
-        let engine = ApplePlayback.engine(for: container, vlcAvailable: vlcAvailable, override: engineOverride) ?? .avPlayer
+        var engine = ApplePlayback.engine(for: container, vlcAvailable: vlcAvailable, override: engineOverride) ?? .avPlayer
+        if Self.liveOnVLC(override: engineOverride, isLiveChannel: request.isLive, container: container, vlcAvailable: vlcAvailable) {
+            engine = .vlcKit
+        }
         return ResolvedStream(url: url, container: container, headers: headers, engine: engine, hlsForcedByOverride: hlsForced)
     }
+
+    /// Build 18 (CONTRACT §6.1 rule 0a): on tvOS, `automatic` plays live channels through VLCKit – what Build ≤ 15
+    /// did de facto (the old device delay routed everything to VLCKit); Build 16 moved them to AVPlayer and
+    /// many IPTV panels' HLS then failed to connect and froze on Apple TV.
+    static func liveOnVLC(override: PlayerEngineOverride, isLiveChannel: Bool, container: StreamContainer,
+                          vlcAvailable: Bool, tvOS: Bool = isTVOS) -> Bool {
+        tvOS && override == .automatic && isLiveChannel && vlcAvailable && container.isSupported(by: .vlcKit)
+    }
+
+    #if os(tvOS)
+    static let isTVOS = true
+    #else
+    static let isTVOS = false
+    #endif
 
     /// Xtream live extension (CONTRACT §4.5); the Apple (AVPlayer) override always asks for `.m3u8` –
     /// `forced` = the account does not list HLS.

@@ -177,6 +177,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         TopShelfKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
+        # App Store Connect rejects 64-bit tvOS extensions without it (ITMS-90502, Build 17 upload).
+        UIRequiredDeviceCapabilities: [arm64]
         NSExtension:
           NSExtensionPointIdentifier: com.apple.tv-top-shelf
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider

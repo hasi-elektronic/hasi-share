@@ -275,3 +275,19 @@ final class EngineOverrideTests: XCTestCase {
         XCTAssertEqual(AppSettings(defaults: defaults).playerEngine, .avPlayer)
     }
 }
+
+/// Build 18 (CONTRACT §6.1 rule 0a): tvOS `automatic` plays live channels through VLCKit (Build ≤ 15 behaviour).
+final class LiveOnVLCTests: XCTestCase {
+    func testTVOSAutomaticLiveGoesToVLC() {
+        XCTAssertTrue(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: true, container: .hls, vlcAvailable: true, tvOS: true))
+        XCTAssertTrue(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: true, container: .mpegts, vlcAvailable: true, tvOS: true))
+    }
+
+    func testOtherCasesUnchanged() {
+        XCTAssertFalse(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: true, container: .hls, vlcAvailable: true, tvOS: false))
+        XCTAssertFalse(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: false, container: .hls, vlcAvailable: true, tvOS: true))
+        XCTAssertFalse(StreamResolver.liveOnVLC(override: .avPlayer, isLiveChannel: true, container: .hls, vlcAvailable: true, tvOS: true))
+        XCTAssertFalse(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: true, container: .hls, vlcAvailable: false, tvOS: true))
+        XCTAssertFalse(StreamResolver.liveOnVLC(override: .automatic, isLiveChannel: true, container: .udp, vlcAvailable: true, tvOS: true))
+    }
+}
