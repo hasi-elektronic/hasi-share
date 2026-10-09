@@ -104,6 +104,7 @@ final class ContentLockTests: XCTestCase {
                        "the individually locked channel stays listed (with a lock), the adult category's channels do not")
         let kids = try XCTUnwrap(env.catalog.channels(sourceId: sid, limit: 50).last)
         XCTAssertTrue(env.parental.needsPin(channel: kids), "playing it needs the PIN")
+        XCTAssertNil(try env.catalog.channelForNumberZap(sourceId: sid, number: 5), "number zapping never reaches it without the PIN")
         XCTAssertTrue(try env.catalog.channels(sourceId: sid, categoryId: try category(env, .live, "XXX Adult").id, limit: 50).isEmpty,
                       "the locked category opens empty until the PIN is entered")
     }

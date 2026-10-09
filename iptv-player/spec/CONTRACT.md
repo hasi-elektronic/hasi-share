@@ -176,6 +176,26 @@ after another (big panels: 35k movies = tens of MB generated server-side). XMLTV
 
 Expected-output schema: see `test-vectors/m3u/README.md`.
 
+### 3.9 M3U catch-up playback URLs (Build 18, audit C11)
+Archive URL of a programme `[start, end)` of an M3U channel with `catchup` (Xtream sources: §4.5 timeshift).
+Only `http(s)` stream URLs; anything not buildable ⇒ no catch-up (the UI says so).
+* `default` – `catchup-source` is the archive URL (placeholders filled); a source that is not an absolute
+  `http(s)` URL is appended to the stream URL. Without `catchup-source`: the stream URL itself when it contains
+  placeholders, else detected: Xtream-shaped (`{host}/[live/]U/P/{id}.ts|m3u8`) → `xc`, Flussonic-shaped
+  (`…/<name>/index|video|mono|playlist|tracks-v1a1.m3u8`, `…/<name>/mpegts`) → `flussonic`, anything else → `shift`.
+* `append` – stream URL + filled `catchup-source` (no source ⇒ none).
+* `shift` (`timeshift`) – stream URL + `?`/`&` + `utc={utc}&lutc={lutc}`.
+* `flussonic` (`flussonic-hls`, `flussonic-ts`, `fs`) – `…/<name>/<list>.m3u8[?q]` → `…/<name>/<list>-{utc}-{duration}.m3u8[?q]`;
+  `…/<name>/mpegts[?q]` → `…/<name>/archive-{utc}-{duration}.ts[?q]`; an explicit `catchup-source` wins.
+* `xc` (`xtream`) – `{host}/[live/]U/P/{id}.{ext}` → `{host}/timeshift/U/P/{ceil(minutes)}/{yyyy-MM-dd:HH-mm UTC}/{id}.{ext}`.
+* Placeholders: `{utc}` `${start}` `{start}` = start (Unix s) · `{utcend}` `${end}` `{end}` · `{lutc}` `${now}`
+  `${timestamp}` `{now}` · `{duration}` `${duration}` (s; `{duration:N}` = ÷N, e.g. minutes) · `{offset}`
+  `${offset}` (now − start, s; `{offset:N}`) · `{Y}{m}{d}{H}{M}{S}` (start, UTC) · `{utc:FMT}` `${start:FMT}`
+  `{utcend:FMT}` `${end:FMT}` `{lutc:FMT}` `${now:FMT}` with the letters `Y m d H M S` (UTC). Unknown ones stay.
+* A programme on air ("from the start") uses the same URL (the server serves up to now). Replay is offered for
+  programmes that started within `max(catchup-days, 1)` days. Apple: `CatchupURLBuilder` (IPTVCore,
+  unit-tested; no shared vector yet – Android implements it when its guide gets catch-up playback).
+
 ---
 
 ## 4. Xtream Codes (`test-vectors/xtream/*`)

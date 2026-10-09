@@ -110,6 +110,7 @@ final class Router {
             env.parental.requestUnlock { [weak self] in self?.play(item, channels: channels, fromStart: fromStart) }
             return
         }
+        let channels = Self.zapList(channels, env: env)   // ▲▼ never reaches a locked channel without the PIN
         // "Continue watching" may know an Xtream episode only by id (no cached row): complete it first (B1).
         if case .episode(let episode, let seriesTitle) = item, episode.url == nil, episode.containerExt == nil {
             Task {

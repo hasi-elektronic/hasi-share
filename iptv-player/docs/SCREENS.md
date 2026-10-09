@@ -267,18 +267,40 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 * **Zaman penceresi saati izler:** dakikada bir "şimdi" çizgisi ve yayındaki bloklar güncellenir; şimdi açılış
   konumundan 30 dk ilerleyince pencere yeniden "şimdi" karonun hemen sağında olacak şekilde kayar (açık
   bırakılan rehber donmaz / boşalmaz). Canlı TV listesinin şimdi/sonra bilgisi de dakikada bir yenilenir.
-* Üstte kategori çipleri (Tümü · Favoriler · kategoriler).
+* Üstte kategori çipleri (Tümü · Favoriler · kategoriler); kilitli kategori (ebeveyn kilidi, "kilitle göster"
+  modu) 🔒 ile gösterilir ve PIN sorar (§3.10).
+* **Gün seçici (Build 18):** çiplerin altında **"Şimdi"** düğmesi (sabit, solda; bugüne ve yayındaki programa döner)
+  + gün çipleri **Dün · Bugün · Yarın · "Paz 11 Eki" …** – geçmişte kaynağın en derin catch-up arşivi kadar gün (en
+  az Dün, en çok 7), ileride +6 gün (EPG saklama penceresi, CONTRACT §5). Günler EPG saat diliminde gece yarısından
+  gece yarısına (yaz saati günleri 23/25 saat). **Bugün** = hareketli pencere (şimdi karonun hemen sağında, günün
+  sonuna kadar, en az 12 saat; Build 16 kuralları aynen); **başka gün** = o günün tamamı, sabit, aynı saatte açılır
+  (ör. yarın 20:15) – "şimdi" çizgisi yalnızca bugün. Sol üstteki başlık seçili günü gösterir. Gün değiştirme
+  ≤ 100 ms (500 bin programlık rehberde ölçüldü). TV: her çip tek odaklanabilir; ▼ ile listeye inince odak
+  bugün yayındaki, başka günde aynı saatteki bloğa gider.
+* **Program detayı (Build 18):** yayındaki bloğa dokun / OK → kanal oynar (eskisi gibi tek adım); **diğer bloklar**
+  (ve her bloğun uzun bas menüsündeki "Sendungsdetails") → detay sayfası: kanal, başlık, gün + saat aralığı,
+  durum ("● Şu an yayında" / "Bitti"), açıklama; eylemler (TV: satır başına bir odak): **Jetzt ansehen** (kanal
+  canlı) · **Von Anfang an** (yayındaki program, catch-up varsa) / **Aufnahme ansehen** (geçmiş program, arşiv
+  günleri içinde) · **Erinnern / Erinnerung entfernen** (gelecekteki program). Hatırlatması olan blokta 🔔.
+* **Hatırlatmalar (Build 18):** iOS – ilk kullanımda bildirim izni istenir; başlangıçta (isteğe bağlı 5 dk önce de)
+  yerel bildirim; dokununca kanal açılır (gerekirse kaynak değişir; kilitliyse PIN). Uygulama açıkken (iOS + tvOS)
+  üstte şerit: "<Program> şimdi <Kanal> kanalında başlıyor – Kanala geçilsin mi?" [Kanala geç] [✕], 20 sn; tvOS'ta
+  odak "Kanala geç"e gelir; oynatıcının üstünde de görünür. Ayar **"Başlangıçta otomatik olarak geç"** açıksa geçiş
+  kendiliğinden olur, şerit yalnızca bildirir. Hatırlatmalar yeniden başlatmada korunur, program bitince silinir;
+  başlangıcı uygulama kapalıyken geçen hatırlatma sonradan gösterilmez. Liste: Ayarlar → Hatırlatmalar (§3.9).
 * **iPad (geniş) ve TV:** sağda panel — **"Şimdi yayında"** (seçili/odaklı kanalın programı, saat, açıklama,
   "▶ Oynat") + **"Bugün"** sıradaki programlar listesi (saat + süre). iPhone'da panel yok. TV'de odak gelecekteki
   / geçmiş bir bloktaysa panel o programı gösterir (**"Daha sonra"** / **"Daha önce"** başlığı, saat, açıklama;
   "Bugün" listesi onun ardından başlar). Liste kartın içinde kırpılır.
 * **TV ★:** sekme çubuğundan/çiplerden ▼ ilk satırın şu an yayındaki bloğuna iner, "şimdi" çizgisi görünür kalır.
-* Dokun / OK → kanal oynar (iPad'de karoya dokunmak paneli o kanala getirir). TV'de D-pad ▲▼ kanallar,
-  ◀▶ programlar arası. Uzun bas → favori / gizle menüsü.
+* Yayındaki bloğa dokun / OK → kanal oynar (iPad'de karoya dokunmak paneli o kanala getirir); diğer bloklar →
+  program detayı. TV'de D-pad ▲▼ kanallar, ◀▶ programlar arası. Uzun bas → program detayı / favori / gizle /
+  kanalı kilitle menüsü.
 * **Geçmiş yayın (catch-up) arşivi:** kanal destekliyorsa panelde/kartta ⟲ → sheet "TV arşivi ·
   Geçmiş yayınlar": gün başlıkları (bugün → arşiv gün sayısı), her satır saat + başlık + açıklama +
-  "Tekrar izle". Tekrar izleme Xtream kaynaklarında `timeshift` URL'siyle (CONTRACT §4) yapılır;
-  M3U `catchup-source` şablonları için yalnızca liste gösterilir (bilgi notu).
+  "Tekrar izle". Tekrar izleme Xtream kaynaklarında `timeshift` URL'siyle (CONTRACT §4.5), **M3U'da (Build 18)
+  `catchup` türüne göre** (`default`/`append`/`shift`/`flussonic`/`xc`, CONTRACT §3.9) yapılır; URL kurulamıyorsa
+  "Bu kanalın arşivi oynatılamıyor" notu.
 * Saatler cihaz saat diliminde (ayar ile değiştirilebilir), 24 saat biçimi TR, sistem biçimi EN.
 
 ### 3.5 Film ve dizi detayı
@@ -608,7 +630,31 @@ ekranı; TV'deki dudak senkronu düzeltmesi, bu yüzden üstte – Gelişmiş'te
     uygulama sürümü, **Açık kaynak lisansları** ekranı (VLCKit LGPL-2.1 bildirimi + kaynak bağlantısı +
     tam metin, diğer bileşenler), **Gizlilik politikası** ve **Kullanım koşulları** bağlantıları (iOS: tarayıcı;
     tvOS: QR + URL; Hakkında ekranında da).
-* Kilitliyken bu ekran tamamen erişilebilir.
+* **Ebeveyn denetimi** ve **Hatırlatmalar** (Build 18): üst düzeyde ayrı grup (Gelişmiş'in üstünde) – §3.10 ve
+  "Hatırlatmalar" listesi: program, kanal, gün + saat; iOS'ta sola kaydırıp sil, tvOS'ta satıra OK = sil (tek
+  odak); "5 dakika önce de hatırlat", "Başlangıçta otomatik olarak geç" anahtarları.
+* PIN ayarlıysa ve "Kaynaklar ve oynatıcı ayarları için PIN" açıksa **Kaynaklar** (liste, detay, düzenle, ekle),
+  **Gelişmiş** (motor, senkron sıfırlama) ve **Ses senkronunu ayarla** sayfaları önce PIN tuş takımını gösterir.
+* Kilitliyken (deneme bitti) bu ekran tamamen erişilebilir.
+
+### 3.10 Ebeveyn denetimi (Build 18)
+* **PIN:** 4 haneli; Ayarlar → Ebeveyn denetimi → "PIN belirle" (iki kez girilir, eşleşmezse tekrar) / "PIN'i
+  değiştir" (mevcut + yeni ×2) / "PIN'i kaldır" (mevcut). Giriş her yerde aynı **tuş takımıyla**: 4 nokta + 1–9,
+  0, ⌫ ızgarası (TV: her tuş tek odaklanabilir, kumandayla); 4. rakamda otomatik gönderilir. Yanlış PIN →
+  "Yanlış PIN – N deneme kaldı"; **5 yanlış → 1 dk bekleme** (yeniden başlatmada da sürer). PIN Keychain'de yalnızca
+  tuzlu PBKDF2-SHA256 özeti olarak saklanır.
+* **Kilitler (kaynak başına):** kategoriler (Canlı TV / Filmler / Diziler – Ayarlar'da tür başına aranabilir anahtar
+  listesi, yetişkin adlı olanlar ⚠ ile) ve tek tek kanallar (kanalın uzun bas menüsü "Kanalı kilitle"; kilit açmak
+  PIN ister; Ayarlar'da kilitli kanallar listesi). **İlk PIN belirlenince** adı yetişkin içeriğe benzeyen kategoriler
+  (XXX, adult, 18+, +18, erotik, yetişkin, Erwachsene, porn …) önerilir: "Yetişkin kategorileri kilitlensin mi?" –
+  hepsi seçili, "Seçilenleri kilitle" / "Şimdi değil".
+* **Gizle / kilitle göster:** "Kilitli içeriği gizle" açık (varsayılan) → kilitli kategoriler ve kanallar hiçbir
+  listede yok; kapalı → 🔒 ile listelenir, açmak / oynatmak PIN ister. Her iki modda da kilitli kategorilerin
+  başlıkları ve posterleri **"Tümü" listelerine, aramaya (yazarken öneriler de kapanır), ana sayfa satırlarına,
+  "İzlemeye devam et"e, numarayla kanal geçişine, Hızlı başlata** sızmaz.
+* **Oturum kilidi:** doğru PIN tüm kilitleri **uygulama arka plana geçene kadar** açar ("Şimdi kilitle" ile hemen
+  geri). PIN'i belirleyen kişi o oturumda kilitsiz devam eder. Kilitli bir içeriğe hangi yoldan gidilirse gidilsin
+  (liste, arama, hatırlatma, catch-up) oynatma öncesi PIN sorulur.
 
 ## 4. Hata ve boş durumlar (ayrı ayrı mesajlar)
 

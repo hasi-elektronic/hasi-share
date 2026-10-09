@@ -293,6 +293,28 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
   (`sleepTimer`, 10 adımda `setVolume` ile 5 sn kısma) ve altyazı stilini/gecikmesini (`PlayerPreferences`,
   motorlarda `applySubtitleStyle` / `setSubtitleDelay`) yönetir; ayrıntılar SCREENS §3.5/§3.7.
 
+### 3.2a Rehber günleri, hatırlatmalar, ebeveyn kilidi (Build 18)
+* **Gün penceresi:** `GuideDay.days(now:timeZone:catchupDays:)` (IPTVKit, saf) EPG saat diliminde gece yarısı
+  sınırlı günler üretir; `EpgTimeline(day:…)` bugün için Build 16'nın hareketli penceresini (günün sonuna kadar), diğer
+  günler için sabit tam günü verir. Satırlar programları `epg_lookup_lc` indeksiyle gün aralığında okur (satır başına
+  bir sorgu, yalnızca görünen satırlar) – 500 bin programda gün değişimi < 1 ms/24 satır (`GuideDayTests`).
+* **Catch-up URL:** `AppEnvironment.catchupURL(channel:program:)` – Xtream `XtreamURLBuilder.timeshiftURL`, M3U
+  `CatchupURLBuilder` (IPTVCore, CONTRACT §3.9). `ProgramActions.decide` detay sayfasının eylemlerini belirler.
+* **Hatırlatmalar:** `ReminderStore` (IPTVKit, `@Observable`, anahtar-değer deposunda JSON; yeniden başlatmada kalır,
+  bitmiş programlar `cleanup()` ile silinir). Sistem bildirimi `ReminderNotifier` protokolüyle uygulama katmanında:
+  iOS `ReminderNotificationCenter` (`UNUserNotificationCenter`, yerel `UNTimeIntervalNotificationTrigger`, delegate
+  uygulama açılışında kurulur – soğuk açılıştaki dokunma da yakalanır; ön planda sistem şeridi bastırılır). tvOS'ta
+  uyarı bildirimi yok: `ReminderRuntime` (uygulama katmanı) bir sonraki hatırlatma anına kadar uyur, `takeDueFires`
+  ile şeridi gösterir veya otomatik geçer. Push/uzak bildirim yok → geliştirici portalında yetenek gerekmez.
+* **Ebeveyn kilidi:** `ParentalControl` (IPTVKit) – PIN özeti Keychain'de (`SecureStore`, `parental.pin.v1`, PBKDF2-
+  HMAC-SHA256, 16 bayt tuz, 60 000 tur), kilit listeleri ve deneme sayacı anahtar-değer deposunda. Kilitliyken
+  `ContentLockFilter` `CatalogRepository.contentLock` kutusuna yazılır; katalog sorguları (kategori listeleri, sayfalı
+  listeler, kimliğe göre okumalar, numara geçişi, arama çözümü) `item_categories` üyeliği üzerinden `NOT EXISTS`
+  koşulu ekler – kilit tek noktada uygulanır, ekranlar ayrı filtre yazmaz. Oturum kilidi açılınca filtre `nil`,
+  her değişiklik `catalogVersion`'ı artırır (ekranlar yeniden yüklenir). Son güvence `Router.play`: kilitli öğe
+  PIN istemi (`ParentalControl.prompt`) olmadan oynamaz; istem kapanma animasyonundan sonra eylemi çalıştırır
+  (`promptDismissed`). Başka süreçlere yazılan veriler (Top Shelf) oturumdan bağımsız `storedFilter` kullanmalıdır.
+
 ### 3.3 Kalıcı depolama: tvOS silinebilir alan ve dayanıklı ayna (Build 14)
 tvOS uygulamalarının yalnızca ~500 KB'lık **kalıcı** yerel alanı vardır (NSUserDefaults); Application Support ve
 Caches dahil konteynerin geri kalanı sistem yer gerektiğinde **silinebilir**. Sahibin kataloğu büyük (≈4k canlı,

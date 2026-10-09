@@ -184,6 +184,12 @@ extension Router {
         }
     }
 
+    /// Zapping list without locked channels (show-with-lock mode lists them) while locked.
+    static func zapList(_ channels: [Channel], env: AppEnvironment) -> [Channel] {
+        guard env.parental.isActive else { return channels }
+        return channels.filter { !env.parental.needsPin(channel: $0) }
+    }
+
     /// Runs `action` (a catch-up of `channel`) after the PIN when the channel is locked.
     func playGuarded(channel: Channel, _ action: @escaping @MainActor () -> Void) {
         if Self.isLocked(.channel(channel), env: env) {

@@ -328,7 +328,7 @@ public final class CatalogRepository: Sendable {
     /// list (1-based); in a numbered source a missing number is nil.
     public func channelForNumberZap(sourceId: String, number: Int) throws -> Channel? {
         guard number > 0 else { return nil }
-        let lock = lockClause(.live, sourceId: sourceId)
+        let lock = lockClause(.live, sourceId: sourceId, excludeLockedChannels: true)
         if let match = try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND number = ?\(lock.sql) ORDER BY sort LIMIT 1",
                                          [.text(sourceId), .int(Int64(number))] + lock.args, map: Self.channel) {
             return match
@@ -347,7 +347,7 @@ public final class CatalogRepository: Sendable {
         guard let sort = try db.queryFirst(
             "SELECT sort FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ? AND item_id = ?",
             args + [.text(channelId)], map: { $0.int(0) }) else { return [] }
-        let lock = lockClause(.live, sourceId: sourceId, alias: "c.")
+        let lock = lockClause(.live, sourceId: sourceId, alias: "c.", excludeLockedChannels: true)
         let select = """
             SELECT \(Self.qualifiedChannelColumns) FROM item_categories ic
             JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id

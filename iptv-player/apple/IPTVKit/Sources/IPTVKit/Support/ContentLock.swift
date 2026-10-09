@@ -68,8 +68,10 @@ public final class ContentLockBox: @unchecked Sendable {
 extension CatalogRepository {
     /// `AND …` predicate that leaves out locked items of `kind` (empty without an active filter / locks).
     /// `alias`: table alias of the item row ("c." for joins); `idColumn`: the item id column (episodes: `series_id`).
+    /// `excludeLockedChannels`: also leave out individually locked channels in show-with-lock mode (zapping in the
+    /// player never reaches a locked channel without the PIN).
     func lockClause(_ kind: CategoryKind, sourceId: String, alias: String = "", idColumn: String = "id",
-                    filter: ContentLockFilter? = nil) -> (sql: String, args: [SQLiteValue]) {
+                    filter: ContentLockFilter? = nil, excludeLockedChannels: Bool = false) -> (sql: String, args: [SQLiteValue]) {
         guard let filter = filter ?? contentLock.filter else { return ("", []) }
         var sql = ""
         var args: [SQLiteValue] = []
@@ -79,7 +81,7 @@ extension CatalogRepository {
                 + " AND lk.item_id = \(alias)\(idColumn) AND lk.category_id IN (\(Self.placeholders(categories.count))))"
             args += categories.map(SQLiteValue.text)
         }
-        if kind == .live, filter.hideLocked {
+        if kind == .live, filter.hideLocked || excludeLockedChannels {
             let channels = filter.lockedChannels(sourceId).sorted()
             if !channels.isEmpty {
                 sql += " AND \(alias)\(idColumn) NOT IN (\(Self.placeholders(channels.count)))"
