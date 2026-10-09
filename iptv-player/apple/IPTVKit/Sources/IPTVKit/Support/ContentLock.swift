@@ -105,8 +105,20 @@ extension CatalogRepository {
         return found != 0
     }
 
-    /// An episode row whatever the lock (to find the series of a progress entry).
-    func episodeIgnoringLock(sourceId: String, id: String) throws -> Episode? {
+    /// A movie whatever the lock (a deep link: playing it then asks for the PIN).
+    public func movieIgnoringLock(sourceId: String, id: String) throws -> Movie? {
+        try database.db.queryFirst("SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND id = ?",
+                                   [.text(sourceId), .text(id)], map: Self.movie)
+    }
+
+    /// A series whatever the lock (a deep-linked episode's title).
+    public func seriesItemIgnoringLock(sourceId: String, id: String) throws -> Series? {
+        try database.db.queryFirst("SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND id = ?",
+                                   [.text(sourceId), .text(id)], map: Self.series)
+    }
+
+    /// An episode row whatever the lock (to find the series of a progress entry; a deep link).
+    public func episodeIgnoringLock(sourceId: String, id: String) throws -> Episode? {
         try database.db.queryFirst("""
             SELECT source_id, id, series_id, season, number, title, container_ext, duration_sec, plot, poster_url, url
             FROM episodes WHERE source_id = ? AND id = ?
@@ -123,5 +135,19 @@ extension CatalogRepository {
     public func maxCatchupDays(sourceId: String) throws -> Int {
         try database.db.scalar("SELECT COALESCE(MAX(catchup_days), 0) FROM channels WHERE source_id = ? AND catchup_type != 'none'",
                                [.text(sourceId)])
+    }
+}
+
+extension AppEnvironment {
+    /// Playing `item` needs the parental PIN now (lock active; the channel itself, or a category of the channel /
+    /// movie / series – memberships included). `Router.play` asks for the PIN first.
+    public func needsPinToPlay(_ item: PlaybackRequest.Item) -> Bool {
+        guard parental.isActive else { return false }
+        switch item {
+        case .channel(let c): return parental.needsPin(channel: c) || catalog.isLocked(sourceId: c.sourceId, kind: .live, itemId: c.id)
+        case .movie(let m): return catalog.isLocked(sourceId: m.sourceId, kind: .movie, itemId: m.id)
+        case .episode(let e, _): return catalog.isLocked(sourceId: e.sourceId, kind: .series, itemId: e.seriesId)
+        case .url: return false
+        }
     }
 }

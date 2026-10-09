@@ -185,6 +185,115 @@ final class TopShelfTests: XCTestCase {
         XCTAssertEqual(resumed.startPositionMs, 1_800_000, "a deep-linked movie resumes")
     }
 
+    // MARK: Parental lock (Build 18 × Top Shelf)
+
+    private func categoryId(_ env: AppEnvironment, _ sid: String, _ kind: CategoryKind, _ name: String) throws -> String {
+        try XCTUnwrap(env.catalog.allCategories(sourceId: sid, kind: kind).first { $0.name == name }?.id, name)
+    }
+
+    /// Watches the channels, the movie and the episode of the demo list (Rhein last).
+    private func watchEverything(_ env: AppEnvironment, _ sid: String) throws {
+        let channels = try env.catalog.channels(sourceId: sid, limit: 10)
+        let movie = try XCTUnwrap(env.catalog.movies(sourceId: sid, limit: 5).first)
+        let series = try XCTUnwrap(env.catalog.series(sourceId: sid, limit: 5).first)
+        let episode = try XCTUnwrap(env.catalog.episodes(sourceId: sid, seriesId: series.id).first)
+        var now: Int64 = 1_000
+        for (item, position, duration) in [(PlaybackRequest.Item.channel(channels[2]), Int64(0), Int64(0)), (.channel(channels[0]), 0, 0),
+                                           (.movie(movie), 1_800_000, 5_400_000),
+                                           (.episode(episode, seriesTitle: series.name), 600_000, 2_400_000), (.channel(channels[1]), 0, 0)] {
+            let request = env.request(for: item)
+            now += 1_000
+            var seriesKey: String?
+            if case .episode(let e, _) = item { seriesKey = env.contentKey(sourceId: sid, kind: .series, itemId: e.seriesId) }
+            try env.library.saveProgress(contentKey: XCTUnwrap(request.contentKey), title: request.title, kind: request.contentKind,
+                                         positionMs: position, durationMs: duration, posterUrl: request.posterUrl, seriesKey: seriesKey, nowMs: now)
+        }
+    }
+
+    private func titles(_ snapshot: TopShelfSnapshot) -> [String] { snapshot.sections.flatMap(\.items).map(\.title) }
+
+    /// Locked titles / posters / logos never reach the home screen – also while the app's PIN session is unlocked
+    /// (the active catalog filter is off then) and in show-with-lock mode; the snapshot follows lock changes (the
+    /// publisher only writes a changed snapshot).
+    func testTopShelfLeavesOutLockedItemsWhateverTheSession() async throws {
+        let env = try await makeEnv()
+        let sid = try XCTUnwrap(env.currentSource?.id)
+        try watchEverything(env, sid)
+        let labels = TopShelfLabels(continueTitle: "C", recentTitle: "R")
+        XCTAssertEqual(titles(env.topShelfSnapshot(labels)), ["Harbor Lights · S1 E2", "Red Horizon (2024) HD", "Rhein 24", "Atlas News HD", "Kids Planet"])
+
+        XCTAssertTrue(env.parental.setPin("1234"))
+        XCTAssertTrue(env.parental.isUnlocked, "the one who set the PIN goes on unlocked")
+        env.parental.hideLocked = false   // show with a lock: the app lists locked items, the shelf still must not
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .movie, "Action"), kind: .movie, sourceId: sid)
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .series, "Crime"), kind: .series, sourceId: sid)
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .live, "Kids"), kind: .live, sourceId: sid)
+        let rhein = try XCTUnwrap(env.catalog.channels(sourceId: sid, limit: 10).first { $0.name == "Rhein 24" })
+        env.parental.setChannelLocked(true, channelId: rhein.id, sourceId: sid)
+        XCTAssertNil(env.parental.filter, "session unlocked: no active catalog filter")
+        XCTAssertNotNil(try env.catalog.movie(sourceId: sid, id: try XCTUnwrap(env.catalog.movies(sourceId: sid, limit: 5).first).id),
+                        "the app shows everything in an unlocked session")
+
+        let unlocked = env.topShelfSnapshot(labels)
+        XCTAssertEqual(titles(unlocked), ["Atlas News HD"], "locked movie, series, category channel and channel left out")
+        let json = String(decoding: unlocked.encoded(), as: UTF8.self)
+        for leak in ["Red Horizon", "red.jpg", "Harbor Lights", "lights.jpg", "Rhein", "b.png", "Kids Planet"] {
+            XCTAssertFalse(json.contains(leak), "\(leak) in \(json)")
+        }
+        env.parental.relock()
+        XCTAssertEqual(titles(env.topShelfSnapshot(labels)), ["Atlas News HD"], "locked session: the same")
+        env.parental.hideLocked = true
+        XCTAssertEqual(titles(env.topShelfSnapshot(labels)), ["Atlas News HD"], "hide mode: the same")
+
+        // Unlocking items changes the snapshot (→ republished).
+        env.parental.setChannelLocked(false, channelId: rhein.id, sourceId: sid)
+        XCTAssertEqual(titles(env.topShelfSnapshot(labels)), ["Rhein 24", "Atlas News HD"])
+        // Without a PIN nothing is locked anywhere (the lists stay for a new PIN).
+        XCTAssertEqual(env.parental.unlock("1234"), .ok)
+        XCTAssertEqual(env.parental.removePin("1234"), .ok)
+        XCTAssertNil(env.topShelfLockFilter)
+        XCTAssertEqual(titles(env.topShelfSnapshot(labels)).count, 5)
+    }
+
+    /// A Top Shelf / reminder link into locked content resolves (it is neither opened silently nor ignored) and
+    /// playing it needs the PIN (`Router.open` → `Router.play` → PIN prompt); after the PIN it plays.
+    func testDeepLinkIntoLockedContentNeedsThePin() async throws {
+        let env = try await makeEnv()
+        let sid = try XCTUnwrap(env.currentSource?.id)
+        let movie = try XCTUnwrap(env.catalog.movies(sourceId: sid, limit: 5).first)
+        let series = try XCTUnwrap(env.catalog.series(sourceId: sid, limit: 5).first)
+        let episode = try XCTUnwrap(env.catalog.episodes(sourceId: sid, seriesId: series.id).first)
+        let channels = try env.catalog.channels(sourceId: sid, limit: 10)
+        let kids = try XCTUnwrap(channels.first { $0.name == "Kids Planet" })
+        let rhein = try XCTUnwrap(channels.first { $0.name == "Rhein 24" })
+        let atlas = try XCTUnwrap(channels.first { $0.name == "Atlas News HD" })
+        XCTAssertTrue(env.parental.setPin("1234"))
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .movie, "Action"), kind: .movie, sourceId: sid)
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .series, "Crime"), kind: .series, sourceId: sid)
+        env.parental.setCategoryLocked(true, categoryId: try categoryId(env, sid, .live, "Kids"), kind: .live, sourceId: sid)
+        env.parental.setChannelLocked(true, channelId: rhein.id, sourceId: sid)
+        env.parental.relock()
+
+        for hideLocked in [true, false] {
+            env.parental.hideLocked = hideLocked
+            let links: [DeepLink] = [.movie(sourceId: sid, movieId: movie.id), .episode(sourceId: sid, seriesId: series.id, episodeId: episode.id),
+                                     .channel(sourceId: sid, channelId: kids.id), .channel(sourceId: sid, channelId: rhein.id)]
+            for link in links {
+                let target = try XCTUnwrap(env.playbackTarget(for: link), "\(link) resolves (hide \(hideLocked))")
+                XCTAssertTrue(env.needsPinToPlay(target.item), "\(link) asks for the PIN (hide \(hideLocked))")
+            }
+            let open = try XCTUnwrap(env.playbackTarget(for: .channel(sourceId: sid, channelId: atlas.id)))
+            XCTAssertFalse(env.needsPinToPlay(open.item), "an unlocked channel plays at once")
+        }
+        guard case .episode(_, let title)? = env.playbackTarget(for: .episode(sourceId: sid, seriesId: series.id, episodeId: episode.id))?.item else {
+            return XCTFail("episode")
+        }
+        XCTAssertEqual(title, series.name, "series title found whatever the lock")
+        XCTAssertEqual(env.parental.unlock("1234"), .ok)
+        let target = try XCTUnwrap(env.playbackTarget(for: .movie(sourceId: sid, movieId: movie.id)))
+        XCTAssertFalse(env.needsPinToPlay(target.item), "after the PIN it plays")
+    }
+
     func testDeepLinkToGoneItemsOrSources() async throws {
         let env = try await makeEnv()
         let sid = try XCTUnwrap(env.currentSource?.id)

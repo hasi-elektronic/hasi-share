@@ -175,13 +175,7 @@ extension Router {
     /// True when `item` is locked now (parental lock active; channel, its categories, the movie's / series'
     /// categories – memberships included).
     static func isLocked(_ item: PlaybackRequest.Item, env: AppEnvironment) -> Bool {
-        guard env.parental.isActive else { return false }
-        switch item {
-        case .channel(let c): return env.parental.needsPin(channel: c) || env.catalog.isLocked(sourceId: c.sourceId, kind: .live, itemId: c.id)
-        case .movie(let m): return env.catalog.isLocked(sourceId: m.sourceId, kind: .movie, itemId: m.id)
-        case .episode(let e, _): return env.catalog.isLocked(sourceId: e.sourceId, kind: .series, itemId: e.seriesId)
-        case .url: return false
-        }
+        env.needsPinToPlay(item)   // IPTVKit (ContentLock.swift), unit-tested with the deep-link targets
     }
 
     /// Zapping list without locked channels (show-with-lock mode lists them) while locked.

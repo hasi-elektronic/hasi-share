@@ -30,6 +30,12 @@ extension AppEnvironment {
     public func topShelfSnapshot(_ labels: TopShelfLabels) -> TopShelfSnapshot {
         guard let source = currentSource, let fingerprint = fingerprint(sourceId: source.id) else { return TopShelfSnapshot(sections: []) }
         let limit = TopShelfSnapshot.maxItemsPerSection
+        // Build 18 parental lock: the home screen is outside the app's PIN session – the STORED locks apply even while
+        // the session is unlocked (the active catalog filter is off then), in both modes (hide / show with a lock).
+        let locks = topShelfLockFilter
+        func locked(_ kind: CategoryKind, _ itemId: String) -> Bool {
+            locks.map { catalog.isLocked(sourceId: source.id, kind: kind, itemId: itemId, filter: $0) } ?? false
+        }
         let progress = ((try? library.progressItems()) ?? []).filter { $0.contentKey.hasPrefix(fingerprint + ":") }
         let home = HomeViewModel(env: self)
 
@@ -39,11 +45,11 @@ extension AppEnvironment {
             let title: String
             let image: String?
             switch home.item(for: entry) {
-            case .movie(let movie)?:
+            case .movie(let movie)? where !locked(.movie, movie.id):
                 link = .movie(sourceId: movie.sourceId, movieId: movie.id)
                 title = labels.movieTitle(movie.name)
                 image = movie.posterUrl ?? entry.data.posterUrl
-            case .episode(let episode, let seriesTitle)?:
+            case .episode(let episode, let seriesTitle)? where !locked(.series, episode.seriesId):
                 link = .episode(sourceId: episode.sourceId, seriesId: episode.seriesId, episodeId: episode.id)
                 title = labels.episodeTitle(seriesTitle, episode)
                 let series = (try? catalog.seriesItem(sourceId: episode.sourceId, id: episode.seriesId)) ?? nil
@@ -56,7 +62,8 @@ extension AppEnvironment {
         }
 
         let recentIds = WatchHistory.recentlyWatched(progress, kind: .live, limit: limit * 3).compactMap { ContentKey.parse($0.contentKey)?.itemId }
-        let channels = ((try? catalog.channels(sourceId: source.id, ids: recentIds)) ?? []).filter { !labels.isHidden($0) }.prefix(limit)
+        let channels = ((try? catalog.channels(sourceId: source.id, ids: recentIds)) ?? [])
+            .filter { !labels.isHidden($0) && !locked(.live, $0.id) }.prefix(limit)
         let recentItems = channels.map { channel -> TopShelfSnapshot.Item in
             let link = DeepLink.channel(sourceId: channel.sourceId, channelId: channel.id)
             return TopShelfSnapshot.Item(id: link.identifier, title: channel.name, imageURL: channel.logoUrl, shape: .square,
@@ -68,23 +75,30 @@ extension AppEnvironment {
         ].filter { !$0.items.isEmpty })
     }
 
+    /// The locks a Top Shelf snapshot applies: the stored lists whenever a PIN exists (nil without a PIN – then nothing
+    /// is locked anywhere).
+    public var topShelfLockFilter: ContentLockFilter? { parental.hasPin ? parental.storedFilter : nil }
+
     /// What a deep link plays: the item and (live) its zapping list – the channel's category (first 200), like
     /// QuickStart. nil when the source or the item is gone. An episode without a cached row is rebuilt from its
     /// progress entry; `Router.play` completes it (`playableEpisode`).
+    /// Build 18: the item is found whatever the parental lock (`Router.play` then asks for the PIN – a link from the
+    /// Top Shelf or a reminder never opens locked content silently, nor is it silently ignored); the zapping list keeps
+    /// the active filter.
     public func playbackTarget(for link: DeepLink) -> (item: PlaybackRequest.Item, channels: [Channel])? {
         guard sources.contains(where: { $0.id == link.sourceId }) else { return nil }
         switch link {
         case .channel(let sid, let id):
-            guard let channel = (try? catalog.channel(sourceId: sid, id: id)) ?? nil else { return nil }
+            guard let channel = (try? catalog.channelIgnoringLock(sourceId: sid, id: id)) ?? nil else { return nil }
             var page = (try? catalog.channels(sourceId: sid, categoryId: channel.categoryId, limit: 200)) ?? []
             if !page.contains(where: { $0.id == channel.id }) { page.insert(channel, at: 0) }
             return (.channel(channel), page)
         case .movie(let sid, let id):
-            guard let movie = (try? catalog.movie(sourceId: sid, id: id)) ?? nil else { return nil }
+            guard let movie = (try? catalog.movieIgnoringLock(sourceId: sid, id: id)) ?? nil else { return nil }
             return (.movie(movie), [])
         case .episode(let sid, let seriesId, let id):
-            let series = (try? catalog.seriesItem(sourceId: sid, id: seriesId)) ?? nil
-            if let episode = (try? catalog.episode(sourceId: sid, id: id)) ?? nil {
+            let series = (try? catalog.seriesItemIgnoringLock(sourceId: sid, id: seriesId)) ?? nil
+            if let episode = (try? catalog.episodeIgnoringLock(sourceId: sid, id: id)) ?? nil {
                 return (.episode(episode, seriesTitle: series?.name ?? ""), [])
             }
             guard let key = contentKey(sourceId: sid, kind: .episode, itemId: id),

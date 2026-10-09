@@ -197,6 +197,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.hasielektronik.novaplayer.storekittests
         GENERATE_INFOPLIST_FILE: YES
+        # `@testable import NovaPlayer` (DeepLinkParentalTests) sees the app's C shim module.
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Vendor/FFmpeg/include
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Shared/Player/Remux/CNovaRemux
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/NovaPlayer.app/NovaPlayer
         BUNDLE_LOADER: $(TEST_HOST)
 

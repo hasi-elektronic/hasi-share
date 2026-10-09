@@ -401,15 +401,23 @@ Gizli bilgiler Keychain'de (`ThisDeviceOnly`) ve silinmez.
 * **Yazan:** `TopShelfPublisher` (tvOS): `libraryVersion` / `catalogVersion` / kaynak / dil değişince 5 sn birleştirerek,
   `.background`'da ve açılışta hemen; yalnızca değişen anlık görüntü yazılır, sonra
   `TVTopShelfContentProvider.topShelfContentDidChange()`. İçerik `AppEnvironment.topShelfSnapshot(_:)`
-  (`HomeViewModel` kuralları, gizli kanallar `TopShelfLabels.isHidden` ile – ebeveyn kilidi de buraya bağlanabilir).
+  (`HomeViewModel` kuralları, gizli kanallar `TopShelfLabels.isHidden` ile). **Ebeveyn kilidi (Build 18):** raf,
+  PIN varken her zaman kayıtlı kilitleri (`AppEnvironment.topShelfLockFilter` = `parental.storedFilter`,
+  `catalog.isLocked(…, filter:)`) uygular – uygulamada PIN oturumu açıkken (etkin filtre `nil`) ve "kilitle göster"
+  kipinde de kilitli film/dizi/kanalın adı, afişi, logosu ana ekrana yazılmaz. Kilitler değişince
+  (`parental.storedFilter` değişimi) raf hemen yeniden yayımlanır.
 * **Derin bağlantılar** (`DeepLink`, her iki platformda `onOpenURL`): `novaplayer://play/channel?source=&id=`,
   `/movie?source=&id=`, `/episode?source=&series=&id=`. `AppEnvironment.playbackTarget(for:)` öğeyi çözer (kanal +
   kategorisi zapping listesi; satırı olmayan bölüm ilerleme kaydından kurulur, `Router.play` tamamlar), `Router.open`
-  kaynağı seçer ve oynatır. Katalog henüz yükleniyorsa bağlantı `pendingDeepLink` olarak 60 sn bekler,
+  kaynağı seçer ve oynatır. Öğe kilitten bağımsız bulunur (`…IgnoringLock` okumaları): kilitli içeriğe giden bağlantı
+  (Top Shelf, hatırlatma) sessizce açılmaz ve yok sayılmaz – `Router.play` (`AppEnvironment.needsPinToPlay`) PIN
+  ister, doğru PIN'den sonra oynar. Katalog henüz yükleniyorsa bağlantı `pendingDeepLink` olarak 60 sn bekler,
   `catalogVersion` değişince yeniden denenir. DEBUG + `-uiTestReset`: kaynak id `uitest-current` geçerli kaynağı
   anlatır (bellek içi UI test kaynağının id'si rastgele).
 * **Test:** `TopShelfTests` (JSON sınırları, sırsız URL'ler, sürüm, derin bağlantı gidiş-dönüş/geçersizler, oluşturma +
-  çözümleme), UI `TVTopShelfTests` (bağlantı oynatıcıda kanalı açar – `XCUIApplication.open` soğuk açılıştır; bilinmeyen
+  çözümleme, kilitli öğeler rafta yok / kilitli bağlantı çözülür ve PIN ister), barındırılan birim testi
+  `DeepLinkParentalTests` (`Router.open` → PIN istemi → doğru PIN'den sonra oynatıcı; UI testi olamaz:
+  `XCUIApplication.open` bellek içi UI test uygulamasını yeniden başlatır, PIN kaybolur), UI `TVTopShelfTests` (bağlantı oynatıcıda kanalı açar – `XCUIApplication.open` soğuk açılıştır; bilinmeyen
   bağlantı hiçbir şey açmaz; isteğe bağlı `TEST_RUNNER_TOPSHELF_HOME=1`: ana ekranda raf ekran görüntüsü).
 
 ## 4. Lisans, deneme ve satın alma

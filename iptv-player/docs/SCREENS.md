@@ -114,6 +114,8 @@ yüklendiğinde odak kaybolmaz (aynı id'ye geri yerleşir). Kenarlarda odak "ka
 **Top Shelf (Build 17, F-01):** uygulama Apple TV ana ekranının üst sırasındayken odaklanınca dinamik raf:
 **"İzlemeye devam et"** (en fazla 10 film/bölüm, afiş + ilerleme çubuğu, Ana Sayfa satırıyla aynı kural, yeniden
 en yeni) ve **"Son izlenen kanallar"** (en fazla 10 kanal logosu, gizlenen kanallar hariç) – geçerli kaynaktan.
+PIN varken kilitli kategorilerin/kanalların içeriği rafta hiç görünmez (uygulamada kilit açık olsa bile, iki kipte
+de); kilitli içeriğe giden bir bağlantı (raf, hatırlatma) önce PIN ister.
 Bir öğeyi seçmek veya Oynat tuşu `novaplayer://` derin bağlantısıyla uygulamayı açar ve öğe **doğrudan oynatıcıda**
 başlar: kanal kendi kategorisi (ilk 200) zapping listesiyle, film/bölüm kaldığı yerden; bağlantının kaynağı geçerli
 kaynak olur. Öğe/kaynak artık yoksa hiçbir şey açılmaz (log). Soğuk açılışta katalog daha yükleniyorsa (kaynaklar

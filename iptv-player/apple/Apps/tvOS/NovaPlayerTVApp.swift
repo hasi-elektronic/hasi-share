@@ -42,6 +42,8 @@ struct NovaPlayerTVApp: App {
                 }
                 .onChange(of: env.settings.currentSourceId) { TopShelfPublisher.shared.schedule(env) }
                 .onChange(of: env.settings.appLanguage) { TopShelfPublisher.shared.schedule(env) }
+                // Build 18: a newly locked item leaves the home screen at once (the shelf applies the stored locks).
+                .onChange(of: env.parental.storedFilter) { TopShelfPublisher.shared.publish(env) }
         }
         .onChange(of: scenePhase) { _, phase in
             env.scenePhaseChanged(AppScenePhase(phase))   // B4: .inactive keeps the player
