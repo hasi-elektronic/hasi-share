@@ -103,6 +103,16 @@ func categoryTitle(_ info: CategoryInfo) -> String {
     info.countryCode == nil ? info.category.name : CategoryCountry.nameWithoutPrefix(info.category.name)
 }
 
+/// Build 18: 🔒 before a listed locked category (show-with-lock mode, still locked).
+struct CategoryLockMark: View {
+    @Environment(AppEnvironment.self) private var env
+    let info: CategoryInfo
+
+    var body: some View {
+        if env.parental.showsLock(categoryId: info.id, kind: info.category.kind, sourceId: info.category.sourceId) { LockMark() }
+    }
+}
+
 /// Leading mark of a category entry: flag for real regions, the code badge for language groups ("EN", "AR").
 struct CategoryLeadingMark: View {
     let code: String?
@@ -210,9 +220,12 @@ struct CategorySheetPresenter: ViewModifier {
     private var sheet: some View {
         if let model {
             CategorySheet(model: model) { info in
-                model.recordOpened(info)
-                pendingRoute = model.gridRoute(info.category)
-                isPresented = false
+                // Build 18: a locked category (show-with-lock mode) opens after the PIN.
+                router.openCategory(info.id, kind: info.category.kind) {
+                    model.recordOpened(info)
+                    pendingRoute = model.gridRoute(info.category)
+                    isPresented = false
+                }
             }
             .environment(env)
             .environment(router)
@@ -352,6 +365,7 @@ struct CategorySheet: View {
 
     private func label(_ info: CategoryInfo, pinned: Bool) -> some View {
         HStack(spacing: 10) {
+            CategoryLockMark(info: info)
             CategoryLeadingMark(code: info.countryCode)
             Text(categoryTitle(info)).foregroundStyle(Theme.textPrimary).lineLimit(2)
             Spacer(minLength: 8)
@@ -457,6 +471,7 @@ extension View {
 /// right; Menu in the right content returns focus to the column, Menu in the column goes to the tab bar.
 struct TVCategoryBrowseView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
     let kind: BrowseKind
     @State private var model: BrowseModel?
     /// nil = Discover (browse page).
@@ -631,10 +646,14 @@ struct TVCategoryBrowseView: View {
     private func categoryEntry(_ model: BrowseModel, _ info: CategoryInfo, prefix: String, identifier: String, hidden: Bool = false) -> some View {
         let key = "\(prefix)_\(info.id)"
         return entry(key: key, selected: selected?.id == info.id, identifier: identifier, action: {
-            selected = info
-            lastColumnKey = key
-            model.recordOpened(info)
+            // Build 18: a locked category (show-with-lock mode) opens after the PIN.
+            router.openCategory(info.id, kind: info.category.kind) {
+                selected = info
+                lastColumnKey = key
+                model.recordOpened(info)
+            }
         }) {
+            CategoryLockMark(info: info)
             CategoryLeadingMark(code: info.countryCode)
             Text(categoryTitle(info)).lineLimit(2)   // long names wrap instead of "4K UHD Neuersch…" (B-16)
             Spacer(minLength: 8)

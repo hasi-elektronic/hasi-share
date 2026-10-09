@@ -146,8 +146,10 @@ public struct CategoryInfo: Sendable, Hashable, Identifiable {
 /// Read and write access to catalog content (categories, channels, movies, series, episodes)
 /// with paged queries and FTS5 search.
 public final class CatalogRepository: Sendable {
-    private let database: AppDatabase
+    let database: AppDatabase
     private var db: SQLiteDatabase { database.db }
+    /// Parental lock (`ContentLockFilter`): while set, category lists, item lists and lookups leave out locked content.
+    public let contentLock = ContentLockBox()
 
     public init(database: AppDatabase) {
         self.database = database
@@ -189,6 +191,12 @@ public final class CatalogRepository: Sendable {
     }
 
     public func categories(sourceId: String, kind: CategoryKind) throws -> [IPTVCore.Category] {
+        let list = try allCategories(sourceId: sourceId, kind: kind)
+        return contentLock.filter?.visibleCategories(list, kind: kind, sourceId: sourceId, id: \.id) ?? list
+    }
+
+    /// Every category of a source and kind, locked ones included (parental settings).
+    public func allCategories(sourceId: String, kind: CategoryKind) throws -> [IPTVCore.Category] {
         try db.query("SELECT id, name, sort FROM categories WHERE source_id = ? AND kind = ? ORDER BY sort",
                      [.text(sourceId), .text(kind.rawValue)]) {
             IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: $0.string(1), sort: $0.int(2))
@@ -198,20 +206,21 @@ public final class CatalogRepository: Sendable {
     /// Categories that contain at least one item (via `item_categories`, so multi-category Xtream items
     /// count everywhere), in provider order – the full list the Movies/Series category chips offer.
     public func categoriesWithContent(sourceId: String, kind: CategoryKind) throws -> [IPTVCore.Category] {
-        try db.query("""
+        let list = try db.query("""
             SELECT id, name, sort FROM categories c WHERE c.source_id = ? AND c.kind = ? AND EXISTS (
               SELECT 1 FROM item_categories ic WHERE ic.source_id = c.source_id AND ic.kind = c.kind AND ic.category_id = c.id)
             ORDER BY sort
             """, [.text(sourceId), .text(kind.rawValue)]) {
             IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: $0.string(1), sort: $0.int(2))
         }
+        return contentLock.filter?.visibleCategories(list, kind: kind, sourceId: sourceId, id: \.id) ?? list
     }
 
     /// Categories with ≥ 1 item, provider order, with item counts (all memberships) and the detected
     /// country – the Movies/Series category navigation (docs/SCREENS.md §3.2). One grouped query over the
     /// `item_categories` index; the country comes from the name (cached per name in `CategoryCountry`).
     public func categoryInfos(sourceId: String, kind: CategoryKind) throws -> [CategoryInfo] {
-        try db.query("""
+        let list = try db.query("""
             SELECT c.id, c.name, c.sort, n.cnt FROM categories c
             JOIN (SELECT category_id, COUNT(*) AS cnt FROM item_categories WHERE source_id = ? AND kind = ? GROUP BY category_id) n
               ON n.category_id = c.id
@@ -222,6 +231,7 @@ public final class CatalogRepository: Sendable {
             return CategoryInfo(category: IPTVCore.Category(sourceId: sourceId, id: $0.string(0), kind: kind, name: name, sort: $0.int(2)),
                                 itemCount: $0.int(3), countryCode: CategoryCountry.code(for: name))
         }
+        return contentLock.filter?.visibleCategories(list, kind: kind, sourceId: sourceId, id: \.id) ?? list
     }
 
     /// `id IN (…)` filter: items of a set of categories (country filter: "new" / Top 10 of one country).
@@ -233,9 +243,11 @@ public final class CatalogRepository: Sendable {
     /// Movies that belong to any of `categoryIds` (each once), sorted, first `limit`.
     public func movies(sourceId: String, categoryIds: [String], sort: CatalogSort, offset: Int = 0, limit: Int) throws -> [Movie] {
         guard !categoryIds.isEmpty else { return [] }
+        let lock = lockClause(.movie, sourceId: sourceId)
         let sql = "SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND \(Self.memberSetFilter(.movie, count: categoryIds.count))"
-            + " ORDER BY \(Self.order(sort)) LIMIT ? OFFSET ?"
-        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + [.int(Int64(limit)), .int(Int64(offset))]
+            + lock.sql + " ORDER BY \(Self.order(sort)) LIMIT ? OFFSET ?"
+        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + lock.args
+            + [.int(Int64(limit)), .int(Int64(offset))]
         return try db.query(sql, args, map: Self.movie)
     }
 
@@ -243,9 +255,11 @@ public final class CatalogRepository: Sendable {
     public func series(sourceId: String, categoryIds: [String], sort: CatalogSort, offset: Int = 0, limit: Int) throws -> [Series] {
         guard !categoryIds.isEmpty else { return [] }
         let order = sort == .added ? "sort DESC" : Self.order(sort)
+        let lock = lockClause(.series, sourceId: sourceId)
         let sql = "SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND \(Self.memberSetFilter(.series, count: categoryIds.count))"
-            + " ORDER BY \(order) LIMIT ? OFFSET ?"
-        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + [.int(Int64(limit)), .int(Int64(offset))]
+            + lock.sql + " ORDER BY \(order) LIMIT ? OFFSET ?"
+        let args: [SQLiteValue] = [.text(sourceId), .text(sourceId)] + categoryIds.map(SQLiteValue.text) + lock.args
+            + [.int(Int64(limit)), .int(Int64(offset))]
         return try db.query(sql, args, map: Self.series)
     }
 
@@ -267,23 +281,33 @@ public final class CatalogRepository: Sendable {
     /// A page of channels; `categoryId == nil` → all.
     public func channels(sourceId: String, categoryId: String? = nil, offset: Int = 0, limit: Int = 100) throws -> [Channel] {
         if let categoryId {
+            let lock = lockClause(.live, sourceId: sourceId, alias: "c.")
             // Walks the membership index in list order (no sort step) and joins the channel rows.
             return try db.query("""
                 SELECT \(Self.qualifiedChannelColumns) FROM item_categories ic
                 JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
-                WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ? ORDER BY ic.sort LIMIT ? OFFSET ?
-                """, [.text(sourceId), .text(categoryId), .int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
+                WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ?\(lock.sql) ORDER BY ic.sort LIMIT ? OFFSET ?
+                """, [.text(sourceId), .text(categoryId)] + lock.args + [.int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
         }
-        return try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? ORDER BY sort LIMIT ? OFFSET ?",
-                            [.text(sourceId), .int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
+        let lock = lockClause(.live, sourceId: sourceId)
+        return try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ?\(lock.sql) ORDER BY sort LIMIT ? OFFSET ?",
+                            [.text(sourceId)] + lock.args + [.int(Int64(limit)), .int(Int64(offset))], map: Self.channel)
     }
 
     public func channelCount(sourceId: String, categoryId: String? = nil) throws -> Int {
         if let categoryId {
-            return try db.scalar("SELECT COUNT(*) FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ?",
-                                 [.text(sourceId), .text(categoryId)])
+            let lock = lockClause(.live, sourceId: sourceId, alias: "c.")
+            guard !lock.sql.isEmpty else {
+                return try db.scalar("SELECT COUNT(*) FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ?",
+                                     [.text(sourceId), .text(categoryId)])
+            }
+            return try db.scalar("""
+                SELECT COUNT(*) FROM item_categories ic JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
+                WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ?\(lock.sql)
+                """, [.text(sourceId), .text(categoryId)] + lock.args)
         }
-        return try db.scalar("SELECT COUNT(*) FROM channels WHERE source_id = ?", [.text(sourceId)])
+        let lock = lockClause(.live, sourceId: sourceId)
+        return try db.scalar("SELECT COUNT(*) FROM channels WHERE source_id = ?\(lock.sql)", [.text(sourceId)] + lock.args)
     }
 
     /// Live channels per category (all memberships) in one query – the category chips' counts.
@@ -294,8 +318,9 @@ public final class CatalogRepository: Sendable {
     }
 
     public func channel(sourceId: String, id: String) throws -> Channel? {
-        try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id = ?",
-                          [.text(sourceId), .text(id)], map: Self.channel)
+        let lock = lockClause(.live, sourceId: sourceId)
+        return try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id = ?\(lock.sql)",
+                                 [.text(sourceId), .text(id)] + lock.args, map: Self.channel)
     }
 
     /// Number zapping (SCREENS §3.7): the channel with this number anywhere in the source (first in list
@@ -303,8 +328,9 @@ public final class CatalogRepository: Sendable {
     /// list (1-based); in a numbered source a missing number is nil.
     public func channelForNumberZap(sourceId: String, number: Int) throws -> Channel? {
         guard number > 0 else { return nil }
-        if let match = try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND number = ? ORDER BY sort LIMIT 1",
-                                         [.text(sourceId), .int(Int64(number))], map: Self.channel) {
+        let lock = lockClause(.live, sourceId: sourceId, excludeLockedChannels: true)
+        if let match = try db.queryFirst("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND number = ?\(lock.sql) ORDER BY sort LIMIT 1",
+                                         [.text(sourceId), .int(Int64(number))] + lock.args, map: Self.channel) {
             return match
         }
         let numbered: Int = try db.scalar("SELECT EXISTS (SELECT 1 FROM channels WHERE source_id = ? AND number IS NOT NULL)", [.text(sourceId)])
@@ -321,15 +347,16 @@ public final class CatalogRepository: Sendable {
         guard let sort = try db.queryFirst(
             "SELECT sort FROM item_categories WHERE source_id = ? AND kind = 'live' AND category_id = ? AND item_id = ?",
             args + [.text(channelId)], map: { $0.int(0) }) else { return [] }
+        let lock = lockClause(.live, sourceId: sourceId, alias: "c.", excludeLockedChannels: true)
         let select = """
             SELECT \(Self.qualifiedChannelColumns) FROM item_categories ic
             JOIN channels c ON c.source_id = ic.source_id AND c.id = ic.item_id
-            WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ?
+            WHERE ic.source_id = ? AND ic.kind = 'live' AND ic.category_id = ?\(lock.sql)
             """
         let head = try db.query(select + " AND ic.sort < ? ORDER BY ic.sort DESC LIMIT ?",
-                                args + [.int(Int64(sort)), .int(Int64(before))], map: Self.channel)
+                                args + lock.args + [.int(Int64(sort)), .int(Int64(before))], map: Self.channel)
         let tail = try db.query(select + " AND ic.sort >= ? ORDER BY ic.sort LIMIT ?",
-                                args + [.int(Int64(sort)), .int(Int64(after + 1))], map: Self.channel)
+                                args + lock.args + [.int(Int64(sort)), .int(Int64(after + 1))], map: Self.channel)
         return head.reversed() + tail
     }
 
@@ -337,8 +364,9 @@ public final class CatalogRepository: Sendable {
     public func channels(sourceId: String, ids: [String]) throws -> [Channel] {
         guard !ids.isEmpty else { return [] }
         let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ",")
-        let rows = try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id IN (\(placeholders))",
-                                [.text(sourceId)] + ids.map(SQLiteValue.text), map: Self.channel)
+        let lock = lockClause(.live, sourceId: sourceId)
+        let rows = try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND id IN (\(placeholders))\(lock.sql)",
+                                [.text(sourceId)] + ids.map(SQLiteValue.text) + lock.args, map: Self.channel)
         let byId = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return ids.compactMap { byId[$0] }
     }
@@ -351,8 +379,9 @@ public final class CatalogRepository: Sendable {
         for start in stride(from: 0, to: ids.count, by: 400) {
             let chunk = Array(ids[start..<min(start + 400, ids.count)])
             let list = Array(repeating: "lower(?)", count: chunk.count).joined(separator: ",")
-            out += try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND lower(epg_id) IN (\(list)) ORDER BY sort",
-                                [.text(sourceId)] + chunk.map(SQLiteValue.text), map: Self.channel)
+            let lock = lockClause(.live, sourceId: sourceId)
+            out += try db.query("SELECT \(Self.channelColumns) FROM channels WHERE source_id = ? AND lower(epg_id) IN (\(list))\(lock.sql) ORDER BY sort",
+                                [.text(sourceId)] + chunk.map(SQLiteValue.text) + lock.args, map: Self.channel)
         }
         return out.sorted { $0.sort < $1.sort }
     }
@@ -375,8 +404,9 @@ public final class CatalogRepository: Sendable {
 
     public func movies(sourceId: String, categoryId: String? = nil, sort: CatalogSort = .added,
                        offset: Int = 0, limit: Int = 60) throws -> [Movie] {
-        var sql = "SELECT \(Self.movieColumns) FROM movies WHERE source_id = ?"
-        var args: [SQLiteValue] = [.text(sourceId)]
+        let lock = lockClause(.movie, sourceId: sourceId)
+        var sql = "SELECT \(Self.movieColumns) FROM movies WHERE source_id = ?" + lock.sql
+        var args: [SQLiteValue] = [.text(sourceId)] + lock.args
         if let categoryId { sql += " AND " + Self.memberFilter(.movie); args += [.text(sourceId), .text(categoryId)] }
         sql += " ORDER BY \(Self.order(sort)) LIMIT ? OFFSET ?"
         args += [.int(Int64(limit)), .int(Int64(offset))]
@@ -384,22 +414,26 @@ public final class CatalogRepository: Sendable {
     }
 
     public func movie(sourceId: String, id: String) throws -> Movie? {
-        try db.queryFirst("SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND id = ?", [.text(sourceId), .text(id)], map: Self.movie)
+        let lock = lockClause(.movie, sourceId: sourceId)
+        return try db.queryFirst("SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND id = ?\(lock.sql)",
+                                 [.text(sourceId), .text(id)] + lock.args, map: Self.movie)
     }
 
     /// Movies by id, in the order given (search results).
     public func movies(sourceId: String, ids: [String]) throws -> [Movie] {
-        try byIds(ids) { chunk in
-            try db.query("SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND id IN (\(Self.placeholders(chunk.count)))",
-                         [.text(sourceId)] + chunk.map(SQLiteValue.text), map: Self.movie)
+        let lock = lockClause(.movie, sourceId: sourceId)
+        return try byIds(ids) { chunk in
+            try db.query("SELECT \(Self.movieColumns) FROM movies WHERE source_id = ? AND id IN (\(Self.placeholders(chunk.count)))\(lock.sql)",
+                         [.text(sourceId)] + chunk.map(SQLiteValue.text) + lock.args, map: Self.movie)
         }
     }
 
     /// Series by id, in the order given (search results).
     public func series(sourceId: String, ids: [String]) throws -> [Series] {
-        try byIds(ids) { chunk in
-            try db.query("SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND id IN (\(Self.placeholders(chunk.count)))",
-                         [.text(sourceId)] + chunk.map(SQLiteValue.text), map: Self.series)
+        let lock = lockClause(.series, sourceId: sourceId)
+        return try byIds(ids) { chunk in
+            try db.query("SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND id IN (\(Self.placeholders(chunk.count)))\(lock.sql)",
+                         [.text(sourceId)] + chunk.map(SQLiteValue.text) + lock.args, map: Self.series)
         }
     }
 
@@ -423,8 +457,9 @@ public final class CatalogRepository: Sendable {
 
     public func series(sourceId: String, categoryId: String? = nil, sort: CatalogSort = .added,
                        offset: Int = 0, limit: Int = 60) throws -> [Series] {
-        var sql = "SELECT \(Self.seriesColumns) FROM series WHERE source_id = ?"
-        var args: [SQLiteValue] = [.text(sourceId)]
+        let lock = lockClause(.series, sourceId: sourceId)
+        var sql = "SELECT \(Self.seriesColumns) FROM series WHERE source_id = ?" + lock.sql
+        var args: [SQLiteValue] = [.text(sourceId)] + lock.args
         if let categoryId { sql += " AND " + Self.memberFilter(.series); args += [.text(sourceId), .text(categoryId)] }
         let order = sort == .added ? "sort DESC" : Self.order(sort)
         sql += " ORDER BY \(order) LIMIT ? OFFSET ?"
@@ -433,7 +468,9 @@ public final class CatalogRepository: Sendable {
     }
 
     public func seriesItem(sourceId: String, id: String) throws -> Series? {
-        try db.queryFirst("SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND id = ?", [.text(sourceId), .text(id)], map: Self.series)
+        let lock = lockClause(.series, sourceId: sourceId)
+        return try db.queryFirst("SELECT \(Self.seriesColumns) FROM series WHERE source_id = ? AND id = ?\(lock.sql)",
+                                 [.text(sourceId), .text(id)] + lock.args, map: Self.series)
     }
 
     static func episode(_ r: SQLiteRow) -> Episode {
@@ -459,10 +496,11 @@ public final class CatalogRepository: Sendable {
 
     /// One episode by id (any series of the source).
     public func episode(sourceId: String, id: String) throws -> Episode? {
-        try db.queryFirst("""
+        let lock = lockClause(.series, sourceId: sourceId, idColumn: "series_id")
+        return try db.queryFirst("""
             SELECT source_id, id, series_id, season, number, title, container_ext, duration_sec, plot, poster_url, url
-            FROM episodes WHERE source_id = ? AND id = ?
-            """, [.text(sourceId), .text(id)], map: Self.episode)
+            FROM episodes WHERE source_id = ? AND id = ?\(lock.sql)
+            """, [.text(sourceId), .text(id)] + lock.args, map: Self.episode)
     }
 
     // MARK: Detail metadata (`item_details`)

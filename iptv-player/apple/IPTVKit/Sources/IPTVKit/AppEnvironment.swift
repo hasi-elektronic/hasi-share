@@ -86,6 +86,10 @@ public final class AppEnvironment {
     public let license: LicenseManager
     public let account: AccountManager
     public let player: PlayerController
+    /// Parental control: PIN, locked categories / channels (Build 18, SCREENS §3.10).
+    public let parental: ParentalControl
+    /// Programme reminders (Build 18, SCREENS §3.4).
+    public let reminders: ReminderStore
 
     /// All configured sources (metadata only).
     public private(set) var sources: [Source] = []
@@ -127,6 +131,8 @@ public final class AppEnvironment {
         favorites = FavoritesController(library: library, kv: kv, now: { Int64(Date().timeIntervalSince1970 * 1000) })
         categoryPrefs = CategoryPreferences(kv: kv)
         recentSearches = RecentSearchStore(database: database)
+        parental = ParentalControl(secureStore: secureStore, kv: kv)
+        reminders = ReminderStore(kv: kv)
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
@@ -153,6 +159,13 @@ public final class AppEnvironment {
         wire()
         cloud.env = self
         cloud.preferenceProviders = [categoryPrefs, favorites]   // the app adds hidden live channels (`activate` comes later)
+        // Build 18: the parental lock filters every catalog query while locked; changes reload the screens.
+        catalog.contentLock.filter = parental.filter
+        parental.onChange = { [weak self] in
+            guard let self else { return }
+            self.catalog.contentLock.filter = self.parental.filter
+            self.catalogVersion += 1
+        }
         installPlayerExtras(kv: kv)   // Build 16: next-episode autoplay, subtitle style (NextEpisode.swift)
         // A database without sources (tvOS purged it, corrupt file, new file in Caches/memory): put the mirrored
         // sources and user state back BEFORE anything reads or mirrors the empty state.
@@ -572,6 +585,8 @@ public final class AppEnvironment {
 
     public func deleteSource(id: String) {
         refresher.clearCatalogFormat(sourceId: id)
+        parental.removeAll(sourceId: id)
+        reminders.removeAll(sourceId: id)
         categoryPrefs.removeAll(sourceId: id)
         try? catalog.deleteContent(sourceId: id)
         recentSearches.clear(sourceId: id)

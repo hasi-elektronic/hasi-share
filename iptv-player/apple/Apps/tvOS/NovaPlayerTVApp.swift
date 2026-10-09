@@ -116,6 +116,7 @@ struct TVRootView: View {
         .fullScreenCover(isPresented: $router.paywallPresented) {
             PaywallView().environment(env)
         }
+        .guideParentalOverlays()   // Build 18: PIN pad, reminder banner, relock
     }
 
     /// `nil` lets the system act: content → tab bar, pushed page → pop, Home tab at its root → leave the app.

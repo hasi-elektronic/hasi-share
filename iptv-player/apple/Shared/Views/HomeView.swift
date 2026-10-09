@@ -523,6 +523,7 @@ struct ChannelMenuItems: View {
                 Label(L10n.t("category_hide"), systemImage: "eye.slash.circle")
             }
         }
+        ChannelLockMenuItem(channel: channel)   // Build 18 parental lock
     }
 }
 

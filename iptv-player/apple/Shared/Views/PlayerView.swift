@@ -112,6 +112,7 @@ struct PlayerView: View {
 
     var body: some View {
         build17Handlers(build16Handlers(layers))
+            .guideParentalOverlays(inPlayer: true)   // Build 18: reminder banner + PIN pad over the video
     }
 
     private var mainLayers: some View {

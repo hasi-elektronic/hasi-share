@@ -9411,6 +9411,1386 @@
         }
       }
     },
+    "guide_day_yesterday": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dün"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestern"
+          }
+        }
+      }
+    },
+    "guide_day_tomorrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tomorrow"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yarın"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Morgen"
+          }
+        }
+      }
+    },
+    "guide_day_picker": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Day"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gün"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag"
+          }
+        }
+      }
+    },
+    "guide_jump_now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Now"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt"
+          }
+        }
+      }
+    },
+    "guide_jump_now_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to today and the programme on air"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugüne ve şu an yayındaki programa dön"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück zu heute und zur laufenden Sendung"
+          }
+        }
+      }
+    },
+    "program_details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Programme details"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Program ayrıntıları"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sendungsdetails"
+          }
+        }
+      }
+    },
+    "program_no_description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No description"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıklama yok"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Beschreibung"
+          }
+        }
+      }
+    },
+    "program_watch_live": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch live"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı izle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt ansehen"
+          }
+        }
+      }
+    },
+    "program_start_over": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch from the start"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baştan izle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von Anfang an"
+          }
+        }
+      }
+    },
+    "program_watch_recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch recording"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydı izle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahme ansehen"
+          }
+        }
+      }
+    },
+    "program_remind": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hatırlat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erinnern"
+          }
+        }
+      }
+    },
+    "program_remind_remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove reminder"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hatırlatmayı kaldır"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erinnerung entfernen"
+          }
+        }
+      }
+    },
+    "program_reminder_set": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder set"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hatırlatma kuruldu"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erinnerung gesetzt"
+          }
+        }
+      }
+    },
+    "program_on_air_now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On air now"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şu an yayında"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Läuft gerade"
+          }
+        }
+      }
+    },
+    "program_ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beendet"
+          }
+        }
+      }
+    },
+    "program_no_replay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No catch-up for this programme."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu program için geçmiş yayın yok."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für diese Sendung gibt es kein TV-Archiv."
+          }
+        }
+      }
+    },
+    "catchup_unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive of this channel cannot be played."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kanalın arşivi oynatılamıyor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Archiv dieses Senders kann nicht abgespielt werden."
+          }
+        }
+      }
+    },
+    "reminder_banner_now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ starts now on %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ şimdi %2$@ kanalında başlıyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ beginnt jetzt auf %2$@"
+          }
+        }
+      }
+    },
+    "reminder_banner_soon": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ starts in 5 minutes on %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 5 dakika sonra %2$@ kanalında başlıyor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ beginnt in 5 Minuten auf %2$@"
+          }
+        }
+      }
+    },
+    "reminder_switch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanala geç"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umschalten"
+          }
+        }
+      }
+    },
+    "reminder_switch_question": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanala geçilsin mi?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umschalten?"
+          }
+        }
+      }
+    },
+    "reminder_switched": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switched to %1$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ kanalına geçildi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umgeschaltet auf %1$@"
+          }
+        }
+      }
+    },
+    "reminders_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hatırlatmalar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erinnerungen"
+          }
+        }
+      }
+    },
+    "reminders_empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reminders. In the TV guide, choose a programme and “Remind me”."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hatırlatma yok. TV rehberinde bir program seçip “Hatırlat”a dokunun."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Erinnerungen. Wählen Sie im TV-Guide eine Sendung und „Erinnern“."
+          }
+        }
+      }
+    },
+    "reminders_early": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also 5 minutes before"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 dakika önce de hatırlat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auch 5 Minuten vorher"
+          }
+        }
+      }
+    },
+    "reminders_auto_switch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch automatically at the start"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlangıçta otomatik olarak geç"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zum Beginn automatisch umschalten"
+          }
+        }
+      }
+    },
+    "reminders_hint_ios": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You get a notification at the start. Tap it to open the channel."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Program başlarken bildirim alırsınız. Kanalı açmak için bildirime dokunun."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zum Beginn erhalten Sie eine Mitteilung. Tippen Sie darauf, um den Sender zu öffnen."
+          }
+        }
+      }
+    },
+    "reminders_hint_tv": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While the app is open, a banner appears at the start."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama açıkken program başladığında bir bildirim şeridi görünür."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solange die App geöffnet ist, erscheint zum Beginn ein Hinweis."
+          }
+        }
+      }
+    },
+    "reminders_count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ active"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ etkin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ aktiv"
+          }
+        }
+      }
+    },
+    "parental_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parental control"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ebeveyn denetimi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kindersicherung"
+          }
+        }
+      }
+    },
+    "parental_status_on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN active"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN etkin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN aktiv"
+          }
+        }
+      }
+    },
+    "parental_intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A 4-digit PIN locks categories and channels. Locked content needs the PIN to open."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4 haneli bir PIN kategorileri ve kanalları kilitler. Kilitli içerik yalnızca PIN ile açılır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine 4-stellige PIN sperrt Kategorien und Sender. Gesperrte Inhalte lassen sich nur mit der PIN öffnen."
+          }
+        }
+      }
+    },
+    "parental_set_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN belirle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN festlegen"
+          }
+        }
+      }
+    },
+    "parental_change_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN'i değiştir"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN ändern"
+          }
+        }
+      }
+    },
+    "parental_remove_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN'i kaldır"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN entfernen"
+          }
+        }
+      }
+    },
+    "parental_enter_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN'i girin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN eingeben"
+          }
+        }
+      }
+    },
+    "parental_new_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a 4-digit PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4 haneli bir PIN seçin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wählen Sie eine 4-stellige PIN"
+          }
+        }
+      }
+    },
+    "parental_confirm_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeat the PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN'i tekrar girin"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN wiederholen"
+          }
+        }
+      }
+    },
+    "parental_current_pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current PIN"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mevcut PIN"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelle PIN"
+          }
+        }
+      }
+    },
+    "parental_pin_mismatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PINs do not match. Please try again."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN'ler eşleşmiyor. Lütfen tekrar deneyin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die PINs stimmen nicht überein. Bitte versuchen Sie es erneut."
+          }
+        }
+      }
+    },
+    "parental_pin_wrong": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrong PIN – %1$@ attempts left"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanlış PIN – %1$@ deneme kaldı"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falsche PIN – noch %1$@ Versuche"
+          }
+        }
+      }
+    },
+    "parental_pin_cooldown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too many attempts. Try again in %1$@ s."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çok fazla deneme. %1$@ sn sonra tekrar deneyin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zu viele Versuche. Bitte versuchen Sie es in %1$@ s erneut."
+          }
+        }
+      }
+    },
+    "parental_pin_digit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Digit %1$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rakam %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffer %1$@"
+          }
+        }
+      }
+    },
+    "parental_pin_entered": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of 4 digits entered"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4 rakamdan %1$@ tanesi girildi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ von 4 Ziffern eingegeben"
+          }
+        }
+      }
+    },
+    "parental_hide_locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide locked content"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilitli içeriği gizle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesperrte Inhalte ausblenden"
+          }
+        }
+      }
+    },
+    "parental_hide_locked_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off: locked categories and channels stay visible with a lock and need the PIN. Locked titles never appear in search, home rows or “Continue watching”."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: kilitli kategoriler ve kanallar kilit simgesiyle görünür ve PIN ister. Kilitli başlıklar aramada, ana sayfada ve “İzlemeye devam et”te hiç görünmez."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus: Gesperrte Kategorien und Sender bleiben mit einem Schloss sichtbar und verlangen die PIN. Gesperrte Titel erscheinen nie in der Suche, auf der Startseite oder unter „Weiterschauen“."
+          }
+        }
+      }
+    },
+    "parental_protect_settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN for sources and player settings"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynaklar ve oynatıcı ayarları için PIN"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN für Quellen und Player-Einstellungen"
+          }
+        }
+      }
+    },
+    "parental_locked_categories": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked categories"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilitli kategoriler"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesperrte Kategorien"
+          }
+        }
+      }
+    },
+    "parental_locked_channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked channels"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilitli kanallar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesperrte Sender"
+          }
+        }
+      }
+    },
+    "parental_no_locked_channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No locked channels. Long-press a channel and choose “Lock channel”."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilitli kanal yok. Bir kanala uzun basıp “Kanalı kilitle”yi seçin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine gesperrten Sender. Halten Sie einen Sender gedrückt und wählen Sie „Sender sperren“."
+          }
+        }
+      }
+    },
+    "parental_lock_now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock now"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi kilitle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt sperren"
+          }
+        }
+      }
+    },
+    "parental_unlocked_note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlocked until the app goes to the background."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama arka plana geçene kadar kilit açık."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entsperrt, bis die App in den Hintergrund wechselt."
+          }
+        }
+      }
+    },
+    "parental_suggest_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock adult categories?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yetişkin kategorileri kilitlensin mi?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kategorien für Erwachsene sperren?"
+          }
+        }
+      }
+    },
+    "parental_suggest_body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These categories look like adult content. Locked categories need the PIN."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kategoriler yetişkin içeriğe benziyor. Kilitli kategoriler PIN ister."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Kategorien sehen nach Inhalten für Erwachsene aus. Gesperrte Kategorien verlangen die PIN."
+          }
+        }
+      }
+    },
+    "parental_suggest_lock": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock selected"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçilenleri kilitle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auswahl sperren"
+          }
+        }
+      }
+    },
+    "parental_suggest_skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi değil"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht jetzt"
+          }
+        }
+      }
+    },
+    "parental_lock_channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock channel"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanalı kilitle"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender sperren"
+          }
+        }
+      }
+    },
+    "parental_unlock_channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock channel"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanal kilidini kaldır"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender entsperren"
+          }
+        }
+      }
+    },
+    "parental_locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilitli"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesperrt"
+          }
+        }
+      }
+    },
+    "parental_pin_set_done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN set. Locks apply from the next start or after “Lock now”."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN belirlendi. Kilitler bir sonraki açılışta veya “Şimdi kilitle”den sonra geçerli olur."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN festgelegt. Die Sperren gelten ab dem nächsten Start oder nach „Jetzt sperren“."
+          }
+        }
+      }
+    },
     "icloud_section": {
       "extractionState": "manual",
       "localizations": {

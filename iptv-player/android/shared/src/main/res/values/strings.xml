@@ -412,6 +412,66 @@
     <string name="settings_background_playback" formatted="false">Keep playing in the background</string>
     <string name="settings_auto_pip" formatted="false">Picture in Picture automatically</string>
     <string name="settings_background_hint" formatted="false">Sound keeps playing when you leave the app or lock the screen. Picture in Picture starts when you leave the app while a video plays – not for streams played by the VLC engine (MKV, TS, …): they continue as sound only.</string>
+    <string name="guide_day_yesterday" formatted="false">Yesterday</string>
+    <string name="guide_day_tomorrow" formatted="false">Tomorrow</string>
+    <string name="guide_day_picker" formatted="false">Day</string>
+    <string name="guide_jump_now" formatted="false">Now</string>
+    <string name="guide_jump_now_hint" formatted="false">Back to today and the programme on air</string>
+    <string name="program_details" formatted="false">Programme details</string>
+    <string name="program_no_description" formatted="false">No description</string>
+    <string name="program_watch_live" formatted="false">Watch live</string>
+    <string name="program_start_over" formatted="false">Watch from the start</string>
+    <string name="program_watch_recording" formatted="false">Watch recording</string>
+    <string name="program_remind" formatted="false">Remind me</string>
+    <string name="program_remind_remove" formatted="false">Remove reminder</string>
+    <string name="program_reminder_set" formatted="false">Reminder set</string>
+    <string name="program_on_air_now" formatted="false">On air now</string>
+    <string name="program_ended" formatted="false">Ended</string>
+    <string name="program_no_replay" formatted="false">No catch-up for this programme.</string>
+    <string name="catchup_unavailable" formatted="false">The archive of this channel cannot be played.</string>
+    <string name="reminder_banner_now">%1$s starts now on %2$s</string>
+    <string name="reminder_banner_soon">%1$s starts in 5 minutes on %2$s</string>
+    <string name="reminder_switch" formatted="false">Switch</string>
+    <string name="reminder_switch_question" formatted="false">Switch?</string>
+    <string name="reminder_switched">Switched to %1$s</string>
+    <string name="reminders_title" formatted="false">Reminders</string>
+    <string name="reminders_empty" formatted="false">No reminders. In the TV guide, choose a programme and “Remind me”.</string>
+    <string name="reminders_early" formatted="false">Also 5 minutes before</string>
+    <string name="reminders_auto_switch" formatted="false">Switch automatically at the start</string>
+    <string name="reminders_hint_ios" formatted="false">You get a notification at the start. Tap it to open the channel.</string>
+    <string name="reminders_hint_tv" formatted="false">While the app is open, a banner appears at the start.</string>
+    <string name="reminders_count">%1$s active</string>
+    <string name="parental_title" formatted="false">Parental control</string>
+    <string name="parental_status_on" formatted="false">PIN active</string>
+    <string name="parental_intro" formatted="false">A 4-digit PIN locks categories and channels. Locked content needs the PIN to open.</string>
+    <string name="parental_set_pin" formatted="false">Set PIN</string>
+    <string name="parental_change_pin" formatted="false">Change PIN</string>
+    <string name="parental_remove_pin" formatted="false">Remove PIN</string>
+    <string name="parental_enter_pin" formatted="false">Enter PIN</string>
+    <string name="parental_new_pin" formatted="false">Choose a 4-digit PIN</string>
+    <string name="parental_confirm_pin" formatted="false">Repeat the PIN</string>
+    <string name="parental_current_pin" formatted="false">Current PIN</string>
+    <string name="parental_pin_mismatch" formatted="false">The PINs do not match. Please try again.</string>
+    <string name="parental_pin_wrong">Wrong PIN – %1$s attempts left</string>
+    <string name="parental_pin_cooldown">Too many attempts. Try again in %1$s s.</string>
+    <string name="parental_pin_digit">Digit %1$s</string>
+    <string name="parental_pin_entered">%1$s of 4 digits entered</string>
+    <string name="parental_hide_locked" formatted="false">Hide locked content</string>
+    <string name="parental_hide_locked_hint" formatted="false">Off: locked categories and channels stay visible with a lock and need the PIN. Locked titles never appear in search, home rows or “Continue watching”.</string>
+    <string name="parental_protect_settings" formatted="false">PIN for sources and player settings</string>
+    <string name="parental_locked_categories" formatted="false">Locked categories</string>
+    <string name="parental_locked_channels" formatted="false">Locked channels</string>
+    <string name="parental_no_locked_channels" formatted="false">No locked channels. Long-press a channel and choose “Lock channel”.</string>
+    <string name="parental_lock_now" formatted="false">Lock now</string>
+    <string name="parental_unlocked_note" formatted="false">Unlocked until the app goes to the background.</string>
+    <string name="parental_suggest_title" formatted="false">Lock adult categories?</string>
+    <string name="parental_suggest_body" formatted="false">These categories look like adult content. Locked categories need the PIN.</string>
+    <string name="parental_suggest_lock" formatted="false">Lock selected</string>
+    <string name="parental_suggest_skip" formatted="false">Not now</string>
+    <string name="parental_lock_channel" formatted="false">Lock channel</string>
+    <string name="parental_unlock_channel" formatted="false">Unlock channel</string>
+    <string name="parental_locked" formatted="false">Locked</string>
+    <string name="parental_pin_set_done" formatted="false">PIN set. Locks apply from the next start or after “Lock now”.</string>
     <string name="icloud_section" formatted="false">iCloud</string>
     <string name="icloud_sync_toggle" formatted="false">Sync with iCloud</string>
     <string name="icloud_status_off" formatted="false">Off – sources, favorites and progress stay on this device.</string>

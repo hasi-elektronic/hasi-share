@@ -11,6 +11,7 @@ struct NovaPlayerApp: App {
         PerfTrace.shared.mark(.appLaunch)
         let env = AppBootstrap.makeEnvironment()
         let router = Router(env: env)
+        ReminderNotificationCenter.install(env: env)   // Build 18: reminder notifications (a cold-start tap too)
         _env = State(initialValue: env)
         _router = State(initialValue: router)
         // Build 17: Picture in Picture (bound to the app's AVPlayerLayer) and the AirPlay route state.
@@ -95,6 +96,7 @@ struct RootView: View {
         .sheet(isPresented: $router.settingsPresented) {
             SettingsSheet().environment(env).environment(router)
         }
+        .guideParentalOverlays()   // Build 18: PIN pad, reminder banner, relock
     }
 
     private var hasHero: Bool { [.home, .movies, .series].contains(router.section) }

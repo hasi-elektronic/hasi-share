@@ -336,6 +336,7 @@ private struct LiveChannelRow: View {
                             Image(systemName: "clock.arrow.circlepath").font(Theme.isTV ? .system(size: 18) : .caption2).foregroundStyle(Theme.textSecondary)
                                 .accessibilityLabel(L10n.t("epg_catchup_available"))   // IOS-18
                         }
+                        if env.parental.isActive, env.parental.isChannelLocked(channel.id, sourceId: channel.sourceId) { LockMark() }
                         #if os(tvOS)
                         if isFavorite { Image(systemName: "star.fill").font(.system(size: 18)).foregroundStyle(Theme.warning) }
                         #endif
@@ -398,12 +399,33 @@ func chipTitle(_ title: String, count: Int?) -> String {
     return flag + CountryFlag.strippedTitle(title) + (count.map { "  \($0)" } ?? "")
 }
 
+/// Build 18: 🔒 on a listed locked category (show-with-lock mode).
+@MainActor
+func isLockedLiveFilter(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
+    guard case .category(let id) = filter, let sid = env.currentSource?.id else { return false }
+    return env.parental.showsLock(categoryId: id, kind: .live, sourceId: sid)
+}
+
+/// Build 18: a locked category opens after the PIN.
+@MainActor
+func selectLiveFilter(_ filter: ChannelFilter, model: LiveTVViewModel, router: Router) {
+    if case .category(let id) = filter {
+        router.openCategory(id, kind: .live) { model.filter = filter }
+    } else {
+        model.filter = filter
+    }
+}
+
 #if !os(tvOS)
 /// iOS: sticky horizontal category chips – ★ Favorites · All · favorite categories (⭐) · the rest,
 /// with channel counts. Long press on a category chip: add/remove favorite category; "show hidden".
 private struct LiveCategoryChips: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
     @Bindable var model: LiveTVViewModel
+
+    private func isLockedChip(_ filter: ChannelFilter) -> Bool { isLockedLiveFilter(filter, env: env) }
+    private func selectGuarded(_ filter: ChannelFilter) { selectLiveFilter(filter, model: model, router: router) }
 
     var body: some View {
         let items = chipItems(model, env: env)
@@ -438,8 +460,9 @@ private struct LiveCategoryChips: View {
 
     private func chip(_ item: ChipItem, index: Int) -> some View {
         let selected = model.filter == item.id
-        return Button { model.filter = item.id } label: {
+        return Button { selectGuarded(item.id) } label: {
             HStack(spacing: 5) {
+                if isLockedChip(item.id) { LockMark() }
                 if item.starred { Image(systemName: "star.fill").font(.caption.weight(.bold)).foregroundStyle(selected ? Color.black : Theme.warning) }
                 Text(item.title).lineLimit(1)
             }
@@ -463,6 +486,7 @@ private struct LiveCategoryChips: View {
 /// tvOS: categories as a left column (vertical list with counts); OK selects, long OK = ⭐ category.
 private struct LiveCategoryColumn: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
     @Bindable var model: LiveTVViewModel
     /// ◀ from the list lands on the selected category (B-13), not the geometrically nearest row.
     @FocusState private var focusedIndex: Int?
@@ -474,8 +498,9 @@ private struct LiveCategoryColumn: View {
             LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     let selected = model.filter == item.id
-                    Button { model.filter = item.id } label: {
+                    Button { selectLiveFilter(item.id, model: model, router: router) } label: {
                         HStack(spacing: 10) {
+                            if isLockedLiveFilter(item.id, env: env) { LockMark() }
                             if item.starred { Image(systemName: "star.fill").font(.system(size: 20)).foregroundStyle(Theme.warning) }
                             Text(item.title).lineLimit(2)   // B-16
                             Spacer(minLength: 0)
@@ -563,6 +588,13 @@ struct GuideView: View {
     @State private var scrollTarget: String?
     /// tvOS: the focused programme block – the panel describes it (B-09).
     @State private var focusedProgram: EpgProgram?
+    /// Build 18 day picker: days of the source (yesterday / catch-up depth … +6) and the selected one (0 = today).
+    @State private var days: [GuideDay] = []
+    @State private var dayOffset = 0
+    /// "Jetzt": bumped to scroll back to the airing programme even when today is already selected.
+    @State private var jumpToken = 0
+    /// Programme detail sheet (Jetzt ansehen · Von Anfang an / Aufnahme · Erinnern).
+    @State private var detail: ProgramSelection?
 
     private var showsPanel: Bool {
         #if os(tvOS)
@@ -577,9 +609,22 @@ struct GuideView: View {
             if let model {
                 let rows = visibleRows(model.rows, sourceId: env.currentSource?.id)
                 ChipBar(items: channelFilters(model, env: env),
-                        selection: Binding(get: { model.filter }, set: { model.filter = $0 }),
-                        showFlags: true, leadingIcon: { isStarred($0, env: env) ? "star.fill" : nil }, identifierPrefix: "guide_filter")
-                    .padding(.bottom, Theme.isTV ? 4 : 8)
+                        selection: Binding(get: { model.filter }, set: { filter in
+                            // A locked category (show-with-lock mode) opens after the PIN.
+                            if case .category(let id) = filter {
+                                router.openCategory(id, kind: .live) { model.filter = filter }
+                            } else {
+                                model.filter = filter
+                            }
+                        }),
+                        showFlags: true, leadingIcon: { guideChipIcon($0) }, identifierPrefix: "guide_filter")
+                    .padding(.bottom, Theme.isTV ? 0 : 4)
+                GuideDayBar(days: days, selection: $dayOffset) {
+                    days = env.guideDays()
+                    dayOffset = 0
+                    jumpToken += 1
+                }
+                .padding(.bottom, Theme.isTV ? 4 : 8)
                 if rows.isEmpty {
                     EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
                                    text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
@@ -588,7 +633,9 @@ struct GuideView: View {
                         EpgListView(rows: rows, zapList: model.channels,
                                     onSelect: showsPanel ? { selected = $0 } : nil,
                                     onProgramFocus: Theme.isTV ? { selected = $0; focusedProgram = $1 } : nil,
-                                    scrollTarget: scrollTarget) { model.loadMoreIfNeeded(current: $0) }
+                                    scrollTarget: scrollTarget,
+                                    day: currentDay, jumpToken: jumpToken,
+                                    onProgramDetail: { detail = ProgramSelection(channel: $0, program: $1) }) { model.loadMoreIfNeeded(current: $0) }
                         if showsPanel {
                             GuidePanel(channel: selected ?? rows.first?.channel, zapList: model.channels,
                                        onArchive: { archiveChannel = $0 }, focusedProgram: focusedProgram)
@@ -604,23 +651,43 @@ struct GuideView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .screenBackground()
         .sheet(item: $archiveChannel) { CatchupSheet(channel: $0).environment(env).environment(router) }
+        .sheet(item: $detail) { ProgramDetailSheet(selection: $0, zapList: model?.channels ?? []).environment(env).environment(router) }
         .onAppear {
             if model == nil {
                 let m = LiveTVViewModel(env: env)
                 model = m
                 m.reload()
             }
+            days = env.guideDays()
             applyFocusRequest()
         }
         .onChange(of: router.guideFocus?.id) { applyFocusRequest() }
-        .onChange(of: env.catalogVersion) { model?.reload() }
+        .onChange(of: env.catalogVersion) {
+            model?.reload()
+            days = env.guideDays()
+        }
         .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+        .onChange(of: env.settings.epgTimeZone) { days = env.guideDays() }
+    }
+
+    /// The selected picker day (today until the days are known).
+    private var currentDay: GuideDay? {
+        days.first { $0.offset == dayOffset } ?? days.first { $0.offset == 0 }
+    }
+
+    /// Guide chip mark: 🔒 locked category (show-with-lock mode), ⭐ favorites / favorite categories.
+    private func guideChipIcon(_ filter: ChannelFilter) -> String? {
+        if case .category(let id) = filter, let sid = env.currentSource?.id, env.parental.showsLock(categoryId: id, kind: .live, sourceId: sid) {
+            return "lock.fill"
+        }
+        return isStarred(filter, env: env) ? "star.fill" : nil
     }
 
     /// Live → "Show in TV guide": the channel's category (or All), its row loaded, scrolled to and in the panel.
     private func applyFocusRequest() {
         guard let channel = router.guideFocus, let model else { return }
         router.guideFocus = nil
+        dayOffset = 0
         let filter = channel.categoryId.map(ChannelFilter.category) ?? .all
         if model.filter != filter { model.filter = filter }
         if !model.reveal(channelId: channel.id), filter != .all {
@@ -737,9 +804,10 @@ private struct GuidePanel: View {
 
     private func load(_ channel: Channel) -> [EpgProgram] {
         guard let epgId = channel.epgId else { return [] }
-        let now = Date()
+        // Around the focused programme (another day of the picker) or now.
+        let ref = focusedProgram.map { max($0.start, Date().addingTimeInterval(-4 * 3600)) } ?? Date()
         return (try? env.epg.programs(sourceId: channel.sourceId, epgId: epgId,
-                                      in: DateInterval(start: now.addingTimeInterval(-4 * 3600), duration: 28 * 3600))) ?? []
+                                      in: DateInterval(start: ref.addingTimeInterval(-4 * 3600), duration: 28 * 3600))) ?? []
     }
 }
 
@@ -756,7 +824,7 @@ struct CatchupSheet: View {
         NavigationStack {
             List {
                 if !canReplay {
-                    LText("catchup_xtream_only").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    LText("catchup_unavailable").font(Theme.caption).foregroundStyle(Theme.textSecondary)
                         .listRowBackground(Theme.surface)
                 }
                 if days.allSatisfy({ $0.programs.isEmpty }) {
@@ -811,7 +879,8 @@ struct CatchupSheet: View {
         if canReplay, let url = replayURL(for: p) {
             Button {
                 dismiss()
-                router.play(.url(url, title: "\(channel.name) · \(p.title)"))
+                let channel = channel
+                router.playGuarded(channel: channel) { router.play(.url(url, title: "\(channel.name) · \(p.title)")) }
             } label: { content }
             .accessibilityLabel("\(L10n.t("catchup_replay")): \(p.title)")
             .listRowBackground(Theme.surface)
@@ -834,10 +903,10 @@ struct CatchupSheet: View {
         }
     }
 
-    /// Xtream timeshift URL (CONTRACT §4); `nil` for M3U sources ("" = replay possible, no programme given).
+    /// Xtream timeshift / M3U catch-up URL (CONTRACT §4.5, §3.9); nil when the archive cannot be played
+    /// ("" = replay possible, no programme given).
     private func replayURL(for p: EpgProgram?) -> String? {
-        guard case .xtream? = env.secrets(for: channel.sourceId) else { return nil }
-        guard let p else { return "" }
+        guard let p else { return env.canReplayArchive(of: channel) ? "" : nil }
         return env.catchupURL(channel: channel, program: p)
     }
 }
@@ -892,6 +961,12 @@ struct EpgListView: View {
     var onProgramFocus: ((Channel, EpgProgram?) -> Void)? = nil
     /// Channel id to scroll to (set → scrolls once).
     var scrollTarget: String? = nil
+    /// Build 18 day picker: the day shown (nil = the moving window around now, e.g. favorite channels).
+    var day: GuideDay? = nil
+    /// "Jetzt" pressed: scroll back to the airing programme.
+    var jumpToken = 0
+    /// A programme block that is not on air was chosen: the detail sheet (nil = blocks play the channel).
+    var onProgramDetail: ((Channel, EpgProgram) -> Void)? = nil
     var onRowAppear: (ChannelRow) -> Void = { _ in }
     @State private var scrollX: CGFloat = 0
     @State private var now = Date()
@@ -901,6 +976,7 @@ struct EpgListView: View {
     @FocusState private var focusedBlock: String?
 
     var body: some View {
+        ScrollViewReader { hProxy in
         ScrollView(.horizontal, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 timeAxis
@@ -909,7 +985,8 @@ struct EpgListView: View {
                         LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
                             ForEach(rows) { row in
                                 EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now,
-                                           focus: $focusedBlock, onSelect: onSelect, onProgramFocus: onProgramFocus)
+                                           focus: $focusedBlock, onSelect: onSelect, onProgramFocus: onProgramFocus,
+                                           onProgramDetail: onProgramDetail)
                                     .id(row.id)
                                     .onAppear { onRowAppear(row) }
                             }
@@ -932,6 +1009,22 @@ struct EpgListView: View {
         .onPreferenceChange(EpgScrollKey.self) { value in updateScrollX(value) }
         .modifier(ScrollOffsetObserver { updateScrollX($0) })
         .overlay(alignment: .topLeading) { todayLabel }
+        // Build 18: another day → its window, opened at the same clock time; "Jetzt" → today at now.
+        .onAppear {
+            if day != nil { timeline = makeTimeline() }
+            if day.map({ !$0.contains(Date()) }) ?? false { scrollToAnchor(hProxy) }
+        }
+        .onChange(of: day) {
+            now = Date()
+            timeline = makeTimeline()
+            scrollToAnchor(hProxy)
+        }
+        .onChange(of: jumpToken) {
+            now = Date()
+            timeline = makeTimeline()
+            scrollToAnchor(hProxy)
+        }
+        }
         .defaultFocus($focusedBlock, rows.first.map { EpgBlockKey.now($0.channel.id) }, priority: .userInitiated)
         // Minute tick on the minute: the now line, the on-air blocks and – every 30 min – the window itself move
         // with the clock (a guide left open for hours never freezes or runs empty, audit B10).
@@ -946,6 +1039,25 @@ struct EpgListView: View {
         }
     }
 
+    private func makeTimeline() -> EpgTimeline {
+        guard let day else { return EpgTimeline(now: now, tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute) }
+        return EpgTimeline(day: day, now: now, tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute)
+    }
+
+    /// Where the list opens: the anchor (now / same clock time) right after the pinned tile + 20 min.
+    private var anchorX: CGFloat {
+        max(0, timeline.x(timeline.anchor(now: now)) - EpgMetrics.tileWidth - 20 * EpgMetrics.pointsPerMinute)
+    }
+
+    private func scrollToAnchor(_ proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(60))   // after the new window is laid out
+            proxy.scrollTo(EpgListView.anchorId, anchor: .leading)
+        }
+    }
+
+    static let anchorId = "epg_anchor"
+
     private func updateScrollX(_ value: CGFloat) {
         let clamped = max(0, value)
         if abs(clamped - scrollX) > 0.5 { scrollX = clamped }
@@ -953,7 +1065,10 @@ struct EpgListView: View {
 
     /// "Today" pinned above the tile column.
     private var todayLabel: some View {
-        LText("epg_today").font(Theme.isTV ? Theme.headline : .title3.bold()).foregroundStyle(Theme.textPrimary)
+        Text(day.map { GuideDayBar.title($0, env: env) } ?? L10n.t("epg_today"))
+            .font(Theme.isTV ? Theme.headline : .title3.bold()).foregroundStyle(Theme.textPrimary)
+            .lineLimit(1).minimumScaleFactor(0.6)
+            .accessibilityIdentifier("guide_day_title")
             .frame(width: EpgMetrics.tileWidth + (Theme.isTV ? 0 : 6), height: EpgMetrics.axisHeight, alignment: .leading)
             .padding(.leading, Theme.safeH)
             .background(Theme.bg)
@@ -963,6 +1078,11 @@ struct EpgListView: View {
     private var timeAxis: some View {
         ZStack(alignment: .topLeading) {
             Color.clear.frame(width: timeline.width, height: EpgMetrics.axisHeight)
+            // Scroll target of the day picker / "Jetzt" (`scrollToAnchor`).
+            HStack(spacing: 0) {
+                Color.clear.frame(width: anchorX, height: 1)
+                Color.clear.frame(width: 1, height: 1).id(EpgListView.anchorId)
+            }
             ForEach(timeline.ticks.filter { abs(timeline.x($0) - timeline.x(now)) > (Theme.isTV ? 200 : 100) || $0 < now }
                         .filter { timeline.x(now) - timeline.x($0) > (Theme.isTV ? 140 : 70) || $0 > now }, id: \.self) { tick in
                 Text(env.timeFormatter.time(tick))
@@ -971,7 +1091,8 @@ struct EpgListView: View {
                     .frame(height: EpgMetrics.axisHeight)
                     .padding(.leading, timeline.x(tick) + 4)
             }
-            // "now" marker
+            // "now" marker (only when now is in the shown day)
+            if timeline.interval.contains(now) {
             HStack(spacing: 4) {
                 Image(systemName: "arrowtriangle.down.fill").font(.system(size: Theme.isTV ? 16 : 9))
                 Text(env.timeFormatter.time(now)).font(Theme.isTV ? Theme.caption.weight(.bold).monospacedDigit() : .footnote.weight(.bold).monospacedDigit())
@@ -981,6 +1102,7 @@ struct EpgListView: View {
             .frame(height: EpgMetrics.axisHeight)
             .background(Theme.bg)
             .padding(.leading, timeline.x(now) - (Theme.isTV ? 12 : 6))
+            }
         }
         .frame(width: timeline.width, height: EpgMetrics.axisHeight, alignment: .leading)
         .accessibilityHidden(true)
@@ -992,7 +1114,7 @@ struct EpgListView: View {
         return Rectangle().fill(Theme.live.opacity(0.75)).frame(width: 1.5)
             .frame(maxHeight: rowsHeight)
             .padding(.leading, x)
-            .opacity(x - scrollX > EpgMetrics.tileWidth + 4 ? 1 : 0)
+            .opacity(x - scrollX > EpgMetrics.tileWidth + 4 && timeline.interval.contains(now) ? 1 : 0)
             .allowsHitTesting(false)
     }
 }
@@ -1022,6 +1144,7 @@ private struct EpgRowView: View {
     let focus: FocusState<String?>.Binding
     var onSelect: ((Channel) -> Void)?
     var onProgramFocus: ((Channel, EpgProgram?) -> Void)?
+    var onProgramDetail: ((Channel, EpgProgram) -> Void)? = nil
     @State private var programs: [EpgProgram]?
 
     private var channel: Channel { row.channel }
@@ -1048,12 +1171,19 @@ private struct EpgRowView: View {
         router.play(.channel(channel), channels: zapList)
     }
 
+    /// Build 18: the programme on air plays the channel (one tap / OK, as before); any other programme opens its
+    /// detail (live · from the start / recording · reminder).
+    private func choose(_ p: EpgProgram?, onAir: Bool) {
+        if !onAir, let p, let onProgramDetail { onProgramDetail(channel, p) } else { play() }
+    }
+
     @ViewBuilder
     private func tile(isFavorite: Bool) -> some View {
         let content = ChannelTile(channel: channel, width: EpgMetrics.tileWidth, height: EpgMetrics.rowHeight)
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 3) {
                     if isFavorite { Image(systemName: "star.fill").foregroundStyle(Theme.warning) }
+                    if env.parental.isActive, env.parental.isChannelLocked(channel.id, sourceId: channel.sourceId) { LockMark() }
                     if channel.catchup.isAvailable {
                         Image(systemName: "clock.arrow.circlepath").foregroundStyle(.white).accessibilityLabel(L10n.t("epg_catchup_available"))
                     }
@@ -1102,17 +1232,29 @@ private struct EpgRowView: View {
         // Sticky label: keeps the text readable when the block slides under the pinned tile.
         let visibleLeft = scrollX + EpgMetrics.tileWidth + EpgMetrics.gap
         let inset = min(max(0, visibleLeft - x0), max(0, width - (Theme.isTV ? 120 : 56)))
-        let onAir = p?.isOnAir(at: now) ?? true
+        // Today the block on air is "now"; another day of the picker has no on-air block (the empty "no information"
+        // block of a channel without EPG counts as on air only today).
+        let onAir = p?.isOnAir(at: now) ?? timeline.interval.contains(now)
         let isPast = p.map { $0.end <= now } ?? false
         let elapsed = p.map { CGFloat(EpgSchedule.progress(of: $0, at: now)) } ?? 0
-        return EpgBlockButton(action: play) {
+        // Focus anchor: the block on air (today) or the one at the same clock time (another day) – B-08.
+        let anchor = timeline.anchor(now: now)
+        let isAnchor = p.map { $0.start <= anchor && anchor < $0.end } ?? true
+        let reminded = p.map { env.reminders.contains(sourceId: channel.sourceId, channelId: channel.id, start: $0.start) } ?? false
+        return EpgBlockButton(action: { choose(p, onAir: onAir) }) {
             EpgBlockLabel(channel: channel, program: p, onAir: onAir, isPast: isPast, elapsed: elapsed,
                           inset: inset, width: width, timeText: p.map { env.timeFormatter.time($0.start) }, isFirst: isFirst,
+                          hasReminder: reminded,
                           onFocus: { onSelect?(channel); onProgramFocus?(channel, p) })
                 .frame(width: width, height: EpgMetrics.rowHeight, alignment: .leading)
         }
-        .focused(focus, equals: onAir ? EpgBlockKey.now(channel.id) : EpgBlockKey.at(channel.id, p?.start ?? timeline.start))
-        .contextMenu { ChannelMenuItems(channel: channel) }
+        .focused(focus, equals: isAnchor ? EpgBlockKey.now(channel.id) : EpgBlockKey.at(channel.id, p?.start ?? timeline.start))
+        .contextMenu {
+            if let p, let onProgramDetail {
+                Button { onProgramDetail(channel, p) } label: { Label(L10n.t("program_details"), systemImage: "info.circle") }
+            }
+            ChannelMenuItems(channel: channel)
+        }
         .accessibilityLabel([channel.name, p?.title ?? L10n.t("epg_no_info"),
                              p.map { env.timeFormatter.range(start: $0.start, end: $0.end) }].compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier(onAir ? "epg_now_\(channel.id)" : "epg_block")
@@ -1147,6 +1289,8 @@ private struct EpgBlockLabel: View {
     let width: CGFloat
     let timeText: String?
     let isFirst: Bool
+    /// Build 18: a reminder is set for this programme (🔔).
+    var hasReminder = false
     var onFocus: () -> Void = {}
 
     /// Room for the text after the sticky inset and the paddings.
@@ -1176,10 +1320,16 @@ private struct EpgBlockLabel: View {
                 .font(Theme.isTV ? .system(size: 20, weight: .semibold) : .system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
             }
-            Text(program?.title ?? L10n.t("epg_no_info"))
-                .font(Theme.isTV ? .system(size: 27, weight: .semibold) : .system(size: 15, weight: .semibold))
-                .foregroundStyle(isPast ? Theme.textSecondary : Theme.textPrimary)
-                .lineLimit(1)
+            HStack(spacing: Theme.isTV ? 6 : 3) {
+                if hasReminder {
+                    Image(systemName: "bell.fill").font(.system(size: Theme.isTV ? 18 : 10, weight: .bold)).foregroundStyle(Theme.warning)
+                        .accessibilityLabel(L10n.t("program_reminder_set"))
+                }
+                Text(program?.title ?? L10n.t("epg_no_info"))
+                    .font(Theme.isTV ? .system(size: 27, weight: .semibold) : .system(size: 15, weight: .semibold))
+                    .foregroundStyle(isPast ? Theme.textSecondary : Theme.textPrimary)
+                    .lineLimit(1)
+            }
         }
         .padding(.leading, inset + (Theme.isTV ? 14 : 8))
         .padding(.trailing, Theme.isTV ? 10 : 6)
