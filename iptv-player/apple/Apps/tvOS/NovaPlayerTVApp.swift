@@ -30,6 +30,8 @@ struct NovaPlayerTVApp: App {
                     await AppBootstrap.applyDebugHooks(env: env, router: router)
                     // After tester access + first StoreKit snapshot (≤ 1.5 s in all), before env.start().
                     await AppBootstrap.quickStart(env: env, router: router, testerAccess: testerAccess)
+                    // Build 18: start() waits for the player to close before refreshing – publish the shelf now too.
+                    TopShelfPublisher.shared.publish(env)
                     await env.start()
                     TopShelfPublisher.shared.publish(env)
                 }

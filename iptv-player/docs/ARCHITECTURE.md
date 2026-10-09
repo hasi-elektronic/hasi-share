@@ -74,6 +74,10 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
    veritabanı. Başlıktaki `url-tvg` EPG adresi otomatik önerilir.
 5. EPG: gzip otomatik tespit, akış halinde ayrıştırma, yalnızca kaynaktaki kanallar ve
    saklama penceresi `[şimdi − max(catchup günü, 1 gün), şimdi + 7 gün]` yazılır.
+5a. **Otomatik yenileme oynatma sırasında başlamaz (Build 18):** açılıştaki/ön plana gelişteki katalog ve EPG
+   indirmeleri oynatıcı kapanana kadar bekler (`AppEnvironment.waitUntilPlayerClosed`). Build 16'dan beri bu
+   indirmeler 10 dakikaya kadar sürebiliyor; çoğu IPTV hesabı tek bağlantıya izin verdiği için yayınla yarışıp
+   donma, bağlantı hatası ve ses kaymasına yol açıyordu. Kullanıcının elle başlattığı yenileme beklemez (EPG kısmı bekler).
 6. Yenileme atomiktir: yeni veri geçici tabloya/işleme yazılır, başarıyla bitince eskisinin
    yerine geçer (yarım liste görünmez). Favoriler/ilerleme `contentKey` ile bağlı olduğu için
    yenilemeden etkilenmez. **Bölümler (Build 16):** Xtream listeleri bölüm içermez (dizi başına

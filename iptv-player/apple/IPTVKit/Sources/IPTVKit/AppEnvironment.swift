@@ -528,6 +528,7 @@ public final class AppEnvironment {
     public func refreshEpgInBackground(sourceId: String) {
         let refresher = self.refresher
         Task { [weak self] in
+            await self?.waitUntilPlayerClosed()
             let count = await refresher.refreshEpg(sourceId: sourceId)
             guard let self else { return }
             self.reloadSources()   // the EPG status (programmes / error) is shown in source management
@@ -540,9 +541,21 @@ public final class AppEnvironment {
     /// normal refresh pipeline after QuickStart; a successful refresh stores the current format, a failed
     /// one is retried on the next launch.
     public func refreshDueSources(now: Date = Date()) async {
+        await waitUntilPlayerClosed()
+        guard !Task.isCancelled else { return }
         for source in sources where !refreshing.contains(source.id) && !restore.sources.contains(where: { $0.id == source.id })
             && (source.isRefreshDue(now: now) || refresher.needsFormatRefresh(sourceId: source.id)) {
             await refreshSource(id: source.id)
+        }
+    }
+
+    /// Build 18: automatic catalog / EPG downloads never run while a stream plays. Since Build 16 they may take up to
+    /// 10 min (`HTTPTimeouts.xtreamList` / `.epg`) and compete with the stream on the same panel – most IPTV accounts
+    /// allow one connection – which froze channels, failed connects and desynced audio (QuickStart starts the
+    /// channel right before `refreshDueSources`). Waits until the player is closed (or released in the background).
+    func waitUntilPlayerClosed(poll: Duration = .seconds(2)) async {
+        while player.request != nil, !Task.isCancelled {
+            try? await Task.sleep(for: poll)
         }
     }
 

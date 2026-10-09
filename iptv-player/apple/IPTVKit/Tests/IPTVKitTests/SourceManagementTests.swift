@@ -203,6 +203,28 @@ final class SourceManagementTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(env.sources.first { $0.id == source.id }?.lastRefreshAt), Date().addingTimeInterval(-60))
     }
 
+    /// Build 18: automatic refreshes wait while a stream plays (one-connection panels froze / dropped the stream).
+    func testDueRefreshWaitsWhileThePlayerIsOpen() async throws {
+        let transport = try Server().transport()
+        let env = try makeEnvironment(transport)
+        _ = try await env.addSource(name: "A", secrets: m3u("a")) { _ in }
+        var old = try XCTUnwrap(env.sources.first)
+        old.lastRefreshAt = Date().addingTimeInterval(-25 * 3600)
+        env.updateSource(old)
+        let lists = { transport.requests.filter { $0.url.absoluteString.hasSuffix(".m3u") }.count }
+        let before = lists()
+
+        env.player.open(PlaybackRequest(item: .url("http://lists.example.com/live.m3u8", title: "Live"), source: nil))
+        XCTAssertNotNil(env.player.request)
+        let refresh = Task { await env.refreshDueSources() }
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertEqual(lists(), before, "no list download while the player is open")
+
+        env.player.close()
+        await refresh.value
+        XCTAssertEqual(lists(), before + 1, "refreshed once the player closed")
+    }
+
     func testEditFormIsPrefilledAndHidesCredentialsInTheDefaultEpgHint() async throws {
         let env = try makeEnvironment(try Server().transport())
         let panel = XtreamSecrets(serverUrl: "http://panel.example.com:8080", username: "demo", password: "s3cret")
