@@ -25,6 +25,8 @@ public final class CategoryPreferences {
     @ObservationIgnored private var entries: [String: Entry] = [:]
     /// Bumped on every change (views observe it).
     public private(set) var version = 0
+    /// Called after a user change (iCloud sync stamps it).
+    @ObservationIgnored public var onChange: @MainActor () -> Void = {}
 
     public init(kv: any KeyValueStore) {
         self.kv = kv
@@ -50,6 +52,7 @@ public final class CategoryPreferences {
         entries[key] = e
         kv.setValue(e, forKey: key)
         version += 1
+        onChange()
     }
 
     // MARK: Country
@@ -143,5 +146,53 @@ public final class CategoryPreferences {
             kv.set(nil, forKey: key)
         }
         version += 1
+        onChange()
+    }
+}
+
+/// iCloud sync (Build 17): pinned, hidden and the chosen country per source + kind. "Recently opened" stays on the
+/// device (it changes on every visit).
+extension CategoryPreferences: CloudPreferenceProvider {
+    static let cloudPinned = "catnav.pin."
+    static let cloudHidden = "catnav.hide."
+    static let cloudCountry = "catnav.country."
+    private static let cloudKinds: [CategoryKind] = [.movie, .series]
+
+    public var cloudPreferenceNames: Set<String> {
+        Set(Self.cloudKinds.flatMap { [Self.cloudPinned + $0.rawValue, Self.cloudHidden + $0.rawValue, Self.cloudCountry + $0.rawValue] })
+    }
+
+    public func cloudPreferences() -> [CloudPreferenceKey: [String]] {
+        var out: [CloudPreferenceKey: [String]] = [:]
+        for kind in Self.cloudKinds {
+            let prefix = "catnav.\(kind.rawValue)."
+            for key in kv.keys(withPrefix: prefix) {
+                let sourceId = String(key.dropFirst(prefix.count))
+                let e = entry(sourceId, kind)
+                out[CloudPreferenceKey(Self.cloudPinned + kind.rawValue, sourceId: sourceId)] = e.pinned
+                out[CloudPreferenceKey(Self.cloudHidden + kind.rawValue, sourceId: sourceId)] = e.hidden.sorted()
+                out[CloudPreferenceKey(Self.cloudCountry + kind.rawValue, sourceId: sourceId)] = e.country.map { [$0] } ?? []
+            }
+        }
+        return out
+    }
+
+    public func applyCloudPreferences(_ values: [CloudPreferenceKey: [String]]) {
+        var changed = false
+        for (key, value) in values {
+            guard let sourceId = key.sourceId,
+                  let kind = Self.cloudKinds.first(where: { key.name.hasSuffix("." + $0.rawValue) }) else { continue }
+            let storeKey = Self.key(sourceId: sourceId, kind: kind)
+            var e = entry(sourceId, kind)
+            let before = e
+            if key.name.hasPrefix(Self.cloudPinned) { e.pinned = value }
+            if key.name.hasPrefix(Self.cloudHidden) { e.hidden = value }
+            if key.name.hasPrefix(Self.cloudCountry) { e.country = value.first }
+            guard e != before else { continue }
+            entries[storeKey] = e
+            kv.setValue(e, forKey: storeKey)
+            changed = true
+        }
+        if changed { version += 1 }
     }
 }
