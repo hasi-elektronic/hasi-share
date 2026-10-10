@@ -365,7 +365,8 @@ The iOS/tvOS apps ship AVPlayer **and** VLCKit 3 (libVLC, LGPL-2.1, dynamic fram
      (H.264/HEVC with a cue index) is remuxed in-app by FFmpeg (LGPL, dynamic `FFmpeg.framework`) into
      HLS/fMP4 on 127.0.0.1 and played by **AVPlayer**; audio AVPlayer cannot decode (DTS, TrueHD, Opus,
      Vorbis, FLAC, MP2/MP3) is transcoded to AAC. A remux failure (no cues, other video codec, broken
-     file) falls back once to VLCKit. Everything else as `auto`. **Audio delay (Build 22):** the content delay (−2000…+2000 ms, not the VLC calibration – AVPlayer
+     file; Build 23: also a server without byte ranges, a rejected Range header, timeouts – any open failure,
+     and any failure before the first frame) falls back once to VLCKit. Everything else as `auto`. **Audio delay (Build 22):** the content delay (−2000…+2000 ms, not the VLC calibration – AVPlayer
      compensates the output latency) is baked into every segment by audio-segment membership at the shifted time;
      a change reopens at the position after 0.6 s without further changes. Limits: no AirPlay video, no bitmap subtitles (PGS/VobSub). **Audio (Build 20):** one track is muxed into the
      local HLS (preferred language, else the container default); the player's audio menu lists every

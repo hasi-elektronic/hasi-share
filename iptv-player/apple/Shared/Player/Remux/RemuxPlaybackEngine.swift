@@ -43,6 +43,8 @@ final class RemuxPlaybackEngine: PlaybackEngine {
     /// Content audio delay (ms, + = audio later) the open session was built with / the next one gets.
     private var audioDelayMs = 0
     private var delayTask: Task<Void, Never>?
+    /// The current item showed a frame (later failures are real playback errors, earlier ones fall back to VLCKit).
+    private var playedThisLoad = false
     /// The inner AVPlayer's last track report (its own legible options when the source has no text tracks).
     private var innerSubtitles: (options: [MediaOption], selected: Int?) = ([], nil)
 
@@ -59,6 +61,7 @@ final class RemuxPlaybackEngine: PlaybackEngine {
               preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         lastLoad = (stream, isLive, preferredSubtitleLanguage, tuning)
         delayTask?.cancel()   // a delay set just before this load belongs to this item, not to a reopen of the old one
+        playedThisLoad = false
         cues.removeAll()
         subtitleTracks = []
         selectedSubtitleTrack = nil
@@ -126,16 +129,17 @@ final class RemuxPlaybackEngine: PlaybackEngine {
         }
     }
 
-    /// Source HTTP errors keep their meaning (403 → card); what the remuxer cannot handle (no cues,
-    /// VP9/AV1/MPEG-2 video, broken file) is `UnsupportedFormat` → the controller retries in VLCKit.
+    /// Any open failure is `UnsupportedFormat` → the controller retries once in VLCKit (Build 23); a segment error after
+    /// the open is a network error (before the first frame `forward` turns it into a fallback too).
     static func map(_ error: Error, isLive: Bool) -> PlaybackError {
-        guard let remux = error as? RemuxSession.RemuxError else { return .network(.other) }
+        guard let remux = error as? RemuxSession.RemuxError else { return .unsupportedFormat(container: StreamContainer.mkv.rawValue) }
         switch remux {
-        case .open(let code, _) where code >= 400 && code < 600:
-            return ErrorClassifier.playbackError(httpStatus: Int(code)) ?? .network(.other)
-        case .open(let code, _) where code == -1:
-            return .network(.other)
         case .open:
+            // Build 23: whatever the remuxer cannot open falls back once to VLCKit, which reads the file sequentially and
+            // classifies a real HTTP error itself (its own error card). Servers without byte ranges answer 200
+            // (`notSeekable`) or reject the Range header (400/403/416…) – common for Xtream series; timeouts, transport
+            // errors, no cues and other codecs too. Before, these counted as network errors: 5 reconnects into the same
+            // remuxer, then "Connection lost" (series did not play on Apple TV, Builds 19–22).
             return .unsupportedFormat(container: StreamContainer.mkv.rawValue)
         case .segment, .cancelled:
             return .network(.other)
@@ -144,6 +148,13 @@ final class RemuxPlaybackEngine: PlaybackEngine {
 
     private func forward(_ event: EngineEvent) {
         bench?.event(event)
+        if case .playing = event { playedThisLoad = true }
+        // Build 23: a failure before the first frame (segment generation / local HLS) → VLCKit once, like an open failure.
+        if case .failed(let error) = event, !playedThisLoad {
+            SafeLog.warning("remux failed before the first frame: \(error) → VLCKit")
+            onEvent?(.failed(.unsupportedFormat(container: StreamContainer.mkv.rawValue)))
+            return
+        }
         // The local HLS carries one audio track and no subtitles: the menus show the source's tracks instead.
         if case .tracks(let audio, let subtitles, let selectedAudio, let selectedSubtitle) = event,
            !audioTracks.isEmpty || !subtitleTracks.isEmpty {
