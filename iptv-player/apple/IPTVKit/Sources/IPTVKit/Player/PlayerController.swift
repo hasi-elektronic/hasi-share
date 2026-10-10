@@ -281,6 +281,11 @@ public final class PlayerController {
     /// VLCKit plays this stream only because of the audio delay (AVPlayer could play it): a VLCKit
     /// format/codec failure falls back to AVPlayer without the delay (CONTRACT §6.1).
     @ObservationIgnored private var delayRoutedToVLC = false
+    /// Build 24: every way to play the opened item (built at its first failure before a frame) and the one in use.
+    @ObservationIgnored private(set) var rescuePlan: [PlaybackAttempt] = []
+    @ObservationIgnored private var rescueIndex = 0
+    /// Every engine + URL loaded for the opened item (no ping-pong between ways that already failed).
+    @ObservationIgnored private var triedAttempts: Set<PlaybackAttempt> = []
     /// The opened stream reached `.playing` at least once (a forced-HLS failure after that is a normal error).
     @ObservationIgnored private var streamPlayed = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
@@ -376,6 +381,9 @@ public final class PlayerController {
         pendingSeek = nil
         pausedDuringReconnect = false
         delayRoutedToVLC = false
+        rescuePlan = []
+        rescueIndex = 0
+        triedAttempts = []
         audioSyncUnavailable = false
         streamPlayed = false
         resetUpNext()
@@ -504,6 +512,7 @@ public final class PlayerController {
 
     private func load(_ stream: ResolvedStream, startMs: Int64?) {
         let kind = engineKind(for: stream)
+        triedAttempts.insert(PlaybackAttempt(engine: kind, url: stream.url, container: stream.container))
         if kind == .vlcKit, engineOverride == .automatic, currentAudioDelay != 0, fallbackEngine == nil || delayRoutedToVLC,
            ApplePlayback.engine(for: stream.container, vlcAvailable: engines.vlcAvailable) == .avPlayer {
             delayRoutedToVLC = true
@@ -657,6 +666,7 @@ public final class PlayerController {
             load(stream, startMs: request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs))
             return
         }
+        if rescue(after: error) { return }
         if let stream, let current = engine?.kind, fallbackEngine == nil,
            let next = ApplePlayback.fallbackEngine(after: error, on: current, vlcAvailable: engines.vlcAvailable, override: engineOverride) {
             SafeLog.info("\(current.rawValue) failed (\(error)) – retrying with \(next.rawValue)")
@@ -686,6 +696,48 @@ public final class PlayerController {
             stopPlayback()
             phase = .failed(finalError(error))
         }
+    }
+
+    /// Build 24 (CONTRACT §6.2): before the first frame, the next untried engine / URL variant instead of reconnects or an
+    /// error card. When every way failed, the reconnects run with the normal first choice. True = handled.
+    private func rescue(after error: PlaybackError) -> Bool {
+        guard !streamPlayed, PlaybackRescue.isRescuable(error), let stream, let current = engine?.kind else { return false }
+        if rescuePlan.isEmpty {
+            rescuePlan = PlaybackRescue.plan(first: PlaybackAttempt(engine: current, url: stream.url, container: stream.container),
+                                             isLive: request?.isLive ?? false, override: engineOverride,
+                                             vlcAvailable: engines.vlcAvailable, remuxAvailable: engines.remuxAvailable,
+                                             remuxPreferred: remuxByDefault)
+            rescueIndex = 0
+        }
+        let resume = request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs)
+        let otherURLOnly = PlaybackRescue.needsOtherURL(error)
+        while rescueIndex + 1 < rescuePlan.count,
+              triedAttempts.contains(rescuePlan[rescueIndex + 1]) || (otherURLOnly && rescuePlan[rescueIndex + 1].url == stream.url) {
+            rescueIndex += 1
+        }
+        guard rescueIndex + 1 < rescuePlan.count else {
+            // Every way failed: back to the first choice, then the normal reconnect policy / error card.
+            if rescueIndex != 0 { use(rescuePlan[0], on: stream) }
+            rescueIndex = 0
+            rescuePlan = Array(rescuePlan.prefix(1))   // the reconnects do not walk the chain again
+            return false
+        }
+        rescueIndex += 1
+        let next = rescuePlan[rescueIndex]
+        SafeLog.info("rescue \(rescueIndex)/\(rescuePlan.count - 1): \(current.rawValue) failed (\(error)) → \(next.engine.rawValue) .\(next.url.pathExtension)")
+        use(next, on: stream)
+        load(self.stream ?? stream, startMs: resume)
+        return true
+    }
+
+    /// Makes `attempt` the current way: its URL in `stream` and its engine as the fallback (wins in `engineKind`).
+    private func use(_ attempt: PlaybackAttempt, on stream: ResolvedStream) {
+        var next = stream
+        next.url = attempt.url
+        next.container = attempt.container
+        next.engine = attempt.engine
+        self.stream = next
+        fallbackEngine = attempt.engine
     }
 
     /// Error card for a failed stream: an Xtream live `.m3u8` requested only because of the Apple engine

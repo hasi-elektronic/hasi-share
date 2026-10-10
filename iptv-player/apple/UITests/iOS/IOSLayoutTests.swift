@@ -32,6 +32,32 @@ final class IOSLayoutTests: XCTestCase {
         UITestSupport.snap("b16-ios-01-hero-ax", in: self)
     }
 
+    /// Build 24 (owner report, iPhone home cut off on the left – tabs "…ien", rows "…ender"): a landscape cover in the
+    /// hero (common for series/movies) must not widen the page. Needs `wide-cover.m3u` + `wide-cover.jpg`
+    /// (UITests/Fixtures) next to the seed playlist; skipped otherwise.
+    @MainActor
+    func testWideHeroCoverKeepsThePageOnScreen() throws {
+        let base = String(UITestSupport.seedM3U[...UITestSupport.seedM3U.lastIndex(of: "/")!])
+        let playlist = base + "wide-cover.m3u"
+        try UITestSupport.requireServed(playlist)
+        try UITestSupport.requireServed(base + "wide-cover.jpg")
+        let app = UITestSupport.launch(["-seedM3U", playlist, "-seedName", "Wide", "-uiSeedLibrary"], seed: false)
+        let play = app.buttons["hero_play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 30))
+        sleep(3)   // the cover image loads and lays out
+        let screen = app.windows.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(play.frame.minX, screen.minX, "▶ inside the screen")
+        XCTAssertLessThanOrEqual(play.frame.maxX, screen.maxX)
+        // A widened page overflows on both sides (▶ stays centred): the first tab and Info show it.
+        let home = app.buttons["tab_home"]
+        XCTAssertTrue(home.exists)
+        XCTAssertGreaterThanOrEqual(home.frame.minX, screen.minX, "first tab not cut off on the left")
+        let info = app.buttons["hero_info"]
+        XCTAssertTrue(info.exists)
+        XCTAssertLessThanOrEqual(info.frame.maxX, screen.maxX, "Info not cut off on the right")
+        UITestSupport.snap("b24-ios-wide-hero", in: self)
+    }
+
     /// IOS-14: Live rows at AX sizes keep the channel name and the programme (screenshot) and are tappable rows.
     @MainActor
     func testLiveRowsAtAccessibilitySize() throws {

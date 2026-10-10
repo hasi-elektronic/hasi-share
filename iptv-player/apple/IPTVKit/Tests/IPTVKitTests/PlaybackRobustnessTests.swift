@@ -70,13 +70,16 @@ final class PlaybackRobustnessTests: XCTestCase {
         XCTAssertEqual(c.phase, .failed(.serverError(httpStatus: 503)))
     }
 
+    /// No HTTP error in the probe: the original (network) error stays – Build 24: the other engine is tried first.
     func testProbeWithoutHTTPErrorKeepsOriginalError() async throws {
         let c = controller(probeStatus: 206)
         try await open(c, "http://h.example.com/a.mp4")
         av.emit(.failed(.network(.other)))
-        try await eventually { c.phase != .loading }
-        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
+        try await eventually { vlc.loads.count == 1 }
+        XCTAssertEqual(c.engineKind, .vlcKit, "rescued with VLCKit before any reconnect")
         XCTAssertEqual(probes.count, 1)
+        vlc.emit(.failed(.network(.other)))
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2), "every way failed → reconnect policy")
     }
 
     func testFailureAfterPlayingIsNotProbed() async throws {
@@ -192,7 +195,9 @@ final class PlaybackRobustnessTests: XCTestCase {
         c.notReadyProbeDelay = .milliseconds(30)
         c.probe = { _, _ in VLCFailureClassifier.Probe(httpStatus: nil, transportError: .network(.dns)) }
         try await open(c, "http://h.example.com/a.mp4")
-        try await eventually { c.phase != .loading }
+        try await eventually { vlc.loads.count == 1 }
+        XCTAssertEqual(c.engineKind, .vlcKit, "Build 24: the other engine first")
+        vlc.emit(.failed(.network(.dns)))
         XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
     }
 

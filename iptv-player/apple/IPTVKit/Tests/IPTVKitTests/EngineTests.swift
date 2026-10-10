@@ -172,18 +172,31 @@ final class EngineSelectionTests: XCTestCase {
         XCTAssertEqual(vlc.loads.count, 1)
     }
 
-    func testCodecErrorFallsBackButNetworkErrorReconnects() async throws {
+    /// Build 24 (CONTRACT §6.2): before the first frame a network error tries the other engine first; once a frame was
+    /// shown, network errors reconnect on the same engine.
+    func testNetworkErrorBeforeFirstFrameTriesVLCAfterAFrameItReconnects() async throws {
         let c = controller(policy: ReconnectPolicy(delaysMs: [5_000, 5_000]))
         try await open(c, "http://h.example.com/live.m3u8")
         av.emit(.failed(.network(.timeout)))
-        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
-        XCTAssertEqual(c.engineKind, .avPlayer, "network errors never switch engine")
-        av.emit(.failed(.unsupportedCodec(codec: nil)))
-        XCTAssertEqual(c.engineKind, .vlcKit)
-        // Reconnects after the fallback stay on VLCKit.
+        XCTAssertEqual(c.engineKind, .vlcKit, "rescued: the other engine before any reconnect")
+        XCTAssertEqual(vlc.loads.count, 1)
+        vlc.emit(.playing)
         vlc.emit(.failed(.network(.other)))
-        XCTAssertEqual(c.phase, .reconnecting(attempt: 2, max: 2))
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 2))
+        XCTAssertEqual(c.engineKind, .vlcKit, "after a frame: reconnect on the same engine")
+    }
+
+    /// Every way failed before a frame → reconnects with the first choice, then the error card.
+    func testWhenEveryWayFailedReconnectsUseTheFirstChoice() async throws {
+        let c = controller(policy: ReconnectPolicy(delaysMs: [20]))
+        try await open(c, "http://h.example.com/live.m3u8")
+        av.emit(.failed(.network(.timeout)))
         XCTAssertEqual(c.engineKind, .vlcKit)
+        vlc.emit(.failed(.network(.timeout)))
+        XCTAssertEqual(c.phase, .reconnecting(attempt: 1, max: 1))
+        for _ in 0..<200 where av.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(c.engineKind, .avPlayer, "the reconnect loads the normal choice")
+        XCTAssertEqual(av.loads.count, 2)
     }
 
     func testNoFallbackWithoutVLC() async throws {

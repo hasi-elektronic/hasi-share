@@ -1,0 +1,5 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="ch1" group-title="News",Channel One
+http://localhost:8765/test-channel.ts
+#EXTINF:-1 tvg-logo="http://localhost:8765/wide-cover.jpg" group-title="Movies",Wide Cover Movie
+http://localhost:8765/movie/u/p/1.mp4

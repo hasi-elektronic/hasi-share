@@ -634,7 +634,9 @@ private struct BrowseHero: View {
                     GeometryReader { g in HeroBackdrop(url: image, height: g.size.height) }
                 }
             }
-            .containerRelativeFrame(.vertical) { h, _ in h * 0.58 }
+            // Width pinned to the container too: an aspect-fill landscape cover (many series/movie covers are wide)
+            // otherwise reported its full width, the page grew wider than the screen and both edges were cut off.
+            .containerRelativeFrame([.horizontal, .vertical]) { length, axis in axis == .vertical ? length * 0.58 : length }
             .clipped()
             VStack(spacing: 12) {
                 Text(title).font(.system(.largeTitle).weight(.heavy)).foregroundStyle(.white)

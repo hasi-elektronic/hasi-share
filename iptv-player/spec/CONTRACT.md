@@ -430,6 +430,18 @@ Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audio
 
 ---
 
+### 6.2 Never give up early (Build 24, Apple; Android follows)
+Before an opened item has shown its first frame, a failure (anything but DRM) does not go to the reconnect policy or
+an error card while another way to play is untried (`PlaybackRescue`):
+1. the same URL on the other engines that support its container – automatic / remux: Apple + Remux (MKV, first on
+   tvOS), AVPlayer, VLCKit, then Remux last where it was not first; an engine override limits the list to that
+   engine (Apple: AVPlayer only; VLC: VLCKit, else AVPlayer);
+2. live Xtream (`/live/U/P/ID.ext`): the other format (`.m3u8` ⇄ `.ts`) on its engines.
+A definite HTTP answer for a URL (403 / 404 / 410 / 5xx, also from the AVPlayer probe) skips that URL's other
+engines – only the other URL is tried. An engine + URL is never loaded twice for one open (no ping-pong). When every
+way failed, the reconnects (§2) load the first choice again; only then the error card. After the first frame,
+failures reconnect on the engine that played.
+
 ## 7. Licensing
 
 ### 7.1 Device key
