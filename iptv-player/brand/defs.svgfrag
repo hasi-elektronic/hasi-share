@@ -1,0 +1,5 @@
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0E1A3A"/><stop offset="1" stop-color="#1B1150"/></linearGradient>
+  <linearGradient id="arc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5BD6FF"/><stop offset="1" stop-color="#7B5CFF"/></linearGradient>
+  <linearGradient id="trail" gradientUnits="userSpaceOnUse" x1="100" y1="0" x2="470" y2="0"><stop offset="0" stop-color="#5BD6FF" stop-opacity="0"/><stop offset="1" stop-color="#7B9BFF"/></linearGradient>
+</defs>
