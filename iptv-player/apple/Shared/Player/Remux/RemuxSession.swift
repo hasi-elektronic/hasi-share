@@ -135,7 +135,7 @@ final class RemuxSession: @unchecked Sendable {
                      forceAudioTranscode: Bool = false, blockSize: Int = 1 << 20, maxInFlight: Int = 1) async throws -> RemuxSession {
         let queue = DispatchQueue(label: "nova.remux.worker", qos: .userInitiated)
         let source = RemuxByteSource(url: url, headers: headers, blockSize: blockSize,
-                                     maxBlocks: max(8, (24 << 20) / blockSize), readAhead: max(2, (3 << 20) / blockSize),
+                                     maxBlocks: max(8, (24 << 20) / blockSize), readAhead: max(2, (12 << 20) / blockSize),
                                      maxInFlight: maxInFlight)
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
@@ -231,7 +231,10 @@ final class RemuxSession: @unchecked Sendable {
     // MARK: Playlists
 
     func masterPlaylist() -> String {
-        var attrs = "BANDWIDTH=\(max(info.bitrate, 100_000)),CODECS=\"\(info.codecs)\""
+        // BANDWIDTH is the PEAK segment rate (HLS); the file's average goes to AVERAGE-BANDWIDTH. With the average as
+        // BANDWIDTH AVPlayer logged -12318 ("segment exceeds the variant's bandwidth") on every busy scene.
+        let average = max(info.bitrate, 100_000)
+        var attrs = "BANDWIDTH=\(average * 2),AVERAGE-BANDWIDTH=\(average),CODECS=\"\(info.codecs)\""
         if info.width > 0, info.height > 0 { attrs += ",RESOLUTION=\(info.width)x\(info.height)" }
         if info.fps > 0 { attrs += ",FRAME-RATE=\(String(format: "%.3f", info.fps))" }
         attrs += ",VIDEO-RANGE=\(info.videoRange)"
