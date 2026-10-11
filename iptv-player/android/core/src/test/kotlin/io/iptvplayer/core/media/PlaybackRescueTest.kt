@@ -30,5 +30,6 @@ class PlaybackRescueTest {
         assertNull(PlaybackRescue.next(url, isLive = true, playedOnce = false, alreadyRescued = true, error = e), "once")
         assertNull(PlaybackRescue.next(url, isLive = false, playedOnce = false, alreadyRescued = false, error = e), "VOD has no variant")
         assertNull(PlaybackRescue.next(url, true, false, false, PlaybackError.Drm))
+        assertNull(PlaybackRescue.next(url, true, false, false, PlaybackError.UnsupportedCodec("video/hevc")), "same codec in the other format: keep the true card")
     }
 }

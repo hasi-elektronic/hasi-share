@@ -22,7 +22,12 @@ public object PlaybackRescue {
         }
     }
 
-    public fun isRescuable(error: PlaybackError): Boolean = error !is PlaybackError.Drm
+    /**
+     * Everything but DRM – and, on Android's single engine, but an undecodable codec: the other format of the same
+     * channel carries the same codec, and trying it would replace the true card ("codec not supported") with that
+     * URL's error (seen: a 404 for the missing .m3u8 twin).
+     */
+    public fun isRescuable(error: PlaybackError): Boolean = error !is PlaybackError.Drm && error !is PlaybackError.UnsupportedCodec
 
     /** The single decision of the controller: the URL to try now, or null (go on with reconnect / error card). */
     public fun next(url: String, isLive: Boolean, playedOnce: Boolean, alreadyRescued: Boolean, error: PlaybackError): String? {

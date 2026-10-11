@@ -20,6 +20,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import io.iptvplayer.core.error.ConnectivityProbe
 import io.iptvplayer.core.error.PlaybackError
+import io.iptvplayer.core.error.NetworkReason
 import io.iptvplayer.core.media.Container
 import io.iptvplayer.core.media.PlatformSupport
 import io.iptvplayer.core.media.PlayerEngine
@@ -81,6 +82,13 @@ class PlayerController(
     private var playedThisOpen = false
     /** The live format variant was already tried for this open (CONTRACT §6.2). */
     private var rescuedThisOpen = false
+    /** Stall watchdog (CONTRACT §2 / Apple stall timer): buffering after the first frame without progress. */
+    private var stallJob: Job? = null
+    /** The "video not decodable" card was raised for this open. */
+    private var videoCheckedThisOpen = false
+    /** A video frame reached the screen for this open (Player.Listener.onRenderedFirstFrame). */
+    private var firstFrameThisOpen = false
+    private var startupJob: Job? = null
     private var stoppedPositionMs: Long? = null
     private var lastSavedAt = 0L
 
@@ -91,6 +99,7 @@ class PlayerController(
             if (!isPlaying) saveProgress()
         }
         override fun onTracksChanged(tracks: Tracks) = updateTracks(tracks)
+        override fun onRenderedFirstFrame() { firstFrameThisOpen = true }
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             if (videoSize.width > 0 && videoSize.height > 0) {
                 _state.update { it.copy(videoAspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height) }
@@ -108,6 +117,10 @@ class PlayerController(
         reconnect.reset()
         playedThisOpen = false
         rescuedThisOpen = false
+        videoCheckedThisOpen = false
+        firstFrameThisOpen = false
+        stallJob?.cancel()
+        startupJob?.cancel()
         reconnectJob?.cancel()
         _state.update { it.copy(item = item, phase = PlayerPhase.Loading, positionMs = 0, durationMs = 0, audioTracks = emptyList(), textTracks = emptyList(), resumedFromMs = null) }
         // Pre-checks (CONTRACT §6, V12).
@@ -244,6 +257,7 @@ class PlayerController(
         p.prepare()
         p.playWhenReady = true
         SafeLog.d(TAG, "prepare ${item.kind.wire} ${container.wire} pos=$positionMs")
+        watchStartup()
     }
 
     private fun fail(error: PlaybackError) {
@@ -257,6 +271,13 @@ class PlayerController(
         val http = generateSequence<Throwable>(e) { it.cause }.filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()?.responseCode
         val mapped = PlaybackErrorMapper.map(e.errorCode, http, connectivity.isOffline(), container, e.message)
         SafeLog.w(TAG, "player error ${e.errorCodeName} -> ${mapped.error.code}")
+        handleMapped(mapped)
+    }
+
+    /** Rescue / reconnect / card for an error from ExoPlayer, the stall watchdog or the video check. */
+    private fun handleMapped(mapped: PlaybackErrorMapper.Mapped) {
+        stallJob?.cancel()
+        startupJob?.cancel()
         val p = _player.value ?: return
         if (mapped.behindLiveWindow) {
             p.seekToDefaultPosition()
@@ -308,11 +329,72 @@ class PlayerController(
             playedThisOpen = true
             reconnect.onPlaying(SystemClock.elapsedRealtime())
         }
+        watchStall(phase, p)
         if (phase == PlayerPhase.Ended) saveProgress()
         _state.update { it.copy(phase = phase) }
     }
 
+    /**
+     * ExoPlayer can stay in BUFFERING forever when a live server stops sending without closing the connection (only
+     * the 30 s socket read timeout would end it, and not at all while bytes trickle). After the first frame, buffering
+     * for [PlaybackWatchdog.STALL_TIMEOUT_MS] without the position moving is a network error → reconnect policy.
+     */
+    /**
+     * Startup watchdog (Apple: not-ready probe after 8 s). ExoPlayer waits forever in BUFFERING when a decoder claims a
+     * format but never outputs a frame (seen: HEVC 4:2:2 10-bit on the emulator – black screen, endless spinner):
+     * - after [PlaybackWatchdog.DECODE_CHECK_MS]: no picture although several seconds are buffered → the video cannot
+     *   be decoded here → UnsupportedCodec card;
+     * - after [PlaybackWatchdog.STARTUP_TIMEOUT_MS]: still not playing → network timeout → rescue / reconnect / card.
+     */
+    private fun watchStartup() {
+        startupJob?.cancel()
+        startupJob = scope.launch {
+            delay(PlaybackWatchdog.DECODE_CHECK_MS)
+            var pl = _player.value ?: return@launch
+            if (!playedThisOpen && PlaybackWatchdog.decoderStuck(pl.videoFormat != null, firstFrameThisOpen, pl.bufferedPosition - pl.currentPosition)) {
+                val mime = pl.videoFormat?.sampleMimeType
+                SafeLog.w(TAG, "no picture after ${PlaybackWatchdog.DECODE_CHECK_MS} ms with data buffered: video $mime not decodable")
+                return@launch handleMapped(PlaybackErrorMapper.Mapped(PlaybackError.UnsupportedCodec(mime), recoverable = false))
+            }
+            delay(PlaybackWatchdog.STARTUP_TIMEOUT_MS - PlaybackWatchdog.DECODE_CHECK_MS)
+            pl = _player.value ?: return@launch
+            if (!playedThisOpen && _state.value.phase !is PlayerPhase.Failed && _state.value.phase !is PlayerPhase.Reconnecting) {
+                SafeLog.w(TAG, "not playing after ${PlaybackWatchdog.STARTUP_TIMEOUT_MS} ms -> timeout")
+                handleMapped(PlaybackErrorMapper.Mapped(PlaybackError.Network(NetworkReason.TIMEOUT), recoverable = true))
+            }
+        }
+    }
+
+    private fun watchStall(phase: PlayerPhase, p: ExoPlayer) {
+        if (phase != PlayerPhase.Buffering || !playedThisOpen) {
+            stallJob?.cancel()
+            stallJob = null
+            return
+        }
+        if (stallJob?.isActive == true) return
+        val startPos = p.currentPosition
+        val startMs = SystemClock.elapsedRealtime()
+        stallJob = scope.launch {
+            delay(PlaybackWatchdog.STALL_TIMEOUT_MS)
+            val pl = _player.value ?: return@launch
+            if (PlaybackWatchdog.stalled(pl.playbackState == Player.STATE_BUFFERING, startMs, SystemClock.elapsedRealtime(), startPos, pl.currentPosition)) {
+                SafeLog.w(TAG, "stalled ${PlaybackWatchdog.STALL_TIMEOUT_MS} ms without progress -> reconnect")
+                handleMapped(PlaybackErrorMapper.Mapped(PlaybackError.Network(NetworkReason.TIMEOUT), recoverable = true))
+            }
+        }
+    }
+
     private fun updateTracks(tracks: Tracks) {
+        // Video present but no track decodable here (e.g. HEVC on a box without an HEVC decoder): Media3 would play the
+        // audio alone and say nothing (Apple Build 25 owner report: "sound, no picture"). Android has no second engine,
+        // so an honest card instead of a black screen.
+        if (!videoCheckedThisOpen && PlaybackWatchdog.videoUndecodable(tracks.containsType(C.TRACK_TYPE_VIDEO), tracks.isTypeSupported(C.TRACK_TYPE_VIDEO))) {
+            videoCheckedThisOpen = true
+            val codec = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO }?.takeIf { it.length > 0 }?.getTrackFormat(0)?.sampleMimeType
+            SafeLog.w(TAG, "video track not decodable on this device: $codec")
+            handleMapped(PlaybackErrorMapper.Mapped(PlaybackError.UnsupportedCodec(codec), recoverable = false))
+            return
+        }
         fun options(type: Int): List<TrackOption> {
             val out = ArrayList<TrackOption>()
             tracks.groups.forEachIndexed { gi, g ->
@@ -371,6 +453,8 @@ class PlayerController(
     private fun releasePlayer() {
         tickerJob?.cancel()
         reconnectJob?.cancel()
+        stallJob?.cancel()
+        startupJob?.cancel()
         _player.value?.let {
             it.removeListener(listener)
             it.release()
