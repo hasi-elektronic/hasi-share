@@ -24,11 +24,11 @@ for s in "App Icon.imagestack:400:240:@1x" "App Icon.imagestack:800:480:@2x" "Ap
   dir=$([ "$1" = AS ] && echo "App Icon - App Store.imagestack" || echo "App Icon.imagestack"); w=$2; h=$3; sc=$4
   render "$TV/$dir/Back.imagestacklayer/Content.imageset/back$sc.png" $w $h "$BG" "0 0 $w $h"
   # mark: 1024 box scaled to 72% of the layer height, centred
-  render "$TV/$dir/Front.imagestacklayer/Content.imageset/front$sc.png" $w $h "<g transform=\"translate($((w/2)) $((h/2))) scale($(echo "$h*0.86/1024" | bc -l)) translate(-512 -512)\">$MARK</g>" "0 0 $w $h" transparent
+  render "$TV/$dir/Front.imagestacklayer/Content.imageset/front$sc.png" $w $h "<g transform=\"translate($((w/2)) $((h/2))) scale($(echo "$h*1.0/1024" | bc -l)) translate(-512 -512)\">$MARK</g>" "0 0 $w $h" transparent
 done
 # Top Shelf: gradient, mark left, wordmark
 shelf() { out="$1"; w=$2; h=$3; s=$(echo "$h/720" | bc -l)
-  render "$out" $w $h "$BG<g transform=\"scale($s)\"><g transform=\"translate(330 360) scale(0.5) translate(-512 -512)\">$MARK</g><text x=\"560\" y=\"405\" font-family=\"-apple-system,Helvetica\" font-weight=\"800\" font-size=\"130\" fill=\"#FFFFFF\">NovaPlayer</text></g>" "0 0 $w $h"; }
+  render "$out" $w $h "$BG<g transform=\"scale($s)\"><g transform=\"translate(330 360) scale(0.5) translate(-512 -512)\">$MARK</g><text x=\"620\" y=\"405\" font-family=\"-apple-system,Helvetica\" font-weight=\"800\" font-size=\"130\" fill=\"#FFFFFF\">NovaPlayer</text></g>" "0 0 $w $h"; }
 shelf "$TV/Top Shelf Image.imageset/topshelf@1x.png" 1920 720
 shelf "$TV/Top Shelf Image.imageset/topshelf@2x.png" 3840 1440
 shelf "$TV/Top Shelf Image Wide.imageset/topshelf@1x.png" 2320 720

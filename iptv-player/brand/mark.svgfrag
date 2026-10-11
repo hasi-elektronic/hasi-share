@@ -1,7 +1,9 @@
+<g transform="translate(512 512) scale(1.18) translate(-512 -512)">
 <g transform="translate(23 0)">
   <g stroke="url(#trail)" stroke-linecap="round" stroke-width="46">
     <path d="M190 420 L440 420"/><path d="M120 512 L420 512"/><path d="M190 604 L440 604"/>
   </g>
   <path d="M470 310 Q470 266 508 290 L820 480 Q858 512 820 544 L508 734 Q470 758 470 714 Z" fill="url(#arc)"/>
   <path d="M528 404 Q528 380 548 393 L716 494 Q736 512 716 530 L548 631 Q528 644 528 620 Z" fill="#FFFFFF"/>
+</g>
 </g>
