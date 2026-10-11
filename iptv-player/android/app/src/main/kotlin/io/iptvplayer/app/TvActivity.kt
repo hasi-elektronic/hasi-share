@@ -16,6 +16,7 @@ class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val graph = (application as AppGraphProvider).graph
+        DebugSeed.apply(this, graph, intent)
         setContent { TvTheme { TvApp(graph) } }
     }
 }

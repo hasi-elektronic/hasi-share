@@ -226,10 +226,17 @@ class LicenseManager(
         return v.claims
     }
 
+    /**
+     * Full access without a store purchase – set ONLY by the app's DEBUG test hook (`DebugSeed`, emulator test matrix;
+     * Apple counterpart: TestFlight tester access). Release builds never set it.
+     */
+    var debugFullAccess: Boolean = false
+        set(value) { field = value; recompute() }
+
     private fun recompute(loaded: Boolean? = null) {
         val now = nowMs()
         val c = claims
-        val decision = AccessPolicy.evaluate(
+        val decision = if (debugFullAccess) AccessDecision(AccessState.PURCHASED, null, false) else AccessPolicy.evaluate(
             platformStore = PlatformStore.GOOGLE,
             store = billing.state.value.storeState,
             token = c?.lic,

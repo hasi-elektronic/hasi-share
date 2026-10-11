@@ -21,6 +21,7 @@ class MobileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val graph = (application as AppGraphProvider).graph
+        DebugSeed.apply(this, graph, intent)
         // A TV that somehow launched the phone UI goes to the TV activity.
         if (graph.isTv) {
             startActivity(Intent(this, TvActivity::class.java))

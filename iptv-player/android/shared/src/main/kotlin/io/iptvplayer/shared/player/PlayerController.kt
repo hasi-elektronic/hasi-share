@@ -23,6 +23,7 @@ import io.iptvplayer.core.error.PlaybackError
 import io.iptvplayer.core.media.Container
 import io.iptvplayer.core.media.PlatformSupport
 import io.iptvplayer.core.media.PlayerEngine
+import io.iptvplayer.core.media.PlaybackRescue
 import io.iptvplayer.core.media.StreamFormatDetector
 import io.iptvplayer.core.net.HttpDefaults
 import io.iptvplayer.core.retry.ReconnectDecision
@@ -76,6 +77,10 @@ class PlayerController(
     private var reconnectJob: Job? = null
     private var tickerJob: Job? = null
     private var container: Container = Container.UNKNOWN
+    /** The opened item showed a frame (later errors reconnect as before). */
+    private var playedThisOpen = false
+    /** The live format variant was already tried for this open (CONTRACT §6.2). */
+    private var rescuedThisOpen = false
     private var stoppedPositionMs: Long? = null
     private var lastSavedAt = 0L
 
@@ -101,6 +106,8 @@ class PlayerController(
     fun play(item: PlayableItem, startPositionMs: Long? = null, resumeFromProgress: Boolean = true) {
         saveProgress()
         reconnect.reset()
+        playedThisOpen = false
+        rescuedThisOpen = false
         reconnectJob?.cancel()
         _state.update { it.copy(item = item, phase = PlayerPhase.Loading, positionMs = 0, durationMs = 0, audioTracks = emptyList(), textTracks = emptyList(), resumedFromMs = null) }
         // Pre-checks (CONTRACT §6, V12).
@@ -256,6 +263,20 @@ class PlayerController(
             p.prepare()
             return
         }
+        // CONTRACT §6.2: before the first frame, the other live format (.ts ⇄ .m3u8) once – before reconnects or a
+        // card, also for 403/404 (panels often serve only one of the two).
+        val item = _state.value.item
+        if (item != null) {
+            PlaybackRescue.next(item.url, item.isLive, playedThisOpen, rescuedThisOpen, mapped.error)?.let { alt ->
+                rescuedThisOpen = true
+                val next = item.copy(url = alt)
+                container = StreamFormatDetector.detect(alt)
+                SafeLog.i(TAG, "rescue: ${mapped.error.code} before the first frame -> live ${container.wire}")
+                _state.update { it.copy(item = next, phase = PlayerPhase.Loading) }
+                prepare(next, null)
+                return
+            }
+        }
         if (!mapped.recoverable) return fail(mapped.error)
         when (val d = reconnect.onError(SystemClock.elapsedRealtime())) {
             is ReconnectDecision.GiveUp -> fail(mapped.error)
@@ -283,7 +304,10 @@ class PlayerController(
             Player.STATE_ENDED -> PlayerPhase.Ended
             else -> if (cur is PlayerPhase.Reconnecting) cur else PlayerPhase.Loading
         }
-        if (phase == PlayerPhase.Playing) reconnect.onPlaying(SystemClock.elapsedRealtime())
+        if (phase == PlayerPhase.Playing) {
+            playedThisOpen = true
+            reconnect.onPlaying(SystemClock.elapsedRealtime())
+        }
         if (phase == PlayerPhase.Ended) saveProgress()
         _state.update { it.copy(phase = phase) }
     }
