@@ -76,6 +76,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     }
 
     public func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
+        videoCheck?.cancel()
         cancelRelax()
         cancelResume()
         lastResumeMs = nil
@@ -245,8 +246,41 @@ public final class AVPlayerEngine: PlaybackEngine {
     private func emitPlayingIfDue() {
         let event = Self.eventForPlayingStatus(firstPlayingEmitted: firstPlayingEmitted,
                                                itemReady: player.currentItem?.status == .readyToPlay)
-        if event == .playing { firstPlayingEmitted = true }
+        if event == .playing, !firstPlayingEmitted {
+            firstPlayingEmitted = true
+            onEvent?(event)
+            startVideoCheck()
+            return
+        }
         onEvent?(event)
+    }
+
+    // MARK: Build 25 – audio without picture
+
+    private var videoCheck: Task<Void, Never>?
+
+    /// Owner report (iPhone, "SHOW TV HEVC" live): HEVC in MPEG-TS HLS segments – Apple decodes HEVC in HLS only from
+    /// fMP4 – plays the audio and silently drops the video, with no error, so nothing fell back. 2.5 s after the first
+    /// `.playing`: still no picture size while the clock ran → `UnsupportedCodec` → the controller moves the stream to
+    /// VLCKit (CONTRACT §6.1 fallback; an audio-only radio channel just plays on in VLCKit).
+    private func startVideoCheck() {
+        videoCheck?.cancel()
+        guard let item = player.currentItem else { return }
+        let start = player.currentTime().seconds
+        videoCheck = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard let self, !Task.isCancelled, self.player.currentItem === item else { return }
+            let played = self.player.currentTime().seconds - (start.isFinite ? start : 0)
+            if Self.videoMissing(presentationSize: item.presentationSize, playedSeconds: played) {
+                SafeLog.warning("avplayer: \(String(format: "%.1f", played)) s played without a picture – video codec not decoded")
+                self.onEvent?(.failed(.unsupportedCodec(codec: "video")))
+            }
+        }
+    }
+
+    /// Played long enough to have shown a frame, but AVPlayer has no picture size (no decodable video track).
+    nonisolated static func videoMissing(presentationSize: CGSize, playedSeconds: Double) -> Bool {
+        playedSeconds.isFinite && playedSeconds >= 1.0 && presentationSize.width <= 0 && presentationSize.height <= 0
     }
 
     /// Event for `timeControlStatus == .playing`: `.playing` once the first one was forwarded or the
@@ -455,6 +489,7 @@ public final class AVPlayerEngine: PlaybackEngine {
     public func stop() {
         wantsToPlay = false
         firstPlayingEmitted = false
+        videoCheck?.cancel()
         cancelRelax()
         cancelResume()
         player.automaticallyWaitsToMinimizeStalling = true

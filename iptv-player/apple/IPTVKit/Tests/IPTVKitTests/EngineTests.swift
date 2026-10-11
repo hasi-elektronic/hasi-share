@@ -304,3 +304,30 @@ final class TrackNamingTests: XCTestCase {
         XCTAssertFalse(TrackNaming.matches(nil, preferred: "tr"))
     }
 }
+
+/// Build 25 (owner report: HEVC live on iPhone – sound, no picture): AVPlayer playing without a picture size
+/// reports UnsupportedCodec; the controller then moves the stream to VLCKit even after the first `.playing`.
+@MainActor
+final class AudioWithoutPictureTests: XCTestCase {
+    func testVideoMissingRule() {
+        XCTAssertTrue(AVPlayerEngine.videoMissing(presentationSize: .zero, playedSeconds: 2.4))
+        XCTAssertFalse(AVPlayerEngine.videoMissing(presentationSize: .zero, playedSeconds: 0.5), "not long enough (still buffering)")
+        XCTAssertFalse(AVPlayerEngine.videoMissing(presentationSize: CGSize(width: 1280, height: 720), playedSeconds: 2.4))
+        XCTAssertFalse(AVPlayerEngine.videoMissing(presentationSize: .zero, playedSeconds: .nan))
+    }
+
+    func testUnsupportedCodecAfterPlayingMovesToVLC() async throws {
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }))
+        c.open(PlaybackRequest(item: .url("http://h.example.com/live/u/p/8.m3u8", title: "HEVC"), source: nil))
+        for _ in 0..<200 where av.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        av.emit(.ready(duration: 0))
+        av.emit(.playing)
+        av.emit(.failed(.unsupportedCodec(codec: "video")))
+        XCTAssertEqual(c.engineKind, .vlcKit)
+        XCTAssertEqual(vlc.loads.count, 1)
+        XCTAssertNotEqual(c.phase, .failed(.unsupportedCodec(codec: "video")))
+    }
+}

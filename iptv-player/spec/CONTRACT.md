@@ -430,6 +430,10 @@ Vectors: `media/expected.json` → `appleEngine.{select, selectWithoutVlc, audio
 
 ---
 
+Audio without picture (Build 25): AVPlayer that played ≥ 1 s (checked 2.5 s after the first `.playing`) without a
+picture size – e.g. HEVC in MPEG-TS HLS segments, which Apple decodes only from fMP4 – reports `UnsupportedCodec("video")`
+and the stream moves to VLCKit (fallback above; an audio-only channel simply plays on in VLCKit).
+
 ### 6.2 Never give up early (Build 24, Apple; Android follows)
 Before an opened item has shown its first frame, a failure (anything but DRM) does not go to the reconnect policy or
 an error card while another way to play is untried (`PlaybackRescue`):
