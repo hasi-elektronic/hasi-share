@@ -13,7 +13,7 @@ Language: technical contract in English (identifiers), user docs in Turkish.
 | Item | Placeholder value | Where it is defined (only place) |
 |---|---|---|
 | Display name | `NovaPlayer` | Android `android/gradle.properties` → `APP_NAME`; Apple `apple/Config/Shared.xcconfig` → `APP_DISPLAY_NAME`; backend `wrangler.toml` → `APP_NAME` |
-| Android applicationId | `de.hasielektronik.novaplayer` | `android/gradle.properties` → `APP_ID` |
+| Android applicationId (same as Apple, owner decision 2026-10-11) | `com.hasielektronic.novaplayer` | `android/gradle.properties` → `APP_ID` |
 | Apple bundle id (iOS **and** tvOS, same id → Universal Purchase) | `com.hasielektronic.novaplayer` (registered in App Store Connect) | `apple/Config/Shared.xcconfig` → `APP_BUNDLE_ID` |
 | Google one-time product (non-consumed INAPP) | `lifetime_access` | `gradle.properties` → `PRODUCT_LIFETIME` + backend `GOOGLE_PRODUCT_ID` |
 | Apple non-consumable (full unlock) | `com.hasielektronic.novaplayer.lifetime` | xcconfig `PRODUCT_LIFETIME` + backend `APPLE_PRODUCT_ID` |

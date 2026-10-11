@@ -602,7 +602,7 @@ imzalı; deneme süresi cihaz saatine dayanmaz; eşleştirme uçtan uca şifreli
 
 | # | Varsayım / karar | Gerekçe |
 |---|---|---|
-| V1 | Uygulama adı `NovaPlayer`, kimlikler `de.hasielektronik.novaplayer` (yer tutucu) | Tek yerden değiştirilebilir |
+| V1 | Uygulama adı `NovaPlayer`, kimlik `com.hasielektronic.novaplayer` (Android + Apple aynı, 2026-10-11) | Tek yerden değiştirilebilir |
 | V2 | Deneme **kullanıcı "Denemeyi başlat"a bastığında** başlar (ilk açılışta karşılama ekranında) | Apple 3.1.1 şeffaflık; kullanıcı ne olacağını bilir |
 | V3 | Demo süresi değişikliği yalnızca yeni denemeleri etkiler; tekil uzatma admin API ile | Başlangıçta verilen söz değişmez |
 | V4 | Android denemesi cihaz başına (ANDROID_ID türevi). Fabrika ayarlarına dönüşte yeni deneme mümkündür | Hesap zorunlu olmadan en makul tekillik; Play Integrity ileride eklenebilir |

@@ -31,7 +31,7 @@ Auth: optional session. Body:
 ```json
 {
   "platform": "android" | "androidtv" | "ios" | "tvos",
-  "appId": "de.hasielektronik.novaplayer",
+  "appId": "com.hasielektronic.novaplayer",
   "appVersion": "1.0.0 (1)",
   "deviceKey": "<64 hex>",
   "startTrial": false,

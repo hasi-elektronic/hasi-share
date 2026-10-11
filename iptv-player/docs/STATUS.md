@@ -55,7 +55,7 @@ Son çalıştırma 2026-10-07, macOS + Xcode, Build 8 kaynağı.
 1. **Cloudflare:** D1 veritabanı oluştur, `wrangler.toml` içindeki `REPLACE_WITH_D1_ID` değerini gir, migration'ları uygula, gizli anahtarları (`LICENSE_SIGNING_KEY` — `node scripts/keygen.mjs --write-clients` ile üret, `ADMIN_TOKEN`, `APPLE_PRIVATE_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_PUBSUB_TOKEN`, `RESEND_API_KEY`) `wrangler secret put` ile kaydet, `PUBLIC_BASE_URL` ve `MAIL_FROM` değerlerini gerçek alan adına çevir, deploy et.
 2. **Resend:** gönderici alan adını doğrula (OTP e-postaları).
 3. **App Store Connect:** IAP ürünleri `com.hasielektronic.novaplayer.lifetime` ve `.trial` (fiyat kademesi 0) oluştur, App Store Server Notifications v2 URL'sini backend'e yönlendir, `APPLE_ISSUER_ID` / `APPLE_KEY_ID` / özel anahtarı backend'e gir, sandbox test kullanıcısıyla satın almayı dene, mağaza meta verileri + gizlilik etiketleri + inceleme.
-4. **Google Play Console:** uygulama oluştur (applicationId `de.hasielektronik.novaplayer` veya `android/gradle.properties` içinde değiştir), `lifetime_access` ürünü, RTDN Pub/Sub → backend, servis hesabı anahtarı, dahili test kanalı, Android TV form faktörü incelemesi.
+4. **Google Play Console:** uygulama oluştur (applicationId `com.hasielektronic.novaplayer`), `lifetime_access` ürünü, RTDN Pub/Sub → backend, servis hesabı anahtarı, dahili test kanalı, Android TV form faktörü incelemesi.
 5. **Yayın öncesi:** `TESTFLIGHT_FULL_ACCESS = YES` sandbox ortamında (TestFlight **ve App Review**) tam erişim verir; App Store'dan indirilen sürümde etkisizdir. İnceleyicinin deneme/satın alma akışını görmesi için mağaza sürümünden önce `Shared.xcconfig` içinde `NO` yapılmalı.
 
 **Bilinen küçük iyileştirmeler (engelleyici değil):**

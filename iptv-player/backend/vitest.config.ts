@@ -19,6 +19,7 @@ export default defineConfig(async () => {
             LICENSE_KID: "test-1",
             // Fixtures use one app id for both stores.
             APP_IDS: "de.hasielektronik.novaplayer",
+            GOOGLE_PACKAGE_NAME: "de.hasielektronik.novaplayer",   // tests keep the neutral sample id (CONTRACT §0)
             APPLE_BUNDLE_ID: "de.hasielektronik.novaplayer",
             APPLE_PRODUCT_ID: "de.hasielektronik.novaplayer.lifetime",
             APPLE_TRIAL_PRODUCT_ID: "de.hasielektronik.novaplayer.trial",

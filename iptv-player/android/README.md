@@ -66,7 +66,7 @@ girdi tek kanal olur (özet sayıları veritabanındaki gerçek satırlardır).
 
 | Özellik | Varsayılan | Açıklama |
 |---|---|---|
-| `APP_NAME`, `APP_ID` | `NovaPlayer`, `de.hasielektronik.novaplayer` | Yer tutucular (CONTRACT §0) |
+| `APP_NAME`, `APP_ID` | `NovaPlayer`, `com.hasielektronic.novaplayer` | Yer tutucular (CONTRACT §0) |
 | `PRODUCT_LIFETIME` | `lifetime_access` | Play ürün kimliği → `BuildConfig.PRODUCT_LIFETIME` |
 | `BACKEND_BASE_URL` | `https://iptv-backend.example.workers.dev` | `example.` içeren URL = backend yok → Android'de deneme başlatılamaz (V9), anlaşılır mesaj |
 | `DEBUG_BACKEND_BASE_URL` | boş | Yalnızca debug derlemesi: örn. `-PDEBUG_BACKEND_BASE_URL=http://10.0.2.2:8798` |
@@ -109,7 +109,7 @@ python3 -m http.server 8766          # emülatörden http://10.0.2.2:8766/test.m
 cd ../android && ./gradlew :app:assembleDebug -PDEBUG_BACKEND_BASE_URL=http://10.0.2.2:8798
 ~/Library/Android/sdk/emulator/emulator -avd iptv_phone -no-snapshot -no-audio &   # veya iptv_tv
 adb wait-for-device && adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n de.hasielektronik.novaplayer/io.iptvplayer.app.MobileActivity   # TV: .TvActivity
+adb shell am start -n com.hasielektronic.novaplayer/io.iptvplayer.app.MobileActivity   # TV: .TvActivity
 adb shell input keyevent 21|20|23|4    # TV D-pad: sol | aşağı | OK | geri
 ```
 

@@ -1,7 +1,7 @@
 # Mağaza Yapılandırması ve Kurulum
 
 > ⚠️ İşaretli (🔑) adımlar **harici hesap / mağaza erişimi** gerektirir ve bu depodan
-> otomatik yapılamaz. Değerler yer tutucudur (`NovaPlayer`, `de.hasielektronik.novaplayer`).
+> otomatik yapılamaz. Değerler yer tutucudur (`NovaPlayer`, `com.hasielektronic.novaplayer`).
 
 ## 0. Yer tutucuları değiştirme (ad ve kimlikler)
 
@@ -42,7 +42,7 @@ Ayrıntılı adımlar: `backend/README.md`. Özet:
 | `DEV_MODE` | var | – | Yalnızca yerelde `true` |
 
 ## 2. Google Play (Android + Android TV) 🔑
-1. **Uygulama oluştur:** paket `de.hasielektronik.novaplayer`. Play App Signing açık; upload key
+1. **Uygulama oluştur:** paket `com.hasielektronic.novaplayer`. Play App Signing açık; upload key
    ile imzalı AAB (`./gradlew :app:bundleRelease`).
 2. **Android TV form faktörü:** *Test and release → Advanced settings → Form factors → Android TV*
    ekle. Gerekenler: 320×180 TV banner (manifestte `android:banner`), TV ekran görüntüleri,
@@ -68,13 +68,13 @@ Ayrıntılı adımlar: `backend/README.md`. Özet:
 
 ## 3. App Store (iOS + tvOS) 🔑
 1. **Anlaşmalar:** *Agreements, Tax, and Banking* → Paid Apps Agreement (IAP için şart).
-2. **Bundle ID:** `de.hasielektronik.novaplayer` (In-App Purchase yeteneği). iOS ve tvOS
+2. **Bundle ID:** `com.hasielektronic.novaplayer` (In-App Purchase yeteneği). iOS ve tvOS
    hedefleri **aynı bundle id** → App Store Connect'te tek uygulama kaydına iOS + tvOS platformu
    eklenir → **Universal Purchase** (iPhone'da alınan Apple TV'de de geçerli).
 3. **Uygulama içi ürünler:**
-   * Non-Consumable `de.hasielektronik.novaplayer.lifetime` – fiyat, yerelleştirilmiş ad
+   * Non-Consumable `com.hasielektronic.novaplayer.lifetime` – fiyat, yerelleştirilmiş ad
      ("Premium – kalıcı erişim").
-   * Non-Consumable `de.hasielektronik.novaplayer.trial` – **fiyat: Ücretsiz (Tier 0)**,
+   * Non-Consumable `com.hasielektronic.novaplayer.trial` – **fiyat: Ücretsiz (Tier 0)**,
      ad: **"7-day Trial" / "7 Günlük Deneme"** (Guideline 3.1.1 adlandırma kuralı). Demo süresi
      admin panelinden değiştirilirse bu adı da güncelleyin.
    * Her ürün için inceleme ekran görüntüsü; ürünleri ilk sürümle birlikte incelemeye gönderin.
