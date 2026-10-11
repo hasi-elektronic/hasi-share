@@ -176,9 +176,10 @@ public class XtreamClient(
 
     // ---------------------------------------------------------------- plumbing
 
-    private suspend fun <T> get(url: String, handle: suspend (BufferedSource) -> T): T = http.get(
+    private suspend fun <T> get(url: String, list: Boolean = false, handle: suspend (BufferedSource) -> T): T = http.get(
         url = url,
-        callTimeoutMs = callTimeoutMs,
+        callTimeoutMs = if (list) maxOf(callTimeoutMs, HttpDefaults.XTREAM_LIST_CALL_TIMEOUT_MS) else callTimeoutMs,
+        readTimeoutMs = if (list) HttpDefaults.LONG_READ_TIMEOUT_MS else null,
         headers = headers + ("Accept" to "application/json"),
         statusMapper = SourceError::fromXtreamHttpStatus,
         tag = "Xtream",
@@ -207,7 +208,7 @@ public class XtreamClient(
         onBatch: suspend (List<T>) -> Unit,
     ): Int {
         require(batchSize > 0)
-        return get(urls.api(action)) { body ->
+        return get(urls.api(action), list = true) { body ->
             var count = 0
             var batch = ArrayList<T>(minOf(batchSize, 1024))
             suspend fun emit(item: JsonElement) {

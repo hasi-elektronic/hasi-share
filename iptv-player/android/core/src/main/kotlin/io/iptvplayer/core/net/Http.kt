@@ -36,8 +36,21 @@ public object HttpDefaults {
     /** Whole-call timeout for playlist / EPG downloads. */
     public const val PLAYLIST_CALL_TIMEOUT_MS: Long = 120_000L
 
-    /** Whole-call timeout for Xtream JSON calls. */
+    /** Whole-call timeout for Xtream JSON calls (account, details, short EPG). */
     public const val XTREAM_CALL_TIMEOUT_MS: Long = 20_000L
+
+    /**
+     * Xtream list calls (`get_*_streams`, `get_series`, categories): big panels (35k movies) generate tens of MB
+     * server-side, often for longer than 20 s – sometimes before the first byte. Same values as Apple
+     * (`HTTPTimeouts.xtreamList`): read (idle) 60 s, whole call 10 min.
+     */
+    public const val XTREAM_LIST_CALL_TIMEOUT_MS: Long = 600_000L
+
+    /** XMLTV guide (several hundred thousand programmes from a slow `xmltv.php`): whole call 10 min. */
+    public const val EPG_CALL_TIMEOUT_MS: Long = 600_000L
+
+    /** Read (idle) timeout of list / EPG downloads. */
+    public const val LONG_READ_TIMEOUT_MS: Long = 60_000L
 
     /** Whole-call timeout for backend calls. */
     public const val BACKEND_CALL_TIMEOUT_MS: Long = 20_000L
@@ -125,6 +138,7 @@ public class SourceHttp(
         url: String,
         callTimeoutMs: Long,
         headers: Map<String, String> = emptyMap(),
+        readTimeoutMs: Long? = null,
         statusMapper: (Int) -> SourceError = SourceError::fromListHttpStatus,
         tag: String = "SourceHttp",
         handle: suspend (Response) -> T,
@@ -141,7 +155,7 @@ public class SourceHttp(
         var retries = 0
         while (true) {
             try {
-                return attempt(request, callTimeoutMs, statusMapper, tag, handle)
+                return attempt(request, callTimeoutMs, readTimeoutMs, statusMapper, tag, handle)
             } catch (f: RetryableFailure) {
                 val wait = retryPolicy.delayBeforeRetry(f.error, retries)
                     ?: throw SourceException(f.error, f.cause)
@@ -155,6 +169,7 @@ public class SourceHttp(
     private suspend fun <T> attempt(
         request: Request,
         callTimeoutMs: Long,
+        readTimeoutMs: Long?,
         statusMapper: (Int) -> SourceError,
         tag: String,
         handle: suspend (Response) -> T,
@@ -162,7 +177,9 @@ public class SourceHttp(
         var consuming = false
         val started = System.nanoTime()
         try {
-            return client.executeCancellable(request, callTimeoutMs, dispatcher) { response ->
+            // A per-call read timeout shares the connection pool (OkHttp newBuilder).
+            val c = if (readTimeoutMs != null) client.newBuilder().readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS).build() else client
+            return c.executeCancellable(request, callTimeoutMs, dispatcher) { response ->
                 val ms = (System.nanoTime() - started) / 1_000_000
                 log(LogLevel.DEBUG, tag, "GET ${request.url} -> ${response.code} ($ms ms)")
                 if (!response.isSuccessful) {

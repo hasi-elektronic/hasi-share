@@ -213,6 +213,7 @@ class PlayerController(
             }
             .build()
         p.addListener(listener)
+        if (_player.value == null) PlaybackActivity.opened()
         _player.value = p
         startTicker()
         return p
@@ -350,6 +351,7 @@ class PlayerController(
             it.removeListener(listener)
             it.release()
         }
+        if (_player.value != null) PlaybackActivity.closed()
         _player.value = null
     }
 

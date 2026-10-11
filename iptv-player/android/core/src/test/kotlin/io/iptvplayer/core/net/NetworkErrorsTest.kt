@@ -167,6 +167,20 @@ class NetworkErrorsTest {
         assertEquals(listOf(2_000L, 4_000L), rec.sleeps)
     }
 
+    /** Android parity with Apple `HTTPTimeouts.xtreamList`: a list/EPG call may wait longer for its first byte. */
+    @Test
+    fun perCallReadTimeoutOverridesTheClientDefault(): Unit = runBlocking {
+        // The panel takes 500 ms before the headers (building a big list); the client default read timeout is 200 ms.
+        server.enqueue(MockResponse().setBody("[]").setHeadersDelay(500, TimeUnit.MILLISECONDS))
+        server.enqueue(MockResponse().setBody("[]").setHeadersDelay(500, TimeUnit.MILLISECONDS))
+        val rec = RecordingHttp(MockServerSupport.fastClient(readTimeoutMs = 200), retry = io.iptvplayer.core.retry.SourceRetryPolicy(emptyList()))
+        val url = server.url("/player_api.php").toString()
+        val short = runCatching { rec.http.get(url, callTimeoutMs = 5_000) { it.body?.string() } }
+        assertEquals(SourceError.Network(NetworkReason.TIMEOUT), (short.exceptionOrNull() as? SourceException)?.error)
+        val long = rec.http.get(url, callTimeoutMs = 5_000, readTimeoutMs = 2_000) { it.body?.string() }
+        assertEquals("[]", long)
+    }
+
     @Test
     fun stallWhileReadingBodyTimesOutWithoutRetry(): Unit = runBlocking {
         // Headers arrive, then the body trickles in slower than the read timeout.

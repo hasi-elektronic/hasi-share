@@ -77,7 +77,7 @@ sözleşme ve ortak test vektörleri** seçildi. Davranış farkı riski vektör
 5a. **Otomatik yenileme oynatma sırasında başlamaz (Build 18):** açılıştaki/ön plana gelişteki katalog ve EPG
    indirmeleri oynatıcı kapanana kadar bekler (`AppEnvironment.waitUntilPlayerClosed`). Build 16'dan beri bu
    indirmeler 10 dakikaya kadar sürebiliyor; çoğu IPTV hesabı tek bağlantıya izin verdiği için yayınla yarışıp
-   donma, bağlantı hatası ve ses kaymasına yol açıyordu. Kullanıcının elle başlattığı yenileme beklemez (EPG kısmı bekler).
+   donma, bağlantı hatası ve ses kaymasına yol açıyordu. Kullanıcının elle başlattığı yenileme beklemez (EPG kısmı bekler). **Android (aynı kural):** `RefreshWorker`, `PlaybackActivity` açıkken `Result.retry()` ile 15 dk ertelenir (WorkManager bir işi 10 dk'dan uzun bekletmez).
 6. Yenileme atomiktir: yeni veri geçici tabloya/işleme yazılır, başarıyla bitince eskisinin
    yerine geçer (yarım liste görünmez). Favoriler/ilerleme `contentKey` ile bağlı olduğu için
    yenilemeden etkilenmez. **Bölümler (Build 16):** Xtream listeleri bölüm içermez (dizi başına
