@@ -517,4 +517,7 @@
     <string name="subtitle_delay" formatted="false">Gecikme</string>
     <string name="perf_launch" formatted="false">Açılış</string>
     <string name="perf_vlc_calibration" formatted="false">VLC kalibrasyonu</string>
+    <string name="avsync_test_remux" formatted="false">Test (Apple + Remux)</string>
+    <string name="avsync_remux_hint" formatted="false">Apple TV\'de MKV film ve diziler Apple + Remux ile oynar. Sesleri TV\'nizde veya soundbar\'ınızda sürekli erken ya da geç geliyorsa burada kalibre edin.</string>
+    <string name="avsync_remux_value" formatted="false">Remux kalibrasyonu (bu cihaz)</string>
 </resources>

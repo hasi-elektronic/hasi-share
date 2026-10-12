@@ -11825,6 +11825,75 @@
           }
         }
       }
+    },
+    "avsync_test_remux": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test (Apple + Remux)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test (Apple + Remux)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test (Apple + Remux)"
+          }
+        }
+      }
+    },
+    "avsync_remux_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Films and series in MKV play through Apple + Remux on Apple TV. Calibrate here if their sound is constantly early or late on your TV or soundbar."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple TV'de MKV film ve diziler Apple + Remux ile oynar. Sesleri TV'nizde veya soundbar'ınızda sürekli erken ya da geç geliyorsa burada kalibre edin."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MKV-Filme und -Serien laufen auf Apple TV über Apple + Remux. Kalibriere hier, wenn ihr Ton an deinem TV oder deiner Soundbar ständig zu früh oder zu spät ist."
+          }
+        }
+      }
+    },
+    "avsync_remux_value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remux calibration (this device)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remux kalibrasyonu (bu cihaz)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remux-Kalibrierung (dieses Gerät)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

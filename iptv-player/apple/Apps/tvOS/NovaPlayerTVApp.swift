@@ -158,6 +158,9 @@ struct TVRootView: View {
         switch router.debugScreen {
         case "live", "player": router.section = .live
         case "settings": router.section = .settings
+        case "avsync":   // calibration screen (Build 29 checks)
+            router.section = .settings
+            paths[.settings] = { var p = NavigationPath(); p.append(SettingsRoute.avSyncCalibration); return p }()
         case "movies": router.section = .movies
         case "series": router.section = .series
         case "guide": router.section = .guide

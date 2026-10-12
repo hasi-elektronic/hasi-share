@@ -8,7 +8,9 @@ import SwiftUI
 /// same presentation time) loops through **VLCKit** while the user moves the per-device VLC calibration
 /// (−500…+500 ms, 10 ms steps, applied live) until beep and flash coincide; "Save" stores it
 /// (`PlayerController.setVLCCalibration`). "Reference (Apple)" plays the same clip as MP4 through AVPlayer
-/// (no calibration) for comparison. Also opened from the player's Sync panel (the player is released meanwhile).
+/// (no calibration) for comparison. Build 29: "Apple + Remux" plays the MKV clip through the remuxer and stores the
+/// per-device remux calibration (`setRemuxCalibration`) – the mode Apple TV opens in, since its MKV films play there.
+/// Also opened from the player's Sync panel (the player is released meanwhile).
 struct AVSyncCalibrationView: View {
     @Environment(AppEnvironment.self) private var env
     /// Shown over the player (Sync panel): a close button, Save closes.
@@ -29,7 +31,9 @@ struct AVSyncCalibrationView: View {
             .navigationTitle(L10n.t("avsync_calibrate"))
             #endif
             .onAppear {
-                value = env.player.vlcCalibrationMs
+                // Apple TV plays MKV films through Apple + Remux (Build 19): start there (Build 29, owner report).
+                if AVSyncCalibrationModel.remuxAvailable, Theme.isTV { model.preselect(.remux) }
+                value = stored(for: model.mode)
                 savedValue = value
                 model.start(calibration: value)
                 #if os(tvOS)
@@ -70,14 +74,14 @@ struct AVSyncCalibrationView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 #if os(tvOS)
-                AudioDelayControl(title: L10n.t("avsync_calibration_value"), value: value, identifier: "avsync_value",
+                AudioDelayControl(title: L10n.t(model.mode == .remux ? "avsync_remux_value" : "avsync_calibration_value"), value: value, identifier: "avsync_value",
                                   focus: $stepperFocused, range: AudioDelayStore.calibrationRange,
                                   stepMs: AudioDelayStore.calibrationStep) { set($0) }
                 #else
-                AudioDelayControl(title: L10n.t("avsync_calibration_value"), value: value, identifier: "avsync_value",
+                AudioDelayControl(title: L10n.t(model.mode == .remux ? "avsync_remux_value" : "avsync_calibration_value"), value: value, identifier: "avsync_value",
                                   range: AudioDelayStore.calibrationRange, stepMs: AudioDelayStore.calibrationStep) { set($0) }
                 #endif
-                Text(L10n.t("avsync_calibration_hint"))
+                Text(L10n.t(model.mode == .remux ? "avsync_remux_hint" : "avsync_calibration_hint"))
                     .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -96,40 +100,67 @@ struct AVSyncCalibrationView: View {
                 .frame(maxWidth: Theme.isTV ? 860 : .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.isTV ? 16 : 10))
                 .accessibilityHidden(true)
-            Text(model.mode == .vlc ? "VLCKit" : "AVPlayer")
+            Text(Self.engineName(model.mode))
                 .font(Theme.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(Capsule().fill(Color.black.opacity(0.6)))
                 .padding(10)
-                .accessibilityLabel(model.mode == .vlc ? "VLCKit" : "AVPlayer")
+                .accessibilityLabel(Self.engineName(model.mode))
                 .accessibilityValue(model.isPlaying ? "playing" : "loading")
                 .accessibilityIdentifier("avsync_engine")
         }
         .frame(maxWidth: .infinity)
     }
 
+    static func engineName(_ mode: AVSyncCalibrationModel.Mode) -> String {
+        switch mode {
+        case .vlc: return "VLCKit"
+        case .remux: return "AVPlayer+Remux"
+        case .apple: return "AVPlayer"
+        }
+    }
+
+    /// The saved calibration of the engine a mode measures (the Apple reference has none).
+    private func stored(for mode: AVSyncCalibrationModel.Mode) -> Int {
+        switch mode {
+        case .vlc: return env.player.vlcCalibrationMs
+        case .remux: return env.player.remuxCalibrationMs
+        case .apple: return 0
+        }
+    }
+
+    private func modeButton(_ mode: AVSyncCalibrationModel.Mode, _ key: String, _ symbol: String, _ id: String) -> some View {
+        Button {
+            value = stored(for: mode)
+            savedValue = value
+            model.switchMode(mode, calibration: value)
+        } label: { Label(L10n.t(key), systemImage: symbol) }
+        #if os(tvOS)
+        .buttonStyle(SecondaryButtonStyle())
+        #else
+        .buttonStyle(.bordered)
+        #endif
+        .disabled(model.mode == mode)
+        .accessibilityIdentifier(id)
+    }
+
     private var actions: some View {
         HStack(spacing: Theme.isTV ? 28 : 12) {
-            Button {
-                model.switchMode(model.mode == .vlc ? .apple : .vlc, calibration: value)
-            } label: {
-                Label(L10n.t(model.mode == .vlc ? "avsync_reference_apple" : "avsync_test_vlc"),
-                      systemImage: model.mode == .vlc ? "applelogo" : "play.rectangle")
+            modeButton(.vlc, "avsync_test_vlc", "play.rectangle", "avsync_mode_vlc")
+            if AVSyncCalibrationModel.remuxAvailable {
+                modeButton(.remux, "avsync_test_remux", "film", "avsync_mode_remux")
             }
-            #if os(tvOS)
-            .buttonStyle(SecondaryButtonStyle())
-            #else
-            .buttonStyle(.bordered)
-            #endif
-            .accessibilityIdentifier("avsync_reference")
-            Button { save() } label: { Label(L10n.t("action_save"), systemImage: "checkmark") }
-                #if os(tvOS)
-                .buttonStyle(PrimaryButtonStyle())
-                #else
-                .buttonStyle(.borderedProminent)
-                #endif
-                .accessibilityIdentifier("avsync_save")
+            modeButton(.apple, "avsync_reference_apple", "applelogo", "avsync_reference")
+            if model.mode != .apple {
+                Button { save() } label: { Label(L10n.t("action_save"), systemImage: "checkmark") }
+                    #if os(tvOS)
+                    .buttonStyle(PrimaryButtonStyle())
+                    #else
+                    .buttonStyle(.borderedProminent)
+                    #endif
+                    .accessibilityIdentifier("avsync_save")
+            }
             if savedNotice {
                 Text(L10n.t("avsync_saved", AudioDelayControl.shortLabel(savedValue)))
                     .font(Theme.caption.weight(.semibold))
@@ -147,8 +178,12 @@ struct AVSyncCalibrationView: View {
     }
 
     private func save() {
-        env.player.setVLCCalibration(value)
-        savedValue = env.player.vlcCalibrationMs
+        switch model.mode {
+        case .vlc: env.player.setVLCCalibration(value)
+        case .remux: env.player.setRemuxCalibration(value)
+        case .apple: return
+        }
+        savedValue = stored(for: model.mode)
         AccessibilityNotification.Announcement(L10n.t("avsync_saved", AudioDelayControl.shortLabel(savedValue))).post()
         savedNotice = true
         noticeTask?.cancel()
@@ -169,7 +204,8 @@ struct AVSyncCalibrationRow: View {
             HStack {
                 Text(L10n.t("avsync_calibrate"))
                 Spacer()
-                Text(AudioDelayControl.shortLabel(env.player.vlcCalibrationMs))
+                Text(AudioDelayControl.shortLabel(Theme.isTV && AVSyncCalibrationModel.remuxAvailable
+                                                  ? env.player.remuxCalibrationMs : env.player.vlcCalibrationMs))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -183,7 +219,18 @@ struct AVSyncCalibrationRow: View {
 @MainActor
 @Observable
 final class AVSyncCalibrationModel {
-    enum Mode { case vlc, apple }
+    enum Mode { case vlc, remux, apple }
+
+    static var remuxAvailable: Bool {
+        #if canImport(CNovaRemux)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// Initial mode before `start` (no engine yet).
+    func preselect(_ mode: Mode) { if engine == nil { self.mode = mode } }
 
     private(set) var mode: Mode = .vlc
     private(set) var engine: (any PlaybackEngine)?
@@ -217,14 +264,15 @@ final class AVSyncCalibrationModel {
     }
 
     /// Live: VLCKit applies it to the running input (+ its automatic output-latency term, as in playback).
+    /// VLCKit applies it live; the remuxer reopens the clip with it (debounced in the engine).
     func apply(calibration: Int) {
-        guard mode == .vlc else { return }
+        guard mode != .apple else { return }
         engine?.setAudioDelay(ms: calibration)
     }
 
     private func play(calibration: Int) {
         isPlaying = false
-        let ext = mode == .vlc ? "mkv" : "mp4"
+        let ext = mode == .apple ? "mp4" : "mkv"
         guard let url = Self.clipURL(ext) else {
             SafeLog.error("avsync clip missing: \(ext)")
             return
@@ -236,6 +284,12 @@ final class AVSyncCalibrationModel {
             let vlc = VLCPlaybackEngine()
             vlc.loops = true
             next = vlc
+            #else
+            next = AVPlayerEngine()
+            #endif
+        case .remux:
+            #if canImport(CNovaRemux)
+            next = RemuxPlaybackEngine()
             #else
             next = AVPlayerEngine()
             #endif
@@ -254,9 +308,10 @@ final class AVSyncCalibrationModel {
             }
         }
         engine = next
-        next.setAudioDelay(ms: mode == .vlc ? calibration : 0)
-        let container: StreamContainer = mode == .vlc ? .mkv : .mp4
-        next.load(ResolvedStream(url: url, container: container, headers: [:], engine: mode == .vlc ? .vlcKit : .avPlayer),
+        next.setAudioDelay(ms: mode == .apple ? 0 : calibration)
+        let container: StreamContainer = mode == .apple ? .mp4 : .mkv
+        let kind: PlayerEngine = switch mode { case .vlc: .vlcKit; case .remux: .avRemux; case .apple: .avPlayer }
+        next.load(ResolvedStream(url: url, container: container, headers: [:], engine: kind),
                   isLive: false, startMs: nil, preferredAudioLanguage: nil, preferredSubtitleLanguage: nil,
                   tuning: LiveStartTuning.make(isLive: false, largeBuffer: false))
     }

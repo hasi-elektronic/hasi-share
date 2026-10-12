@@ -161,6 +161,32 @@ final class EngineOverrideTests: XCTestCase {
         XCTAssertEqual(c.engineKind, .avRemux)
     }
 
+    /// Build 29 (owner report: MKV films on Apple TV constantly out of sync): the remuxer gets content delay + the
+    /// per-device remux calibration (10 ms precision), never the VLC calibration; a change reaches a playing item.
+    func testRemuxCalibrationIsAddedToTheContentDelay() async throws {
+        let remux = FakeEngine(kind: .avRemux)
+        let av = FakeEngine(kind: .avPlayer)
+        let vlc = FakeEngine(kind: .vlcKit)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }, remux: { remux }))
+        let delays = AudioDelayStore(kv: InMemoryKeyValueStore())
+        delays.setVLCCalibration(200)
+        delays.setRemuxCalibration(-130)
+        c.audioDelayStore = delays
+        c.remuxByDefault = true
+        c.open(url("http://h.example.com/film.mkv"))
+        for _ in 0..<200 where remux.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(remux.audioDelays.last, -130, "calibration from the first load on; the VLC 200 stays out")
+        remux.emit(.ready(duration: 600))
+        remux.emit(.playing)
+        c.setAudioDelay(300)
+        XCTAssertEqual(remux.audioDelays.last, 170, "content 300 + calibration −130")
+        c.setRemuxCalibration(-140)
+        XCTAssertEqual(c.remuxCalibrationMs, -140)
+        XCTAssertEqual(remux.audioDelays.last, 160, "a new calibration reaches the playing item")
+        XCTAssertEqual(delays.remuxCalibration, -140, "stored per device")
+    }
+
     func testVLCOverrideWithoutVLCKitIsAVPlayerColumn() async throws {
         let c = controller(.vlcKit, withVLC: false)
         try await open(c, url("http://h.example.com/live.m3u8"))

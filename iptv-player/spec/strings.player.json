@@ -165,6 +165,21 @@
    "en": "VLC calibration",
    "tr": "VLC kalibrasyonu",
    "de": "VLC-Kalibrierung"
+  },
+  "avsync_test_remux": {
+   "en": "Test (Apple + Remux)",
+   "tr": "Test (Apple + Remux)",
+   "de": "Test (Apple + Remux)"
+  },
+  "avsync_remux_hint": {
+   "en": "Films and series in MKV play through Apple + Remux on Apple TV. Calibrate here if their sound is constantly early or late on your TV or soundbar.",
+   "tr": "Apple TV'de MKV film ve diziler Apple + Remux ile oynar. Sesleri TV'nizde veya soundbar'ınızda sürekli erken ya da geç geliyorsa burada kalibre edin.",
+   "de": "MKV-Filme und -Serien laufen auf Apple TV über Apple + Remux. Kalibriere hier, wenn ihr Ton an deinem TV oder deiner Soundbar ständig zu früh oder zu spät ist."
+  },
+  "avsync_remux_value": {
+   "en": "Remux calibration (this device)",
+   "tr": "Remux kalibrasyonu (bu cihaz)",
+   "de": "Remux-Kalibrierung (dieses Gerät)"
   }
  }
 }

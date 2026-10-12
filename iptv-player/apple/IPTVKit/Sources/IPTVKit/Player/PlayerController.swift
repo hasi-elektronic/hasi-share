@@ -172,6 +172,8 @@ public final class PlayerController {
     /// Per-device VLC calibration (Settings → Advanced → "Calibrate audio sync"): added to every VLCKit
     /// item, never changes the engine (Build 16).
     public private(set) var vlcCalibrationMs = 0
+    /// Per-device "Apple + Remux" calibration (Build 29), added to the content delay of remuxed items.
+    public private(set) var remuxCalibrationMs = 0
     /// Delay handed to the engine: content + VLC calibration (AVPlayer ignores it).
     public var engineAudioDelay: Int { currentAudioDelay + vlcCalibrationMs }
 
@@ -180,7 +182,7 @@ public final class PlayerController {
     func audioDelay(for kind: PlayerEngine) -> Int {
         switch kind {
         case .vlcKit: return engineAudioDelay
-        case .avRemux: return currentAudioDelay
+        case .avRemux: return min(max(currentAudioDelay + remuxCalibrationMs, -2000), 2000)   // 10 ms calibration precision kept
         case .avPlayer, .media3: return 0
         }
     }
@@ -1031,6 +1033,7 @@ public final class PlayerController {
     /// Re-reads the effective delay of the current request (store or raw-URL session value).
     private func refreshAudioDelay() {
         vlcCalibrationMs = audioDelayStore?.vlcCalibration ?? 0
+        remuxCalibrationMs = audioDelayStore?.remuxCalibration ?? 0
         if let key = audioDelayContentKey, let audioDelayStore {
             contentAudioDelay = audioDelayStore.contentDelay(key)
             currentAudioDelay = audioDelayStore.effectiveDelay(key)
@@ -1082,6 +1085,14 @@ public final class PlayerController {
 
     /// Settings → Advanced → "Calibrate audio sync" / the Sync panel's calibration row: the per-device VLC
     /// offset. Applied live to a VLCKit item; an AVPlayer item stays on AVPlayer (never reloaded for it).
+    /// Calibration screen, "Apple + Remux" mode: the per-device remux offset; a playing remuxed item reopens with it.
+    public func setRemuxCalibration(_ ms: Int) {
+        audioDelayStore?.setRemuxCalibration(ms)
+        refreshAudioDelay()
+        guard let engine, engine.kind == .avRemux, hasActiveItem else { return }
+        engine.setAudioDelay(ms: audioDelay(for: .avRemux))
+    }
+
     public func setVLCCalibration(_ ms: Int) {
         audioDelayStore?.setVLCCalibration(ms)
         refreshAudioDelay()

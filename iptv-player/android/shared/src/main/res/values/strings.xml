@@ -517,4 +517,7 @@
     <string name="subtitle_delay" formatted="false">Delay</string>
     <string name="perf_launch" formatted="false">Launch</string>
     <string name="perf_vlc_calibration" formatted="false">VLC calibration</string>
+    <string name="avsync_test_remux" formatted="false">Test (Apple + Remux)</string>
+    <string name="avsync_remux_hint" formatted="false">Films and series in MKV play through Apple + Remux on Apple TV. Calibrate here if their sound is constantly early or late on your TV or soundbar.</string>
+    <string name="avsync_remux_value" formatted="false">Remux calibration (this device)</string>
 </resources>

@@ -32,6 +32,8 @@ final class RemuxByteSource: @unchecked Sendable {
     private let maxBlocks: Int
     private let readAhead: Int
     private let timeout: TimeInterval
+    /// A bundled file (the A/V calibration clip, Build 29): read directly, no HTTP.
+    private let file: FileHandle?
 
     private let cond = NSCondition()
     // Guarded by `cond`.
@@ -78,6 +80,12 @@ final class RemuxByteSource: @unchecked Sendable {
         self.maxBlocks = maxBlocks
         self.readAhead = max(2, min(readAhead, maxBlocks / 2))
         self.timeout = timeout
+        if url.isFileURL, let handle = try? FileHandle(forReadingFrom: url) {
+            file = handle
+            total = (try? handle.seekToEnd()).map(Int64.init) ?? -1
+        } else {
+            file = nil
+        }
         let config = URLSessionConfiguration.ephemeral
         config.httpMaximumConnectionsPerHost = 1   // never more than one connection per stream (single-connection IPTV accounts)
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -106,7 +114,10 @@ final class RemuxByteSource: @unchecked Sendable {
         }
     }
 
-    deinit { session.invalidateAndCancel() }
+    deinit {
+        session.invalidateAndCancel()
+        try? file?.close()
+    }
 
     var size: Int64 { cond.withLock { total } }
     var statistics: Stats { cond.withLock { stats } }
@@ -181,6 +192,15 @@ final class RemuxByteSource: @unchecked Sendable {
 
     private func waitForBlockLocked(_ index: Int) throws {
         readerIndex = index
+        if let file {
+            if blocks[index] == nil {
+                guard (try? file.seek(toOffset: UInt64(index) * UInt64(blockSize))) != nil,
+                      let data = try? file.read(upToCount: blockSize), !data.isEmpty || index == 0 else { throw SourceError.transport }
+                storeLocked(index, data)
+            }
+            touchLocked(index)
+            return
+        }
         if blocks[index] != nil {
             touchLocked(index)
             regulateStreamLocked()

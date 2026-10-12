@@ -62,6 +62,17 @@ public struct AudioDelayStore: Sendable {
 
     public func setVLCCalibration(_ ms: Int) { kv.setValue(Self.normalizeCalibration(ms), forKey: Self.calibrationKey) }
 
+    // MARK: Remux calibration (per device, Build 29)
+
+    static let remuxCalibrationKey = "remuxCalibration.ms"
+
+    /// Per-device offset for "Apple + Remux" items (ms, + = audio later), added to their content delay by the remuxer.
+    /// Owner report: MKV films on Apple TV constantly out of sync on his TV/soundbar – AVPlayer did not compensate that
+    /// output path, and the VLC calibration never applied to the remuxer.
+    public var remuxCalibration: Int { kv.value(Int.self, forKey: Self.remuxCalibrationKey) ?? 0 }
+
+    public func setRemuxCalibration(_ ms: Int) { kv.setValue(Self.normalizeCalibration(ms), forKey: Self.remuxCalibrationKey) }
+
     /// Moves the old device delay into the calibration once (an existing calibration wins) and removes it, so
     /// it no longer forces AVPlayer content into VLCKit. True when a value was migrated.
     @discardableResult
