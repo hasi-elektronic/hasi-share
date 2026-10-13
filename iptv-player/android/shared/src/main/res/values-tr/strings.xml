@@ -397,6 +397,8 @@
     <string name="search_kind_one_series" formatted="false">Dizi</string>
     <string name="search_kind_channel" formatted="false">Kanal</string>
     <string name="search_list_empty" formatted="false">Başka sonuç yok.</string>
+    <string name="field_backup_servers" formatted="false">Yedek sunucular (isteğe bağlı)</string>
+    <string name="field_backup_servers_hint" formatted="false">Aynı hesabın diğer adresleri, virgülle ayırın – ana sunucuya ulaşılamazsa otomatik kullanılır.</string>
     <string name="trial_backend_unavailable" formatted="false">Ücretsiz deneme için lisans sunucusuna bağlantı gerekiyor. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="sync_now" formatted="false">Şimdi eşitle</string>
     <string name="format_test_pending" formatted="false">Test edilmedi</string>

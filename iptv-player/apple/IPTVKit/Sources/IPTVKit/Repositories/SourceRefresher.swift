@@ -68,10 +68,27 @@ public final class SourceRefresher: Sendable {
                 epgURL = (m3u.epgUrl ?? result.epgUrls.first).flatMap { URL(string: $0.trimmingCharacters(in: .whitespaces)) }
             case .xtream(let xtream):
                 onProgress(.authenticating)
-                let result = try await loadXtream(sourceId: sourceId, secrets: xtream, now: now, onProgress: onProgress)
-                status = result.0
-                account = result.1
-                epgURL = xtream.epgUrl.flatMap { URL(string: $0) } ?? XtreamURLBuilder(secrets: xtream)?.xmltvURL()
+                // Build 30 (CONTRACT §1.1): the main server, then each backup while the error is a server problem.
+                var lastError: Error = SourceError.invalidFormat
+                var loaded: (SourceStatus, XtreamAccountInfo, XtreamSecrets)?
+                for server in xtream.servers {
+                    let attempt = xtream.using(server: server)
+                    do {
+                        let r = try await loadXtream(sourceId: sourceId, secrets: attempt, now: now, onProgress: onProgress)
+                        loaded = (r.0, r.1, attempt)
+                        break
+                    } catch {
+                        lastError = error
+                        let mapped = ErrorClassifier.sourceError(from: error)
+                        guard ServerFailover.tryNextServer(after: mapped) else { throw error }
+                        SafeLog.warning("refresh: server \(URLNormalizer.host(of: server) ?? "?") failed (\(mapped.code)) – trying the next one")
+                    }
+                }
+                guard let loaded else { throw lastError }
+                status = loaded.0
+                account = loaded.1
+                if loaded.2.serverUrl != xtream.serverUrl { sources.promoteServer(id: sourceId, server: loaded.2.serverUrl) }
+                epgURL = xtream.epgUrl.flatMap { URL(string: $0) } ?? XtreamURLBuilder(secrets: loaded.2)?.xmltvURL()
             }
         } catch {
             let mapped = ErrorClassifier.sourceError(from: error)

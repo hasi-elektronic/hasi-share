@@ -397,6 +397,8 @@
     <string name="search_kind_one_series" formatted="false">Serie</string>
     <string name="search_kind_channel" formatted="false">Sender</string>
     <string name="search_list_empty" formatted="false">Keine weiteren Ergebnisse.</string>
+    <string name="field_backup_servers" formatted="false">Backup-Server (optional)</string>
+    <string name="field_backup_servers_hint" formatted="false">Weitere Adressen desselben Kontos, durch Kommas getrennt – werden automatisch genutzt, wenn der Hauptserver nicht erreichbar ist.</string>
     <string name="trial_backend_unavailable" formatted="false">Für die kostenlose Testphase ist eine Verbindung zum Lizenzserver nötig. Bitte Internetverbindung prüfen und erneut versuchen.</string>
     <string name="sync_now" formatted="false">Jetzt synchronisieren</string>
     <string name="format_test_pending" formatted="false">Nicht getestet</string>

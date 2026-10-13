@@ -70,3 +70,34 @@ final class PlaybackRescueTests: XCTestCase {
         }
     }
 }
+
+/// Build 30 (CONTRACT §1.1): backup servers are the last rescue step, after engines and the live variant.
+final class ServerRescueTests: XCTestCase {
+    func testBackupServersComeLast() {
+        let first = PlaybackAttempt(engine: .avPlayer, url: URL(string: "http://main/live/u/p/7.m3u8")!, container: .hls)
+        let plan = PlaybackRescue.plan(first: first, isLive: true, override: .automatic, vlcAvailable: true, remuxAvailable: false,
+                                       remuxPreferred: false, backupURLs: [URL(string: "http://dns2/live/u/p/7.m3u8")!])
+            .map { "\($0.url.host!) \($0.engine.rawValue) \($0.url.pathExtension)" }
+        XCTAssertEqual(plan, ["main avplayer m3u8", "main vlckit m3u8", "main vlckit ts", "dns2 avplayer m3u8", "dns2 vlckit m3u8"])
+    }
+
+    @MainActor
+    func testResolverListsTheSameStreamOnBackupServers() async throws {
+        let secrets = SourceSecrets.xtream(XtreamSecrets(serverUrl: "http://main.example.com:8080", username: "u", password: "p",
+                                                         backupServers: ["http://dns2.example.net"]))
+        let resolver = StreamResolver(secrets: { _ in secrets }, sniffer: nil, hlsProbe: nil, vlcAvailable: true)
+        let movie = Movie(sourceId: "s", id: "42", name: "Film", containerExt: "mkv")
+        let stream = try await resolver.resolve(PlaybackRequest(item: .movie(movie), source: nil))
+        XCTAssertEqual(stream.url.absoluteString, "http://main.example.com:8080/movie/u/p/42.mkv")
+        XCTAssertEqual(stream.serverAlternatives.map(\.url.absoluteString), ["http://dns2.example.net/movie/u/p/42.mkv"])
+        XCTAssertEqual(stream.serverAlternatives.first?.server, "http://dns2.example.net")
+    }
+}
+
+final class BackupServerFieldTests: XCTestCase {
+    func testCommaSpaceAndNewlineSeparatedAddresses() {
+        XCTAssertEqual(AddSourceViewModel.parseServers("http://a.com:8080, b.net  c.org;\nhttp://d.tv"),
+                       ["http://a.com:8080", "b.net", "c.org", "http://d.tv"])
+        XCTAssertEqual(AddSourceViewModel.parseServers("  "), [])
+    }
+}

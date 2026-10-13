@@ -73,6 +73,19 @@ public struct PlaybackRequest: Sendable, Hashable, Identifiable {
 }
 
 /// A resolved, pre-checked stream.
+/// One backup server of an Xtream source and the stream's URL there.
+public struct ServerAlternative: Sendable, Hashable {
+    public var sourceId: String
+    public var server: String
+    public var url: URL
+
+    public init(sourceId: String, server: String, url: URL) {
+        self.sourceId = sourceId
+        self.server = server
+        self.url = url
+    }
+}
+
 public struct ResolvedStream: Sendable, Hashable {
     public var url: URL
     public var container: StreamContainer
@@ -82,6 +95,8 @@ public struct ResolvedStream: Sendable, Hashable {
     /// Xtream live requested as `.m3u8` only because of the Apple (AVPlayer) engine override although the
     /// account lists only `ts`: a failure before the first frame is shown as "ask your provider for HLS".
     public var hlsForcedByOverride: Bool
+    /// Build 30 (CONTRACT §1.1): the same stream on the account's backup servers (rescue chain, last step).
+    public var serverAlternatives: [ServerAlternative] = []
 
     public init(url: URL, container: StreamContainer, headers: [String: String], engine: PlayerEngine = .avPlayer,
                 hlsForcedByOverride: Bool = false) {
@@ -147,7 +162,29 @@ public struct StreamResolver: Sendable {
             if let error = ApplePlayback.playbackError(for: container, vlcAvailable: vlcAvailable, override: engineOverride) { throw error }
         }
         let engine = ApplePlayback.engine(for: container, vlcAvailable: vlcAvailable, override: engineOverride) ?? .avPlayer
-        return ResolvedStream(url: url, container: container, headers: headers, engine: engine, hlsForcedByOverride: hlsForced)
+        var resolved = ResolvedStream(url: url, container: container, headers: headers, engine: engine, hlsForcedByOverride: hlsForced)
+        resolved.serverAlternatives = serverAlternatives(for: url, request: request)
+        return resolved
+    }
+
+    /// The same Xtream URL (live, movie, episode, catch-up) on each backup server of the item's source.
+    func serverAlternatives(for url: URL, request: PlaybackRequest) -> [ServerAlternative] {
+        let sourceId: String
+        switch request.item {
+        case .channel(let c): sourceId = c.sourceId
+        case .movie(let m): sourceId = m.sourceId
+        case .episode(let e, _): sourceId = e.sourceId
+        case .url: return []
+        }
+        guard case .xtream(let x)? = secrets(sourceId), let main = XtreamURLBuilder(secrets: x) else { return [] }
+        let string = url.absoluteString
+        guard string.hasPrefix(main.base) else { return [] }   // an M3U-style URL of its own
+        let path = string.dropFirst(main.base.count)
+        return x.servers.filter { $0 != x.serverUrl }.compactMap { server in
+            guard let base = XtreamURLBuilder(secrets: x.using(server: server))?.base, base != main.base,
+                  let alt = URL(string: base + path) else { return nil }
+            return ServerAlternative(sourceId: sourceId, server: server, url: alt)
+        }
     }
 
     /// Xtream live extension (CONTRACT §4.5); the Apple (AVPlayer) override always asks for `.m3u8` –

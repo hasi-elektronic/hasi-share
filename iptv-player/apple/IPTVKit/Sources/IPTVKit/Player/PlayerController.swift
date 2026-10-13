@@ -288,6 +288,8 @@ public final class PlayerController {
     @ObservationIgnored private var rescueIndex = 0
     /// Every engine + URL loaded for the opened item (no ping-pong between ways that already failed).
     @ObservationIgnored private var triedAttempts: Set<PlaybackAttempt> = []
+    /// Build 30: a stream played from a backup server (sourceId, server) – the environment promotes that server.
+    @ObservationIgnored public var onServerWorked: ((String, String) -> Void)?
     /// The opened stream reached `.playing` at least once (a forced-HLS failure after that is a normal error).
     @ObservationIgnored private var streamPlayed = false
     /// Audio session activation (at playback start / resume) and deactivation (player released); set by the app.
@@ -599,6 +601,9 @@ public final class PlayerController {
         switch event {
         case .playing:
             loadReady = true
+            if !streamPlayed, let stream, let alt = stream.serverAlternatives.first(where: { $0.url == stream.url }) {
+                onServerWorked?(alt.sourceId, alt.server)   // a backup server played: it becomes the main one
+            }
             streamPlayed = true
             PerfTrace.shared.mark(.firstFrame) // idempotent per attempt
             if let channel = currentChannel { updateLastSession(LastSession(sourceId: channel.sourceId, channelId: channel.id, endedInPlayer: true)) }
@@ -708,7 +713,7 @@ public final class PlayerController {
             rescuePlan = PlaybackRescue.plan(first: PlaybackAttempt(engine: current, url: stream.url, container: stream.container),
                                              isLive: request?.isLive ?? false, override: engineOverride,
                                              vlcAvailable: engines.vlcAvailable, remuxAvailable: engines.remuxAvailable,
-                                             remuxPreferred: remuxByDefault)
+                                             remuxPreferred: remuxByDefault, backupURLs: stream.serverAlternatives.map(\.url))
             rescueIndex = 0
         }
         let resume = request?.isLive == true ? nil : (currentTime > 1 ? Int64(currentTime * 1000) : request?.startPositionMs)

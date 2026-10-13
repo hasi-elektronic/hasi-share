@@ -151,6 +151,8 @@ public final class AppEnvironment {
         let streamResolver = StreamResolver(secrets: { repo.secrets(id: $0) }, vlcAvailable: engines.vlcAvailable)
         player = PlayerController(resolver: streamResolver, library: library, engines: engines)
         player.audioDelayStore = AudioDelayStore(kv: kv)   // per-content + device audio delay (SCREENS §3.7)
+        // Build 30 (CONTRACT §1.1): a stream that played from a backup server makes it the source's main server.
+        player.onServerWorked = { sourceId, server in repo.promoteServer(id: sourceId, server: server) }
         let controller = player
         player.prefetcher = ZapPrefetcher(resolver: { [weak controller] in
                                               try await streamResolver.resolve($0, engineOverride: controller?.engineOverride ?? .automatic)

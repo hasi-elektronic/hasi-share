@@ -397,6 +397,8 @@
     <string name="search_kind_one_series" formatted="false">Series</string>
     <string name="search_kind_channel" formatted="false">Channel</string>
     <string name="search_list_empty" formatted="false">No more results.</string>
+    <string name="field_backup_servers" formatted="false">Backup servers (optional)</string>
+    <string name="field_backup_servers_hint" formatted="false">Other addresses of the same account, separated by commas – used automatically when the main server is unreachable.</string>
     <string name="trial_backend_unavailable" formatted="false">The free trial needs a connection to the license server. Check your internet connection and try again.</string>
     <string name="sync_now" formatted="false">Sync now</string>
     <string name="format_test_pending" formatted="false">Not tested</string>

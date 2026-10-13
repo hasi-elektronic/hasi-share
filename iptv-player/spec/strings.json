@@ -1973,6 +1973,16 @@
    "en": "No more results.",
    "tr": "Başka sonuç yok.",
    "de": "Keine weiteren Ergebnisse."
+  },
+  "field_backup_servers": {
+   "en": "Backup servers (optional)",
+   "tr": "Yedek sunucular (isteğe bağlı)",
+   "de": "Backup-Server (optional)"
+  },
+  "field_backup_servers_hint": {
+   "en": "Other addresses of the same account, separated by commas – used automatically when the main server is unreachable.",
+   "tr": "Aynı hesabın diğer adresleri, virgülle ayırın – ana sunucuya ulaşılamazsa otomatik kullanılır.",
+   "de": "Weitere Adressen desselben Kontos, durch Kommas getrennt – werden automatisch genutzt, wenn der Hauptserver nicht erreichbar ist."
   }
  }
 }

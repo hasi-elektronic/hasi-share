@@ -24,6 +24,8 @@ public final class AddSourceViewModel {
     public var server = ""
     public var username = ""
     public var password = ""
+    /// Build 30: backup server addresses, separated by commas / spaces / new lines (CONTRACT §1.1).
+    public var backupServers = ""
     public var showPassword = false
     public private(set) var phase: Phase = .editing
     /// Edit mode (Settings → source → Edit): the source whose connection data the form changes.
@@ -54,6 +56,7 @@ public final class AddSourceViewModel {
             username = x.username
             password = x.password
             epgURL = x.epgUrl ?? ""
+            backupServers = x.backupServers.joined(separator: ", ")
         case nil:
             break
         }
@@ -128,6 +131,11 @@ public final class AddSourceViewModel {
         }
     }
 
+    /// "a.com:8080, b.net  c.org" → ["a.com:8080", "b.net", "c.org"] (invalid ones are dropped later by `servers`).
+    nonisolated public static func parseServers(_ text: String) -> [String] {
+        text.split(whereSeparator: { $0 == "," || $0 == ";" || $0.isWhitespace }).map(String.init).filter { !$0.isEmpty }
+    }
+
     public var secrets: SourceSecrets {
         func opt(_ s: String) -> String? {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -139,7 +147,7 @@ public final class AddSourceViewModel {
         case .xtream:
             return .xtream(XtreamSecrets(serverUrl: server.trimmingCharacters(in: .whitespacesAndNewlines),
                                          username: username.trimmingCharacters(in: .whitespaces), password: password,
-                                         epgUrl: opt(epgURL)))
+                                         epgUrl: opt(epgURL), backupServers: Self.parseServers(backupServers)))
         }
     }
 

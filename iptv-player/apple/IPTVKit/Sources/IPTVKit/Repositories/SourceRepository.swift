@@ -157,6 +157,23 @@ public final class SourceRepository: Sendable {
         secureStore.value(SourceSecrets.self, forKey: Self.secretsKey(id))
     }
 
+    /// Build 30 (CONTRACT §1.1): a backup server of an Xtream source answered while the main one did not – it becomes
+    /// the main server and the former main one a backup (tried again later). Everything that builds URLs from the
+    /// secrets (playback, guide, catch-up) follows without further plumbing. No-op for other servers / sources.
+    @discardableResult
+    public func promoteServer(id: String, server: String) -> Bool {
+        guard case .xtream(let x)? = secrets(id: id), x.serverUrl != server, x.servers.contains(server) else { return false }
+        var promoted = x.using(server: server)
+        promoted.backupServers = x.servers.filter { $0 != server }
+        do {
+            try writeSecrets(.xtream(promoted), id: id)
+        } catch {
+            return false
+        }
+        SafeLog.info("source server switched to a backup (\(URLNormalizer.host(of: server) ?? "?"))")
+        return true
+    }
+
     public func delete(id: String) throws {
         if let secrets = secrets(id: id) { Redactor.shared.unregister(secrets.redactableValues) }
         try writeSecrets(nil, id: id)

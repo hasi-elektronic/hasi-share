@@ -60,7 +60,7 @@ Source {
 
 SourceSecrets   (ONLY in Keychain / Android-Keystore-encrypted storage, keyed by Source.id)
   M3U:    { url, epgUrl? , userAgent? }
-  XTREAM: { serverUrl, username, password, epgUrl? }
+  XTREAM: { serverUrl, username, password, epgUrl?, backupServers? }   // backupServers: Build 30, §1.1
 
 Category  { sourceId, id, kind(live|movie|series), name, sort }
 Channel   { sourceId, id, name, number?, logoUrl?, categoryId?, categoryIds, epgId?,
@@ -101,6 +101,18 @@ contentKey = fingerprint + ":" + kind + ":" + itemId
 Vectors: `test-vectors/content-keys.json`.
 
 ---
+
+### 1.1 Backup servers (Build 30, Apple; Android decodes and ignores them for now)
+Many Xtream providers give one account several domains. `backupServers` (secrets, optional, omitted from the JSON
+when empty – old records, pairing payloads and vectors keep their shape) lists them; `servers` = main first, then
+the backups, valid hosts only, duplicates dropped.
+* **Refresh:** the main server, then each backup while the error is a server problem (`ServerFailover`: network,
+  timeout, DNS, 5xx, 404, an invalid / non-JSON answer – a dead domain often serves a parking page). Account answers
+  (wrong password, expired, disabled) never move on.
+* **Playback:** the same URL on each backup is the last rescue step (§6.2), after the engines and the live variant.
+* A backup that answered (refresh) or played (playback) **becomes the main server**; the former main server becomes a
+  backup (tried again later). Every URL built from the secrets (streams, guide, catch-up) follows.
+* Add / edit source → Advanced: "Backup servers", separated by commas, spaces or new lines.
 
 ## 2. Error taxonomy (identical on all platforms)
 

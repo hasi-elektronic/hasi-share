@@ -129,12 +129,49 @@ public struct XtreamSecrets: Codable, Sendable, Hashable {
     public var username: String
     public var password: String
     public var epgUrl: String?
+    /// Backup server addresses of the same account (CONTRACT §1.1, Build 30): many providers hand out several
+    /// domains (dns1, dns2…). Tried when the main server is unreachable; omitted from the JSON when empty.
+    public var backupServers: [String]
 
-    public init(serverUrl: String, username: String, password: String, epgUrl: String? = nil) {
+    public init(serverUrl: String, username: String, password: String, epgUrl: String? = nil, backupServers: [String] = []) {
         self.serverUrl = serverUrl
         self.username = username
         self.password = password
         self.epgUrl = epgUrl
+        self.backupServers = backupServers
+    }
+
+    /// Main server first, then the backups: valid Xtream bases only, duplicates (same base) dropped.
+    public var servers: [String] {
+        var seen = Set<String>()
+        return ([serverUrl] + backupServers).compactMap { raw in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A real server: no spaces, a host with a dot (domain / IPv4) or a port ("localhost:8080").
+            guard !trimmed.isEmpty, !trimmed.contains(where: \.isWhitespace),
+                  let base = URLNormalizer.xtreamBase(trimmed), let host = URLNormalizer.host(of: base),
+                  host.contains(".") || base.dropFirst(base.hasPrefix("https") ? 8 : 7).contains(":"),
+                  seen.insert(base).inserted else { return nil }
+            return trimmed
+        }
+    }
+
+    /// The same account on another server (the backups stay as they are).
+    public func using(server: String) -> XtreamSecrets {
+        var copy = self
+        copy.serverUrl = server
+        return copy
+    }
+}
+
+/// Which source errors move a refresh / an open on to the next server (CONTRACT §1.1): the server or its domain is
+/// unreachable or answers nonsense (a dead domain often serves a parking page) – never an account answer (wrong
+/// password, expired, disabled), which is the same on every server of the account.
+public enum ServerFailover {
+    public static func tryNextServer(after error: SourceError) -> Bool {
+        switch error {
+        case .network, .serverError, .notFound, .invalidResponse, .invalidFormat: return true
+        case .invalidCredentials, .accountExpired, .accountDisabled, .empty, .cancelled: return false
+        }
     }
 }
 
@@ -178,7 +215,7 @@ public enum SourceSecrets: Codable, Sendable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, url, epgUrl, userAgent, serverUrl, username, password
+        case type, url, epgUrl, userAgent, serverUrl, username, password, backupServers
     }
 
     public init(from decoder: Decoder) throws {
@@ -192,7 +229,8 @@ public enum SourceSecrets: Codable, Sendable, Hashable {
             self = .xtream(XtreamSecrets(serverUrl: try c.decode(String.self, forKey: .serverUrl),
                                          username: try c.decode(String.self, forKey: .username),
                                          password: try c.decode(String.self, forKey: .password),
-                                         epgUrl: try c.decodeIfPresent(String.self, forKey: .epgUrl)))
+                                         epgUrl: try c.decodeIfPresent(String.self, forKey: .epgUrl),
+                                         backupServers: try c.decodeIfPresent([String].self, forKey: .backupServers) ?? []))
         }
     }
 
@@ -209,6 +247,7 @@ public enum SourceSecrets: Codable, Sendable, Hashable {
             try c.encode(s.username, forKey: .username)
             try c.encode(s.password, forKey: .password)
             try c.encodeIfPresent(s.epgUrl, forKey: .epgUrl)
+            if !s.backupServers.isEmpty { try c.encode(s.backupServers, forKey: .backupServers) }
         }
     }
 }

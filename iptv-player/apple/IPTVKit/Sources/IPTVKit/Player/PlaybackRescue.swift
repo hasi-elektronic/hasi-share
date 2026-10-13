@@ -21,7 +21,7 @@ public struct PlaybackAttempt: Hashable, Sendable {
 public enum PlaybackRescue {
     /// All attempts in order; the first is the normal choice (`first`).
     public static func plan(first: PlaybackAttempt, isLive: Bool, override: PlayerEngineOverride, vlcAvailable: Bool,
-                            remuxAvailable: Bool, remuxPreferred: Bool) -> [PlaybackAttempt] {
+                            remuxAvailable: Bool, remuxPreferred: Bool, backupURLs: [URL] = []) -> [PlaybackAttempt] {
         var out = [first]
         func add(_ attempt: PlaybackAttempt) { if !out.contains(attempt) { out.append(attempt) } }
         for engine in engines(for: first.container, override: override, vlcAvailable: vlcAvailable,
@@ -33,6 +33,14 @@ public enum PlaybackRescue {
             for engine in engines(for: container, override: override, vlcAvailable: vlcAvailable,
                                   remuxAvailable: remuxAvailable, remuxPreferred: remuxPreferred) {
                 add(PlaybackAttempt(engine: engine, url: alternate, container: container))
+            }
+        }
+        // Build 30 (CONTRACT §1.1): last, the same stream on the account's backup servers (a dead main domain).
+        for backup in backupURLs {
+            let container = StreamFormatDetector.detect(url: backup.absoluteString)
+            for engine in engines(for: container, override: override, vlcAvailable: vlcAvailable,
+                                  remuxAvailable: remuxAvailable, remuxPreferred: remuxPreferred) {
+                add(PlaybackAttempt(engine: engine, url: backup, container: container))
             }
         }
         return out

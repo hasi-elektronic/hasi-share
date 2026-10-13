@@ -187,6 +187,11 @@ private struct AddSourceForm: View {
                     if model.kind == .m3u {
                         TextField(L10n.t("field_user_agent"), text: $model.userAgent).plainField()
                             .accessibilityIdentifier("field_user_agent")
+                    } else {
+                        // Build 30: other domains of the same account (CONTRACT §1.1).
+                        TextField(L10n.t("field_backup_servers"), text: $model.backupServers).urlField()
+                            .accessibilityIdentifier("field_backup_servers")
+                        LText("field_backup_servers_hint").font(.caption).foregroundStyle(Theme.textSecondary)
                     }
                 }
             }

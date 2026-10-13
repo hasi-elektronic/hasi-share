@@ -225,6 +225,34 @@ final class SourceManagementTests: XCTestCase {
         XCTAssertEqual(lists(), before + 1, "refreshed once the player closed")
     }
 
+    /// Build 30 (CONTRACT §1.1): the main server's domain is dead → the backup loads the catalog and becomes the main
+    /// server (the old one stays as a backup); a wrong password never moves on to a backup.
+    func testDeadMainServerFallsBackToABackupAndPromotesIt() async throws {
+        let panel = try Server().transport()
+        let transport = FakeTransport { request in
+            if request.url.host == "dead.example.com" { throw URLError(.cannotFindHost) }
+            return try panel.handler(request)
+        }
+        let env = try makeEnvironment(transport)
+        let secrets = SourceSecrets.xtream(XtreamSecrets(serverUrl: "http://dead.example.com:8080", username: "demo", password: "pw",
+                                                         backupServers: ["http://panel.example.com"]))
+        let source = try await env.addSource(name: "Panel", secrets: secrets) { _ in }
+        guard case .xtream(let stored)? = env.secrets(for: source.id) else { return XCTFail("secrets") }
+        XCTAssertEqual(stored.serverUrl, "http://panel.example.com", "the working backup is the main server now")
+        XCTAssertEqual(stored.backupServers, ["http://dead.example.com:8080"], "the dead one stays as a backup")
+        XCTAssertTrue(transport.requests.contains { $0.url.host == "panel.example.com" })
+
+        // Account errors are the same on every server: no backup is tried.
+        let wrong = SourceSecrets.xtream(XtreamSecrets(serverUrl: "http://panel.example.com", username: "demo", password: "wrong",
+                                                       backupServers: ["http://other.example.com"]))
+        let before = transport.requests.count
+        do {
+            _ = try await env.addSource(name: "Wrong", secrets: wrong) { _ in }
+            XCTFail("wrong password must fail")
+        } catch {}
+        XCTAssertFalse(transport.requests.dropFirst(before).contains { $0.url.host == "other.example.com" })
+    }
+
     func testEditFormIsPrefilledAndHidesCredentialsInTheDefaultEpgHint() async throws {
         let env = try makeEnvironment(try Server().transport())
         let panel = XtreamSecrets(serverUrl: "http://panel.example.com:8080", username: "demo", password: "s3cret")
