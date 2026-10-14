@@ -10,6 +10,7 @@ final class FakeEngine: PlaybackEngine {
     var onEvent: (@MainActor (EngineEvent) -> Void)?
     private(set) var loads: [(url: URL, startMs: Int64?)] = []
     private(set) var tunings: [LiveStartTuning] = []
+    private(set) var languages: [(audio: String?, subtitle: String?)] = []
     private(set) var stops = 0
     private(set) var aspect: AspectMode?
     private(set) var selectedAudio: Int?
@@ -25,6 +26,7 @@ final class FakeEngine: PlaybackEngine {
     func load(_ stream: ResolvedStream, isLive: Bool, startMs: Int64?, preferredAudioLanguage: String?, preferredSubtitleLanguage: String?, tuning: LiveStartTuning) {
         loads.append((stream.url, startMs))
         tunings.append(tuning)
+        languages.append((preferredAudioLanguage, preferredSubtitleLanguage))
     }
     func play() { isPlaying = true }
     func pause() { isPlaying = false }
@@ -331,3 +333,43 @@ final class AudioWithoutPictureTests: XCTestCase {
         XCTAssertNotEqual(c.phase, .failed(.unsupportedCodec(codec: "video")))
     }
 }
+
+/// Build 31 (owner report: after switching a series to German, every new episode started in English).
+@MainActor
+final class SeriesTrackMemoryTests: XCTestCase {
+    func testAnEpisodesAudioAndSubtitleChoiceHoldsForTheSeries() async throws {
+        let vlc = FakeEngine(kind: .vlcKit)
+        let av = FakeEngine(kind: .avPlayer)
+        let c = PlayerController(resolver: StreamResolver(secrets: { _ in nil }, sniffer: nil, hlsProbe: nil, vlcAvailable: true),
+                                 library: nil, engines: PlaybackEngines(avPlayer: { av }, vlc: { vlc }))
+        c.preferences = PlayerPreferences(kv: InMemoryKeyValueStore())
+        c.preferredAudioLanguage = "en"
+        func episode(_ n: Int, series: String = "s1") -> PlaybackRequest {
+            let e = Episode(sourceId: "src", id: "e\(n)", seriesId: series, season: 1, number: n, title: "E\(n)",
+                            containerExt: "mkv", url: "http://h.example.com/series/e\(n).mkv")
+            return PlaybackRequest(item: .episode(e, seriesTitle: "Show"), source: nil)
+        }
+        c.open(episode(1))
+        for _ in 0..<200 where vlc.loads.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(vlc.languages.last?.audio, "en", "app preference before any choice")
+        vlc.emit(.tracks(audio: [MediaOption(id: 0, name: "English", languageCode: "eng"), MediaOption(id: 1, name: "Deutsch", languageCode: "ger")],
+                         subtitles: [MediaOption(id: 0, name: "Deutsch", languageCode: "ger")], selectedAudio: 0, selectedSubtitle: nil))
+        c.selectAudio(1)
+        c.selectSubtitle(0)
+
+        c.open(episode(2))
+        for _ in 0..<200 where vlc.loads.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(vlc.languages.last?.audio, "ger", "next episode starts in German")
+        XCTAssertEqual(vlc.languages.last?.subtitle, "ger")
+
+        c.selectSubtitle(nil)   // subtitles off is remembered too
+        c.open(episode(3))
+        for _ in 0..<200 where vlc.loads.count < 3 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertNil(vlc.languages.last?.subtitle)
+
+        c.open(episode(1, series: "other"))
+        for _ in 0..<200 where vlc.loads.count < 4 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(vlc.languages.last?.audio, "en", "other series keep the app preference")
+    }
+}
+

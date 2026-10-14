@@ -13,6 +13,7 @@
 #include <libswresample/swresample.h>
 #include <stdatomic.h>
 #include <string.h>
+#include <strings.h>
 
 #define NR_OUT_VIDEO_TB ((AVRational){1, 90000})
 /// Constant decode-time shift of the video track (frames): dts = sorted pts − shift, so every
@@ -258,6 +259,20 @@ static int nr_cmp_i64(const void *a, const void *b) {
     return x < y ? -1 : x > y;
 }
 
+/// `wanted` is a comma list of spellings ("de,deu,ger" – Build 31: Matroska tags German "ger", which the old
+/// 2-character prefix test never matched against "de"). Exact (case-insensitive) match of any spelling.
+static int nr_language_matches(const char *track, const char *wanted) {
+    const char *p = wanted;
+    while (*p) {
+        const char *end = strchr(p, ',');
+        size_t n = end ? (size_t)(end - p) : strlen(p);
+        if (n > 0 && strlen(track) == n && strncasecmp(track, p, n) == 0) return 1;
+        if (!end) break;
+        p = end + 1;
+    }
+    return 0;
+}
+
 static int nr_pick_audio(AVFormatContext *fmt, int vidx, const char *lang, int wanted, int *count) {
     int best = -1;
     *count = 0;
@@ -272,7 +287,7 @@ static int nr_pick_audio(AVFormatContext *fmt, int vidx, const char *lang, int w
         (*count)++;
         if (lang && *lang && best < 0) {
             AVDictionaryEntry *t = av_dict_get(st->metadata, "language", NULL, 0);
-            if (t && strncmp(t->value, lang, 2) == 0) best = (int)i;
+            if (t && nr_language_matches(t->value, lang)) best = (int)i;
         }
     }
     if (best >= 0) return best;

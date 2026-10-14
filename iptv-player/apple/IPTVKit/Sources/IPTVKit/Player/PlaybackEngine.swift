@@ -137,11 +137,30 @@ public enum TrackNaming {
         return nil
     }
 
-    /// Two-letter language code (if known) for preference matching: "tur" → "tr", "en-US" → "en".
+    /// ISO 639-2/B (bibliographic) codes that differ from the /T (terminology) ones – Matroska files use the /B codes
+    /// ("ger", "fre"), Foundation knows only /T ("deu", "fra"). Owner report (Build 31): a German episode track tagged
+    /// "ger" never matched the preference "de", so every new episode started in English.
+    static let bibliographic: [String: String] = [
+        "alb": "sqi", "arm": "hye", "baq": "eus", "bur": "mya", "chi": "zho", "cze": "ces", "dut": "nld", "fre": "fra",
+        "geo": "kat", "ger": "deu", "gre": "ell", "ice": "isl", "mac": "mkd", "mao": "mri", "may": "msa", "per": "fas",
+        "rum": "ron", "slo": "slk", "tib": "bod", "wel": "cym",
+    ]
+
+    /// Every spelling of a language a container may use: "de" → ["de", "deu", "ger"], "tur" → ["tr", "tur"].
+    public static func languageVariants(_ code: String?) -> [String] {
+        guard let two = normalized(code) else { return [] }
+        var out = [two]
+        if let three = Locale.Language(identifier: two).languageCode?.identifier(.alpha3), !out.contains(three) { out.append(three) }
+        for (b, t) in bibliographic where out.contains(t) && !out.contains(b) { out.append(b) }
+        return out
+    }
+
+    /// Two-letter language code (if known) for preference matching: "tur" → "tr", "ger" → "de", "en-US" → "en".
     public static func normalized(_ code: String?) -> String? {
         guard let code = code?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else { return nil }
-        let base = code.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? code
-        let language = Locale.Language(identifier: base.lowercased())
+        var base = (code.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? code).lowercased()
+        if let t = bibliographic[base] { base = t }
+        let language = Locale.Language(identifier: base)
         return language.languageCode?.identifier(.alpha2) ?? language.languageCode?.identifier ?? base.lowercased()
     }
 

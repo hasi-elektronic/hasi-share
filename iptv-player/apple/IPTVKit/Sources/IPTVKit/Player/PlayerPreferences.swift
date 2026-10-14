@@ -25,6 +25,32 @@ public final class PlayerPreferences {
     static let backgroundAudioKey = "player.backgroundAudio"
     static let autoPiPKey = "player.autoPiP"
 
+    /// Build 31 (owner report: every new episode started in English after he chose German): the audio / subtitle choice
+    /// made in an episode, remembered for its series. `subtitleOff` = subtitles explicitly turned off.
+    public struct SeriesTracks: Codable, Sendable, Equatable {
+        public var audioLanguage: String?
+        public var subtitleLanguage: String?
+        public var subtitleOff: Bool
+
+        public init(audioLanguage: String? = nil, subtitleLanguage: String? = nil, subtitleOff: Bool = false) {
+            self.audioLanguage = audioLanguage
+            self.subtitleLanguage = subtitleLanguage
+            self.subtitleOff = subtitleOff
+        }
+    }
+
+    static func seriesKey(sourceId: String, seriesId: String) -> String { "seriesTracks.\(sourceId).\(seriesId)" }
+
+    public func seriesTracks(sourceId: String, seriesId: String) -> SeriesTracks? {
+        kv.value(SeriesTracks.self, forKey: Self.seriesKey(sourceId: sourceId, seriesId: seriesId))
+    }
+
+    public func updateSeriesTracks(sourceId: String, seriesId: String, _ change: (inout SeriesTracks) -> Void) {
+        var tracks = seriesTracks(sourceId: sourceId, seriesId: seriesId) ?? SeriesTracks()
+        change(&tracks)
+        kv.setValue(tracks, forKey: Self.seriesKey(sourceId: sourceId, seriesId: seriesId))
+    }
+
     public init(kv: any KeyValueStore) {
         self.kv = kv
         autoplayNextEpisode = kv.value(Bool.self, forKey: Self.autoplayKey) ?? true

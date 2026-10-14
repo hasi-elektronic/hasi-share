@@ -543,10 +543,11 @@ public final class PlayerController {
         next.setAudioDelay(ms: audioDelay(for: next.kind))   // before load: VLCKit / the remuxer start the item with it
         next.applySubtitleStyle(subtitleStyle)
         next.setSubtitleDelay(ms: subtitleDelayMs)
-        let subtitleLanguage = reloadSubtitleLanguage ?? preferredSubtitleLanguage
+        let languages = trackLanguages()
+        let subtitleLanguage = reloadSubtitleLanguage ?? languages.subtitle
         reloadSubtitleLanguage = nil
         next.load(stream, isLive: isLive, startMs: startMs,
-                  preferredAudioLanguage: preferredAudioLanguage, preferredSubtitleLanguage: subtitleLanguage,
+                  preferredAudioLanguage: languages.audio, preferredSubtitleLanguage: subtitleLanguage,
                   tuning: LiveStartTuning.make(isLive: isLive, largeBuffer: largeBuffer))
         // VOD only: a second connection to a live panel (often one connection per account) could itself be refused.
         if next.kind == .avPlayer, !isLive { watchNotReady(stream) }
@@ -1014,15 +1015,36 @@ public final class PlayerController {
     // MARK: Audio / subtitles
 
     public func selectAudio(_ id: Int) {
-        guard audioOptions.contains(where: { $0.id == id }) else { return }
+        guard let option = audioOptions.first(where: { $0.id == id }) else { return }
         engine?.selectAudio(id)
         selectedAudio = id
+        // Build 31: an episode's choice holds for the rest of its series.
+        if case .episode(let e, _)? = request?.item, let language = option.languageCode {
+            preferences?.updateSeriesTracks(sourceId: e.sourceId, seriesId: e.seriesId) { $0.audioLanguage = language }
+        }
     }
 
     /// nil → subtitles off.
     public func selectSubtitle(_ id: Int?) {
         engine?.selectSubtitle(id)
         selectedSubtitle = id
+        if case .episode(let e, _)? = request?.item {
+            let language = id.flatMap { i in subtitleOptions.first { $0.id == i }?.languageCode }
+            preferences?.updateSeriesTracks(sourceId: e.sourceId, seriesId: e.seriesId) {
+                $0.subtitleOff = id == nil
+                if let language { $0.subtitleLanguage = language }
+            }
+        }
+    }
+
+    /// Audio / subtitle language for the current request: the series' remembered choice, else the app preferences.
+    func trackLanguages() -> (audio: String?, subtitle: String?) {
+        guard case .episode(let e, _)? = request?.item,
+              let remembered = preferences?.seriesTracks(sourceId: e.sourceId, seriesId: e.seriesId) else {
+            return (preferredAudioLanguage, preferredSubtitleLanguage)
+        }
+        let subtitle = remembered.subtitleOff ? nil : (remembered.subtitleLanguage ?? preferredSubtitleLanguage)
+        return (remembered.audioLanguage ?? preferredAudioLanguage, subtitle)
     }
 
     // MARK: Audio sync

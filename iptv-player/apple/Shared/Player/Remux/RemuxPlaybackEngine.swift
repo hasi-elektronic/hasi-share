@@ -88,7 +88,7 @@ final class RemuxPlaybackEngine: PlaybackEngine {
             do {
                 let port = try await RemuxHTTPServer.shared.start()
                 let session = try await RemuxSession.open(url: stream.url, headers: stream.headers,
-                                                          audioLanguage: preferredAudioLanguage.flatMap(TrackNaming.normalized),
+                                                          audioLanguage: Self.languageList(preferredAudioLanguage),
                                                           audioStream: audioStream, audioDelayMs: delayMs)
                 guard let self, !Task.isCancelled, self.generation == generation else { session.close(); return }
                 let info = session.info
@@ -127,6 +127,12 @@ final class RemuxPlaybackEngine: PlaybackEngine {
                 self.onEvent?(.failed(mapped))
             }
         }
+    }
+
+    /// "de" → "de,deu,ger": every spelling a container may use (nova_remux matches any of them).
+    static func languageList(_ code: String?) -> String? {
+        let variants = TrackNaming.languageVariants(code)
+        return variants.isEmpty ? nil : variants.joined(separator: ",")
     }
 
     /// Any open failure is `UnsupportedFormat` → the controller retries once in VLCKit (Build 23); a segment error after
