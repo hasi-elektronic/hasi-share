@@ -636,3 +636,63 @@ Every log line passes `redact()`, rules applied **in this order**:
 5. `(?i)(Bearer\s+)[A-Za-z0-9._~+/=-]+` → `$1***`
 
 Release builds log nothing below WARN.
+
+---
+
+## 11. Metadata (TMDB) – Phase 2
+
+Posters, plot, rating, cast and trailer for VOD (movies, series) come from TMDB API v3 through the
+backend (`BACKEND_API.md` "Metadata"); the apps never hold the TMDB key. The provider's own fields
+(Xtream `plot`, `rating`, `cover`) stay the fallback whenever no match exists or the backend is unreachable.
+The backend only ever receives the **title text** (never source, account or stream data) and stores no
+per-user data for it (cache rows are keyed by the title only).
+
+### 11.1 Wire model
+```
+MediaType = movie | tv                     // tv = Series
+MetadataLanguage = de | tr | en            // UI language; TMDB gets de-DE / tr-TR / en-US
+
+MediaMetadata {
+  tmdbId: int, type: MediaType, title: string, originalTitle: string?,
+  overview: string?                        // UI language, English fallback when untranslated
+  posterUrl: string?                       // https://image.tmdb.org/t/p/w500/…
+  backdropUrl: string?                     // …/w1280/…
+  rating: number?                          // vote average 0..10, 1 decimal; null when voteCount = 0
+  voteCount: int, releaseDate: "YYYY-MM-DD"?  // tv: first air date
+  genres: [string]                         // localized names
+  cast: [{name, character?, profileUrl? (w185)}]   // max 10, billing order
+  trailerUrl: string?                      // https://www.youtube.com/watch?v=KEY
+  runtimeMinutes: int?, seasons: int? (tv only), language: MetadataLanguage
+}
+MetadataSearchResult { tmdbId, type, title, originalTitle?, overview?, posterUrl?, backdropUrl?,
+                       rating?, voteCount, releaseDate? }
+ParsedVodName { title, year?, yearInBrackets: bool, season?, episode? }
+MetadataMatch { parsed: ParsedVodName, match: MetadataSearchResult?, confidence: 0..1 }
+```
+Decoders are lenient: unknown fields are ignored, every optional field may be `null`.
+Trailer choice: YouTube only, `Trailer` before `Teaser`; UI language < English < other; official first.
+
+### 11.2 VOD name → TMDB match (`test-vectors/metadata/vod-names.json`)
+If the provider already gives a TMDB id (Xtream `get_vod_info` → `info.tmdb_id`), use it directly
+(`GET /v1/metadata/{id}`) and skip matching. Otherwise `parseVodName(raw)`:
+1. Collapse whitespace. A name **without spaces** that contains `.` or `_` → those become spaces.
+2. Strip provider prefixes (up to 4 times), **case-sensitive** tags `DE GER DEU TR TUR EN ENG US UK GB FR ES IT NL
+   PL RU AR AT CH AL KU MULTI VOD 4K UHD FHD HD SD HEVC 3D`, optionally joined by `- _ / +`, optionally opened by
+   `[ ( |`, closed by `] ) | :` or ` - ` (`DE | `, `|TR| `, `[EN] `, `4K-DE - `, `DE: `). "It: Chapter Two" survives.
+3. Season/episode: earliest of `S01E05`, `1x05`, `Staffel|Season|Sezon 2`, a trailing `S03` → season/episode;
+   everything from the marker on is dropped (only when the marker is not at position 0).
+4. Year: first `(YYYY)` / `[YYYY]` (19xx/20xx) with text before it → year, `yearInBrackets = true`, group removed.
+   Else the **last** bare 19xx/20xx token with text before it and only tags/brackets after it → year, cut there
+   (`Inception 2010 1080p`). A name that is only a year (`1917`) stays the title.
+5. Remove remaining `[…]`, `(…)`, `{…}`; drop trailing tags (`1080p`, `x265`, `BluRay`, `WEB-DL`, `HEVC`,
+   `German`, `DE`, … – full list in `backend/src/metadata/match.ts` `TAIL_JUNK`); trim ` - : | , .` at both ends.
+   Empty result → the collapsed raw name.
+
+`compareKey(s)`: lowercase → NFD, drop U+0300..U+036F → map `ı→i ß→ss ø→o æ→ae œ→oe ł→l đ→d` →
+every run of `[^a-z0-9]` becomes one space → trim.
+`titleSimilarity(a, b)` = max(1 − levenshtein/maxLen, token Dice) on the compare keys (1 when equal).
+`score` = max(similarity to `title`, to `originalTitle`), then with a known year: same year +0.10, ±1 +0.05,
+other −0.35, candidate without date −0.05; plus `min(0.05, log10(voteCount + 1) × 0.0125)`; clamp 0..1, round to
+2 decimals. Best = highest score, then higher voteCount, then TMDB order. **Match iff score ≥ 0.75.**
+Search attempts (stop at the first match): (1) title + year filter, (2) title without year, (3) if the year was bare,
+`"title year"` without filter ("Blade Runner 2049"). No match is cached too (negative cache, 3 days).

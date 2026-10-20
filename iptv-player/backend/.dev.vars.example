@@ -45,3 +45,8 @@ REPLACE_WITH_CONTENT_OF_SubscriptionKey_XXXXXXXXXX.p8
 # Resend (https://resend.com) API key. Without it, login e-mails only work with DEV_MODE=true
 # (the code is returned as devCode); in production /v1/auth/email/start answers 503.
 RESEND_API_KEY="re_REPLACE_WITH_RESEND_API_KEY"
+
+# --- TMDB metadata (optional; /v1/metadata/*) -----------------------------------
+# themoviedb.org → Settings → API: v3 "API Key" or v4 "API Read Access Token" (eyJ…).
+# Without it the metadata endpoints answer 503 metadata_unavailable.
+TMDB_API_KEY="REPLACE_WITH_TMDB_API_KEY"

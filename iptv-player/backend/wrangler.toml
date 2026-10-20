@@ -16,6 +16,12 @@ database_name = "iptv-backend"
 database_id = "REPLACE_WITH_D1_ID"
 migrations_dir = "migrations"
 
+# Optional hot cache for TMDB metadata (TTL). Create with `npx wrangler kv namespace create METADATA_KV`.
+# Without this binding the D1 tables metadata_items / metadata_lookups are the only cache.
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "REPLACE_WITH_KV_ID"
+
 # Daily: Google Play Voided Purchases poll + housekeeping (UTC).
 [triggers]
 crons = ["17 3 * * *"]

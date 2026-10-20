@@ -116,6 +116,7 @@ Hepsi `npx wrangler secret put <AD>` ile girilir (yerelde `.dev.vars`; örnek:
 | `GOOGLE_PUBSUB_TOKEN` | RTDN | Push URL'sindeki paylaşılan sır (`openssl rand -hex 24`) |
 | `APPLE_PRIVATE_KEY` | Apple satışı | In-App Purchase anahtarı (.p8 içeriği) |
 | `RESEND_API_KEY` | Hesap özelliği | Giriş kodu e-postaları. Yoksa (ve `DEV_MODE` kapalıysa) `email/start` → 503 |
+| `TMDB_API_KEY` | Metadata | TMDB API v3 anahtarı **veya** v4 "Read Access Token" (`eyJ…`). Yoksa `/v1/metadata/*` → 503 `metadata_unavailable` (önbellekte olanlar yine döner) |
 
 ```bash
 npx wrangler secret put ADMIN_TOKEN
@@ -123,7 +124,18 @@ npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON < service-account.json
 npx wrangler secret put GOOGLE_PUBSUB_TOKEN
 npx wrangler secret put APPLE_PRIVATE_KEY < SubscriptionKey_XXXXXXXXXX.p8
 npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put TMDB_API_KEY       # themoviedb.org → Ayarlar → API 🔑
 ```
+**Metadata önbelleği (TMDB):** D1 tabloları `metadata_items` / `metadata_lookups`
+(`migrations/0002_metadata.sql`) kalıcı katmandır; KV (`METADATA_KV`) isteğe bağlı sıcak katmandır:
+```bash
+npx wrangler kv namespace create METADATA_KV     # çıktıdaki id → wrangler.toml [[kv_namespaces]]
+npm run db:migrate:remote                        # 0002_metadata.sql
+```
+KV ücretsiz planda günde 1 000 yazma ile sınırlıdır; aşılırsa yazma hatası yalnızca loglanır, D1
+önbelleği çalışmaya devam eder. KV istemiyorsanız `[[kv_namespaces]]` bloğunu silin.
+TMDB şartı: uygulamada "This product uses the TMDB API but is not endorsed or certified by TMDB"
+ibaresi + TMDB logosu gösterilmelidir (Ayarlar → Hakkında).
 `[vars]` içinde düzenlenecekler: `PUBLIC_BASE_URL` (Worker'ın mutlak adresi – QR kodları ve
 `/link` bağlantıları bununla üretilir), `APP_NAME`, `APP_IDS`, `LICENSE_KID`,
 `GOOGLE_PACKAGE_NAME`, `GOOGLE_PRODUCT_ID`, `APPLE_ISSUER_ID`, `APPLE_KEY_ID`,

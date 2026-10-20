@@ -38,11 +38,16 @@ export interface Env {
   MIN_VERSION_ANDROID?: string;
   MIN_VERSION_APPLE?: string;
   CORS_ORIGINS?: string;
+
+  /** Secret (optional): TMDB API v3 key or v4 read access token. Without it /v1/metadata/* answers 503. */
+  TMDB_API_KEY?: string;
+  /** Optional KV namespace: hot metadata cache with TTL in front of the D1 cache tables. */
+  METADATA_KV?: KVNamespace;
 }
 
 /** Injectable dependencies (tests replace them; production uses the globals). */
 export interface Deps {
-  /** All outbound HTTP (Google, Apple, Resend) goes through this. */
+  /** All outbound HTTP (Google, Apple, Resend, TMDB) goes through this. */
   fetch: typeof fetch;
   /** Current time in epoch milliseconds. */
   now: () => number;
@@ -68,7 +73,7 @@ export function baseUrl(env: Env): string {
 /** Secret values that must never appear in logs (CONTRACT §10 rule 1). */
 export function secretValues(env: Env): string[] {
   const out: string[] = [];
-  for (const v of [env.ADMIN_TOKEN, env.GOOGLE_PUBSUB_TOKEN, env.RESEND_API_KEY]) {
+  for (const v of [env.ADMIN_TOKEN, env.GOOGLE_PUBSUB_TOKEN, env.RESEND_API_KEY, env.TMDB_API_KEY]) {
     if (v && v.length >= 3) out.push(v);
   }
   return out;

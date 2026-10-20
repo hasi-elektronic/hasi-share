@@ -1,5 +1,6 @@
 import type { Ctx } from "./http";
 import { revokeLicense } from "./license/repo";
+import { METADATA_RETENTION_MS } from "./metadata/cache";
 import { GooglePlayClient } from "./stores/google";
 
 const DAY_MS = 86_400_000;
@@ -47,5 +48,8 @@ export async function cleanup(c: Ctx): Promise<void> {
     db.prepare("DELETE FROM rate_limits WHERE window_start < ?1").bind(now - DAY_MS),
     // Sync tombstones are kept for 180 days.
     db.prepare("DELETE FROM sync_items WHERE deleted = 1 AND updated_at < ?1").bind(now - 180 * DAY_MS),
+    // TMDB cache rows nobody refreshed for 90 days (popular titles are re-fetched long before).
+    db.prepare("DELETE FROM metadata_items WHERE fetched_at < ?1").bind(now - METADATA_RETENTION_MS),
+    db.prepare("DELETE FROM metadata_lookups WHERE fetched_at < ?1").bind(now - METADATA_RETENTION_MS),
   ]);
 }

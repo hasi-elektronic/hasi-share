@@ -94,6 +94,24 @@ licenses are detached (kept for store-refund bookkeeping, no personal data).
 ### `POST /v1/sync` `{items: [SyncItem]}` (≤ 500) → `{applied, cursor}`
 Limits: 5 000 favorites, 2 000 progress items per account (oldest progress trimmed).
 
+## Metadata (TMDB proxy + cache, CONTRACT §11)
+Public (no session), rate limit 120/min per IP. Requires the `TMDB_API_KEY` secret; without it
+(and with nothing cached) every endpoint answers `503 metadata_unavailable`.
+Common query parameters: `type=movie|tv` (required), `language=de|tr|en` (default `en`; `de-DE` style accepted).
+Successful answers carry `Cache-Control: public, max-age=3600` (`max-age=300` when stale) and
+`X-Metadata-Cache: kv|d1|tmdb|stale`.
+
+* `GET /v1/metadata/search?query=<1..200>&type=&year=&language=` → `{results: [MetadataSearchResult]}` (TMDB page 1, no adult titles)
+* `GET /v1/metadata/match?name=<raw VOD name ≤ 300>&type=&year=&language=` →
+  `{parsed: ParsedVodName, match: MetadataSearchResult | null, confidence: 0..1}` – parses the IPTV name (§11.2),
+  searches TMDB and returns the best candidate if `confidence ≥ 0.75`. `year` = the provider's own year (Xtream `year`), overrides the name.
+* `GET /v1/metadata/{tmdbId}?type=&language=` → `MediaMetadata` | `404 not_found`
+
+Cache: KV (optional binding `METADATA_KV`) → D1 (`metadata_items`, `metadata_lookups`) → TMDB.
+Details fresh 14 days (KV TTL 7 days), search/match 3 days (KV TTL 1 day). Older D1 rows are served
+as `stale` while TMDB fails; rows not refreshed for 90 days are deleted by the daily cron.
+Errors: `400 invalid_request`, `404 not_found`, `429 rate_limited`, `503 metadata_unavailable` (`retryAfter`).
+
 ## Pairing
 * `POST /v1/pair/sessions {publicKey: JWK}` → `{code, secret, expiresAt, pairUrl}` (10/min/IP)
 * `GET /v1/pair/sessions/{code}/key` → `{publicKey}` | `404` | `410`
@@ -141,3 +159,5 @@ Limits: 5 000 favorites, 2 000 progress items per account (oldest progress trimm
 | `RESEND_API_KEY` | **secret** | e-mail delivery for login codes (optional) |
 | `MAIL_FROM` | var | sender address |
 | `DEV_MODE` | var | `true` only locally: returns `devCode`, relaxes rate limits |
+| `TMDB_API_KEY` | **secret** | TMDB API v3 key or v4 read access token (optional; metadata endpoints) |
+| `METADATA_KV` | KV binding | optional hot cache for metadata (TTL); D1 is the durable cache |

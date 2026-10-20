@@ -16,6 +16,7 @@ import { isDevMode, secretValues, type Deps, type Env } from "./env";
 import { HttpError, corsHeaders, errorResponse, json, withHeaders, type Ctx } from "./http";
 import { licenseSync } from "./license/sync";
 import { Logger, type LogLevel, type LogSink } from "./log";
+import { metadataDetails, metadataMatch, metadataSearch } from "./metadata/handlers";
 import { adminPage } from "./pages/admin";
 import { linkPage } from "./pages/link";
 import { pairPage } from "./pages/pair";
@@ -60,6 +61,10 @@ export function buildRouter(): Router {
     .post("/v1/auth/device/approve", deviceApprove)
     .get("/v1/sync", syncGet)
     .post("/v1/sync", syncPost)
+    // Static metadata routes first: "/v1/metadata/:tmdbId" would also match them.
+    .get("/v1/metadata/search", metadataSearch)
+    .get("/v1/metadata/match", metadataMatch)
+    .get("/v1/metadata/:tmdbId", metadataDetails)
     .post("/v1/pair/sessions", pairCreate)
     .get("/v1/pair/sessions/:code/key", pairGetKey)
     .post("/v1/pair/sessions/:code/payload", pairPostPayload)

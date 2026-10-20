@@ -28,6 +28,8 @@ const TABLES = [
   "sync_items",
   "pair_sessions",
   "rate_limits",
+  "metadata_items",
+  "metadata_lookups",
 ];
 
 export async function resetDb(): Promise<void> {
@@ -111,6 +113,8 @@ export class FakeStores {
   appleDown = false;
   emails: { to: string[]; subject: string; text: string }[] = [];
   oauthCount = 0;
+  /** TMDB fake, set by the metadata tests; unset → any TMDB call fails the test. */
+  tmdb: ((url: URL, headers: Headers) => Response | Promise<Response>) | null = null;
 
   constructor(private readonly keys: Awaited<ReturnType<typeof testKeys>>) {}
 
@@ -137,6 +141,7 @@ export class FakeStores {
       if (!tx || tx.env !== env) return Response.json({ errorCode: 4040010, errorMessage: "Transaction id not found." }, { status: 404 });
       return Response.json({ signedTransactionInfo: fakeJws(tx.payload) });
     }
+    if (url.hostname === "api.themoviedb.org" && this.tmdb) return this.tmdb(url, req.headers);
     if (url.href === "https://api.resend.com/emails") {
       if (req.headers.get("authorization") !== `Bearer ${RESEND_KEY}`) return new Response("bad key", { status: 401 });
       const j = JSON.parse(body) as { to: string[]; subject: string; text: string };
