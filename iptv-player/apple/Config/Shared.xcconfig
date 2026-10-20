@@ -6,7 +6,7 @@ APP_BUNDLE_ID = com.hasielektronic.novaplayer
 PRODUCT_LIFETIME = com.hasielektronic.novaplayer.lifetime
 PRODUCT_TRIAL = com.hasielektronic.novaplayer.trial
 // Backend (Cloudflare Worker). Production must be HTTPS.
-BACKEND_BASE_URL = https:/$()/iptv-backend.example.workers.dev
+BACKEND_BASE_URL = https:/$()/iptv-backend.hguencavdi.workers.dev
 // Accounts, phone sign-in and QR pairing (owner decision: hidden until the backend is live). YES shows them –
 // they still stay hidden while BACKEND_BASE_URL is a placeholder (*.example…).
 ACCOUNTS_ENABLED = NO
@@ -17,4 +17,4 @@ TERMS_URL = https:/$()/hasi-elektronic.de/agb
 // Set NO to test the paywall/trial flow via TestFlight.
 TESTFLIGHT_FULL_ACCESS = YES
 MARKETING_VERSION = 1.0.0
-CURRENT_PROJECT_VERSION = 31
+CURRENT_PROJECT_VERSION = 32
