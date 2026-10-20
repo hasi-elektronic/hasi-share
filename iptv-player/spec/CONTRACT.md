@@ -696,3 +696,16 @@ other −0.35, candidate without date −0.05; plus `min(0.05, log10(voteCount +
 2 decimals. Best = highest score, then higher voteCount, then TMDB order. **Match iff score ≥ 0.75.**
 Search attempts (stop at the first match): (1) title + year filter, (2) title without year, (3) if the year was bare,
 `"title year"` without filter ("Blade Runner 2049"). No match is cached too (negative cache, 3 days).
+
+### 11.3 Apps
+* Lookups run only against a configured backend (not the `*.example` placeholder). The detail page uses the
+  provider's TMDB id when `get_vod_info` / `get_series_info` carries one (`tmdb_id` / `tmdb`), else `/match` with the raw
+  name and the provider's year, then `/v1/metadata/{id}` in the UI language.
+* Field priority on the detail page: TMDB overview, rating, genres, cast (photo row), trailer and backdrop first; the
+  provider's poster stays (TMDB poster only when the provider has none); year and duration come from the provider when known.
+* Grids/rows ask `/match` only for items **without** provider artwork (poster fallback), one call per visible cell.
+* Graceful fallback: `503 metadata_unavailable` pauses all lookups for `retryAfter` seconds (30 min without one = no TMDB
+  key); `429`, 5xx and transport errors pause for 60 s. Paused lookups answer "no metadata" without a request, and the page
+  shows the provider's fields. Answers (including "no match") are kept in memory for the app session.
+* Attribution (TMDB terms): Settings → About shows the TMDB mark and "This product uses the TMDB API but is not endorsed or
+  certified by TMDB."; a detail page showing TMDB data carries the "Info and images: TMDB" line.

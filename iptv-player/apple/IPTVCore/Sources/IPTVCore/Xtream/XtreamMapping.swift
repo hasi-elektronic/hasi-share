@@ -31,6 +31,8 @@ public struct XtreamSeriesDetails: Codable, Sendable, Hashable {
     public var categoryId: String?
     /// `youtube_trailer`: a YouTube video id or URL (see `YouTubeTrailer`).
     public var trailer: String? = nil
+    /// `tmdb` / `tmdb_id`: the panel's TMDB id – used directly instead of name matching (CONTRACT §11.2).
+    public var tmdbId: Int? = nil
 }
 
 /// Result of `get_series_info`.
@@ -54,6 +56,8 @@ public struct XtreamVodInfo: Codable, Sendable, Hashable {
     public var containerExt: String?
     /// `youtube_trailer`: a YouTube video id or URL (see `YouTubeTrailer`).
     public var trailer: String? = nil
+    /// `tmdb_id`: the panel's TMDB id – used directly instead of name matching (CONTRACT §11.2).
+    public var tmdbId: Int? = nil
 }
 
 /// Maps lenient panel JSON to the domain model (CONTRACT §4.3 + test-vectors/README.md).
@@ -220,7 +224,8 @@ public enum XtreamMapper {
                                    rating: info["rating"]?.doubleValue, year: year(info),
                                    backdropUrl: firstString(info["backdrop_path"]),
                                    categoryId: info["category_id"]?.stringValue,
-                                   trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]))
+                                   trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]),
+                                   tmdbId: tmdbId(info["tmdb"]) ?? tmdbId(info["tmdb_id"]))
     }
 
     /// `get_vod_info` → details.
@@ -236,7 +241,16 @@ public enum XtreamMapper {
                              posterUrl: info["movie_image"]?.stringValue ?? info["cover_big"]?.stringValue,
                              backdropUrl: firstString(info["backdrop_path"]),
                              containerExt: movie["container_extension"]?.stringValue,
-                             trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]))
+                             trailer: text(info["youtube_trailer"]) ?? text(info["trailer"]),
+                             tmdbId: tmdbId(info["tmdb_id"]) ?? tmdbId(info["tmdb"]))
+    }
+
+    /// A panel TMDB id: a positive integer or digit string ("", "0", booleans → nil).
+    static func tmdbId(_ value: JSONValue?) -> Int? {
+        switch value {
+        case .int, .double, .string: return value?.intValue.flatMap { $0 > 0 ? $0 : nil }
+        default: return nil
+        }
     }
 
     /// YouTube watch URL of a panel `youtube_trailer` value: a bare 11-character video id, or a

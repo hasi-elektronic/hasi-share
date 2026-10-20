@@ -13,9 +13,11 @@ public struct ItemDetails: Codable, Sendable, Hashable {
     public var durationSec: Int?
     /// YouTube id or URL (`youtube_trailer`).
     public var trailer: String?
+    /// The panel's TMDB id (`tmdb_id` / `tmdb`) – metadata lookups skip name matching (CONTRACT §11.2).
+    public var tmdbId: Int?
 
     public init(plot: String? = nil, genre: String? = nil, cast: String? = nil, director: String? = nil, year: Int? = nil,
-                rating: Double? = nil, durationSec: Int? = nil, trailer: String? = nil) {
+                rating: Double? = nil, durationSec: Int? = nil, trailer: String? = nil, tmdbId: Int? = nil) {
         self.plot = plot
         self.genre = genre
         self.cast = cast
@@ -24,16 +26,17 @@ public struct ItemDetails: Codable, Sendable, Hashable {
         self.rating = rating
         self.durationSec = durationSec
         self.trailer = trailer
+        self.tmdbId = tmdbId
     }
 
     public init(_ info: XtreamVodInfo) {
         self.init(plot: info.plot, genre: info.genre, cast: info.cast, director: info.director, year: info.year,
-                  rating: info.rating, durationSec: info.durationSec, trailer: info.trailer)
+                  rating: info.rating, durationSec: info.durationSec, trailer: info.trailer, tmdbId: info.tmdbId)
     }
 
     public init(_ details: XtreamSeriesDetails) {
         self.init(plot: details.plot, genre: details.genre, cast: details.cast, director: details.director,
-                  year: details.year, rating: details.rating, trailer: details.trailer)
+                  year: details.year, rating: details.rating, trailer: details.trailer, tmdbId: details.tmdbId)
     }
 
     /// YouTube watch URL of the trailer, if any.

@@ -307,14 +307,14 @@ private struct SearchItemCard: View {
                 onOpen()
                 router.open(.movie(m))
             } label: {
-                PosterCard(title: MediaTags.clean(m.name).title, url: m.posterUrl, subtitle: subtitle(m.year))
+                PosterCard(title: MediaTags.clean(m.name).title, url: m.posterUrl, subtitle: subtitle(m.year), lookup: .init(m))
             }
         case .series(let s):
             FavoritePosterButton(target: env.favoriteTarget(s), identifier: identifier("series", s.id)) {
                 onOpen()
                 router.open(.series(s))
             } label: {
-                PosterCard(title: MediaTags.clean(s.name).title, url: s.posterUrl, subtitle: subtitle(s.year))
+                PosterCard(title: MediaTags.clean(s.name).title, url: s.posterUrl, subtitle: subtitle(s.year), lookup: .init(s))
             }
         }
     }

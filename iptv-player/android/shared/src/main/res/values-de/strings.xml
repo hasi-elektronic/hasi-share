@@ -486,6 +486,12 @@
     <string name="source_waiting_keychain" formatted="false">Warten auf den iCloud-Schlüsselbund …</string>
     <string name="source_waiting_keychain_hint" formatted="false">Diese Quelle wurde auf einem anderen Gerät hinzugefügt. Die Zugangsdaten kommen über den iCloud-Schlüsselbund – das kann einige Minuten dauern. Bitte prüfen Sie, ob der iCloud-Schlüsselbund (Passwörter) für Ihre Apple-ID auf diesem Gerät aktiviert ist.</string>
     <string name="about_privacy_icloud" formatted="false">Kein Tracking, keine Werbung. Mit iCloud-Synchronisierung werden Ihre Quellen, Favoriten und Ihr Fortschritt in Ihrer eigenen iCloud gespeichert, Zugangsdaten nur im iCloud-Schlüsselbund.</string>
+    <string name="detail_cast_title" formatted="false">Besetzung</string>
+    <string name="detail_metadata_source" formatted="false">Infos und Bilder: TMDB</string>
+    <string name="about_metadata_title" formatted="false">Film- und Serieninfos</string>
+    <string name="about_tmdb_notice" formatted="false">Dieses Produkt verwendet die TMDB-API, wird von TMDB jedoch weder unterstützt noch zertifiziert.</string>
+    <string name="about_tmdb_details" formatted="false">Poster, Beschreibungen, Bewertungen und Besetzung stammen von The Movie Database (TMDB). Gesendet wird nur der Titel – nie deine Quellen oder dein Konto. Ohne Treffer zeigen wir die Infos des Anbieters.</string>
+    <string name="about_tmdb_website" formatted="false">Website</string>
     <string name="avsync_calibrate" formatted="false">Audio-Sync kalibrieren</string>
     <string name="avsync_calibration_value" formatted="false">VLC-Kalibrierung (dieses Gerät)</string>
     <string name="avsync_intro" formatted="false">Jede Sekunde blitzt das Bild weiß auf und Sie hören einen kurzen Piepton. Ändern Sie den Wert, bis der Piepton genau mit dem Blitz kommt. Piepton nach dem Blitz? − wählen. Piepton vor dem Blitz? + wählen.</string>

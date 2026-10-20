@@ -11113,6 +11113,144 @@
         }
       }
     },
+    "detail_cast_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cast"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oyuncular"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Besetzung"
+          }
+        }
+      }
+    },
+    "detail_metadata_source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Info and images: TMDB"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilgi ve görseller: TMDB"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Infos und Bilder: TMDB"
+          }
+        }
+      }
+    },
+    "about_metadata_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie and series information"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Film ve dizi bilgileri"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Film- und Serieninfos"
+          }
+        }
+      }
+    },
+    "about_tmdb_notice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ürün TMDB API'sini kullanır, ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Produkt verwendet die TMDB-API, wird von TMDB jedoch weder unterstützt noch zertifiziert."
+          }
+        }
+      }
+    },
+    "about_tmdb_details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posters, descriptions, ratings and cast come from The Movie Database (TMDB). Only the title is sent – never your sources or account. Without a match, the provider's own information is shown."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afişler, açıklamalar, puanlar ve oyuncular The Movie Database'den (TMDB) gelir. Yalnızca başlık gönderilir – kaynaklarınız veya hesabınız asla. Eşleşme yoksa sağlayıcının kendi bilgileri gösterilir."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poster, Beschreibungen, Bewertungen und Besetzung stammen von The Movie Database (TMDB). Gesendet wird nur der Titel – nie deine Quellen oder dein Konto. Ohne Treffer zeigen wir die Infos des Anbieters."
+          }
+        }
+      }
+    },
+    "about_tmdb_website": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Website"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web sitesi"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Website"
+          }
+        }
+      }
+    },
     "avsync_calibrate": {
       "extractionState": "manual",
       "localizations": {

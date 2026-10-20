@@ -239,8 +239,15 @@ struct PosterCard: View {
     /// Fixed width, or `nil` to fill the grid cell (2:3).
     var width: CGFloat? = Theme.posterWidth
     var isNew = false
+    /// Without provider artwork: the TMDB poster of this item (CONTRACT §11); nil = provider artwork only.
+    var lookup: MetadataService.Lookup?
+    @Environment(AppEnvironment.self) private var env: AppEnvironment?
+    @State private var metadataPoster: String?
+
+    private var shownURL: String? { url.flatMap { $0.isEmpty ? nil : $0 } ?? metadataPoster }
 
     var body: some View {
+        let url = shownURL
         VStack(alignment: .leading, spacing: Theme.isTV ? 12 : 6) {
             Color.clear
                 .frame(width: width, height: width.map { $0 * 1.5 })
@@ -272,6 +279,12 @@ struct PosterCard: View {
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
+        .task(id: lookup) {
+            // Only for empty provider artwork: one match call per visible cell; a scrolled-away cell cancels.
+            guard self.url?.isEmpty ?? true, let lookup, let env else { return }
+            let language = MetadataLanguage(code: L10n.languageCode)
+            metadataPoster = await env.metadata.match(lookup, language: language)?.posterUrl
+        }
     }
 }
 

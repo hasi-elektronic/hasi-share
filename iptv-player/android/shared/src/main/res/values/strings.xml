@@ -486,6 +486,12 @@
     <string name="source_waiting_keychain" formatted="false">Waiting for iCloud Keychain…</string>
     <string name="source_waiting_keychain_hint" formatted="false">This source was added on another device. Its login details arrive through iCloud Keychain – this can take a few minutes. Make sure iCloud Keychain (Passwords) is turned on for your Apple ID on this device.</string>
     <string name="about_privacy_icloud" formatted="false">No tracking, no ads. With iCloud sync on, your sources, favorites and progress are stored in your own iCloud; login details only in iCloud Keychain.</string>
+    <string name="detail_cast_title" formatted="false">Cast</string>
+    <string name="detail_metadata_source" formatted="false">Info and images: TMDB</string>
+    <string name="about_metadata_title" formatted="false">Movie and series information</string>
+    <string name="about_tmdb_notice" formatted="false">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="about_tmdb_details" formatted="false">Posters, descriptions, ratings and cast come from The Movie Database (TMDB). Only the title is sent – never your sources or account. Without a match, the provider\'s own information is shown.</string>
+    <string name="about_tmdb_website" formatted="false">Website</string>
     <string name="avsync_calibrate" formatted="false">Calibrate audio sync</string>
     <string name="avsync_calibration_value" formatted="false">VLC calibration (this device)</string>
     <string name="avsync_intro" formatted="false">Every second the picture flashes white and you hear a short beep. Change the value until the beep comes exactly with the flash. Beep after the flash? Use −. Beep before the flash? Use +.</string>

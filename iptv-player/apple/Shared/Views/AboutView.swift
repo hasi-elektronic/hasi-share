@@ -11,6 +11,7 @@ struct AboutView: View {
     static let hasiBlue = Color(red: 0x3A / 255, green: 0xBA / 255, blue: 0xDF / 255)
     static let website = "hasi-elektronic.de"
     static let email = "info@hasi-elektronic.de"
+    static let tmdbWebsite = "www.themoviedb.org"
 
     private var displayName: String {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
@@ -82,6 +83,32 @@ struct AboutView: View {
             } footer: {
                 Text(L10n.t("about_privacy_icloud"))   // Build 17: where synced data lives
                     .accessibilityIdentifier("about_privacy_icloud")
+            }
+
+            // TMDB terms: attribution notice + logo, less prominent than the app's own branding (CONTRACT §11).
+            Section(L10n.t("about_metadata_title")) {
+                VStack(alignment: .leading, spacing: Theme.isTV ? 14 : 8) {
+                    TMDBMark()
+                    Text(L10n.t("about_tmdb_notice")).font(Theme.caption).foregroundStyle(Theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("about_tmdb_notice")
+                    Text(L10n.t("about_tmdb_details")).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 6)
+                .accessibilityElement(children: .combine)
+                .tvFocusableRow()
+                #if os(tvOS)
+                LabeledContent(L10n.t("about_tmdb_website")) { Text(verbatim: Self.tmdbWebsite).foregroundStyle(Theme.textSecondary) }
+                    .focusable()
+                #else
+                if let url = URL(string: "https://\(Self.tmdbWebsite)") {
+                    Link(destination: url) {
+                        LabeledContent(L10n.t("about_tmdb_website")) { Text(verbatim: Self.tmdbWebsite).foregroundStyle(Theme.textSecondary) }
+                    }
+                    .accessibilityIdentifier("about_tmdb_website")
+                }
+                #endif
             }
 
             Section {

@@ -244,7 +244,10 @@ struct AdvancedSettingsView: View {
                 NavigationLink(value: SettingsRoute.formatTest) { LText("diagnostics_format_test") }
                 Toggle(L10n.t("perf_overlay"), isOn: $settings.showPerfOverlay)
                     .accessibilityIdentifier("settings_perf_overlay")
-                Button(L10n.t("diagnostics_clear_images")) { ImageLoader.shared.clear() }
+                Button(L10n.t("diagnostics_clear_images")) {
+                    ImageLoader.shared.clear()
+                    Task { await env.metadata.clear() }
+                }
                 Button(L10n.t("diagnostics_clear_epg")) { env.clearEpgCache() }
                 LText("about_version", env.config.appVersion).foregroundStyle(Theme.textSecondary)
                 NavigationLink(value: SettingsRoute.licenses) { LText("about_licenses") }

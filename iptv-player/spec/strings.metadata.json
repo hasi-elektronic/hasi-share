@@ -1,0 +1,35 @@
+{
+ "_note": "Phase 2 metadata strings (TMDB, CONTRACT §11). Merged with strings.json by spec/tools/gen-strings.mjs.",
+ "strings": {
+  "detail_cast_title": {
+   "en": "Cast",
+   "tr": "Oyuncular",
+   "de": "Besetzung"
+  },
+  "detail_metadata_source": {
+   "en": "Info and images: TMDB",
+   "tr": "Bilgi ve görseller: TMDB",
+   "de": "Infos und Bilder: TMDB"
+  },
+  "about_metadata_title": {
+   "en": "Movie and series information",
+   "tr": "Film ve dizi bilgileri",
+   "de": "Film- und Serieninfos"
+  },
+  "about_tmdb_notice": {
+   "en": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+   "tr": "Bu ürün TMDB API'sini kullanır, ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır.",
+   "de": "Dieses Produkt verwendet die TMDB-API, wird von TMDB jedoch weder unterstützt noch zertifiziert."
+  },
+  "about_tmdb_details": {
+   "en": "Posters, descriptions, ratings and cast come from The Movie Database (TMDB). Only the title is sent – never your sources or account. Without a match, the provider's own information is shown.",
+   "tr": "Afişler, açıklamalar, puanlar ve oyuncular The Movie Database'den (TMDB) gelir. Yalnızca başlık gönderilir – kaynaklarınız veya hesabınız asla. Eşleşme yoksa sağlayıcının kendi bilgileri gösterilir.",
+   "de": "Poster, Beschreibungen, Bewertungen und Besetzung stammen von The Movie Database (TMDB). Gesendet wird nur der Titel – nie deine Quellen oder dein Konto. Ohne Treffer zeigen wir die Infos des Anbieters."
+  },
+  "about_tmdb_website": {
+   "en": "Website",
+   "tr": "Web sitesi",
+   "de": "Website"
+  }
+ }
+}

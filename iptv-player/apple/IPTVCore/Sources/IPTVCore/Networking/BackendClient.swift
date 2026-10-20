@@ -53,6 +53,13 @@ public enum BackendError: Error, Sendable, Hashable {
     }
 }
 
+/// `503 metadata_unavailable`: the backend has no TMDB key (no `retryAfter`) or TMDB is down with nothing cached
+/// (`retryAfter` seconds). The apps fall back to the provider's own metadata (CONTRACT §11).
+public struct MetadataUnavailable: Error, Sendable, Hashable {
+    public var retryAfter: Int?
+    public init(retryAfter: Int? = nil) { self.retryAfter = retryAfter }
+}
+
 /// Typed client for the app-facing endpoints of spec/BACKEND_API.md (admin endpoints are
 /// not part of the apps). Runs over any `HTTPTransport`; every method throws `BackendError`.
 ///
@@ -208,6 +215,40 @@ public struct BackendClient: Sendable {
         case 404: return .notFound
         default: throw Self.error(for: response)
         }
+    }
+
+    // MARK: Metadata (CONTRACT §11)
+
+    /// `GET /v1/metadata/match` – the best TMDB candidate for a raw provider name (`match` nil below 0.75).
+    /// `year`: the provider's own year, overrides the one in the name.
+    /// Throws `MetadataUnavailable` for `503 metadata_unavailable`, else `BackendError`.
+    public func metadataMatch(name: String, type: MediaType, year: Int? = nil, language: MetadataLanguage) async throws -> MetadataMatch {
+        var items = [("name", String(name.prefix(300))), ("type", type.rawValue)]
+        if let year, (1874...2100).contains(year) { items.append(("year", String(year))) }
+        items.append(("language", language.rawValue))
+        let response = try await perform(request(.get, "/v1/metadata/match", query: PercentEncoding.query(items)))
+        return try decode(MetadataMatch.self, from: try Self.metadataBody(response))
+    }
+
+    /// `GET /v1/metadata/{tmdbId}`; nil for `404 not_found`.
+    /// Throws `MetadataUnavailable` for `503 metadata_unavailable`, else `BackendError`.
+    public func metadata(tmdbId: Int, type: MediaType, language: MetadataLanguage) async throws -> MediaMetadata? {
+        let query = PercentEncoding.query([("type", type.rawValue), ("language", language.rawValue)])
+        let response = try await perform(request(.get, "/v1/metadata/\(tmdbId)", query: query))
+        if response.statusCode == 404 { return nil }
+        return try decode(MediaMetadata.self, from: try Self.metadataBody(response))
+    }
+
+    private static func metadataBody(_ response: HTTPResponse) throws -> Data {
+        if (200..<300).contains(response.statusCode) { return response.body }
+        let error = error(for: response)
+        if response.statusCode == 503, error.code == nil || error.code == "metadata_unavailable" {
+            struct Body: Decodable { let retryAfter: Int? }
+            let retry = (try? JSONDecoder().decode(Body.self, from: response.body))?.retryAfter
+                ?? response.headers.first { $0.key.lowercased() == "retry-after" }.flatMap { Int($0.value.trimmingCharacters(in: .whitespaces)) }
+            throw MetadataUnavailable(retryAfter: retry)
+        }
+        throw error
     }
 
     // MARK: Plumbing

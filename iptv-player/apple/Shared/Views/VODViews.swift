@@ -116,6 +116,8 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
     #endif
     let title: String
     let imageURL: String?
+    /// TMDB landscape backdrop (CONTRACT §11): full-bleed hero instead of the blurred poster.
+    var backdropURL: String? = nil
     let meta: DetailMetaRow
     let genres: String?
     let plot: String?
@@ -128,7 +130,11 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
                 ZStack(alignment: .bottomLeading) {
-                    HeroBackdrop(url: imageURL, height: 1000)
+                    if let backdropURL {
+                        BackdropHero(url: backdropURL, height: 1000)
+                    } else {
+                        HeroBackdrop(url: imageURL, height: 1000)
+                    }
                     VStack(alignment: .leading, spacing: 20) {
                         Text(title).font(Theme.largeTitle).foregroundStyle(.white).lineLimit(2).minimumScaleFactor(0.6)
                         meta
@@ -158,7 +164,9 @@ private struct DetailScaffold<Actions: View, Below: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 ZStack {
                     Group {
-                        if sizeClass == .compact {
+                        if let backdropURL {
+                            GeometryReader { g in BackdropHero(url: backdropURL, height: g.size.height) }
+                        } else if sizeClass == .compact {
                             RemoteImage(url: imageURL, maxPixel: 1200, placeholder: "film")
                                 .overlay(LinearGradient(stops: [.init(color: .clear, location: 0.55), .init(color: .black, location: 1)],
                                                         startPoint: .top, endPoint: .bottom))
@@ -246,12 +254,14 @@ private struct DetailActions<Round: View>: View {
     }
 }
 
-/// Cast / director lines and the trailer action of a detail page (IOS-09, provider metadata).
+/// Cast / director lines of a detail page (IOS-09, provider metadata). With TMDB cast the photo row
+/// (`DetailMetadataExtras`) replaces the provider's cast line.
 private struct DetailPeople: View {
     let details: ItemDetails?
+    var fields: DetailFields? = nil
 
     var body: some View {
-        if let cast = details?.cast {
+        if let cast = details?.cast, fields?.cast.isEmpty ?? true {
             Text(L10n.t("cast_value", cast)).font(Theme.isTV ? Theme.caption : .footnote).foregroundStyle(Theme.textSecondary)
                 .lineLimit(Theme.isTV ? 1 : 3)
                 .accessibilityIdentifier("detail_cast")
@@ -260,6 +270,22 @@ private struct DetailPeople: View {
             Text(L10n.t("director_value", director)).font(Theme.isTV ? Theme.caption : .footnote).foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
                 .accessibilityIdentifier("detail_director")
+        }
+    }
+}
+
+/// TMDB cast row and source line (CONTRACT §11); empty without metadata.
+private struct DetailMetadataExtras: View {
+    let fields: DetailFields
+
+    var body: some View {
+        if !fields.cast.isEmpty {
+            CastRow(cast: fields.cast)
+        }
+        if fields.usesMetadata {
+            MetadataSourceLine()
+                .padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+                .padding(.top, Theme.isTV ? 8 : 4)
         }
     }
 }
@@ -297,10 +323,14 @@ struct MovieDetailView: View {
         let duration = info?.durationSec ?? progress?.data.durationMs.map { Int($0 / 1000) }
         let clean = MediaTags.clean(movie.name)
         // IOS-09: the provider's genre – never the category name ("Neu im Kino" is not a genre).
-        DetailScaffold(title: clean.title, imageURL: movie.posterUrl,
-                       meta: DetailMetaRow(rating: movie.rating ?? info?.rating, year: movie.year ?? info?.year ?? clean.year, durationSec: duration),
-                       genres: info?.genre ?? movie.genre,
-                       plot: info?.plot ?? movie.plot, onPlay: { router.play(.movie(movie)) }) {
+        // CONTRACT §11: TMDB first (poster only when the provider has none), the provider's fields as fallback.
+        let fields = DetailFields(metadata: model?.metadata, posterURL: movie.posterUrl, rating: movie.rating ?? info?.rating,
+                                  year: movie.year ?? info?.year ?? clean.year, durationSec: duration,
+                                  genres: info?.genre ?? movie.genre, plot: info?.plot ?? movie.plot, trailerURL: info?.trailerURL)
+        DetailScaffold(title: clean.title, imageURL: fields.imageURL, backdropURL: fields.backdropURL,
+                       meta: DetailMetaRow(rating: fields.rating, year: fields.year, durationSec: fields.durationSec),
+                       genres: fields.genres,
+                       plot: fields.plot, onPlay: { router.play(.movie(movie)) }) {
             DetailActions(primaryTitle: canResume ? L10n.t("action_resume_at", L10n.clock(Double(resumeMs) / 1000)) : L10n.t("action_play"),
                           primaryAction: { router.play(.movie(movie)) },
                           format: MediaTags.format(container: movie.containerExt, name: movie.name)) { focus in
@@ -315,16 +345,20 @@ struct MovieDetailView: View {
                         .accessibilityLabel(L10n.t("action_play_from_start"))
                         .accessibilityIdentifier("detail_restart")
                 }
-                TrailerButton(url: info?.trailerURL)
+                TrailerButton(url: fields.trailerURL)
             }
         } below: {
-            DetailPeople(details: info).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+            VStack(alignment: .leading, spacing: Theme.isTV ? 16 : 8) {
+                DetailPeople(details: info, fields: fields).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+                DetailMetadataExtras(fields: fields)
+            }
         }
         .task {
             progress = env.contentKey(sourceId: movie.sourceId, kind: .movie, itemId: movie.id).flatMap { try? env.library.progress(contentKey: $0) }
             let m = model ?? MovieDetailViewModel(env: env, movie: movie)
             model = m
             await m.load()
+            await m.loadMetadata(language: .ui)
         }
         .onChange(of: env.libraryVersion) {
             progress = env.contentKey(sourceId: movie.sourceId, kind: .movie, itemId: movie.id).flatMap { try? env.library.progress(contentKey: $0) }
@@ -394,29 +428,35 @@ struct SeriesDetailView: View {
         let play = { if let next { router.play(.episode(next, seriesTitle: series.name)) } }
         let clean = MediaTags.clean(series.name)
         let details = model?.details
-        DetailScaffold(title: clean.title, imageURL: series.posterUrl,
-                       meta: DetailMetaRow(rating: series.rating ?? details?.rating, year: series.year ?? details?.year ?? clean.year, durationSec: nil,
+        let fields = DetailFields(metadata: model?.metadata, posterURL: series.posterUrl, rating: series.rating ?? details?.rating,
+                                  year: series.year ?? details?.year ?? clean.year, durationSec: nil,
+                                  genres: details?.genre ?? series.genre, plot: model?.plot ?? series.plot, trailerURL: details?.trailerURL)
+        DetailScaffold(title: clean.title, imageURL: fields.imageURL, backdropURL: fields.backdropURL,
+                       meta: DetailMetaRow(rating: fields.rating, year: fields.year, durationSec: nil,
                                            extra: model.flatMap { $0.seasons.isEmpty ? nil : L10n.t("seasons_value", String($0.seasons.count)) }),
-                       genres: details?.genre ?? series.genre,
-                       plot: model?.plot ?? series.plot, onPlay: play) {
+                       genres: fields.genres,
+                       plot: fields.plot, onPlay: play) {
             DetailActions(primaryTitle: primaryTitle, primaryAction: play,
                           format: next.flatMap { MediaTags.format(container: $0.containerExt, name: series.name) }) { focus in
                 if let target = env.favoriteTarget(series) {
                     FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: Theme.isTV ? 84 : 38))
                         .focused(focus, equals: .secondary(0))
                 }
-                TrailerButton(url: details?.trailerURL)
+                TrailerButton(url: fields.trailerURL)
             }
         } below: {
             VStack(alignment: .leading, spacing: Theme.isTV ? 16 : 8) {
-                DetailPeople(details: details).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
+                DetailPeople(details: details, fields: fields).padding(.horizontal, Theme.isTV ? Theme.safeH : 0)
                 if let model { episodes(model) }
+                // TMDB cast below the episodes: on Apple TV ▼ from the action row still reaches the seasons first.
+                DetailMetadataExtras(fields: fields)
             }
         }
         .task {
             let m = SeriesDetailViewModel(env: env, series: series)
             model = m
             await m.load()
+            await m.loadMetadata(language: .ui)
         }
         // An episode played from here (or elsewhere) while the page stays in the stack: "Continue SxEy" and the
         // episode progress follow (B-03 / IOS-07), like the movie detail.
@@ -699,7 +739,7 @@ struct FavoritesView: View {
                 grid {
                     ForEach(model.movies) { m in
                         FavoritePosterLink(value: m, target: env.favoriteTarget(m), identifier: "favorite_movie_\(m.id)") {
-                            PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: gridPosterWidth)
+                            PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: gridPosterWidth, lookup: .init(m))
                         }
                     }
                 }
@@ -709,7 +749,7 @@ struct FavoritesView: View {
                 grid {
                     ForEach(model.series) { s in
                         FavoritePosterLink(value: s, target: env.favoriteTarget(s), identifier: "favorite_series_\(s.id)") {
-                            PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: gridPosterWidth)
+                            PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: gridPosterWidth, lookup: .init(s))
                         }
                     }
                 }

@@ -486,6 +486,12 @@
     <string name="source_waiting_keychain" formatted="false">iCloud Anahtar Zinciri bekleniyor…</string>
     <string name="source_waiting_keychain_hint" formatted="false">Bu kaynak başka bir cihazda eklendi. Giriş bilgileri iCloud Anahtar Zinciri üzerinden gelir – bu birkaç dakika sürebilir. Bu cihazda Apple Kimliğiniz için iCloud Anahtar Zinciri\'nin (Parolalar) açık olduğundan emin olun.</string>
     <string name="about_privacy_icloud" formatted="false">Takip yok, reklam yok. iCloud eşitleme açıkken kaynaklarınız, favorileriniz ve izleme durumunuz kendi iCloud\'unuzda; giriş bilgileri yalnızca iCloud Anahtar Zinciri\'nde saklanır.</string>
+    <string name="detail_cast_title" formatted="false">Oyuncular</string>
+    <string name="detail_metadata_source" formatted="false">Bilgi ve görseller: TMDB</string>
+    <string name="about_metadata_title" formatted="false">Film ve dizi bilgileri</string>
+    <string name="about_tmdb_notice" formatted="false">Bu ürün TMDB API\'sini kullanır, ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır.</string>
+    <string name="about_tmdb_details" formatted="false">Afişler, açıklamalar, puanlar ve oyuncular The Movie Database\'den (TMDB) gelir. Yalnızca başlık gönderilir – kaynaklarınız veya hesabınız asla. Eşleşme yoksa sağlayıcının kendi bilgileri gösterilir.</string>
+    <string name="about_tmdb_website" formatted="false">Web sitesi</string>
     <string name="avsync_calibrate" formatted="false">Ses senkronunu ayarla</string>
     <string name="avsync_calibration_value" formatted="false">VLC kalibrasyonu (bu cihaz)</string>
     <string name="avsync_intro" formatted="false">Her saniye görüntü beyaz yanıp söner ve kısa bir bip sesi duyulur. Bip, yanıp sönmeyle tam aynı anda gelene kadar değeri değiştirin. Bip yanıp sönmeden sonra mı? − kullanın. Önce mi? + kullanın.</string>

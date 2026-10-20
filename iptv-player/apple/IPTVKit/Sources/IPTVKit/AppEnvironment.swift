@@ -67,6 +67,8 @@ public final class AppEnvironment {
     @ObservationIgnored public let library: LibraryRepository
     @ObservationIgnored public let refresher: SourceRefresher
     @ObservationIgnored public let backend: BackendClient
+    /// TMDB metadata through the backend (CONTRACT §11); answers nil without a configured backend.
+    @ObservationIgnored public let metadata: MetadataService
     @ObservationIgnored public let syncManager: SyncManager
     /// One-tap favorites: cached set, undo, device-local order, favorite categories.
     public let favorites: FavoritesController
@@ -136,6 +138,7 @@ public final class AppEnvironment {
         refresher = SourceRefresher(database: database, sources: sourceRepository, catalog: catalog, epg: epg, transport: transport)
         backend = BackendClient(baseURL: config.backendBaseURL, transport: transport,
                                 userAgent: "\(config.displayName)/\(config.appVersion) (\(config.platform.rawValue))")
+        metadata = MetadataService(backend: config.backendConfigured ? backend : nil)
         let verifier = try LicenseTokenVerifier(jwkSetJSON: config.licenseKeysJSON, audience: config.bundleId)
         store = StoreManager(productIDs: config.productIDs, kv: kv)
         license = LicenseManager(backend: backend, verifier: verifier, kv: kv,

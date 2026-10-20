@@ -316,6 +316,14 @@ public final class SeriesDetailViewModel {
         await revalidate()
     }
 
+    /// TMDB details (CONTRACT §11) after `load()` (the provider may know the TMDB id); nil keeps the provider's fields.
+    public private(set) var metadata: MediaMetadata?
+
+    public func loadMetadata(language: MetadataLanguage) async {
+        let lookup = MetadataService.Lookup(name: series.name, type: .tv, year: series.year ?? details?.year, tmdbId: details?.tmdbId)
+        if let found = await env.metadata.details(lookup, language: language) { metadata = found }
+    }
+
     private func revalidate() async {
         let hadEpisodes = !episodes.isEmpty
         isLoading = !hadEpisodes
@@ -395,6 +403,14 @@ public final class MovieDetailViewModel {
         let cached = try? env.catalog.details(sourceId: movie.sourceId, kind: .movie, itemId: movie.id)
         if let cached, now().timeIntervalSince(cached.fetchedAt) < ItemDetails.ttl { return }
         if let fresh = try? await env.fetchMovieDetails(movie, now: now()) { details = fresh }
+    }
+
+    /// TMDB details (CONTRACT §11) after `load()` (the provider may know the TMDB id); nil keeps the provider's fields.
+    public private(set) var metadata: MediaMetadata?
+
+    public func loadMetadata(language: MetadataLanguage) async {
+        let lookup = MetadataService.Lookup(name: movie.name, type: .movie, year: movie.year ?? details?.year, tmdbId: details?.tmdbId)
+        if let found = await env.metadata.details(lookup, language: language) { metadata = found }
     }
 }
 

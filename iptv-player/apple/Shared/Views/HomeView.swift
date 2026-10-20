@@ -46,6 +46,14 @@ enum CatalogItem: Identifiable, Hashable {
         case .series(let s): return s.year ?? MediaTags.clean(s.name).year
         }
     }
+
+    /// TMDB poster lookup for items without provider artwork (CONTRACT §11).
+    var metadataLookup: MetadataService.Lookup {
+        switch self {
+        case .movie(let m): return .init(m)
+        case .series(let s): return .init(s)
+        }
+    }
 }
 
 /// Which browse screen (SCREENS §3.2).
@@ -490,7 +498,8 @@ struct BrowseView: View {
         Shelf(title: title, seeAll: seeAll, identifier: id) {
             ForEach(items) { item in
                 FavoritePosterLink(value: item, target: env.favoriteTarget(item), identifier: "poster_\(item.id)") {
-                    PosterCard(title: item.title, url: item.posterUrl, subtitle: item.year.map(String.init), isNew: markNew)
+                    PosterCard(title: item.title, url: item.posterUrl, subtitle: item.year.map(String.init), isNew: markNew,
+                               lookup: item.metadataLookup)
                 }
             }
         }
@@ -859,7 +868,8 @@ struct CatalogGridView: View {
                 if let movies {
                     ForEach(movies.movies) { m in
                         FavoritePosterLink(value: CatalogItem.movie(m), target: env.favoriteTarget(m), identifier: "grid_\(m.id)") {
-                            PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil)
+                            PosterCard(title: m.name, url: m.posterUrl, subtitle: m.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil,
+                                       lookup: .init(m))
                         }
                         .onAppear { movies.loadMoreIfNeeded(m) }
                     }
@@ -867,7 +877,8 @@ struct CatalogGridView: View {
                 if let series {
                     ForEach(series.series) { s in
                         FavoritePosterLink(value: CatalogItem.series(s), target: env.favoriteTarget(s), identifier: "grid_\(s.id)") {
-                            PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil)
+                            PosterCard(title: s.name, url: s.posterUrl, subtitle: s.year.map(String.init), width: Theme.isTV ? Theme.posterWidth : nil,
+                                       lookup: .init(s))
                         }
                         .onAppear { series.loadMoreIfNeeded(s) }
                     }
