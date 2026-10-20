@@ -29,7 +29,7 @@ android {
 
     defaultConfig {
         applicationId = appId
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         versionCode = prop("VERSION_CODE", "1").toInt()
         versionName = prop("VERSION_NAME", "1.0.0")

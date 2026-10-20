@@ -187,4 +187,4 @@ Android modülleri aynı katalogu kullanır). 2026-10-04'te çözümlenip derlen
 Kotlin 2.2.21 (KSP 2.2.21-2.0.5), Compose BOM 2025.12.01, tv-material 1.0.1, Media3 1.8.0,
 Room 2.8.4, Paging 3.3.6, WorkManager 2.11.0, DataStore 1.1.7, Play Billing 8.3.0, Coil 3.3.0,
 ZXing 3.5.3, Robolectric 4.16. Daha yeni ana sürümler (AGP 9, Kotlin 2.3+, Billing 9, compileSdk
-37 isteyen androidx sürümleri) bilinçli olarak kullanılmadı: compileSdk/targetSdk 36, minSdk 23.
+37 isteyen androidx sürümleri) bilinçli olarak kullanılmadı: compileSdk/targetSdk 36, minSdk 24 (Google Play minimum).

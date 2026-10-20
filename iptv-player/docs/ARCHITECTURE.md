@@ -619,6 +619,6 @@ imzalı; deneme süresi cihaz saatine dayanmaz; eşleştirme uçtan uca şifreli
 | V15 | M3U'da film/dizi ayrımı sezgiseldir (URL yolu, uzantı, `SxxEyy`) | M3U standardı türü taşımaz |
 | V16 | Görüntü oranı tercihi global (kanal başına değil) | Basitlik |
 | V17 | HTTP (şifresiz) IPTV kaynaklarına izin verilir (Android cleartext, iOS ATS istisnası) | IPTV sunucularının çoğu HTTP; mağaza incelemesinde gerekçelendirilir |
-| V18 | Minimum: Android 6.0 (API 23), iOS/tvOS 17 | Eski TV kutuları; SwiftUI `@Observable` |
+| V18 | Minimum: Android 7.0 (API 24, Google Play minimum), iOS/tvOS 17 | Eski TV kutuları; SwiftUI `@Observable` |
 | V19 | Uygulama içerik sağlamaz, örnek liste içermez | Mağaza politikaları (IPTV uygulamaları) |
 | V20 | Senkron edilen başlık/poster gizlilik politikasında belirtilir; hesap silinince silinir | GDPR |
