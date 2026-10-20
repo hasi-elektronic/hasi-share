@@ -1,3 +1,6 @@
 #include "Shared.xcconfig"
+// Debug builds talk to the deployed backend (TMDB metadata, config). Release keeps the placeholder from
+// Shared.xcconfig until the license signing / App Store secrets are set on the Worker.
+BACKEND_BASE_URL = https:/$()/iptv-backend.hguencavdi.workers.dev
 // Optional, git-ignored local overrides (e.g. BACKEND_BASE_URL = http:/$()/localhost:8798).
 #include? "Local.xcconfig"
