@@ -221,5 +221,19 @@ describe("GET /privacy", () => {
     expect(r.text).toContain("hguencavdi@gmail.com");
     expect(r.text).toContain("TMDB");
     expect(r.text).toContain("pseudonyme");
+    expect(r.text).toContain("ab 18 Jahren");
+    expect(r.text).toContain('href="/terms"');
+  });
+});
+
+describe("GET /terms", () => {
+  it("serves the German terms of use as cacheable HTML", async () => {
+    const r = await h.get("/terms");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(r.text).toContain('<html lang="de">');
+    expect(r.text).toContain("Nutzungsbedingungen");
+    expect(r.text).toContain("ab 18 Jahren");
+    expect(r.text).toContain('href="/privacy"');
   });
 });

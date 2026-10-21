@@ -20,6 +20,7 @@ import { metadataDetails, metadataMatch, metadataSearch } from "./metadata/handl
 import { adminPage } from "./pages/admin";
 import { linkPage } from "./pages/link";
 import { privacyPage } from "./pages/privacy";
+import { termsPage } from "./pages/terms";
 import { pairPage } from "./pages/pair";
 import { pairCreate, pairGetKey, pairPoll, pairPostPayload } from "./pair";
 import { Router } from "./router";
@@ -82,7 +83,8 @@ export function buildRouter(): Router {
     .get("/pair", pairPage)
     .get("/link", linkPage)
     .get("/admin", adminPage)
-    .get("/privacy", privacyPage);
+    .get("/privacy", privacyPage)
+    .get("/terms", termsPage);
 }
 
 export interface WorkerOptions extends Partial<Deps> {

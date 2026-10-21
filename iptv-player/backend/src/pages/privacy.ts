@@ -90,8 +90,9 @@ Datenschutz und die Informationsfreiheit Baden-Württemberg.</p>
 </div>
 
 <div class="card">
-<h2>10. Kinder</h2>
-<p>Die App richtet sich nicht an Kinder unter 16 Jahren. Wir erheben wissentlich keine Daten von Kindern.</p>
+<h2>10. Altersgrenze</h2>
+<p>Die App richtet sich ausschließlich an Personen ab 18 Jahren. Wir erheben wissentlich keine Daten von
+Minderjährigen.</p>
 </div>
 
 <div class="card">
@@ -99,7 +100,7 @@ Datenschutz und die Informationsfreiheit Baden-Württemberg.</p>
 <p>Wir passen diese Erklärung an, wenn sich die App ändert. Es gilt die jeweils hier veröffentlichte Fassung.</p>
 </div>
 
-<footer>© 2026 Hasi Elektronic</footer>`;
+<footer><a href="/terms">Nutzungsbedingungen</a> · © 2026 Hasi Elektronic</footer>`;
   const response = renderPage({ lang: "de", title: "Datenschutzerklärung", appName: app, body, scripts: [] });
   // Public, rarely changing: allow caching and search engines (the shared layout is no-store / noindex).
   response.headers.set("cache-control", "public, max-age=3600");
