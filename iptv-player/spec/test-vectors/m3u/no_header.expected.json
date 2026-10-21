@@ -1,0 +1,40 @@
+{
+  "epgUrls": [],
+  "skipped": 0,
+  "entries": [
+    {
+      "name": "Channel A",
+      "url": "http://x.example.com/a.m3u8",
+      "kind": "live",
+      "tvgId": "a",
+      "tvgName": null,
+      "logo": null,
+      "group": null,
+      "chno": null,
+      "duration": -1,
+      "catchup": null,
+      "tvgShiftHours": null,
+      "userAgent": null,
+      "referrer": null,
+      "drm": false,
+      "series": null
+    },
+    {
+      "name": "Channel B",
+      "url": "http://x.example.com/b.m3u8",
+      "kind": "live",
+      "tvgId": "b",
+      "tvgName": null,
+      "logo": null,
+      "group": null,
+      "chno": null,
+      "duration": -1,
+      "catchup": null,
+      "tvgShiftHours": null,
+      "userAgent": null,
+      "referrer": null,
+      "drm": false,
+      "series": null
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+﻿#EXTM3U url-tvg="http://epg.example.com/guide.xml.gz,http://epg2.example.com/e.xml" x-tvg-url="http://epg.example.com/guide.xml.gz"
+#EXTINF:-1 tvg-id="trt1.tr" tvg-name="TRT 1" tvg-logo="http://logo.example.com/trt1.png" group-title="Ulusal" tvg-chno="1" catchup="default" catchup-days="7" catchup-source="http://cdn.example.com/trt1/{utc}/{duration}.m3u8",TRT 1 HD
+http://iptv.example.com:8080/live/user1/pass1/1001.ts
+#EXTINF:-1 tvg-id='kanal-d' tvg-logo='http://logo.example.com/kd.png' group-title='Ulusal, Eğlence',Kanal D
+http://iptv.example.com:8080/live/user1/pass1/1002.m3u8
+#EXTINF:-1 tvg-id=ard.de group-title=Deutsch tvg-shift=-1.5,Das Erste
+#EXTVLCOPT:http-user-agent=VLC/3.0.20 LibVLC/3.0.20
+#EXTVLCOPT:http-referrer=http://ref.example.com/
+https://ard.example.de/live/master.m3u8
+#EXTINF:-1 tvg-id="" tvg-name="Kids Channel",
+#EXTGRP:Çocuk
+http://iptv.example.com:8080/live/user1/pass1/1004.ts
+#EXTINF:-1 tvg-id="drm.ch" group-title="Premium",DRM Channel
+#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+#KODIPROP:inputstream.adaptive.license_key=https://license.example.com/wv
+https://drm.example.com/manifest.mpd
+
+#EXTINF:7200 tvg-name="Inception" tvg-logo="http://img.example.com/inception.jpg" group-title="Filmler | Bilim Kurgu",Inception (2010)
+http://iptv.example.com:8080/movie/user1/pass1/5001.mkv
+#EXTINF:-1 group-title="Diziler",Breaking Bad S01 E02
+http://iptv.example.com:8080/series/user1/pass1/7002.mp4
+#EXTINF:0,Local Movie.Night
+http://media.example.com/files/movie_night.mp4?token=abc
+#EXTINF:-1,The Office.S03E05.720p
+http://media.example.com/files/the.office.s03e05.mkv
+http://direct.example.com/stream/channel9

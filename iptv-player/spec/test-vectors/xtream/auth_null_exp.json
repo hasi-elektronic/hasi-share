@@ -1,0 +1,17 @@
+{
+  "user_info": {
+    "username": "user1",
+    "password": "pass1",
+    "auth": "1",
+    "status": "Active",
+    "exp_date": null,
+    "active_cons": 1,
+    "max_connections": 1,
+    "allowed_output_formats": []
+  },
+  "server_info": {
+    "url": "iptv.example.com",
+    "port": 8080,
+    "server_protocol": "http"
+  }
+}

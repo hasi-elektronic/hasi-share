@@ -1,0 +1,21 @@
+# Build outputs / caches
+node_modules/
+.wrangler/
+.build/
+.swiftpm/
+build/
+.gradle/
+.kotlin/
+local.properties
+*.iml
+.idea/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+# Secrets
+.keys/
+.dev.vars
+keystore.properties
+*.jks
+*.keystore
+*.p8

@@ -1,0 +1,35 @@
+{
+  "epg_listings": [
+    {
+      "id": "1",
+      "epg_id": "5",
+      "title": "QWvFn2FtIEhhYmVybGVyaQ==",
+      "lang": "tr",
+      "start": "2025-10-04 18:30:00",
+      "end": "2025-10-04 20:00:00",
+      "description": "R8O8bsO8biDDtm5lIMOnxLFrYW4gaGFiZXJsZXJpLg==",
+      "channel_id": "trt1.tr",
+      "start_timestamp": "1759591800",
+      "stop_timestamp": "1759597200"
+    },
+    {
+      "id": "2",
+      "epg_id": "5",
+      "title": "RGl6aQ==",
+      "start": "2025-10-04 20:00:00",
+      "end": "2025-10-04 21:30:00",
+      "description": "",
+      "channel_id": "trt1.tr",
+      "start_timestamp": 1759597200,
+      "stop_timestamp": 1759602600,
+      "has_archive": 1
+    },
+    {
+      "id": "3",
+      "epg_id": "5",
+      "title": "!!!not-base64!!!",
+      "start_timestamp": "x",
+      "stop_timestamp": "y"
+    }
+  ]
+}

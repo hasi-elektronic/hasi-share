@@ -1,0 +1,1354 @@
+import IPTVCore
+import IPTVKit
+import SwiftUI
+
+/// Category menu entries shared by Live TV and the TV guide: All · Favorites · favorite categories
+/// (⭐) · the other categories; hidden categories removed.
+@MainActor
+func channelFilters(_ model: LiveTVViewModel, env: AppEnvironment) -> [(id: ChannelFilter, title: String)] {
+    let sourceId = env.currentSource?.id
+    let hidden = sourceId.map { HiddenStore.shared.hiddenCategories($0) } ?? []
+    let favorite = sourceId.map { env.favorites.favoriteCategoryIds(sourceId: $0) } ?? []
+    let visible = model.categories.filter { !hidden.contains($0.id) }
+    let ordered = visible.filter { favorite.contains($0.id) } + visible.filter { !favorite.contains($0.id) }
+    return [(ChannelFilter.all, L10n.t("all")), (.favorites, L10n.t("nav_favorites"))]
+        + ordered.map { (ChannelFilter.category($0.id), $0.name) }
+}
+
+/// ⭐ marker of the filter menu / chips: the Favorites entry and favorite categories.
+@MainActor
+func isStarred(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
+    switch filter {
+    case .favorites: return true
+    case .category(let id): return env.currentSource.map { env.favorites.isFavoriteCategory(sourceId: $0.id, categoryId: id) } ?? false
+    case .all: return false
+    }
+}
+
+/// Rows without hidden channels / categories.
+@MainActor
+func visibleRows(_ rows: [ChannelRow], sourceId: String?) -> [ChannelRow] {
+    guard let sourceId else { return rows }
+    let store = HiddenStore.shared
+    return rows.filter { !store.isHidden(channelId: $0.channel.id, categoryId: $0.channel.categoryId, sourceId: sourceId) }
+}
+
+/// Channel shown in the Live info panel. Its own observable, read only by the panel (and by iPad rows
+/// for the selection mark), so a tvOS focus move does not re-render the whole list.
+@MainActor
+@Observable
+final class LiveSelection {
+    var channel: Channel?
+}
+
+/// Live TV (SCREENS §3.3): a channel LIST (more channels on screen than the old card grid).
+/// iPhone portrait: sticky category chips + list. Wide (iPad, iPhone landscape): list + info panel.
+/// Apple TV: category column | list | info panel (focus drives the panel, 150 ms debounce).
+struct LiveTVView: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    #if !os(tvOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+    @State private var model: LiveTVViewModel?
+    @State private var archiveChannel: Channel?
+    @State private var selection = LiveSelection()
+    @State private var selectTask: Task<Void, Never>?
+    /// Minute clock of the rows (progress bars; now/next re-read every minute, audit B10).
+    @State private var now = Date()
+
+    var body: some View {
+        Group {
+            if let model {
+                content(model)
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .screenBackground()
+        .sheet(item: $archiveChannel) { CatchupSheet(channel: $0).environment(env).environment(router) }
+        .onAppear {
+            if model == nil {
+                let m = LiveTVViewModel(env: env)
+                m.showsFavoriteSections = true
+                model = m
+                m.reload()
+            }
+            applyLiveCategory()
+        }
+        .onChange(of: router.liveCategory) { applyLiveCategory() }
+        .onChange(of: env.catalogVersion) { model?.reload() }
+        .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+        .onChange(of: model?.filter) { selection.channel = nil }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(EpgClock.secondsToNextMinute()))
+                guard !Task.isCancelled else { return }
+                now = Date()
+                model?.refreshNowNext(at: now)
+            }
+        }
+    }
+
+    /// Search → live category (SCREENS §3.6): show that category.
+    private func applyLiveCategory() {
+        guard let id = router.liveCategory, let model else { return }
+        router.liveCategory = nil
+        model.filter = .category(id)
+    }
+
+    @ViewBuilder
+    private func content(_ model: LiveTVViewModel) -> some View {
+        #if os(tvOS)
+        HStack(alignment: .top, spacing: 30) {
+            LiveCategoryColumn(model: model).frame(width: 360)
+            list(model, selectFirst: false)
+            LivePanel(selection: selection, model: model, onArchive: { archiveChannel = $0 }).frame(width: 500)
+        }
+        .padding(.leading, Theme.safeH)
+        .padding(.trailing, Theme.safeH)
+        #else
+        VStack(spacing: 0) {
+            LiveCategoryChips(model: model)
+            GeometryReader { geo in
+                let wide = geo.size.width >= 700
+                // Select-first only on iPad (regular width); iPhone landscape plays on the first tap.
+                let selectFirst = wide && sizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad
+                HStack(alignment: .top, spacing: 16) {
+                    list(model, selectFirst: selectFirst)
+                        .frame(width: wide ? geo.size.width * 0.55 : geo.size.width)
+                    if wide {
+                        LivePanel(selection: selection, model: model, onArchive: { archiveChannel = $0 })
+                            .padding(.trailing, Theme.safeH).padding(.vertical, 8)
+                    }
+                }
+            }
+        }
+        #endif
+    }
+
+    /// iPad: a tap selects (panel), a tap on the selected row plays. Elsewhere a tap plays.
+    private func list(_ model: LiveTVViewModel, selectFirst: Bool) -> some View {
+        let sid = env.currentSource?.id
+        let rows = visibleRows(model.rows, sourceId: sid)
+        let favorites = model.filter == .all ? visibleRows(model.favoriteRows, sourceId: sid) : []
+        // "● Watching": the channel playing now, else the last one played from this source (the
+        // player is closed while the list is visible on iPhone).
+        let last = env.settings.lastSession
+        let playing = env.player.currentChannel?.id ?? (last?.sourceId == sid ? last?.channelId : nil)
+        let zapAll = model.channels   // once per update, not per row
+        return ScrollView {
+            if rows.isEmpty && favorites.isEmpty {
+                EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
+                               text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
+                    .frame(height: 400)
+            }
+            // Favorites are a plain VStack above the lazy rows: a section inserted at the top of a lazy
+            // stack after a ⭐ toggle was not rendered until the view was rebuilt.
+            VStack(alignment: .leading, spacing: Theme.isTV ? 12 : 0) {
+                if !favorites.isEmpty {
+                    sectionHeader(L10n.t("nav_favorites"), icon: "star.fill", id: "live_section_favorites")
+                    let zap = favorites.map(\.channel)
+                    ForEach(favorites) { row in
+                        rowView(row, zap: zap, selectFirst: selectFirst, playing: playing, id: "live_favorite_\(row.channel.id)")
+                    }
+                    if !rows.isEmpty { sectionHeader(L10n.t("live_all_channels"), icon: nil, id: "live_section_all") }
+                }
+                LazyVStack(alignment: .leading, spacing: Theme.isTV ? 12 : 0) {
+                    ForEach(rows) { row in
+                        rowView(row, zap: zapAll, selectFirst: selectFirst, playing: playing, id: "channel_\(row.channel.id)")
+                            .onAppear { model.loadMoreIfNeeded(current: row) }
+                    }
+                }
+            }
+            .padding(.bottom, Theme.isTV ? 60 : 30)
+        }
+        #if os(tvOS)
+        .scrollClipDisabled()
+        .tvTopClipped(leading: 24)   // rows do not slide under the floating tab bar (B-05)
+        .focusSection()
+        #endif
+        .accessibilityIdentifier("live_list")
+    }
+
+    private func rowView(_ row: ChannelRow, zap: [Channel], selectFirst: Bool, playing: String?, id: String) -> some View {
+        let channel = row.channel
+        let selection = selection
+        return LiveChannelRow(row: row, isPlaying: playing == channel.id, selection: selectFirst ? selection : nil,
+                              identifier: id, now: now,
+                              onTap: {
+                                  if selectFirst && selection.channel?.id != channel.id { selection.channel = channel } else { router.play(.channel(channel), channels: zap) }
+                              },
+                              onFocus: { focusSelect(channel) },
+                              onArchive: { archiveChannel = channel },
+                              onGuide: { router.showInGuide(channel) })
+    }
+
+    /// tvOS: the panel follows the focus after 150 ms (fast D-pad runs do not reload it per row).
+    private func focusSelect(_ channel: Channel) {
+        selectTask?.cancel()
+        let selection = selection
+        selectTask = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            if !Task.isCancelled { selection.channel = channel }
+        }
+    }
+
+    private func sectionHeader(_ title: String, icon: String?, id: String) -> some View {
+        HStack(spacing: Theme.isTV ? 12 : 6) {
+            if let icon { Image(systemName: icon).foregroundStyle(Theme.warning) }
+            Text(title).font(Theme.isTV ? Theme.caption.weight(.heavy) : .footnote.weight(.heavy)).textCase(.uppercase)
+                .foregroundStyle(Theme.textSecondary).lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.isTV ? 4 : Theme.safeH)
+        .padding(.top, Theme.isTV ? 16 : 10)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.bg)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// Info panel of the Live list: the selected / focused channel, else the one playing / played last
+/// from this source (iPhone landscape: a tap plays, so the panel follows what was watched), else the
+/// first row.
+private struct LivePanel: View {
+    @Environment(AppEnvironment.self) private var env
+    let selection: LiveSelection
+    let model: LiveTVViewModel
+    let onArchive: (Channel) -> Void
+
+    var body: some View {
+        let sid = env.currentSource?.id
+        let shown = selection.channel ?? watched(sourceId: sid)
+            ?? visibleRows(model.favoriteRows, sourceId: sid).first?.channel
+            ?? visibleRows(model.rows, sourceId: sid).first?.channel
+        GuidePanel(channel: shown, zapList: model.channels, onArchive: onArchive, liveActions: true, identifier: "live_info_panel")
+    }
+
+    /// The channel playing now, else the last one played from this source – if the shown list has it.
+    private func watched(sourceId: String?) -> Channel? {
+        guard let sourceId else { return nil }
+        let last = env.settings.lastSession
+        guard let id = env.player.currentChannel?.id ?? (last?.sourceId == sourceId ? last?.channelId : nil) else { return nil }
+        return visibleRows(model.favoriteRows + model.rows, sourceId: sourceId).first { $0.channel.id == id }?.channel
+    }
+}
+
+/// One channel row (~76 pt iOS): number · logo tile · name + quality + ⟲ · NOW (time, title, progress)
+/// · NEXT line · ⭐ (iOS; tvOS: one focus target per row, favorite via long OK / player ▲ card).
+private struct LiveChannelRow: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let row: ChannelRow
+    let isPlaying: Bool
+    /// iPad select-first: the row reads the selection itself (only then); tvOS rows never do.
+    let selection: LiveSelection?
+    let identifier: String
+    let now: Date
+    let onTap: () -> Void
+    let onFocus: () -> Void
+    let onArchive: () -> Void
+    let onGuide: () -> Void
+
+    private var channel: Channel { row.channel }
+    private var isSelected: Bool { selection?.channel?.id == channel.id }
+    /// iPhone/iPad at accessibility text sizes: multi-line layout.
+    private var large: Bool { !Theme.isTV && typeSize.isAccessibilitySize }
+
+    var body: some View {
+        let target = env.favoriteTarget(channel)
+        HStack(spacing: 0) {
+            Button(action: onTap) { label(isFavorite: target.map { env.favorites.isFavorite($0.contentKey) } ?? false) }
+                #if os(tvOS)
+                .buttonStyle(CardButtonStyle(radius: 14, scale: 1.02))
+                #else
+                .buttonStyle(.plain)
+                #endif
+                .contextMenu {
+                    ChannelMenuItems(channel: channel)
+                    if channel.catchup.isAvailable {
+                        Button(action: onArchive) { Label(L10n.t("catchup_title"), systemImage: "clock.arrow.circlepath") }
+                    }
+                    Button(action: onGuide) { Label(L10n.t("live_open_guide"), systemImage: "calendar") }
+                }
+                .accessibilityLabel(accessibilityText)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier(identifier)
+            #if !os(tvOS)
+            if let target {
+                FavoriteButton(target: target, minTapSize: 44)
+                    .foregroundStyle(Theme.textSecondary)
+                    .buttonStyle(.plain)
+                    .padding(.trailing, Theme.safeH - 6)
+            }
+            #endif
+        }
+        .background(isSelected ? Theme.surfaceElevated : Color.clear)
+        .overlay(alignment: .leading) {
+            if isPlaying { Rectangle().fill(Theme.primary).frame(width: 3) }
+        }
+        #if !os(tvOS)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.stroke).frame(height: 0.5).padding(.leading, Theme.safeH + 88) }
+        #endif
+    }
+
+    private var accessibilityText: String {
+        var parts = [channel.name]
+        if isPlaying { parts.append(L10n.t("live_watching")) }
+        if let now = row.nowNext?.now { parts.append(now.title) }
+        if let next = row.nowNext?.next { parts.append(L10n.t("live_next_at", env.timeFormatter.time(next.start), next.title)) }
+        return parts.joined(separator: ", ")
+    }
+
+    private func label(isFavorite: Bool) -> some View {
+        let tile: CGFloat = Theme.isTV ? 84 : 48
+        let now = row.nowNext?.now
+        return RowFocusReporter(onFocus: onFocus) {
+            HStack(alignment: .center, spacing: Theme.isTV ? 20 : 12) {
+                Text(channel.number.map(String.init) ?? "")
+                    .font((Theme.isTV ? Theme.caption : .caption).monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: Theme.isTV ? 56 : 28, alignment: .trailing)
+                ChannelTile(channel: channel, width: tile, height: tile, radius: Theme.isTV ? 12 : 9)
+                VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 2) {
+                    // Accessibility text sizes (IOS-14): the name gets its own lines (not "Das Ers…"), the badges follow.
+                    if large {
+                        Text(channel.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+                            .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: 6) {
+                        if !large {
+                            Text(channel.name).font(Theme.isTV ? Theme.body.weight(.semibold) : .subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                        }
+                        if let q = MediaTags.quality(in: channel.name) {
+                            Text(q).font(.system(size: Theme.isTV ? 15 : 9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.textSecondary, lineWidth: 1))
+                                .fixedSize()
+                        }
+                        if channel.catchup.isAvailable {
+                            Image(systemName: "clock.arrow.circlepath").font(Theme.isTV ? .system(size: 18) : .caption2).foregroundStyle(Theme.textSecondary)
+                                .accessibilityLabel(L10n.t("epg_catchup_available"))   // IOS-18
+                        }
+                        if env.parental.isActive, env.parental.isChannelLocked(channel.id, sourceId: channel.sourceId) { LockMark() }
+                        #if os(tvOS)
+                        if isFavorite { Image(systemName: "star.fill").font(.system(size: 18)).foregroundStyle(Theme.warning) }
+                        #endif
+                        if isPlaying {
+                            Text("● " + L10n.t("live_watching")).font(.system(size: Theme.isTV ? 16 : 10, weight: .heavy))
+                                .foregroundStyle(Theme.live).lineLimit(1).fixedSize()
+                        }
+                    }
+                    if let now {
+                        if large {   // time above the title, the title on up to 3 lines (it was squeezed out, IOS-14)
+                            Text(env.timeFormatter.range(start: now.start, end: now.end))
+                                .font(.caption2.monospacedDigit()).foregroundStyle(Theme.textSecondary).lineLimit(2)
+                            Text(now.title).font(.caption.weight(.medium)).foregroundStyle(Theme.textPrimary)
+                                .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            HStack(spacing: 6) {
+                                Text(env.timeFormatter.range(start: now.start, end: now.end))
+                                    .font((Theme.isTV ? Font.system(size: 20) : .caption2).monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1).fixedSize()
+                                Text(now.title).font(Theme.isTV ? .system(size: 22, weight: .medium) : .caption.weight(.medium))
+                                    .foregroundStyle(Theme.textPrimary).lineLimit(1)
+                            }
+                        }
+                        ProgressBar(value: EpgSchedule.progress(of: now, at: self.now)).frame(maxWidth: Theme.isTV ? 360 : 160).frame(height: Theme.isTV ? 4 : 2.5)
+                    } else {
+                        LText("epg_no_info").font(Theme.isTV ? .system(size: 20) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    }
+                    if let next = row.nowNext?.next {
+                        Text(L10n.t("live_next_at", env.timeFormatter.time(next.start), next.title))
+                            .font(Theme.isTV ? .system(size: 19) : .caption2).foregroundStyle(Theme.textSecondary).lineLimit(large ? 2 : 1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, Theme.isTV ? 12 : Theme.safeH - 12)
+            .padding(.trailing, Theme.isTV ? 16 : 0)
+            .padding(.vertical, Theme.isTV ? 12 : 8)
+            .frame(minHeight: Theme.isTV ? 108 : 76)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+/// Reports focus (tvOS) of the row label to its parent.
+private struct RowFocusReporter<Content: View>: View {
+    @Environment(\.isFocused) private var isFocused
+    let onFocus: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content().onChange(of: isFocused) { _, focused in if focused { onFocus() } }
+    }
+}
+
+/// Chip title: flag + name (+ count).
+@MainActor
+func chipTitle(_ title: String, count: Int?) -> String {
+    let flag = CountryFlag.emoji(for: title).map { "\($0) " } ?? ""
+    return flag + CountryFlag.strippedTitle(title) + (count.map { "  \($0)" } ?? "")
+}
+
+/// Build 18: 🔒 on a listed locked category (show-with-lock mode).
+@MainActor
+func isLockedLiveFilter(_ filter: ChannelFilter, env: AppEnvironment) -> Bool {
+    guard case .category(let id) = filter, let sid = env.currentSource?.id else { return false }
+    return env.parental.showsLock(categoryId: id, kind: .live, sourceId: sid)
+}
+
+/// Build 18: a locked category opens after the PIN.
+@MainActor
+func selectLiveFilter(_ filter: ChannelFilter, model: LiveTVViewModel, router: Router) {
+    if case .category(let id) = filter {
+        router.openCategory(id, kind: .live) { model.filter = filter }
+    } else {
+        model.filter = filter
+    }
+}
+
+#if !os(tvOS)
+/// iOS: sticky horizontal category chips – ★ Favorites · All · favorite categories (⭐) · the rest,
+/// with channel counts. Long press on a category chip: add/remove favorite category; "show hidden".
+private struct LiveCategoryChips: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    @Bindable var model: LiveTVViewModel
+
+    private func isLockedChip(_ filter: ChannelFilter) -> Bool { isLockedLiveFilter(filter, env: env) }
+    private func selectGuarded(_ filter: ChannelFilter) { selectLiveFilter(filter, model: model, router: router) }
+
+    var body: some View {
+        let items = chipItems(model, env: env)
+        let sid = env.currentSource?.id
+        let hiddenCount = sid.map { HiddenStore.shared.count($0) } ?? 0
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        chip(item, index: index)
+                    }
+                    if hiddenCount > 0, let sid {
+                        Button { HiddenStore.shared.showAll(sourceId: sid); model.reload() } label: {
+                            Label(L10n.t("hidden_show_all", String(hiddenCount)), systemImage: "eye")
+                                .font(.subheadline.weight(.medium)).foregroundStyle(Theme.textSecondary)
+                                .padding(.horizontal, 12).frame(minHeight: 36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("live_show_hidden")
+                    }
+                }
+                .padding(.horizontal, Theme.safeH)
+                .padding(.vertical, 8)
+            }
+            .onChange(of: model.filter) { _, filter in
+                if let index = items.firstIndex(where: { $0.id == filter }) { withAnimation { proxy.scrollTo(index, anchor: .center) } }
+            }
+        }
+        .background(Theme.bg)
+        .accessibilityIdentifier("live_category_chips")
+    }
+
+    private func chip(_ item: ChipItem, index: Int) -> some View {
+        let selected = model.filter == item.id
+        return Button { selectGuarded(item.id) } label: {
+            HStack(spacing: 5) {
+                if isLockedChip(item.id) { LockMark() }
+                if item.starred { Image(systemName: "star.fill").font(.caption.weight(.bold)).foregroundStyle(selected ? Color.black : Theme.warning) }
+                Text(item.title).lineLimit(1)
+            }
+            .font(.subheadline.weight(selected ? .semibold : .medium))
+            .foregroundStyle(selected ? Color.black : Theme.textPrimary)
+            .padding(.horizontal, 14).frame(minHeight: 36)
+            .background(Capsule().fill(selected ? Color.white : Theme.surface))
+            .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
+        .id(index)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("live_chip_\(index)")
+    }
+}
+#endif
+
+#if os(tvOS)
+/// tvOS: categories as a left column (vertical list with counts); OK selects, long OK = ⭐ category.
+private struct LiveCategoryColumn: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    @Bindable var model: LiveTVViewModel
+    /// ◀ from the list lands on the selected category (B-13), not the geometrically nearest row.
+    @FocusState private var focusedIndex: Int?
+
+    var body: some View {
+        let items = chipItems(model, env: env)
+        let hiddenCount = env.currentSource.map { HiddenStore.shared.count($0.id) } ?? 0
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    let selected = model.filter == item.id
+                    Button { selectLiveFilter(item.id, model: model, router: router) } label: {
+                        HStack(spacing: 10) {
+                            if isLockedLiveFilter(item.id, env: env) { LockMark() }
+                            if item.starred { Image(systemName: "star.fill").font(.system(size: 20)).foregroundStyle(Theme.warning) }
+                            Text(item.title).lineLimit(2)   // B-16
+                            Spacer(minLength: 0)
+                        }
+                        .font(Theme.caption.weight(selected ? .bold : .medium))
+                        .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
+                        .padding(.horizontal, 20).padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Theme.surfaceElevated : Color.clear))
+                    }
+                    .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+                    .focused($focusedIndex, equals: index)
+                    .contextMenu { CategoryFavoriteMenuItem(filter: item.id) }
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("live_chip_\(index)")
+                }
+                // Last row: bring hidden channels / categories back (long OK on a row hides them).
+                if hiddenCount > 0, let sid = env.currentSource?.id {
+                    Button { HiddenStore.shared.showAll(sourceId: sid); model.reload() } label: {
+                        Label(L10n.t("hidden_show_all", String(hiddenCount)), systemImage: "eye")
+                            .font(Theme.caption.weight(.medium)).foregroundStyle(Theme.textSecondary)
+                            .padding(.horizontal, 20).padding(.vertical, 14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+                    .accessibilityIdentifier("live_show_hidden")
+                }
+            }
+            .padding(.vertical, 20)
+        }
+        .scrollClipDisabled()
+        .tvTopClipped()
+        .focusSection()
+        .defaultFocus($focusedIndex, items.firstIndex { $0.id == model.filter } ?? 0, priority: .userInitiated)
+        .accessibilityIdentifier("live_category_chips")
+    }
+}
+#endif
+
+private struct ChipItem {
+    let id: ChannelFilter
+    let title: String
+    let starred: Bool
+}
+
+/// ★ Favorites · All · favorite categories · other categories (hidden ones removed), with counts.
+@MainActor
+private func chipItems(_ model: LiveTVViewModel, env: AppEnvironment) -> [ChipItem] {
+    let items = channelFilters(model, env: env).map { item in
+        switch item.id {
+        case .favorites: return ChipItem(id: .favorites, title: chipTitle(item.title, count: model.favoriteCount), starred: true)
+        case .all: return ChipItem(id: .all, title: chipTitle(item.title, count: model.allCount), starred: false)
+        case .category(let id):
+            return ChipItem(id: item.id, title: chipTitle(item.title, count: model.categoryCounts[id]), starred: isStarred(item.id, env: env))
+        }
+    }
+    return items.filter { $0.id == .favorites } + items.filter { $0.id != .favorites }
+}
+
+/// Long press on a category chip: ⭐ add/remove the category (per source, this device only).
+private struct CategoryFavoriteMenuItem: View {
+    @Environment(AppEnvironment.self) private var env
+    let filter: ChannelFilter
+
+    var body: some View {
+        if case .category(let categoryId) = filter, let sid = env.currentSource?.id {
+            let on = env.favorites.isFavoriteCategory(sourceId: sid, categoryId: categoryId)
+            Button { env.favorites.toggleCategory(sourceId: sid, categoryId: categoryId) } label: {
+                Label(L10n.t(on ? "fav_category_remove" : "fav_category_add"), systemImage: on ? "star.slash" : "star")
+            }
+        }
+    }
+}
+
+/// TV guide (SCREENS §3.4): category chips + EPG list; iPad / Apple TV add the "Now on air" + "Today" panel.
+struct GuideView: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    #if !os(tvOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+    @State private var model: LiveTVViewModel?
+    @State private var selected: Channel?
+    @State private var archiveChannel: Channel?
+    /// Row the EPG list scrolls to ("Show in TV guide").
+    @State private var scrollTarget: String?
+    /// tvOS: the focused programme block – the panel describes it (B-09).
+    @State private var focusedProgram: EpgProgram?
+    /// Build 18 day picker: days of the source (yesterday / catch-up depth … +6) and the selected one (0 = today).
+    @State private var days: [GuideDay] = []
+    @State private var dayOffset = 0
+    /// "Jetzt": bumped to scroll back to the airing programme even when today is already selected.
+    @State private var jumpToken = 0
+    /// Programme detail sheet (Jetzt ansehen · Von Anfang an / Aufnahme · Erinnern).
+    @State private var detail: ProgramSelection?
+
+    private var showsPanel: Bool {
+        #if os(tvOS)
+        true
+        #else
+        sizeClass == .regular
+        #endif
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let model {
+                let rows = visibleRows(model.rows, sourceId: env.currentSource?.id)
+                ChipBar(items: channelFilters(model, env: env),
+                        selection: Binding(get: { model.filter }, set: { filter in
+                            // A locked category (show-with-lock mode) opens after the PIN.
+                            if case .category(let id) = filter {
+                                router.openCategory(id, kind: .live) { model.filter = filter }
+                            } else {
+                                model.filter = filter
+                            }
+                        }),
+                        showFlags: true, leadingIcon: { guideChipIcon($0) }, identifierPrefix: "guide_filter")
+                    .padding(.bottom, Theme.isTV ? 0 : 4)
+                GuideDayBar(days: days, selection: $dayOffset) {
+                    days = env.guideDays()
+                    dayOffset = 0
+                    jumpToken += 1
+                }
+                .padding(.bottom, Theme.isTV ? 4 : 8)
+                if rows.isEmpty {
+                    EmptyStateView(icon: model.filter == .favorites ? "star" : "tv",
+                                   text: L10n.t(model.filter == .favorites ? "favorites_empty" : "live_empty"))
+                } else {
+                    HStack(alignment: .top, spacing: Theme.isTV ? 30 : 16) {
+                        EpgListView(rows: rows, zapList: model.channels,
+                                    onSelect: showsPanel ? { selected = $0 } : nil,
+                                    onProgramFocus: Theme.isTV ? { selected = $0; focusedProgram = $1 } : nil,
+                                    scrollTarget: scrollTarget,
+                                    day: currentDay, jumpToken: jumpToken,
+                                    onProgramDetail: { detail = ProgramSelection(channel: $0, program: $1) }) { model.loadMoreIfNeeded(current: $0) }
+                        if showsPanel {
+                            GuidePanel(channel: selected ?? rows.first?.channel, zapList: model.channels,
+                                       onArchive: { archiveChannel = $0 }, focusedProgram: focusedProgram)
+                                .frame(width: Theme.isTV ? 520 : 320)
+                                .padding(.trailing, Theme.safeH)
+                        }
+                    }
+                }
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .screenBackground()
+        .sheet(item: $archiveChannel) { CatchupSheet(channel: $0).environment(env).environment(router) }
+        .sheet(item: $detail) { ProgramDetailSheet(selection: $0, zapList: model?.channels ?? []).environment(env).environment(router) }
+        .onAppear {
+            if model == nil {
+                let m = LiveTVViewModel(env: env)
+                model = m
+                m.reload()
+            }
+            days = env.guideDays()
+            applyFocusRequest()
+        }
+        .onChange(of: router.guideFocus?.id) { applyFocusRequest() }
+        .onChange(of: env.catalogVersion) {
+            model?.reload()
+            days = env.guideDays()
+        }
+        .onChange(of: env.libraryVersion) { model?.reloadFavorites() }
+        .onChange(of: env.settings.epgTimeZone) { days = env.guideDays() }
+    }
+
+    /// The selected picker day (today until the days are known).
+    private var currentDay: GuideDay? {
+        days.first { $0.offset == dayOffset } ?? days.first { $0.offset == 0 }
+    }
+
+    /// Guide chip mark: 🔒 locked category (show-with-lock mode), ⭐ favorites / favorite categories.
+    private func guideChipIcon(_ filter: ChannelFilter) -> String? {
+        if case .category(let id) = filter, let sid = env.currentSource?.id, env.parental.showsLock(categoryId: id, kind: .live, sourceId: sid) {
+            return "lock.fill"
+        }
+        return isStarred(filter, env: env) ? "star.fill" : nil
+    }
+
+    /// Live → "Show in TV guide": the channel's category (or All), its row loaded, scrolled to and in the panel.
+    private func applyFocusRequest() {
+        guard let channel = router.guideFocus, let model else { return }
+        router.guideFocus = nil
+        dayOffset = 0
+        let filter = channel.categoryId.map(ChannelFilter.category) ?? .all
+        if model.filter != filter { model.filter = filter }
+        if !model.reveal(channelId: channel.id), filter != .all {
+            model.filter = .all
+            model.reveal(channelId: channel.id)
+        }
+        selected = channel
+        scrollTarget = nil
+        Task { @MainActor in scrollTarget = channel.id }   // after the rows are laid out
+    }
+}
+
+/// Side panel: "Now on air" + "Today" upcoming programmes of the selected channel.
+private struct GuidePanel: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    let channel: Channel?
+    let zapList: [Channel]
+    let onArchive: (Channel) -> Void
+    /// tvOS guide: the focused block; a past / future programme is described instead of the one on air (B-09).
+    var focusedProgram: EpgProgram? = nil
+    /// Live list panel: ▶ Play · ⭐ · Guide · ⟲ (iOS; tvOS keeps one focus target per list row).
+    var liveActions = false
+    var identifier = "guide_panel"
+
+    var body: some View {
+        // Re-rendered every minute: "Now on air" and "Today" follow the clock while the panel stays open (B10).
+        TimelineView(.everyMinute) { context in content(now: context.date) }
+    }
+
+    @ViewBuilder
+    private func content(now: Date) -> some View {
+        let programs = channel.map(load) ?? []
+        let onAir = programs.first { $0.isOnAir(at: now) }
+        // The focused block of this channel when it is not the one on air: "Later" / "Earlier".
+        let other = focusedProgram.flatMap { p in
+            p.channelEpgId.lowercased() == channel?.epgId?.lowercased() && !p.isOnAir(at: now) ? p : nil
+        }
+        let current = other ?? onAir
+        let upcoming = programs.filter { $0.start > (other.map { max($0.end, now) } ?? now) }.prefix(Theme.isTV ? 6 : 10)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.isTV ? 18 : 12) {
+                header(other.map { $0.start > now ? "epg_later" : "epg_earlier" } ?? "epg_now_on_air")
+                if let channel {
+                    HStack(spacing: 12) {
+                        ChannelTile(channel: channel, width: Theme.isTV ? 96 : 56, height: Theme.isTV ? 96 : 56, radius: 10)
+                        Text(channel.name).font(Theme.isTV ? Theme.headline : .headline).foregroundStyle(Theme.textPrimary).lineLimit(2)
+                    }
+                    if let current {
+                        Text(current.title).font(Theme.isTV ? Theme.body.weight(.bold) : .subheadline.weight(.bold)).foregroundStyle(Theme.textPrimary)
+                        Text(env.timeFormatter.range(start: current.start, end: current.end))
+                            .font(Theme.isTV ? Theme.caption : .caption).foregroundStyle(Theme.textSecondary)
+                        if other == nil { ProgressBar(value: EpgSchedule.progress(of: current, at: now)).frame(height: 4) }
+                        if let d = current.description {
+                            Text(d).font(Theme.isTV ? .system(size: 22) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(4)
+                        }
+                    } else {
+                        LText("epg_no_info").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                    #if !os(tvOS)
+                    HStack(spacing: 10) {
+                        Button { router.play(.channel(channel), channels: zapList) } label: { Label(L10n.t("action_play"), systemImage: "play.fill") }
+                            .buttonStyle(WhitePillButtonStyle())
+                            .accessibilityIdentifier(liveActions ? "live_panel_play" : "guide_play")
+                        if liveActions, let target = env.favoriteTarget(channel) {
+                            FavoriteButton(target: target).buttonStyle(RoundIconButtonStyle(size: 40))
+                        }
+                        if liveActions {
+                            Button { router.section = .guide } label: { Image(systemName: "calendar") }
+                                .buttonStyle(RoundIconButtonStyle(size: 40))
+                                .accessibilityLabel(L10n.t("live_open_guide"))
+                                .accessibilityIdentifier("live_panel_guide")
+                        }
+                        if channel.catchup.isAvailable {
+                            Button { onArchive(channel) } label: { Image(systemName: "clock.arrow.circlepath") }
+                                .buttonStyle(RoundIconButtonStyle(size: 40))
+                                .accessibilityLabel(L10n.t("catchup_title"))
+                                .accessibilityIdentifier("guide_archive")
+                        }
+                    }
+                    #endif
+                    if !upcoming.isEmpty {
+                        header("epg_today").padding(.top, 8)
+                        ForEach(Array(upcoming), id: \.start) { p in
+                            HStack(alignment: .top, spacing: 12) {
+                                Text(env.timeFormatter.time(p.start)).font((Theme.isTV ? Theme.caption : .footnote).monospacedDigit().weight(.semibold))
+                                    .foregroundStyle(Theme.textPrimary).lineLimit(1).fixedSize().frame(minWidth: Theme.isTV ? 120 : 52, alignment: .leading)
+                                Text(p.title).font(Theme.isTV ? Theme.caption : .footnote).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                                Spacer(minLength: 4)
+                                Text(L10n.t("minutes_short", String(Int(p.duration / 60))))
+                                    .font(Theme.isTV ? .system(size: 20) : .caption2).foregroundStyle(Theme.textSecondary)
+                            }
+                            .padding(Theme.isTV ? 14 : 10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceElevated.opacity(0.6)))
+                        }
+                    }
+                }
+            }
+            .padding(Theme.isTV ? 28 : 16)
+        }
+        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+        // The "Today" rows stay inside the card (tvOS drew the last ones below it, B-10).
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func header(_ key: String) -> some View {
+        HStack(spacing: 8) {
+            Capsule().fill(Theme.primary).frame(width: 4, height: Theme.isTV ? 26 : 16)
+            LText(key).font((Theme.isTV ? Theme.caption : .caption).weight(.heavy)).textCase(.uppercase).foregroundStyle(Theme.textPrimary)
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func load(_ channel: Channel) -> [EpgProgram] {
+        guard let epgId = channel.epgId else { return [] }
+        // Around the focused programme (another day of the picker) or now.
+        let ref = focusedProgram.map { max($0.start, Date().addingTimeInterval(-4 * 3600)) } ?? Date()
+        return (try? env.epg.programs(sourceId: channel.sourceId, epgId: epgId,
+                                      in: DateInterval(start: ref.addingTimeInterval(-4 * 3600), duration: 28 * 3600))) ?? []
+    }
+}
+
+/// Catch-up archive (SCREENS §3.4): past programmes per day; replay via the Xtream timeshift URL.
+struct CatchupSheet: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    @Environment(\.dismiss) private var dismiss
+    let channel: Channel
+
+    var body: some View {
+        let days = days()
+        let canReplay = replayURL(for: nil) != nil
+        NavigationStack {
+            List {
+                if !canReplay {
+                    LText("catchup_unavailable").font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                        .listRowBackground(Theme.surface)
+                }
+                if days.allSatisfy({ $0.programs.isEmpty }) {
+                    LText("catchup_empty").foregroundStyle(Theme.textSecondary).listRowBackground(Theme.surface)
+                }
+                ForEach(days, id: \.day) { day in
+                    if !day.programs.isEmpty {
+                        Section {
+                            ForEach(day.programs, id: \.start) { p in row(p, canReplay: canReplay) }
+                        } header: {
+                            Text(day.day.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(L10n.locale)))
+                                .font((Theme.isTV ? Theme.caption : .subheadline).weight(.bold)).foregroundStyle(Theme.primary)
+                                .textCase(nil)
+                        }
+                    }
+                }
+            }
+            .hiddenListBackground()
+            .screenBackground()
+            .navigationTitle(L10n.t("catchup_title"))
+            #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel(L10n.t("action_close"))
+                }
+            }
+            #endif
+        }
+        .accessibilityIdentifier("catchup_sheet")
+    }
+
+    @ViewBuilder
+    private func row(_ p: EpgProgram, canReplay: Bool) -> some View {
+        let onAir = p.isOnAir(at: Date())
+        let content = HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(onAir ? "\(env.timeFormatter.time(p.start)) · \(L10n.t("catchup_on_air"))" : env.timeFormatter.time(p.start))
+                    .font((Theme.isTV ? Theme.caption : .caption).weight(.bold).monospacedDigit())
+                    .foregroundStyle(onAir ? Theme.live : Theme.primary)
+                Text(p.title).font(Theme.isTV ? Theme.body.weight(.semibold) : .subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                if let d = p.description {
+                    Text(d).font(Theme.isTV ? .system(size: 21) : .caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            if canReplay {
+                Image(systemName: "play.circle").font(Theme.isTV ? .system(size: 36) : .title2).foregroundStyle(Theme.textPrimary)
+            }
+        }
+        if canReplay, let url = replayURL(for: p) {
+            Button {
+                dismiss()
+                let channel = channel
+                router.playGuarded(channel: channel) { router.play(.url(url, title: "\(channel.name) · \(p.title)")) }
+            } label: { content }
+            .accessibilityLabel("\(L10n.t("catchup_replay")): \(p.title)")
+            .listRowBackground(Theme.surface)
+        } else {
+            content.listRowBackground(Theme.surface)
+        }
+    }
+
+    /// Days of the archive (today first, back to `catchup.days`), past and on-air programmes newest first.
+    private func days() -> [(day: Date, programs: [EpgProgram])] {
+        guard let epgId = channel.epgId else { return [] }
+        let cal = Calendar.current
+        let now = Date()
+        let count = min(max(channel.catchup.days, 1), 7)
+        return (0..<count).compactMap { offset in
+            guard let day = cal.date(byAdding: .day, value: -offset, to: cal.startOfDay(for: now)),
+                  let end = cal.date(byAdding: .day, value: 1, to: day) else { return nil }
+            let programs = (try? env.epg.programs(sourceId: channel.sourceId, epgId: epgId, in: DateInterval(start: day, end: min(end, now)))) ?? []
+            return (day, programs.filter { $0.start <= now }.sorted { $0.start > $1.start })
+        }
+    }
+
+    /// Xtream timeshift / M3U catch-up URL (CONTRACT §4.5, §3.9); nil when the archive cannot be played
+    /// ("" = replay possible, no programme given).
+    private func replayURL(for p: EpgProgram?) -> String? {
+        guard let p else { return env.canReplayArchive(of: channel) ? "" : nil }
+        return env.catchupURL(channel: channel, program: p)
+    }
+}
+
+/// Layout constants of the EPG list.
+private enum EpgMetrics {
+    #if os(tvOS)
+    static let tileWidth: CGFloat = 250
+    static let rowHeight: CGFloat = 112
+    static let rowSpacing: CGFloat = 14
+    static let pointsPerMinute: CGFloat = 8      // 30 min = 240 pt
+    static let axisHeight: CGFloat = 64
+    static let gap: CGFloat = 6
+    #else
+    static let tileWidth: CGFloat = 92
+    static let rowHeight: CGFloat = 56
+    static let rowSpacing: CGFloat = 8
+    static let pointsPerMinute: CGFloat = 4      // 30 min = 120 pt
+    static let axisHeight: CGFloat = 36
+    static let gap: CGFloat = 4
+    #endif
+}
+
+/// iOS/tvOS 18+: exact horizontal offset (focus-driven scrolling on tvOS does not always
+/// re-run the GeometryReader preference); iOS/tvOS 17 rely on the preference only.
+private struct ScrollOffsetObserver: ViewModifier {
+    let onChange: (CGFloat) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, tvOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.x + $0.contentInsets.leading }) { _, x in onChange(x) }
+        } else {
+            content
+        }
+    }
+}
+
+private struct EpgScrollKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// The reinvented EPG list (shared iOS + tvOS). Rows share one horizontal scroll position, so the
+/// time axis stays in sync; the channel tile stays pinned on the left while programmes slide under it.
+struct EpgListView: View {
+    @Environment(AppEnvironment.self) private var env
+    let rows: [ChannelRow]
+    let zapList: [Channel]
+    /// iPad: tile tap selects the channel for the side panel; tvOS: called on focus.
+    var onSelect: ((Channel) -> Void)? = nil
+    /// tvOS: a programme block got the focus (nil programme = "no information" block).
+    var onProgramFocus: ((Channel, EpgProgram?) -> Void)? = nil
+    /// Channel id to scroll to (set → scrolls once).
+    var scrollTarget: String? = nil
+    /// Build 18 day picker: the day shown (nil = the moving window around now, e.g. favorite channels).
+    var day: GuideDay? = nil
+    /// "Jetzt" pressed: scroll back to the airing programme.
+    var jumpToken = 0
+    /// A programme block that is not on air was chosen: the detail sheet (nil = blocks play the channel).
+    var onProgramDetail: ((Channel, EpgProgram) -> Void)? = nil
+    var onRowAppear: (ChannelRow) -> Void = { _ in }
+    @State private var scrollX: CGFloat = 0
+    @State private var now = Date()
+    @State private var timeline = EpgTimeline(now: Date(), tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute)
+    /// Focused programme block (`EpgBlockKey`). Entering the list (▼ from the tab bar / chips) lands on the
+    /// programme airing now in the first row, with the "now" line in view (B-08).
+    @FocusState private var focusedBlock: String?
+
+    var body: some View {
+        ScrollViewReader { hProxy in
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                timeAxis
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: !Theme.isTV) {
+                        LazyVStack(alignment: .leading, spacing: EpgMetrics.rowSpacing) {
+                            ForEach(rows) { row in
+                                EpgRowView(row: row, zapList: zapList, timeline: timeline, scrollX: scrollX, now: now,
+                                           focus: $focusedBlock, onSelect: onSelect, onProgramFocus: onProgramFocus,
+                                           onProgramDetail: onProgramDetail)
+                                    .id(row.id)
+                                    .onAppear { onRowAppear(row) }
+                            }
+                        }
+                        .padding(.top, 4)
+                        .padding(.bottom, Theme.isTV ? 60 : 24)
+                    }
+                    .onChange(of: scrollTarget) { _, id in if let id { proxy.scrollTo(id, anchor: .center) } }
+                    .onAppear { if let scrollTarget { proxy.scrollTo(scrollTarget, anchor: .center) } }
+                }
+                .frame(width: timeline.width)
+                .overlay(alignment: .topLeading) { nowLine }
+            }
+            .padding(.leading, Theme.isTV ? Theme.safeH : Theme.safeH)
+            .background(GeometryReader { g in
+                Color.clear.preference(key: EpgScrollKey.self, value: -g.frame(in: .named("epg_h")).minX)
+            })
+        }
+        .coordinateSpace(name: "epg_h")
+        .onPreferenceChange(EpgScrollKey.self) { value in updateScrollX(value) }
+        .modifier(ScrollOffsetObserver { updateScrollX($0) })
+        .overlay(alignment: .topLeading) { todayLabel }
+        // Build 18: another day → its window, opened at the same clock time; "Jetzt" → today at now.
+        .onAppear {
+            if day != nil { timeline = makeTimeline() }
+            if day.map({ !$0.contains(Date()) }) ?? false { scrollToAnchor(hProxy) }
+        }
+        .onChange(of: day) {
+            now = Date()
+            timeline = makeTimeline()
+            scrollToAnchor(hProxy)
+        }
+        .onChange(of: jumpToken) {
+            now = Date()
+            timeline = makeTimeline()
+            scrollToAnchor(hProxy)
+        }
+        }
+        .defaultFocus($focusedBlock, rows.first.map { EpgBlockKey.now($0.channel.id) }, priority: .userInitiated)
+        // Minute tick on the minute: the now line, the on-air blocks and – every 30 min – the window itself move
+        // with the clock (a guide left open for hours never freezes or runs empty, audit B10).
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(EpgClock.secondsToNextMinute()))
+                guard !Task.isCancelled else { return }
+                now = Date()
+                let moved = timeline.following(now)
+                if moved != timeline { timeline = moved }
+            }
+        }
+    }
+
+    private func makeTimeline() -> EpgTimeline {
+        guard let day else { return EpgTimeline(now: now, tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute) }
+        return EpgTimeline(day: day, now: now, tileWidth: EpgMetrics.tileWidth, pointsPerMinute: EpgMetrics.pointsPerMinute)
+    }
+
+    /// Where the list opens: the anchor (now / same clock time) right after the pinned tile + 20 min.
+    private var anchorX: CGFloat {
+        max(0, timeline.x(timeline.anchor(now: now)) - EpgMetrics.tileWidth - 20 * EpgMetrics.pointsPerMinute)
+    }
+
+    private func scrollToAnchor(_ proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(60))   // after the new window is laid out
+            proxy.scrollTo(EpgListView.anchorId, anchor: .leading)
+        }
+    }
+
+    static let anchorId = "epg_anchor"
+
+    private func updateScrollX(_ value: CGFloat) {
+        let clamped = max(0, value)
+        if abs(clamped - scrollX) > 0.5 { scrollX = clamped }
+    }
+
+    /// "Today" pinned above the tile column.
+    private var todayLabel: some View {
+        Text(day.map { GuideDayBar.title($0, env: env) } ?? L10n.t("epg_today"))
+            .font(Theme.isTV ? Theme.headline : .title3.bold()).foregroundStyle(Theme.textPrimary)
+            .lineLimit(1).minimumScaleFactor(0.6)
+            .accessibilityIdentifier("guide_day_title")
+            .frame(width: EpgMetrics.tileWidth + (Theme.isTV ? 0 : 6), height: EpgMetrics.axisHeight, alignment: .leading)
+            .padding(.leading, Theme.safeH)
+            .background(Theme.bg)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var timeAxis: some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear.frame(width: timeline.width, height: EpgMetrics.axisHeight)
+            // Scroll target of the day picker / "Jetzt" (`scrollToAnchor`).
+            HStack(spacing: 0) {
+                Color.clear.frame(width: anchorX, height: 1)
+                Color.clear.frame(width: 1, height: 1).id(EpgListView.anchorId)
+            }
+            ForEach(timeline.ticks.filter { abs(timeline.x($0) - timeline.x(now)) > (Theme.isTV ? 200 : 100) || $0 < now }
+                        .filter { timeline.x(now) - timeline.x($0) > (Theme.isTV ? 140 : 70) || $0 > now }, id: \.self) { tick in
+                Text(env.timeFormatter.time(tick))
+                    .font(Theme.isTV ? Theme.caption.monospacedDigit() : .footnote.monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(height: EpgMetrics.axisHeight)
+                    .padding(.leading, timeline.x(tick) + 4)
+            }
+            // "now" marker (only when now is in the shown day)
+            if timeline.interval.contains(now) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrowtriangle.down.fill").font(.system(size: Theme.isTV ? 16 : 9))
+                Text(env.timeFormatter.time(now)).font(Theme.isTV ? Theme.caption.weight(.bold).monospacedDigit() : .footnote.weight(.bold).monospacedDigit())
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .padding(.horizontal, 6)
+            .frame(height: EpgMetrics.axisHeight)
+            .background(Theme.bg)
+            .padding(.leading, timeline.x(now) - (Theme.isTV ? 12 : 6))
+            }
+        }
+        .frame(width: timeline.width, height: EpgMetrics.axisHeight, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
+    private var nowLine: some View {
+        let x = timeline.x(now)
+        let rowsHeight = CGFloat(rows.count) * (EpgMetrics.rowHeight + EpgMetrics.rowSpacing) + 4
+        return Rectangle().fill(Theme.live.opacity(0.75)).frame(width: 1.5)
+            .frame(maxHeight: rowsHeight)
+            .padding(.leading, x)
+            .opacity(x - scrollX > EpgMetrics.tileWidth + 4 && timeline.interval.contains(now) ? 1 : 0)
+            .allowsHitTesting(false)
+    }
+}
+
+/// Sleeping until the next full minute (+50 ms): minute ticks of the guide and the Live list.
+enum EpgClock {
+    static func secondsToNextMinute(_ date: Date = Date()) -> Double {
+        60 - date.timeIntervalSince1970.truncatingRemainder(dividingBy: 60) + 0.05
+    }
+}
+
+/// Focus keys of the programme blocks: the on-air block of a channel has a stable key.
+enum EpgBlockKey {
+    static func now(_ channelId: String) -> String { "\(channelId)|now" }
+    static func at(_ channelId: String, _ start: Date) -> String { "\(channelId)|\(Int(start.timeIntervalSince1970))" }
+}
+
+/// One channel of the EPG list.
+private struct EpgRowView: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    let row: ChannelRow
+    let zapList: [Channel]
+    let timeline: EpgTimeline
+    let scrollX: CGFloat
+    let now: Date
+    let focus: FocusState<String?>.Binding
+    var onSelect: ((Channel) -> Void)?
+    var onProgramFocus: ((Channel, EpgProgram?) -> Void)?
+    var onProgramDetail: ((Channel, EpgProgram) -> Void)? = nil
+    @State private var programs: [EpgProgram]?
+
+    private var channel: Channel { row.channel }
+
+    var body: some View {
+        let isFavorite = env.favoriteTarget(channel).map { env.favorites.isFavorite($0.contentKey) } ?? false
+        ZStack(alignment: .topLeading) {
+            blocks(isFavorite: isFavorite)
+            tile(isFavorite: isFavorite)
+                .offset(x: scrollX)
+                .zIndex(1)
+        }
+        .frame(width: timeline.width, height: EpgMetrics.rowHeight, alignment: .topLeading)
+        // catalogVersion also bumps when the background XMLTV load finishes.
+        .task(id: "\(channel.id)|\(timeline.start.timeIntervalSince1970)|\(env.catalogVersion)") { load() }
+    }
+
+    private func load() {
+        guard let epgId = channel.epgId else { programs = []; return }
+        programs = (try? env.epg.programs(sourceId: channel.sourceId, epgId: epgId, in: timeline.interval)) ?? []
+    }
+
+    private func play() {
+        router.play(.channel(channel), channels: zapList)
+    }
+
+    /// Build 18: the programme on air plays the channel (one tap / OK, as before); any other programme opens its
+    /// detail (live · from the start / recording · reminder).
+    private func choose(_ p: EpgProgram?, onAir: Bool) {
+        if !onAir, let p, let onProgramDetail { onProgramDetail(channel, p) } else { play() }
+    }
+
+    @ViewBuilder
+    private func tile(isFavorite: Bool) -> some View {
+        let content = ChannelTile(channel: channel, width: EpgMetrics.tileWidth, height: EpgMetrics.rowHeight)
+            .overlay(alignment: .bottomLeading) {
+                HStack(spacing: 3) {
+                    if isFavorite { Image(systemName: "star.fill").foregroundStyle(Theme.warning) }
+                    if env.parental.isActive, env.parental.isChannelLocked(channel.id, sourceId: channel.sourceId) { LockMark() }
+                    if channel.catchup.isAvailable {
+                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(.white).accessibilityLabel(L10n.t("epg_catchup_available"))
+                    }
+                }
+                .font(.system(size: Theme.isTV ? 18 : 9, weight: .bold))
+                .shadow(color: .black.opacity(0.6), radius: 2)
+                .padding(Theme.isTV ? 8 : 4)
+            }
+            // Mask the gutter left of the tile and the gap right of it while programmes slide under it.
+            .background(alignment: .trailing) {
+                // ×2 on TV: the scroll view adds the system safe-area inset on top of our padding.
+                Theme.bg.frame(width: EpgMetrics.tileWidth + Theme.safeH * (Theme.isTV ? 2 : 1) + EpgMetrics.gap).offset(x: EpgMetrics.gap)
+            }
+        #if os(tvOS)
+        content   // focus lives on the programme blocks (D-pad ◀▶ programmes, ▲▼ channels)
+        #else
+        Button { if let onSelect { onSelect(channel) } else { play() } } label: { content }
+            .buttonStyle(.plain)
+            .accessibilityLabel(channel.name)
+            .accessibilityHint(L10n.t("action_play"))
+            .accessibilityIdentifier("channel_\(channel.id)")
+            .contextMenu { ChannelMenuItems(channel: channel) }
+        #endif
+    }
+
+    @ViewBuilder
+    private func blocks(isFavorite: Bool) -> some View {
+        let visible = (programs ?? []).filter { $0.end > timeline.start && $0.start < timeline.end }
+        ZStack(alignment: .topLeading) {
+            if visible.isEmpty {
+                block(nil, from: 0, to: timeline.width, isFirst: true, isFavorite: isFavorite)
+            } else {
+                ForEach(Array(visible.enumerated()), id: \.element.start) { index, p in
+                    let x0 = timeline.x(p.start)
+                    let x1 = timeline.x(p.end)
+                    if x1 - x0 > 2 {
+                        block(p, from: x0, to: x1, isFirst: index == 0, isFavorite: isFavorite)
+                    }
+                }
+            }
+        }
+    }
+
+    private func block(_ p: EpgProgram?, from x0: CGFloat, to x1: CGFloat, isFirst: Bool, isFavorite: Bool) -> some View {
+        let width = max(0, x1 - x0 - EpgMetrics.gap)
+        // Sticky label: keeps the text readable when the block slides under the pinned tile.
+        let visibleLeft = scrollX + EpgMetrics.tileWidth + EpgMetrics.gap
+        let inset = min(max(0, visibleLeft - x0), max(0, width - (Theme.isTV ? 120 : 56)))
+        // Today the block on air is "now"; another day of the picker has no on-air block (the empty "no information"
+        // block of a channel without EPG counts as on air only today).
+        let onAir = p?.isOnAir(at: now) ?? timeline.interval.contains(now)
+        let isPast = p.map { $0.end <= now } ?? false
+        let elapsed = p.map { CGFloat(EpgSchedule.progress(of: $0, at: now)) } ?? 0
+        // Focus anchor: the block on air (today) or the one at the same clock time (another day) – B-08.
+        let anchor = timeline.anchor(now: now)
+        let isAnchor = p.map { $0.start <= anchor && anchor < $0.end } ?? true
+        let reminded = p.map { env.reminders.contains(sourceId: channel.sourceId, channelId: channel.id, start: $0.start) } ?? false
+        return EpgBlockButton(action: { choose(p, onAir: onAir) }) {
+            EpgBlockLabel(channel: channel, program: p, onAir: onAir, isPast: isPast, elapsed: elapsed,
+                          inset: inset, width: width, timeText: p.map { env.timeFormatter.time($0.start) }, isFirst: isFirst,
+                          hasReminder: reminded,
+                          onFocus: { onSelect?(channel); onProgramFocus?(channel, p) })
+                .frame(width: width, height: EpgMetrics.rowHeight, alignment: .leading)
+        }
+        .focused(focus, equals: isAnchor ? EpgBlockKey.now(channel.id) : EpgBlockKey.at(channel.id, p?.start ?? timeline.start))
+        .contextMenu {
+            if let p, let onProgramDetail {
+                Button { onProgramDetail(channel, p) } label: { Label(L10n.t("program_details"), systemImage: "info.circle") }
+            }
+            ChannelMenuItems(channel: channel)
+        }
+        .accessibilityLabel([channel.name, p?.title ?? L10n.t("epg_no_info"),
+                             p.map { env.timeFormatter.range(start: $0.start, end: $0.end) }].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityIdentifier(onAir ? "epg_now_\(channel.id)" : "epg_block")
+        .padding(.leading, x0)
+    }
+}
+
+/// Programme block button: plain on iOS; on tvOS the block brightens, scales slightly and gets the ring.
+private struct EpgBlockButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button(action: action, label: label)
+            #if os(tvOS)
+            .buttonStyle(CardButtonStyle(radius: 12, scale: 1.03))
+            #else
+            .buttonStyle(.plain)
+            #endif
+    }
+}
+
+private struct EpgBlockLabel: View {
+    @Environment(\.isFocused) private var isFocused
+    let channel: Channel
+    let program: EpgProgram?
+    let onAir: Bool
+    let isPast: Bool
+    let elapsed: CGFloat
+    let inset: CGFloat
+    /// Visible width of the block: short programmes drop the channel name / time instead of overlapping.
+    let width: CGFloat
+    let timeText: String?
+    let isFirst: Bool
+    /// Build 18: a reminder is set for this programme (🔔).
+    var hasReminder = false
+    var onFocus: () -> Void = {}
+
+    /// Room for the text after the sticky inset and the paddings.
+    private var textWidth: CGFloat { width - inset - (Theme.isTV ? 24 : 14) }
+    private var showsChannel: Bool { (onAir || program == nil) && textWidth >= (Theme.isTV ? 320 : 150) }
+    private var showsTime: Bool { timeText != nil && textWidth >= (Theme.isTV ? 110 : 52) }
+
+    var body: some View {
+        let color = Theme.channelColor(channel.name)
+        let radius: CGFloat = Theme.isTV ? 12 : 9
+        // The text is laid out inside the block's width and clipped to it: a 15-min programme never prints its
+        // time or title over the next block ("13:2213:37", IOS-05 / B-11).
+        VStack(alignment: .leading, spacing: Theme.isTV ? 4 : 1) {
+            if showsChannel || showsTime {
+                HStack(spacing: Theme.isTV ? 8 : 4) {
+                    if showsChannel {
+                        Text(channel.name.uppercased()).lineLimit(1)
+                        if let q = MediaTags.quality(in: channel.name) {
+                            Text(q).font(.system(size: Theme.isTV ? 15 : 8, weight: .heavy))
+                                .fixedSize()
+                                .padding(.horizontal, 3)
+                                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.textSecondary, lineWidth: 1))
+                        }
+                    }
+                    if showsTime, let timeText { Text(timeText).monospacedDigit().lineLimit(1).layoutPriority(1) }
+                }
+                .font(Theme.isTV ? .system(size: 20, weight: .semibold) : .system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+            }
+            HStack(spacing: Theme.isTV ? 6 : 3) {
+                if hasReminder {
+                    Image(systemName: "bell.fill").font(.system(size: Theme.isTV ? 18 : 10, weight: .bold)).foregroundStyle(Theme.warning)
+                        .accessibilityLabel(L10n.t("program_reminder_set"))
+                }
+                Text(program?.title ?? L10n.t("epg_no_info"))
+                    .font(Theme.isTV ? .system(size: 27, weight: .semibold) : .system(size: 15, weight: .semibold))
+                    .foregroundStyle(isPast ? Theme.textSecondary : Theme.textPrimary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.leading, inset + (Theme.isTV ? 14 : 8))
+        .padding(.trailing, Theme.isTV ? 10 : 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(onAir ? color.opacity(0.42) : (isPast ? Theme.surface : color.opacity(0.2)))
+                if onAir, program != nil {
+                    GeometryReader { g in
+                        Rectangle().fill(color.opacity(0.38)).frame(width: g.size.width * elapsed)
+                    }
+                }
+                if isFocused {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.white.opacity(0.14))
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .onChange(of: isFocused) { _, focused in if focused { onFocus() } }
+    }
+}

@@ -1,0 +1,31 @@
+{
+  "_note": "VOD name parsing and comparison keys for TMDB matching (CONTRACT §11.2). Hand-written, not produced by tools/gen-vectors.mjs.",
+  "parse": [
+    { "input": "Inception", "title": "Inception", "year": null, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "Dune: Part Two (2024)", "title": "Dune: Part Two", "year": 2024, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "DE | The Matrix (1999) [4K]", "title": "The Matrix", "year": 1999, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "|TR| Ayla (2017)", "title": "Ayla", "year": 2017, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "[EN] Breaking Bad S01E05", "title": "Breaking Bad", "year": null, "yearInBrackets": false, "season": 1, "episode": 5 },
+    { "input": "4K-DE - Oppenheimer 2023", "title": "Oppenheimer", "year": 2023, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "DE: Der Herr der Ringe - Die Gefährten (2001) (DE)", "title": "Der Herr der Ringe - Die Gefährten", "year": 2001, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "Inception.2010.1080p.BluRay.x264", "title": "Inception", "year": 2010, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "Avatar: The Way of Water 2022 1080p WEB-DL", "title": "Avatar: The Way of Water", "year": 2022, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "Blade Runner 2049", "title": "Blade Runner", "year": 2049, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "1917", "title": "1917", "year": null, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "2012 (2009)", "title": "2012", "year": 2009, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "It: Chapter Two (2019)", "title": "It: Chapter Two", "year": 2019, "yearInBrackets": true, "season": null, "episode": null },
+    { "input": "EN - Dark Staffel 2", "title": "Dark", "year": null, "yearInBrackets": false, "season": 2, "episode": null },
+    { "input": "Kurtlar Vadisi 1x05", "title": "Kurtlar Vadisi", "year": null, "yearInBrackets": false, "season": 1, "episode": 5 },
+    { "input": "Babylon Berlin S03", "title": "Babylon Berlin", "year": null, "yearInBrackets": false, "season": 3, "episode": null },
+    { "input": "The Batman HEVC DE", "title": "The Batman", "year": null, "yearInBrackets": false, "season": null, "episode": null },
+    { "input": "  Fast & Furious 7   ", "title": "Fast & Furious 7", "year": null, "yearInBrackets": false, "season": null, "episode": null }
+  ],
+  "compareKey": [
+    { "input": "Der Herr der Ringe: Die Gefährten", "expected": "der herr der ringe die gefahrten" },
+    { "input": "Çakallarla Dans", "expected": "cakallarla dans" },
+    { "input": "Kırmızı Oda", "expected": "kirmizi oda" },
+    { "input": "Fast & Furious 7", "expected": "fast furious 7" },
+    { "input": "WALL·E", "expected": "wall e" },
+    { "input": "Straße", "expected": "strasse" }
+  ]
+}

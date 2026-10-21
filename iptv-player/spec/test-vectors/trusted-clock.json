@@ -1,0 +1,123 @@
+{
+  "_note": "CONTRACT §7.3. expected = trusted now in ms.",
+  "cases": [
+    {
+      "name": "no-state",
+      "state": null,
+      "wallMs": 1000,
+      "monoMs": 50,
+      "bootId": "a",
+      "expected": 1000
+    },
+    {
+      "name": "same-boot-clock-rolled-back",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "wallMs": 5000,
+      "monoMs": 600,
+      "bootId": "a",
+      "expected": 10500
+    },
+    {
+      "name": "same-boot-clock-forward-ignored",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "wallMs": 99999,
+      "monoMs": 600,
+      "bootId": "a",
+      "expected": 10500
+    },
+    {
+      "name": "rebooted-wall-behind",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "wallMs": 5000,
+      "monoMs": 10,
+      "bootId": "b",
+      "expected": 10000
+    },
+    {
+      "name": "rebooted-wall-ahead",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "wallMs": 20000,
+      "monoMs": 10,
+      "bootId": "b",
+      "expected": 20000
+    },
+    {
+      "name": "mono-went-backwards",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "wallMs": 4000,
+      "monoMs": 50,
+      "bootId": "a",
+      "expected": 10000
+    },
+    {
+      "name": "unknown-boot-id",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": ""
+      },
+      "wallMs": 5000,
+      "monoMs": 600,
+      "bootId": "",
+      "expected": 10000
+    }
+  ],
+  "updates": [
+    {
+      "name": "newer-server-time-replaces",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "update": {
+        "serverMs": 20000,
+        "monoMs": 700,
+        "bootId": "a"
+      },
+      "expectedState": {
+        "serverMs": 20000,
+        "monoMs": 700,
+        "bootId": "a"
+      }
+    },
+    {
+      "name": "older-server-time-ignored",
+      "state": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      },
+      "update": {
+        "serverMs": 9000,
+        "monoMs": 700,
+        "bootId": "a"
+      },
+      "expectedState": {
+        "serverMs": 10000,
+        "monoMs": 100,
+        "bootId": "a"
+      }
+    }
+  ]
+}

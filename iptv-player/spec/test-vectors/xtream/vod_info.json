@@ -1,0 +1,24 @@
+{
+  "info": {
+    "name": "Inception",
+    "plot": "Dreams within dreams.",
+    "genre": [
+      "Sci-Fi",
+      " Action "
+    ],
+    "cast": [
+      "Leonardo DiCaprio",
+      "",
+      null,
+      "Elliot Page"
+    ],
+    "director": " Christopher Nolan ",
+    "rating": "8.8",
+    "duration_secs": 8880
+  },
+  "movie_data": {
+    "stream_id": 5001,
+    "name": "Inception",
+    "container_extension": "mkv"
+  }
+}

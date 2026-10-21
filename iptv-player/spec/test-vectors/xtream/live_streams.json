@@ -1,0 +1,45 @@
+[
+  {
+    "num": 1,
+    "name": "TRT 1 HD",
+    "stream_type": "live",
+    "stream_id": 1001,
+    "stream_icon": "http://logo.example.com/trt1.png",
+    "epg_channel_id": "trt1.tr",
+    "added": "1700000000",
+    "category_id": "1",
+    "custom_sid": "",
+    "tv_archive": 1,
+    "direct_source": "",
+    "tv_archive_duration": "7"
+  },
+  {
+    "num": "2",
+    "name": "Kanal D",
+    "stream_type": "live",
+    "stream_id": "1002",
+    "stream_icon": "",
+    "epg_channel_id": null,
+    "added": "1700000001",
+    "category_id": "1",
+    "tv_archive": "0",
+    "tv_archive_duration": 0
+  },
+  {
+    "num": 3,
+    "name": "Broken",
+    "stream_type": "live",
+    "stream_id": null,
+    "category_id": "2"
+  },
+  {
+    "num": null,
+    "name": "beIN Sports 1",
+    "stream_type": "live",
+    "stream_id": 2001,
+    "stream_icon": "http://logo.example.com/bein1.png",
+    "epg_channel_id": "bein1.tr",
+    "category_id": 2,
+    "tv_archive": 0
+  }
+]

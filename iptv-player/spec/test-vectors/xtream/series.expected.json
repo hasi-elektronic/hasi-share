@@ -1,0 +1,38 @@
+[
+  {
+    "id": "7000",
+    "name": "Breaking Bad",
+    "posterUrl": "http://img.example.com/bb.jpg",
+    "categoryId": "20",
+    "plot": "A chemistry teacher turns to crime.",
+    "rating": 9.5,
+    "year": 2008,
+    "cast": "Bryan Cranston, Aaron Paul",
+    "director": null,
+    "genre": "Drama"
+  },
+  {
+    "id": "7100",
+    "name": "Dark",
+    "posterUrl": null,
+    "categoryId": "20",
+    "plot": null,
+    "rating": null,
+    "year": 2017,
+    "cast": null,
+    "director": null,
+    "genre": null
+  },
+  {
+    "id": "7200",
+    "name": "Konuşanlar",
+    "posterUrl": null,
+    "categoryId": "21",
+    "plot": null,
+    "rating": null,
+    "year": 2021,
+    "cast": "Hasan Can Kaya",
+    "director": "Ali Yılmaz",
+    "genre": null
+  }
+]

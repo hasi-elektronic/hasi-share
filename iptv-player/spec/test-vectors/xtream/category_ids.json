@@ -1,0 +1,85 @@
+{
+  "live": [
+    {
+      "num": 1,
+      "name": "TRT 1 HD",
+      "stream_type": "live",
+      "stream_id": 1001,
+      "category_id": "1",
+      "category_ids": [1, 7]
+    },
+    {
+      "num": 2,
+      "name": "Kanal D",
+      "stream_type": "live",
+      "stream_id": 1002,
+      "category_id": null,
+      "category_ids": [7]
+    }
+  ],
+  "vod": [
+    {
+      "num": 1,
+      "name": "Ayla",
+      "stream_type": "movie",
+      "stream_id": 5001,
+      "category_id": "31",
+      "category_ids": [31, 32],
+      "container_extension": "mkv"
+    },
+    {
+      "num": 2,
+      "name": "Babam ve Oğlum",
+      "stream_type": "movie",
+      "stream_id": 5002,
+      "category_id": "",
+      "category_ids": ["32"],
+      "container_extension": "mp4"
+    }
+  ],
+  "series": [
+    {
+      "num": 1,
+      "name": "Kuruluş Osman",
+      "series_id": 9001,
+      "cover": "http://img.example.com/osman.jpg",
+      "releaseDate": "2019-11-20",
+      "rating": "8.1",
+      "category_id": "215",
+      "category_ids": [215, 216]
+    },
+    {
+      "num": 2,
+      "name": "Yalı Çapkını",
+      "series_id": "9002",
+      "category_id": null,
+      "category_ids": [216]
+    },
+    {
+      "num": 3,
+      "name": "The Crown",
+      "series_id": 9003,
+      "category_id": "102",
+      "category_ids": [101, 102]
+    },
+    {
+      "num": 4,
+      "name": "Aşk-ı Memnu",
+      "series_id": 9004,
+      "category_id": "",
+      "category_ids": ["215", 215, null, ""]
+    },
+    {
+      "num": 5,
+      "name": "Der Bergdoktor",
+      "series_id": 9005,
+      "category_id": 102
+    },
+    {
+      "num": 6,
+      "name": "Ohne Kategorie",
+      "series_id": 9006,
+      "category_ids": []
+    }
+  ]
+}

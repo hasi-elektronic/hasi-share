@@ -1,0 +1,11 @@
+{
+  "_note": "DEV/TEST ONLY: public key of the test-only kid \"test-1\" from spec/test-vectors/license-token.json (its private key is public in the repo!). Production builds MUST replace this file: node backend/scripts/keygen.mjs --write-clients (see android/README.md).",
+  "keys": {
+    "test-1": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "1mZSl5DlTBlGPZy7C3MOMolrHsu5lPP-LqcXvghmRQI",
+      "y": "bXxHgwdgkp-Xrru35KYQv97qM2OgRRllDuada1qBxBU"
+    }
+  }
+}

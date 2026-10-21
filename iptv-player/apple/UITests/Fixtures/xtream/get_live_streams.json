@@ -1,0 +1,17 @@
+[
+ {
+  "num": 1,
+  "name": "TRT 1 HD",
+  "stream_id": 101,
+  "stream_icon": "http://localhost:8765/redesign/logo-anka.png",
+  "category_id": "1",
+  "epg_channel_id": "trt1"
+ },
+ {
+  "num": 2,
+  "name": "Disney Junior",
+  "stream_id": 102,
+  "stream_icon": "http://localhost:8765/redesign/logo-kids.png",
+  "category_id": "2"
+ }
+]

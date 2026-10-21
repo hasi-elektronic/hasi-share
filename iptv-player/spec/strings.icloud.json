@@ -1,0 +1,65 @@
+{
+ "_note": "Build 17 iCloud sync (Apple only). Merged with strings.json by spec/tools/gen-strings.mjs.",
+ "strings": {
+  "icloud_section": {
+   "en": "iCloud",
+   "tr": "iCloud",
+   "de": "iCloud"
+  },
+  "icloud_sync_toggle": {
+   "en": "Sync with iCloud",
+   "tr": "iCloud ile eşitle",
+   "de": "Mit iCloud synchronisieren"
+  },
+  "icloud_status_off": {
+   "en": "Off – sources, favorites and progress stay on this device.",
+   "tr": "Kapalı – kaynaklar, favoriler ve izleme durumu bu cihazda kalır.",
+   "de": "Aus – Quellen, Favoriten und Fortschritt bleiben auf diesem Gerät."
+  },
+  "icloud_status_no_account": {
+   "en": "No iCloud account – sign in to iCloud in the device settings.",
+   "tr": "iCloud hesabı yok – cihaz ayarlarından iCloud'a giriş yapın.",
+   "de": "Kein iCloud-Account – melden Sie sich in den Geräteeinstellungen bei iCloud an."
+  },
+  "icloud_status_syncing": {
+   "en": "Syncing…",
+   "tr": "Eşitleniyor…",
+   "de": "Wird synchronisiert …"
+  },
+  "icloud_status_synced": {
+   "en": "Up to date · {0}",
+   "tr": "Güncel · {0}",
+   "de": "Aktuell · {0}"
+  },
+  "icloud_status_on": {
+   "en": "On – changes are shared with your other devices.",
+   "tr": "Açık – değişiklikler diğer cihazlarınızla paylaşılır.",
+   "de": "Ein – Änderungen werden mit Ihren anderen Geräten geteilt."
+  },
+  "icloud_status_storage_full": {
+   "en": "iCloud space for this app is full – only the most recent watch progress is synced.",
+   "tr": "Bu uygulamanın iCloud alanı dolu – yalnızca en son izleme durumu eşitlenir.",
+   "de": "Der iCloud-Speicher dieser App ist voll – nur der neueste Fortschritt wird synchronisiert."
+  },
+  "icloud_hint": {
+   "en": "Sources, favorites, watch progress and category settings appear on your iPhone, iPad and Apple TV with the same Apple ID. Server addresses, user names and passwords travel only in iCloud Keychain (end-to-end encrypted). Audio delays stay on each device. The data stays in your iCloud – we have no access to it.",
+   "tr": "Kaynaklar, favoriler, izleme durumu ve kategori ayarları aynı Apple Kimliği ile iPhone, iPad ve Apple TV'nizde görünür. Sunucu adresleri, kullanıcı adları ve şifreler yalnızca iCloud Anahtar Zinciri'nde (uçtan uca şifreli) taşınır. Ses gecikmeleri her cihazda ayrı kalır. Veriler iCloud'unuzda kalır – bizim erişimimiz yoktur.",
+   "de": "Quellen, Favoriten, Fortschritt und Kategorie-Einstellungen erscheinen auf Ihrem iPhone, iPad und Apple TV mit derselben Apple-ID. Serveradressen, Benutzernamen und Passwörter werden nur über den iCloud-Schlüsselbund übertragen (Ende-zu-Ende-verschlüsselt). Tonverzögerungen bleiben auf jedem Gerät. Die Daten bleiben in Ihrer iCloud – wir haben keinen Zugriff darauf."
+  },
+  "source_waiting_keychain": {
+   "en": "Waiting for iCloud Keychain…",
+   "tr": "iCloud Anahtar Zinciri bekleniyor…",
+   "de": "Warten auf den iCloud-Schlüsselbund …"
+  },
+  "source_waiting_keychain_hint": {
+   "en": "This source was added on another device. Its login details arrive through iCloud Keychain – this can take a few minutes. Make sure iCloud Keychain (Passwords) is turned on for your Apple ID on this device.",
+   "tr": "Bu kaynak başka bir cihazda eklendi. Giriş bilgileri iCloud Anahtar Zinciri üzerinden gelir – bu birkaç dakika sürebilir. Bu cihazda Apple Kimliğiniz için iCloud Anahtar Zinciri'nin (Parolalar) açık olduğundan emin olun.",
+   "de": "Diese Quelle wurde auf einem anderen Gerät hinzugefügt. Die Zugangsdaten kommen über den iCloud-Schlüsselbund – das kann einige Minuten dauern. Bitte prüfen Sie, ob der iCloud-Schlüsselbund (Passwörter) für Ihre Apple-ID auf diesem Gerät aktiviert ist."
+  },
+  "about_privacy_icloud": {
+   "en": "No tracking, no ads. With iCloud sync on, your sources, favorites and progress are stored in your own iCloud; login details only in iCloud Keychain.",
+   "tr": "Takip yok, reklam yok. iCloud eşitleme açıkken kaynaklarınız, favorileriniz ve izleme durumunuz kendi iCloud'unuzda; giriş bilgileri yalnızca iCloud Anahtar Zinciri'nde saklanır.",
+   "de": "Kein Tracking, keine Werbung. Mit iCloud-Synchronisierung werden Ihre Quellen, Favoriten und Ihr Fortschritt in Ihrer eigenen iCloud gespeichert, Zugangsdaten nur im iCloud-Schlüsselbund."
+  }
+ }
+}

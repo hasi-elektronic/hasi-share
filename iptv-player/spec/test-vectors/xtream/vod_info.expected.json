@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "file": "vod_info.json",
+      "name": "Inception",
+      "cast": "Leonardo DiCaprio, Elliot Page",
+      "director": "Christopher Nolan",
+      "genre": "Sci-Fi, Action",
+      "durationSec": 8880,
+      "containerExt": "mkv"
+    },
+    {
+      "file": "vod_info_actors.json",
+      "name": "Yerli Film",
+      "cast": "Ayşe Kaya, Mehmet Demir",
+      "director": null,
+      "genre": null,
+      "durationSec": null,
+      "containerExt": null
+    }
+  ]
+}

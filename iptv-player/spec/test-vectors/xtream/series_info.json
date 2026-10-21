@@ -1,0 +1,72 @@
+{
+  "seasons": [
+    {
+      "air_date": "2008-01-20",
+      "episode_count": 2,
+      "id": 1,
+      "name": "Season 1",
+      "overview": "",
+      "season_number": 1,
+      "cover": "http://img.example.com/bb_s1.jpg"
+    }
+  ],
+  "info": {
+    "name": "Breaking Bad",
+    "cover": "http://img.example.com/bb.jpg",
+    "plot": "A chemistry teacher turns to crime.",
+    "releaseDate": "2008-01-20",
+    "rating": "9.5",
+    "category_id": "20",
+    "cast": [
+      "Bryan Cranston",
+      " ",
+      null,
+      "Aaron Paul"
+    ],
+    "director": " Vince Gilligan ",
+    "genre": [
+      "Drama",
+      "Crime"
+    ]
+  },
+  "episodes": {
+    "1": [
+      {
+        "id": "70001",
+        "episode_num": 1,
+        "title": "Breaking Bad - S01E01 - Pilot",
+        "container_extension": "mkv",
+        "info": {
+          "duration_secs": 3480,
+          "duration": "00:58:00",
+          "plot": "Walter White is diagnosed.",
+          "movie_image": "http://img.example.com/bb_e1.jpg"
+        },
+        "season": 1,
+        "custom_sid": "",
+        "added": "1700000000",
+        "direct_source": ""
+      },
+      {
+        "id": "70002",
+        "episode_num": "2",
+        "title": "Breaking Bad - S01E02 - Cat's in the Bag...",
+        "container_extension": "mp4",
+        "info": [],
+        "season": "1"
+      }
+    ],
+    "2": [
+      {
+        "id": "70101",
+        "episode_num": 1,
+        "title": "S02E01",
+        "container_extension": "mkv",
+        "info": {
+          "duration_secs": "2820"
+        },
+        "season": 2
+      }
+    ]
+  }
+}

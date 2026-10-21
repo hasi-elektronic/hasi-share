@@ -1,0 +1,113 @@
+{
+  "identifier": "4F6B6C2E-7D1A-4C59-9E7B-1F2C3D4E5A60",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "6740000001",
+      "localizations": [
+        {
+          "description": "Unlimited playback, pay once.",
+          "displayName": "Premium – lifetime access",
+          "locale": "en_US"
+        },
+        {
+          "description": "Sınırsız oynatma, tek seferlik ödeme.",
+          "displayName": "Premium – kalıcı erişim",
+          "locale": "tr"
+        }
+      ],
+      "productID": "com.hasielektronic.novaplayer.lifetime",
+      "referenceName": "Lifetime",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "0.0",
+      "familyShareable": false,
+      "internalID": "6740000002",
+      "localizations": [
+        {
+          "description": "Free 7-day trial of all playback features.",
+          "displayName": "7-day Trial",
+          "locale": "en_US"
+        },
+        {
+          "description": "Tüm oynatma özelliklerinin 7 günlük ücretsiz denemesi.",
+          "displayName": "7 Günlük Deneme",
+          "locale": "tr"
+        }
+      ],
+      "productID": "com.hasielektronic.novaplayer.trial",
+      "referenceName": "Trial",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": [
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Load Products"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Purchase"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Verification"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Store Sync"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Subscription Status"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Transaction"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Manage Subscriptions Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Refund Request Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  },
+  "appPolicies": {
+    "eula": "",
+    "policies": [
+      {
+        "locale": "en_US",
+        "policyText": "",
+        "policyURL": ""
+      }
+    ]
+  }
+}

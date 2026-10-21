@@ -1,0 +1,298 @@
+{
+  "_note": "CONTRACT \u00a76. Real files generated with ffmpeg 7.1 (spec/test-vectors/media/README.md). Sniff with the first 1024 bytes; url is a fake URL WITHOUT a useful extension so that sniffing is exercised.",
+  "files": [
+    {
+      "file": "sample.ts",
+      "expected": "mpegts"
+    },
+    {
+      "file": "sample_multiaudio.ts",
+      "expected": "mpegts"
+    },
+    {
+      "file": "sample.mp4",
+      "expected": "mp4"
+    },
+    {
+      "file": "sample.mkv",
+      "expected": "mkv"
+    },
+    {
+      "file": "sample.webm",
+      "expected": "webm"
+    },
+    {
+      "file": "sample.flv",
+      "expected": "flv"
+    },
+    {
+      "file": "sample.avi",
+      "expected": "avi"
+    },
+    {
+      "file": "hls/index.m3u8",
+      "expected": "hls"
+    },
+    {
+      "file": "dash/manifest.mpd",
+      "expected": "dash"
+    }
+  ],
+  "urls": [
+    {
+      "url": "rtmp://live.example.com/app/stream",
+      "contentType": null,
+      "expected": "rtmp"
+    },
+    {
+      "url": "rtsp://cam.example.com:554/h264",
+      "contentType": null,
+      "expected": "rtsp"
+    },
+    {
+      "url": "udp://@239.0.0.1:1234",
+      "contentType": null,
+      "expected": "udp"
+    },
+    {
+      "url": "http://x.example.com/live/a/b/1.ts",
+      "contentType": null,
+      "expected": "mpegts"
+    },
+    {
+      "url": "http://x.example.com/live/a/b/1.m3u8?token=1",
+      "contentType": null,
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "application/vnd.apple.mpegurl; charset=utf-8",
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "application/x-mpegURL",
+      "expected": "hls"
+    },
+    {
+      "url": "http://x.example.com/play?id=5",
+      "contentType": "video/MP2T",
+      "expected": "mpegts"
+    },
+    {
+      "url": "http://x.example.com/v/movie.MKV",
+      "contentType": null,
+      "expected": "mkv"
+    },
+    {
+      "url": "http://x.example.com/v/movie.mov",
+      "contentType": null,
+      "expected": "mp4"
+    },
+    {
+      "url": "http://x.example.com/manifest.mpd",
+      "contentType": null,
+      "expected": "dash"
+    },
+    {
+      "url": "http://x.example.com/stream/channel9",
+      "contentType": "application/octet-stream",
+      "expected": "unknown"
+    },
+    {
+      "url": "http://x.example.com/x.m3u8",
+      "contentType": "video/mp2t",
+      "expected": "mpegts",
+      "_why": "content-type beats extension"
+    }
+  ],
+  "support": {
+    "media3": {
+      "hls": true,
+      "dash": true,
+      "mpegts": true,
+      "mp4": true,
+      "mkv": true,
+      "webm": true,
+      "flv": true,
+      "avi": true,
+      "rtmp": false,
+      "rtsp": true,
+      "udp": false,
+      "unknown": true
+    },
+    "avplayer": {
+      "hls": true,
+      "dash": false,
+      "mpegts": false,
+      "mp4": true,
+      "mkv": false,
+      "webm": false,
+      "flv": false,
+      "avi": false,
+      "rtmp": false,
+      "rtsp": false,
+      "udp": false,
+      "unknown": true
+    },
+    "vlckit": {
+      "hls": true,
+      "dash": true,
+      "mpegts": true,
+      "mp4": true,
+      "mkv": true,
+      "webm": true,
+      "flv": true,
+      "avi": true,
+      "rtmp": true,
+      "rtsp": true,
+      "udp": false,
+      "unknown": true
+    }
+  },
+  "appleEngine": {
+    "_why": "CONTRACT §6.1 – Apple apps: AVPlayer first, VLCKit for the rest; 'withoutVlc' = build without VLCKit",
+    "select": {
+      "hls": "avplayer",
+      "dash": "vlckit",
+      "mpegts": "vlckit",
+      "mp4": "avplayer",
+      "mkv": "vlckit",
+      "webm": "vlckit",
+      "flv": "vlckit",
+      "avi": "vlckit",
+      "rtmp": "vlckit",
+      "rtsp": "vlckit",
+      "udp": "error:UnsupportedFormat",
+      "unknown": "avplayer"
+    },
+    "selectWithoutVlc": {
+      "hls": "avplayer",
+      "dash": "error:UnsupportedFormat",
+      "mpegts": "error:UnsupportedFormat",
+      "mp4": "avplayer",
+      "mkv": "error:UnsupportedFormat",
+      "webm": "error:UnsupportedFormat",
+      "flv": "error:UnsupportedFormat",
+      "avi": "error:UnsupportedFormat",
+      "rtmp": "error:UnsupportedFormat",
+      "rtsp": "error:UnsupportedFormat",
+      "udp": "error:UnsupportedFormat",
+      "unknown": "avplayer"
+    },
+    "audioDelay": {
+      "_why": "CONTRACT §6.1 – the content audio delay ≠ 0 → VLCKit (Build 16: the per-device VLC calibration never routes) (AVPlayer has no audio delay); delay 0 → the plain select tables; without VLCKit the delay is ignored",
+      "audioDelayMs": 200,
+      "select": {
+        "hls": "vlckit",
+        "dash": "vlckit",
+        "mpegts": "vlckit",
+        "mp4": "vlckit",
+        "mkv": "vlckit",
+        "webm": "vlckit",
+        "flv": "vlckit",
+        "avi": "vlckit",
+        "rtmp": "vlckit",
+        "rtsp": "vlckit",
+        "udp": "error:UnsupportedFormat",
+        "unknown": "vlckit"
+      },
+      "selectWithoutVlc": {
+        "hls": "avplayer",
+        "dash": "error:UnsupportedFormat",
+        "mpegts": "error:UnsupportedFormat",
+        "mp4": "avplayer",
+        "mkv": "error:UnsupportedFormat",
+        "webm": "error:UnsupportedFormat",
+        "flv": "error:UnsupportedFormat",
+        "avi": "error:UnsupportedFormat",
+        "rtmp": "error:UnsupportedFormat",
+        "rtsp": "error:UnsupportedFormat",
+        "udp": "error:UnsupportedFormat",
+        "unknown": "avplayer"
+      }
+    },
+    "override": {
+      "_why": "CONTRACT §6.1 rule −1 – user override (Settings → Player engine, Apple apps only). 'apple' = AVPlayer only (audio delay ignored, no VLCKit fallback); 'vlc' = VLCKit for everything it plays (without VLCKit: the AVPlayer column). Same result with audioDelayMs 0 and the value below; 'auto' = the tables above.",
+      "audioDelayMs": 200,
+      "apple": {
+        "select": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        },
+        "selectWithoutVlc": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        }
+      },
+      "vlc": {
+        "select": {
+          "hls": "vlckit",
+          "dash": "vlckit",
+          "mpegts": "vlckit",
+          "mp4": "vlckit",
+          "mkv": "vlckit",
+          "webm": "vlckit",
+          "flv": "vlckit",
+          "avi": "vlckit",
+          "rtmp": "vlckit",
+          "rtsp": "vlckit",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "vlckit"
+        },
+        "selectWithoutVlc": {
+          "hls": "avplayer",
+          "dash": "error:UnsupportedFormat",
+          "mpegts": "error:UnsupportedFormat",
+          "mp4": "avplayer",
+          "mkv": "error:UnsupportedFormat",
+          "webm": "error:UnsupportedFormat",
+          "flv": "error:UnsupportedFormat",
+          "avi": "error:UnsupportedFormat",
+          "rtmp": "error:UnsupportedFormat",
+          "rtsp": "error:UnsupportedFormat",
+          "udp": "error:UnsupportedFormat",
+          "unknown": "avplayer"
+        }
+      },
+      "fallback": [
+        { "override": "apple", "engine": "avplayer", "error": "UnsupportedFormat", "expected": null },
+        { "override": "apple", "engine": "avplayer", "error": "UnsupportedCodec", "expected": null },
+        { "override": "vlc", "engine": "avplayer", "error": "UnsupportedFormat", "expected": null },
+        { "override": "vlc", "engine": "vlckit", "error": "UnsupportedCodec", "expected": null }
+      ]
+    },
+    "fallback": [
+      { "engine": "avplayer", "error": "UnsupportedFormat", "expected": "vlckit" },
+      { "engine": "avplayer", "error": "UnsupportedCodec", "expected": "vlckit" },
+      { "engine": "avplayer", "error": "Network", "expected": null },
+      { "engine": "avplayer", "error": "StreamOffline", "expected": null },
+      { "engine": "avplayer", "error": "AccessDenied", "expected": null },
+      { "engine": "avplayer", "error": "Drm", "expected": null },
+      { "engine": "avplayer", "error": "Unknown", "expected": null },
+      { "engine": "vlckit", "error": "UnsupportedFormat", "expected": null },
+      { "engine": "vlckit", "error": "UnsupportedCodec", "expected": null }
+    ]
+  },
+  "_unknown": "unknown => try to play and map the player error"
+}
