@@ -209,3 +209,17 @@ describe("GET /link", () => {
     expect(r.text).not.toContain("<b>1</b>");
   });
 });
+
+describe("GET /privacy", () => {
+  it("serves the German privacy policy as cacheable HTML", async () => {
+    const r = await h.get("/privacy");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/html");
+    expect(r.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(r.text).toContain('<html lang="de">');
+    expect(r.text).toContain("Datenschutzerklärung");
+    expect(r.text).toContain("hguencavdi@gmail.com");
+    expect(r.text).toContain("TMDB");
+    expect(r.text).toContain("pseudonyme");
+  });
+});

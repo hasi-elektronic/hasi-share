@@ -19,6 +19,7 @@ import { Logger, type LogLevel, type LogSink } from "./log";
 import { metadataDetails, metadataMatch, metadataSearch } from "./metadata/handlers";
 import { adminPage } from "./pages/admin";
 import { linkPage } from "./pages/link";
+import { privacyPage } from "./pages/privacy";
 import { pairPage } from "./pages/pair";
 import { pairCreate, pairGetKey, pairPoll, pairPostPayload } from "./pair";
 import { Router } from "./router";
@@ -80,7 +81,8 @@ export function buildRouter(): Router {
     .post("/v1/admin/licenses/:id/restore", adminRestore)
     .get("/pair", pairPage)
     .get("/link", linkPage)
-    .get("/admin", adminPage);
+    .get("/admin", adminPage)
+    .get("/privacy", privacyPage);
 }
 
 export interface WorkerOptions extends Partial<Deps> {
